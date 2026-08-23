@@ -137,6 +137,24 @@ class NotificationService {
     return granted;
   }
 
+  /// Whether reminders can be scheduled to the minute. Only Android 12+ can
+  /// answer no; below that exact alarms need no permission.
+  Future<bool> canScheduleExactly() async {
+    final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
+        _plugin.resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+    return await androidPlugin?.canScheduleExactNotifications() ?? false;
+  }
+
+  /// Opens the system screen that grants exact alarms. There is no in-app
+  /// dialog for this one.
+  Future<void> requestExactAlarms() async {
+    final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
+        _plugin.resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+    await androidPlugin?.requestExactAlarmsPermission();
+  }
+
   Future<bool> areNotificationsEnabled() async {
     final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
         _plugin.resolvePlatformSpecificImplementation<
@@ -145,12 +163,7 @@ class NotificationService {
   }
 
   Future<AndroidScheduleMode> _scheduleMode() async {
-    final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
-        _plugin.resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
-    final bool exact =
-        await androidPlugin?.canScheduleExactNotifications() ?? false;
-    return exact
+    return await canScheduleExactly()
         ? AndroidScheduleMode.exactAllowWhileIdle
         : AndroidScheduleMode.inexactAllowWhileIdle;
   }

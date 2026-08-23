@@ -60,9 +60,7 @@ flutter pub get
 flutter run
 ```
 
-Android is the supported platform. The `web/` and `windows/` folders are left
-over from `flutter create`, but `sqflite` has no desktop or web implementation
-without `sqflite_common_ffi`, so those targets will not run as-is.
+Android is the supported platform.
 
 ```bash
 flutter analyze

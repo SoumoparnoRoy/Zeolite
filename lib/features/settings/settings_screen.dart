@@ -36,6 +36,7 @@ class SettingsScreen extends ConsumerWidget {
     final List<HolidayRun> runs = buildHolidayRuns(holidays);
     final bool folderUsable =
         ref.watch(backupFolderUsableProvider).value ?? false;
+    final bool exactAlarms = ref.watch(exactAlarmsProvider).value ?? true;
     final List<ClassCategory> categories =
         timetable?.categories ?? <ClassCategory>[];
     final List<Subject> subjects = timetable?.subjects ?? <Subject>[];
@@ -323,6 +324,17 @@ class SettingsScreen extends ConsumerWidget {
                                   context, controller, settings, ref)
                               : null,
                         ),
+                        if (settings.classRemindersActive) ...<Widget>[
+                          const Divider(indent: 58),
+                          _Row(
+                            icon: Icons.timer_outlined,
+                            title: 'Exact timing',
+                            value: exactAlarms
+                                ? 'Reminders arrive on the minute'
+                                : 'Off — a reminder can be a few minutes late',
+                            onTap: () => _requestExactAlarms(context, ref),
+                          ),
+                        ],
                         const Divider(indent: 58),
                         _SwitchRow(
                           icon: Icons.edit_calendar_outlined,
@@ -687,6 +699,14 @@ class SettingsScreen extends ConsumerWidget {
         content: Text("Automatic backups go to the app's own folder again."),
       ),
     );
+  }
+
+  /// Android owns the decision, so the app opens the screen and re-reads the
+  /// answer once it closes.
+  Future<void> _requestExactAlarms(BuildContext context, WidgetRef ref) async {
+    await NotificationService.instance.requestExactAlarms();
+    ref.invalidate(exactAlarmsProvider);
+    await ref.read(actionsProvider).refreshNotifications();
   }
 
   Future<void> _addHoliday(BuildContext context, WidgetRef ref) async {

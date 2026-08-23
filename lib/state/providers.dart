@@ -42,6 +42,12 @@ final backupFolderUsableProvider = FutureProvider<bool>((ref) async {
   return BackupFolder().isUsable(uri);
 });
 
+/// Whether class reminders can fire to the minute. Asked when Settings draws,
+/// since the permission is granted on a system screen the app cannot watch.
+final exactAlarmsProvider = FutureProvider<bool>(
+  (ref) => NotificationService.instance.canScheduleExactly(),
+);
+
 final backupServiceProvider = Provider<BackupService>(
   (ref) => BackupService(
     ref.watch(repositoryProvider),
@@ -537,6 +543,10 @@ class TimetableActions {
     await _ref.read(timetableProvider.future);
     await _syncNotifications();
   }
+
+  /// Alarms already in the system keep the mode they were scheduled with, so
+  /// granting exact alarms only takes effect once they are laid down again.
+  Future<void> refreshNotifications() => _syncNotifications();
 
   Future<void> _syncNotifications() async {
     final AppSettings? settings = _ref.read(settingsProvider).value;

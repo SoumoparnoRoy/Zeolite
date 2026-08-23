@@ -19,14 +19,5 @@
 # Collapse the lockfile in GitHub diffs without hiding it from git itself.
 pubspec.lock linguist-generated=true
 
-# ------------------------------------------------------- Language statistics
-# Everything below is host-platform scaffolding emitted by `flutter create`,
-# not application code. Left unmarked it reports as C++/CMake/C/HTML and buries
-# the Dart the project is actually written in.
-# android/ is deliberately NOT marked: its manifest and Gradle files are
-# hand-edited for notifications, and collapsing their diffs would hurt.
-windows/**  linguist-generated=true
-web/**      linguist-generated=true
-
 # Developer tooling rather than shipped source.
 tool/**     linguist-vendored=true

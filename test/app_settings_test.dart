@@ -116,5 +116,21 @@ void main() {
       expect(restored.notificationsEnabled, isTrue);
       expect(restored.inAppAlerts, isTrue);
     });
+
+    test('carries the break, and an older backup restores without one', () {
+      const AppSettings settings = AppSettings(
+        blockMinutes: 50,
+        breakAfterBlock: 4,
+        breakMinutes: 40,
+      );
+      final AppSettings restored = AppSettings.fromJson(settings.toJson());
+      expect(restored.breakAfterBlock, 4);
+      expect(restored.breakMinutes, 40);
+      expect(restored.dayGrid.hasBreak, isTrue);
+
+      final AppSettings older =
+          AppSettings.fromJson(<String, Object?>{'blockMinutes': 50});
+      expect(older.dayGrid.hasBreak, isFalse);
+    });
   });
 }

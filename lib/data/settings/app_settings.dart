@@ -41,6 +41,8 @@ class AppSettings {
     this.dayStartMinutes = 9 * 60,
     this.dayEndMinutes = 17 * 60,
     this.blockMinutes = 0,
+    this.breakAfterBlock = 0,
+    this.breakMinutes = 0,
     this.use24HourTime = false,
     this.themeMode = AppThemeMode.dark,
     this.notificationsEnabled = true,
@@ -77,6 +79,11 @@ class AppSettings {
   final int dayStartMinutes;
   final int dayEndMinutes;
   final int blockMinutes;
+
+  /// A mid-day break, held as the block it follows rather than a clock time so
+  /// it cannot land halfway through a lecture. Zero means no break.
+  final int breakAfterBlock;
+  final int breakMinutes;
 
   final bool use24HourTime;
 
@@ -133,6 +140,8 @@ class AppSettings {
         dayStartMinutes: dayStartMinutes,
         dayEndMinutes: dayEndMinutes,
         blockMinutes: blockMinutes,
+        breakAfterBlock: breakAfterBlock,
+        breakMinutes: breakMinutes,
       );
 
   /// A type only reaches the system tray when the master switch and its own
@@ -181,6 +190,8 @@ class AppSettings {
     int? dayStartMinutes,
     int? dayEndMinutes,
     int? blockMinutes,
+    int? breakAfterBlock,
+    int? breakMinutes,
     bool? use24HourTime,
     AppThemeMode? themeMode,
     bool? notificationsEnabled,
@@ -206,6 +217,8 @@ class AppSettings {
       dayStartMinutes: dayStartMinutes ?? this.dayStartMinutes,
       dayEndMinutes: dayEndMinutes ?? this.dayEndMinutes,
       blockMinutes: blockMinutes ?? this.blockMinutes,
+      breakAfterBlock: breakAfterBlock ?? this.breakAfterBlock,
+      breakMinutes: breakMinutes ?? this.breakMinutes,
       use24HourTime: use24HourTime ?? this.use24HourTime,
       themeMode: themeMode ?? this.themeMode,
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
@@ -239,6 +252,8 @@ class AppSettings {
         'dayStartMinutes': dayStartMinutes,
         'dayEndMinutes': dayEndMinutes,
         'blockMinutes': blockMinutes,
+        'breakAfterBlock': breakAfterBlock,
+        'breakMinutes': breakMinutes,
         'use24HourTime': use24HourTime,
         'themeMode': themeMode.name,
         'notificationsEnabled': notificationsEnabled,
@@ -265,6 +280,8 @@ class AppSettings {
       dayStartMinutes: (json['dayStartMinutes'] as num?)?.toInt() ?? 9 * 60,
       dayEndMinutes: (json['dayEndMinutes'] as num?)?.toInt() ?? 17 * 60,
       blockMinutes: (json['blockMinutes'] as num?)?.toInt() ?? 0,
+      breakAfterBlock: (json['breakAfterBlock'] as num?)?.toInt() ?? 0,
+      breakMinutes: (json['breakMinutes'] as num?)?.toInt() ?? 0,
       use24HourTime: json['use24HourTime'] as bool? ?? false,
       themeMode: AppThemeMode.fromName(json['themeMode'] as String?),
       // Backups written before these existed default to "on", which matches
@@ -293,6 +310,8 @@ class SettingsService {
   static const String _kDayStart = 'ut.dayStartMinutes';
   static const String _kDayEnd = 'ut.dayEndMinutes';
   static const String _kBlockMinutes = 'ut.blockMinutes';
+  static const String _kBreakAfterBlock = 'ut.breakAfterBlock';
+  static const String _kBreakMinutes = 'ut.breakMinutes';
   static const String _k24h = 'ut.use24HourTime';
   static const String _kThemeMode = 'ut.themeMode';
   static const String _kNotificationsEnabled = 'ut.notificationsEnabled';
@@ -325,6 +344,8 @@ class SettingsService {
       dayStartMinutes: await prefs.getInt(_kDayStart) ?? 9 * 60,
       dayEndMinutes: await prefs.getInt(_kDayEnd) ?? 17 * 60,
       blockMinutes: await prefs.getInt(_kBlockMinutes) ?? 0,
+      breakAfterBlock: await prefs.getInt(_kBreakAfterBlock) ?? 0,
+      breakMinutes: await prefs.getInt(_kBreakMinutes) ?? 0,
       use24HourTime: await prefs.getBool(_k24h) ?? false,
       themeMode: AppThemeMode.fromName(await prefs.getString(_kThemeMode)),
       notificationsEnabled:
@@ -366,6 +387,8 @@ class SettingsService {
     await prefs.setInt(_kDayStart, settings.dayStartMinutes);
     await prefs.setInt(_kDayEnd, settings.dayEndMinutes);
     await prefs.setInt(_kBlockMinutes, settings.blockMinutes);
+    await prefs.setInt(_kBreakAfterBlock, settings.breakAfterBlock);
+    await prefs.setInt(_kBreakMinutes, settings.breakMinutes);
     await prefs.setBool(_k24h, settings.use24HourTime);
     await prefs.setString(_kThemeMode, settings.themeMode.name);
     await prefs.setBool(

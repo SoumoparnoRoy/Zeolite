@@ -106,10 +106,96 @@ class DayGridSection extends ConsumerWidget {
                   );
                 },
               ),
+              if (grid.isConfigured) ...<Widget>[
+                const SizedBox(height: AppSpacing.lg),
+                _BreakField(grid: grid, settings: settings),
+              ],
               _GridPreview(grid: grid, use24Hour: use24Hour),
             ],
           ),
         ),
+      ],
+    );
+  }
+}
+
+/// A mid-day break, set as a length plus the block it follows rather than a
+/// clock time, so it can only ever land on a boundary.
+class _BreakField extends ConsumerWidget {
+  const _BreakField({required this.grid, required this.settings});
+
+  final DayGrid grid;
+  final AppSettings settings;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final SettingsController controller = ref.read(settingsProvider.notifier);
+    final int maxAfter = grid.maxBreakAfterBlock;
+    if (maxAfter < 1) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Row(
+          children: <Widget>[
+            const Expanded(
+              child: Text(
+                'Break',
+                style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600),
+              ),
+            ),
+            Text(
+              grid.hasBreak
+                  ? Clock.formatDuration(settings.breakMinutes)
+                  : 'None',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: context.palette.accent,
+                letterSpacing: -0.4,
+              ),
+            ),
+          ],
+        ),
+        Slider(
+          value: settings.breakMinutes.toDouble().clamp(0, 90),
+          max: 90,
+          divisions: 18,
+          label: settings.breakMinutes <= 0
+              ? 'None'
+              : Clock.formatDuration(settings.breakMinutes),
+          onChanged: (double value) {
+            final int minutes = (value / 5).round() * 5;
+            controller.save(
+              settings.copyWith(
+                breakMinutes: minutes,
+                // A length on its own would do nothing, so give it a position.
+                breakAfterBlock: minutes > 0 && settings.breakAfterBlock < 1
+                    ? (maxAfter + 1) ~/ 2
+                    : settings.breakAfterBlock,
+              ),
+            );
+          },
+        ),
+        if (settings.breakMinutes > 0) ...<Widget>[
+          const SizedBox(height: AppSpacing.xs),
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: <Widget>[
+              for (int block = 1; block <= maxAfter; block++)
+                ChoiceChip(
+                  label: Text('After $block'),
+                  selected: settings.breakAfterBlock == block,
+                  onSelected: (_) => controller.save(
+                    settings.copyWith(breakAfterBlock: block),
+                  ),
+                ),
+            ],
+          ),
+        ],
       ],
     );
   }
@@ -144,7 +230,7 @@ class _GridPreview extends StatelessWidget {
           spacing: AppSpacing.xs,
           runSpacing: AppSpacing.xs,
           children: <Widget>[
-            for (int i = 0; i < grid.blockCount; i++)
+            for (int i = 0; i < grid.blockCount; i++) ...<Widget>[
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                 decoration: BoxDecoration(
@@ -161,16 +247,41 @@ class _GridPreview extends StatelessWidget {
                   ),
                 ),
               ),
+              if (grid.hasBreak && i + 1 == grid.breakAfterBlock)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                    border: Border.all(color: context.palette.hairline),
+                  ),
+                  child: Text(
+                    'Break  '
+                    '${Clock.format(grid.breakStartMinutes, use24Hour: use24Hour)}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: context.palette.textTertiary,
+                    ),
+                  ),
+                ),
+            ],
           ],
         ),
         const SizedBox(height: AppSpacing.sm),
         Text(
           <String>[
-            '${grid.blockCount} blocks of '
-                '${Clock.formatDuration(grid.blockMinutes)}',
-            if (grid.leftoverMinutes > 0)
-              '${Clock.formatDuration(grid.leftoverMinutes)} left over at the '
-                  'end',
+            if (grid.tailMinutes > 0)
+              '${grid.blockCount - 1} blocks of '
+                  '${Clock.formatDuration(grid.blockMinutes)}'
+            else
+              '${grid.blockCount} blocks of '
+                  '${Clock.formatDuration(grid.blockMinutes)}',
+            if (grid.tailMinutes > 0)
+              'a last one of ${Clock.formatDuration(grid.tailMinutes)}',
+            if (grid.hasBreak)
+              '${Clock.formatDuration(grid.breakMinutes)} break after '
+                  '${grid.breakAfterBlock}',
           ].join(' · '),
           style: TextStyle(
             fontSize: 12,

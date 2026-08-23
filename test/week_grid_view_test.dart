@@ -75,14 +75,15 @@ void main() {
     await tester.pumpWidget(_app(_fixture()));
     await tester.pumpAndSettle();
 
-    // Nine blocks across seven days, all of them free.
-    expect(find.byIcon(Icons.add_rounded), findsNWidgets(9 * 7));
+    // Nine whole blocks and the short 30-minute tail, across seven days, all
+    // of them free.
+    expect(find.byIcon(Icons.add_rounded), findsNWidgets(10 * 7));
     // The gutter keeps the minutes — without them a sub-hourly block length
     // prints the same label twice in a row.
     expect(find.text('9:00'), findsOneWidget);
     expect(find.text('9:50'), findsOneWidget);
     expect(find.text('3:40'), findsOneWidget);
-    expect(find.text('4:30'), findsNothing);
+    expect(find.text('4:30'), findsOneWidget);
   });
 
   testWidgets('each empty cell opens its own block, not the last one',

@@ -17,6 +17,8 @@ import '../data/models/tag.dart';
 import '../data/settings/app_settings.dart';
 import '../domain/attendance_log.dart';
 import '../domain/attendance_stats.dart';
+import '../domain/attendance_totals_import.dart';
+import '../domain/attendance_totals_ocr.dart';
 import '../domain/day_grid.dart';
 import '../domain/schedule_engine.dart';
 import '../domain/tag_stats.dart';
@@ -752,6 +754,69 @@ class TimetableActions {
 
     await _refresh();
     _undo.arm(before);
+  }
+
+  /// Writes a portal's per-subject figures onto the subjects they name.
+  ///
+  /// Additive in the same way the paste import is: a row the user left out of
+  /// [decisions] is not touched at all, and the whole thing sits under one undo
+  /// snapshot. [TotalsDecision.clearMarks] drops that subject's term marks
+  /// first, for the reason given on [TotalsMatch.overlap].
+  Future<int> importAttendanceTotals(List<TotalsDecision> decisions) async {
+    final TimetableData? data = _ref.read(timetableProvider).value;
+    if (data == null || decisions.isEmpty) return 0;
+
+    final DatabaseSnapshot before = await _repo.snapshot();
+    final AppSettings settings =
+        _ref.read(settingsProvider).value ?? const AppSettings();
+    final List<int> palette = AppColors.subjectPalette;
+
+    int created = 0;
+    for (final TotalsDecision decision in decisions) {
+      final TotalsRow row = decision.row;
+      final int? id = decision.subjectId;
+      if (id == null) {
+        await _repo.insertSubject(
+          Subject(
+            name: row.subject,
+            colorValue:
+                palette[(data.subjects.length + created) % palette.length],
+            priorHeld: row.held,
+            priorAttended: row.attended,
+            expectedTotal: row.expectedTotal,
+          ),
+        );
+        created++;
+        continue;
+      }
+
+      if (decision.clearMarks) {
+        // The window has to match what [AppSettings.countsInTerm] counts, or
+        // the marks the preview weighed are not the marks that go: with no
+        // dates set everything counts, so everything goes.
+        await _repo.clearAttendanceBetween(
+          id,
+          settings.semesterStart ?? DateTime.utc(1970),
+          settings.semesterEnd ?? DateTime.utc(2999),
+        );
+      }
+      final Subject? existing = data.subjects
+          .where((Subject s) => s.id == id)
+          .firstOrNull;
+      // Gone since the preview was built, so there is nothing to write onto.
+      if (existing == null) continue;
+      await _repo.updateSubject(
+        existing.copyWith(
+          priorHeld: row.held,
+          priorAttended: row.attended,
+          expectedTotal: row.expectedTotal,
+        ),
+      );
+    }
+
+    await _refresh();
+    _undo.arm(before);
+    return decisions.length;
   }
 
   /// The first teacher named against the subject anywhere in the paste. A

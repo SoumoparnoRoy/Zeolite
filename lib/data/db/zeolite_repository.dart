@@ -383,6 +383,20 @@ class ZeoliteRepository {
     );
   }
 
+  /// Every mark for one subject between two dates, gone.
+  Future<int> clearAttendanceBetween(
+    int subjectId,
+    DateTime from,
+    DateTime to,
+  ) async {
+    final Database db = await _db;
+    return db.delete(
+      'attendance',
+      where: 'subject_id = ? AND date >= ? AND date <= ?',
+      whereArgs: <Object?>[subjectId, Dates.keyOf(from), Dates.keyOf(to)],
+    );
+  }
+
   /// Marks every unmarked occurrence in one shot — used by "mark all present".
   Future<void> setManyAttendance(List<AttendanceRecord> records) async {
     if (records.isEmpty) return;

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../core/words.dart';
+import '../../domain/attendance_totals_ocr.dart';
 import '../../domain/day_grid.dart';
 import '../../domain/timetable_import.dart';
 import '../../domain/timetable_ocr.dart';
@@ -13,6 +14,7 @@ import '../../state/providers.dart';
 import '../../widgets/common.dart';
 import '../../widgets/gradient_header.dart';
 import '../../widgets/undo_snack.dart';
+import '../subjects/totals_import_screen.dart';
 
 /// Types a whole timetable in one paste instead of twenty trips through the
 /// class sheet.
@@ -67,6 +69,26 @@ class _ImportTimetableScreenState
       if (picked == null) return;
       final List<OcrLine> lines =
           await TextRecognition.readImage(await picked.readAsBytes());
+
+      // Spotted before the timetable parse, which would only fail on it.
+      if (AttendanceTotalsOcr.looksLikeTotals(lines)) {
+        final AttendanceTotals? totals = AttendanceTotalsOcr.read(lines);
+        if (!mounted) return;
+        if (totals == null || totals.rows.isEmpty) {
+          messenger.showSnackBar(const SnackBar(
+            content: Text('That looks like an attendance page, but no course '
+                'rows could be read off it.'),
+          ));
+          return;
+        }
+        await Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => TotalsImportScreen(totals: totals),
+          ),
+        );
+        return;
+      }
+
       final TimetableGrid? grid = TimetableGridReader.read(lines);
       final List<String> read =
           grid == null ? <String>[] : TimetableOcr.toLines(lines, grid);

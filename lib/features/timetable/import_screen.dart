@@ -3,11 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
+import '../../core/words.dart';
 import '../../domain/day_grid.dart';
 import '../../domain/timetable_import.dart';
 import '../../state/providers.dart';
 import '../../widgets/common.dart';
 import '../../widgets/gradient_header.dart';
+import '../../widgets/undo_snack.dart';
 
 /// Types a whole timetable in one paste instead of twenty trips through the
 /// class sheet.
@@ -37,8 +39,18 @@ class _ImportTimetableScreenState
 
   Future<void> _import(TimetableImportResult result) async {
     setState(() => _saving = true);
-    await ref.read(actionsProvider).importTimetable(result);
+    // The screen pops on success, so the offer is raised on the messenger
+    // rather than through this route's context.
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    final TimetableActions actions = ref.read(actionsProvider);
+    final int count = result.classes.length;
+    await actions.importTimetable(result);
     if (mounted) Navigator.of(context).pop();
+    showUndoSnack(
+      messenger,
+      actions,
+      'Added ${Words.plural(count, 'class', 'classes')} to your timetable',
+    );
   }
 
   @override

@@ -19,6 +19,7 @@ import '../../services/notification_service.dart';
 import '../../state/providers.dart';
 import '../../widgets/common.dart';
 import '../../widgets/gradient_header.dart';
+import '../../widgets/undo_snack.dart';
 import '../subjects/class_editor_sheets.dart';
 import '../timetable/import_screen.dart';
 import '../subjects/subjects_screen.dart';
@@ -774,6 +775,8 @@ class SettingsScreen extends ConsumerWidget {
   ) async {
     if (run.ids.isEmpty) return;
 
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+
     if (!run.isSingleDay) {
       final bool? confirmed = await showDialog<bool>(
         context: context,
@@ -801,7 +804,9 @@ class SettingsScreen extends ConsumerWidget {
       if (confirmed != true) return;
     }
 
-    await ref.read(actionsProvider).deleteHolidays(run.ids);
+    final TimetableActions actions = ref.read(actionsProvider);
+    await actions.deleteHolidays(run.ids);
+    showUndoSnack(messenger, actions, '${run.name} removed');
   }
 
   /// Saves through the system dialog so the file lands outside the app's own
@@ -897,6 +902,7 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   Future<void> _reset(BuildContext context, WidgetRef ref) async {
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
     final bool? confirmed = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) => AlertDialog(
@@ -904,7 +910,8 @@ class SettingsScreen extends ConsumerWidget {
         title: const Text('Delete everything?'),
         content: const Text(
           'Every subject, class and attendance mark will be removed. '
-          'Export a backup first if you might want this data back.',
+          'Undo puts it straight back, but only until you change something '
+          'else — export a backup first if you want a copy that keeps.',
           style: TextStyle(height: 1.4),
         ),
         actions: <Widget>[
@@ -922,10 +929,9 @@ class SettingsScreen extends ConsumerWidget {
       ),
     );
     if (confirmed != true) return;
-    await ref.read(actionsProvider).resetEverything();
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('All data deleted')));
+    final TimetableActions actions = ref.read(actionsProvider);
+    await actions.resetEverything();
+    showUndoSnack(messenger, actions, 'All data deleted');
   }
 }
 

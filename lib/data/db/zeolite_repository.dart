@@ -12,6 +12,9 @@ import '../models/subject.dart';
 import '../models/tag.dart';
 import 'app_database.dart';
 
+/// One row per table, exactly as SQLite handed it over.
+typedef DatabaseSnapshot = Map<String, List<Map<String, Object?>>>;
+
 /// Single entry point for all persistence.
 ///
 /// The UI never touches SQL — it asks the repository for typed models, which
@@ -468,4 +471,47 @@ class ZeoliteRepository {
   // ------------------------------------------------------------------- admin
 
   Future<void> clearAll() => _appDb.clearAll();
+
+  /// Every table, parents before children — the order rows have to go back in
+  /// while foreign keys are on.
+  static const List<String> _tables = <String>[
+    'categories',
+    'rooms',
+    'tags',
+    'subjects',
+    'class_slots',
+    'extra_classes',
+    'attendance',
+    'holidays',
+  ];
+
+  Future<DatabaseSnapshot> snapshot() async {
+    final Database db = await _db;
+    final DatabaseSnapshot snapshot = <String, List<Map<String, Object?>>>{};
+    for (final String table in _tables) {
+      snapshot[table] = await db.query(table);
+    }
+    return snapshot;
+  }
+
+  /// Puts [snapshot] back, primary keys and all.
+  ///
+  /// Ids are written verbatim rather than reassigned the way a backup import
+  /// does: these are the same run's own rows, so nothing can collide once the
+  /// tables are empty, and a screen still holding an id keeps working. The
+  /// transaction is so a failure cannot leave the database half restored.
+  Future<void> restore(DatabaseSnapshot snapshot) async {
+    final Database db = await _db;
+    await db.transaction((Transaction txn) async {
+      for (final String table in _tables.reversed) {
+        await txn.delete(table);
+      }
+      for (final String table in _tables) {
+        for (final Map<String, Object?> row
+            in snapshot[table] ?? const <Map<String, Object?>>[]) {
+          await txn.insert(table, row);
+        }
+      }
+    });
+  }
 }

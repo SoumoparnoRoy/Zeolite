@@ -47,6 +47,8 @@ calls. It works on a train with no signal.
   forgot, and alerts when a subject nears its limit. A master switch silences
   all three.
 - **JSON backup** - export to clipboard and file, import to restore.
+- **Undo** - deleting a subject or a class, importing a timetable and marking a
+  whole day all offer Undo until you change something else.
 
 ## Getting started
 

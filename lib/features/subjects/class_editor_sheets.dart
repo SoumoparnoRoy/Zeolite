@@ -17,6 +17,7 @@ import '../../domain/class_clash.dart';
 import '../../domain/day_grid.dart';
 import '../../state/providers.dart';
 import '../../widgets/common.dart';
+import '../../widgets/undo_snack.dart';
 
 // ---------------------------------------------------------------- entry point
 
@@ -2485,8 +2486,7 @@ Future<bool> _confirmDeleteWithMarks(
       title: const Text('Delete the class and its attendance?'),
       content: Text(
         '$subjectName loses this weekly class and the '
-        '${Words.plural(markCount, 'mark')} recorded against it. '
-        'This cannot be undone.',
+        '${Words.plural(markCount, 'mark')} recorded against it.',
         style: const TextStyle(height: 1.4),
       ),
       actions: <Widget>[
@@ -2522,6 +2522,11 @@ Future<void> showSessionOptions(
   final int markCount = slot == null
       ? 0
       : (data?.records ?? <AttendanceRecord>[]).where(slot.covers).length;
+
+  // Grabbed before the sheet opens: every option below pops it first, so the
+  // undo offer has to be raised through something that outlives the route.
+  final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+  final TimetableActions actions = ref.read(actionsProvider);
 
   await showAppSheet<void>(
     context: context,
@@ -2564,9 +2569,13 @@ Future<void> showSessionOptions(
                 'Keeps everything already recorded, but the class no longer appears from ${Dates.formatDayMonth(session.date)} onwards.',
             onTap: () async {
               Navigator.of(context).pop();
-              await ref
-                  .read(actionsProvider)
-                  .endSlotFrom(session.slotId!, session.date);
+              await actions.endSlotFrom(session.slotId!, session.date);
+              showUndoSnack(
+                messenger,
+                actions,
+                '${session.subject.name} stops repeating from '
+                '${Dates.formatDayMonth(session.date)}',
+              );
             },
           ),
           const SizedBox(height: AppSpacing.md),
@@ -2581,7 +2590,12 @@ Future<void> showSessionOptions(
             danger: true,
             onTap: () async {
               Navigator.of(context).pop();
-              await ref.read(actionsProvider).deleteSlot(session.slotId!);
+              await actions.deleteSlot(session.slotId!);
+              showUndoSnack(
+                messenger,
+                actions,
+                'Weekly ${session.subject.name} deleted',
+              );
             },
           ),
           if (markCount > 0) ...<Widget>[
@@ -2601,7 +2615,13 @@ Future<void> showSessionOptions(
                 );
                 if (!confirmed || !context.mounted) return;
                 Navigator.of(context).pop();
-                await ref.read(actionsProvider).deleteSlotAndMarks(slot!);
+                await actions.deleteSlotAndMarks(slot!);
+                showUndoSnack(
+                  messenger,
+                  actions,
+                  'Weekly ${session.subject.name} and its '
+                  '${Words.plural(markCount, 'mark')} deleted',
+                );
               },
             ),
           ],
@@ -2615,9 +2635,12 @@ Future<void> showSessionOptions(
             danger: true,
             onTap: () async {
               Navigator.of(context).pop();
-              await ref
-                  .read(actionsProvider)
-                  .deleteExtraClass(session.extraClassId!);
+              await actions.deleteExtraClass(session.extraClassId!);
+              showUndoSnack(
+                messenger,
+                actions,
+                'One-off ${session.subject.name} deleted',
+              );
             },
           ),
         ],

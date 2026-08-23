@@ -24,6 +24,7 @@ import '../domain/timetable_import.dart';
 import '../services/backup_folder.dart';
 import '../services/backup_service.dart';
 import '../services/notification_service.dart';
+import 'undo.dart';
 
 // ---------------------------------------------------------------- singletons
 
@@ -540,7 +541,12 @@ class TimetableActions {
 
   ZeoliteRepository get _repo => _ref.read(repositoryProvider);
 
+  final UndoStore _undo = UndoStore();
+
   Future<void> _refresh() async {
+    // Every mutation ends here, so this is the one place the pending undo has
+    // to be dropped: restoring it would throw away whatever happened since.
+    _undo.drop();
     _ref.invalidate(timetableProvider);
     await _ref.read(timetableProvider.future);
     await _syncNotifications();
@@ -600,6 +606,21 @@ class TimetableActions {
     }
   }
 
+  // undo ---------------------------------------------------------------------
+
+  int? get pendingUndoToken => _undo.pendingToken;
+
+  /// Puts the database back as it stood before the action [token] belongs to.
+  /// False once that offer has been overtaken, which is what stops a snackbar
+  /// still on screen from undoing something it did not name.
+  Future<bool> undo(int token) async {
+    final DatabaseSnapshot? snapshot = _undo.take(token);
+    if (snapshot == null) return false;
+    await _repo.restore(snapshot);
+    await _refresh();
+    return true;
+  }
+
   // categories -------------------------------------------------------------
 
   Future<int> addCategory(ClassCategory category) async {
@@ -657,8 +678,10 @@ class TimetableActions {
   }
 
   Future<void> deleteSubject(int id) async {
+    final DatabaseSnapshot before = await _repo.snapshot();
     await _repo.deleteSubject(id);
     await _refresh();
+    _undo.arm(before);
   }
 
   // recurring slots --------------------------------------------------------
@@ -673,9 +696,14 @@ class TimetableActions {
   /// A subject already on the timetable is matched by name and reused, so a
   /// second paste extends it rather than creating a twin that would split the
   /// attendance percentage in two.
+  /// Additive, so nothing here destroys data — but ten subjects and twenty-one
+  /// classes arrive in one tap, and taking them back out again is a delete per
+  /// subject. That asymmetry is what the snapshot is for.
   Future<void> importTimetable(TimetableImportResult result) async {
     final TimetableData? data = _ref.read(timetableProvider).value;
     if (data == null || result.classes.isEmpty) return;
+
+    final DatabaseSnapshot before = await _repo.snapshot();
 
     final Map<String, int> idByName = <String, int>{
       for (final Subject subject in data.subjects)
@@ -723,6 +751,7 @@ class TimetableActions {
     }
 
     await _refresh();
+    _undo.arm(before);
   }
 
   /// The first teacher named against the subject anywhere in the paste. A
@@ -748,8 +777,10 @@ class TimetableActions {
   /// so they keep counting and stay reachable in the subject's attendance log,
   /// flagged as orphaned.
   Future<void> deleteSlot(int id) async {
+    final DatabaseSnapshot before = await _repo.snapshot();
     await _repo.deleteSlot(id);
     await _refresh();
+    _undo.arm(before);
   }
 
   /// Deletes the rule *and* the attendance recorded against it — the
@@ -758,6 +789,7 @@ class TimetableActions {
   Future<void> deleteSlotAndMarks(ClassSlot slot) async {
     final int? id = slot.id;
     if (id == null) return;
+    final DatabaseSnapshot before = await _repo.snapshot();
     final List<AttendanceRecord> records =
         _ref.read(timetableProvider).value?.records ?? <AttendanceRecord>[];
     for (final AttendanceRecord record in records) {
@@ -770,12 +802,15 @@ class TimetableActions {
     }
     await _repo.deleteSlot(id);
     await _refresh();
+    _undo.arm(before);
   }
 
   /// Keeps history intact but stops the class recurring from [date] on.
   Future<void> endSlotFrom(int slotId, DateTime date) async {
+    final DatabaseSnapshot before = await _repo.snapshot();
     await _repo.endSlotBefore(slotId, date);
     await _refresh();
+    _undo.arm(before);
   }
 
   // one-off classes --------------------------------------------------------
@@ -795,8 +830,10 @@ class TimetableActions {
   }
 
   Future<void> deleteExtraClass(int id) async {
+    final DatabaseSnapshot before = await _repo.snapshot();
     await _repo.deleteExtraClass(id);
     await _refresh();
+    _undo.arm(before);
   }
 
   // tags --------------------------------------------------------------------
@@ -813,8 +850,10 @@ class TimetableActions {
   }
 
   Future<void> deleteTag(int id) async {
+    final DatabaseSnapshot before = await _repo.snapshot();
     await _repo.deleteTag(id);
     await _refresh();
+    _undo.arm(before);
   }
 
   Future<int> countMarksWithTag(int id) => _repo.countMarksWithTag(id);
@@ -948,8 +987,10 @@ class TimetableActions {
       );
     }
     if (records.isEmpty) return 0;
+    final DatabaseSnapshot before = await _repo.snapshot();
     await _repo.setManyAttendance(records);
     await _refresh();
+    _undo.arm(before);
     return records.length;
   }
 
@@ -969,22 +1010,28 @@ class TimetableActions {
   }
 
   Future<void> deleteHoliday(int id) async {
+    final DatabaseSnapshot before = await _repo.snapshot();
     await _repo.deleteHoliday(id);
     await _refresh();
+    _undo.arm(before);
   }
 
   Future<void> deleteHolidays(List<int> ids) async {
     if (ids.isEmpty) return;
+    final DatabaseSnapshot before = await _repo.snapshot();
     await _repo.deleteHolidays(ids);
     await _refresh();
+    _undo.arm(before);
   }
 
   // admin ------------------------------------------------------------------
 
   Future<void> resetEverything() async {
+    final DatabaseSnapshot before = await _repo.snapshot();
     await _repo.clearAll();
     await NotificationService.instance.cancelAll();
     await _refresh();
+    _undo.arm(before);
   }
 
   Future<void> reloadAfterImport() async {

@@ -10,6 +10,7 @@ import '../../data/settings/app_settings.dart';
 import '../../domain/day_grid.dart';
 import '../../state/providers.dart';
 import '../../widgets/common.dart';
+import '../../widgets/undo_snack.dart';
 
 /// Settings for the shape of the teaching day: when it starts, when it ends and
 /// how long one lecture block runs.
@@ -594,11 +595,14 @@ class TagsSection extends ConsumerWidget {
     Tag tag,
   ) async {
     final int id = tag.id!;
-    final int inUse = await ref.read(actionsProvider).countMarksWithTag(id);
+    final TimetableActions actions = ref.read(actionsProvider);
+    final int inUse = await actions.countMarksWithTag(id);
     if (!context.mounted) return;
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
 
     if (inUse == 0) {
-      await ref.read(actionsProvider).deleteTag(id);
+      await actions.deleteTag(id);
+      showUndoSnack(messenger, actions, '${tag.name} deleted');
       return;
     }
 
@@ -626,7 +630,8 @@ class TagsSection extends ConsumerWidget {
       ),
     );
     if (confirmed != true) return;
-    await ref.read(actionsProvider).deleteTag(id);
+    await actions.deleteTag(id);
+    showUndoSnack(messenger, actions, '${tag.name} deleted');
   }
 }
 

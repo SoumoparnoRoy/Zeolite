@@ -12,6 +12,7 @@ import '../../domain/tag_stats.dart';
 import '../../state/providers.dart';
 import '../../widgets/common.dart';
 import '../../widgets/gradient_header.dart';
+import '../../widgets/undo_snack.dart';
 import '../subjects/attendance_log_screen.dart';
 import '../subjects/class_editor_sheets.dart';
 
@@ -535,13 +536,13 @@ class _SubjectDetail extends ConsumerWidget {
     WidgetRef ref,
     Subject subject,
   ) async {
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
     final bool? confirmed = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) => AlertDialog(
         title: Text('Delete ${subject.name}?'),
         content: const Text(
-          'This also removes its classes and all attendance history. '
-          'This cannot be undone.',
+          'This also removes its classes and all attendance history.',
           style: TextStyle(height: 1.4),
         ),
         actions: <Widget>[
@@ -563,7 +564,9 @@ class _SubjectDetail extends ConsumerWidget {
     if (confirmed != true) return;
     final int? id = subject.id;
     if (id != null) {
-      await ref.read(actionsProvider).deleteSubject(id);
+      final TimetableActions actions = ref.read(actionsProvider);
+      await actions.deleteSubject(id);
+      showUndoSnack(messenger, actions, 'Deleted ${subject.name}');
     }
     if (context.mounted) Navigator.of(context).pop();
   }

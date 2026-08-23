@@ -667,6 +667,9 @@ class AppTheme {
           fontFamily: AppFonts.sans,
           color: isDark ? p.textPrimary : Colors.white,
         ),
+        // The chip is dark in both themes, so Undo takes the light violet even
+        // in light — the light palette's accent is far too dark against it.
+        actionTextColor: isDark ? p.accent : const Color(0xFFA28FFF),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppSpacing.radiusMd),

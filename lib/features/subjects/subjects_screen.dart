@@ -11,6 +11,7 @@ import '../../domain/attendance_stats.dart';
 import '../../state/providers.dart';
 import '../../widgets/common.dart';
 import '../../widgets/gradient_header.dart';
+import '../../widgets/undo_snack.dart';
 import 'class_editor_sheets.dart';
 
 /// Every subject in one place: add, edit, recolour and delete.
@@ -290,7 +291,7 @@ class _SubjectRow extends ConsumerWidget {
     final String message = losses.isEmpty
         ? 'Nothing is recorded against it yet, so nothing else is lost.'
         : '${subject.name} has ${_joinNaturally(losses)}. Deleting the subject '
-            'removes all of it. This cannot be undone.';
+            'removes all of it.';
 
     final bool? confirmed = await showDialog<bool>(
       context: context,
@@ -313,10 +314,9 @@ class _SubjectRow extends ConsumerWidget {
     );
 
     if (confirmed != true) return;
-    await ref.read(actionsProvider).deleteSubject(id);
-    messenger.showSnackBar(
-      SnackBar(content: Text('Deleted ${subject.name}')),
-    );
+    final TimetableActions actions = ref.read(actionsProvider);
+    await actions.deleteSubject(id);
+    showUndoSnack(messenger, actions, 'Deleted ${subject.name}');
   }
 
   /// "a, b and c" — reads like a sentence rather than a list of counts.

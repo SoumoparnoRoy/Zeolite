@@ -16,6 +16,7 @@ import '../../state/providers.dart';
 import '../../widgets/common.dart';
 import '../../widgets/gradient_header.dart';
 import '../../widgets/tag_picker.dart';
+import '../../widgets/undo_snack.dart';
 import '../subjects/class_editor_sheets.dart';
 import '../timetable/week_grid_view.dart';
 import 'session_card.dart';
@@ -287,15 +288,14 @@ class TodayScreen extends ConsumerWidget {
     WidgetRef ref,
     List<ClassSession> sessions,
   ) async {
-    final int count = await ref
-        .read(actionsProvider)
-        .markAll(sessions, AttendanceStatus.present);
-    if (!context.mounted || count == 0) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content:
-            Text('Marked $count ${count == 1 ? 'class' : 'classes'} present'),
-      ),
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    final TimetableActions actions = ref.read(actionsProvider);
+    final int count = await actions.markAll(sessions, AttendanceStatus.present);
+    if (count == 0) return;
+    showUndoSnack(
+      messenger,
+      actions,
+      'Marked $count ${count == 1 ? 'class' : 'classes'} present',
     );
   }
 

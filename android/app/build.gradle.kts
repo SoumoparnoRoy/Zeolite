@@ -53,6 +53,10 @@ android {
             // Null without key.properties, leaving the artifact unsigned so
             // it fails loudly. Debug keys here looked fine and were not.
             signingConfig = signingConfigs.findByName("release")
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 }

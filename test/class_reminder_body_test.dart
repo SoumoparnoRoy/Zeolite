@@ -42,20 +42,20 @@ void main() {
     test('names the time, the room and the teacher', () {
       expect(
         NotificationService.reminderDetailLine(
-          _session(room: 'LT-3', teacher: 'Dr Rao'),
+          _session(room: 'LT-3', teacher: 'Dr A. Example'),
           use24Hour: false,
         ),
-        '9:00 am · LT-3 · Dr Rao',
+        '9:00 am · LT-3 · Dr A. Example',
       );
     });
 
     test('leaves out whatever the class does not have', () {
       expect(
         NotificationService.reminderDetailLine(
-          _session(teacher: 'Dr Rao'),
+          _session(teacher: 'Dr A. Example'),
           use24Hour: false,
         ),
-        '9:00 am · Dr Rao',
+        '9:00 am · Dr A. Example',
       );
       expect(
         NotificationService.reminderDetailLine(

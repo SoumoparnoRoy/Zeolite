@@ -1,4 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Local notifications: reminders before class, the evening nudge and
          attendance alerts. Scheduling survives a reboot. -->
@@ -6,6 +7,15 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!-- ML Kit's telemetry transport declares these so it can upload usage
+         metrics to Google. Text recognition itself runs entirely on-device, so
+         the app asks for neither: no network calls is the product, and a
+         permission on the listing is what google_fonts was turned down for. -->
+    <uses-permission android:name="android.permission.INTERNET"
+        tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"
+        tools:node="remove" />
 
     <application
         android:label="Zeolite"

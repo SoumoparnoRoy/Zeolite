@@ -49,6 +49,9 @@ calls. It works on a train with no signal.
 - **JSON backup** - export to clipboard and file, import to restore.
 - **Undo** - deleting a subject or a class, importing a timetable and marking a
   whole day all offer Undo until you change something else.
+- **Import your timetable** - paste it a line at a time, or read it straight
+  off a screenshot. Everything is shown back as the classes it would create
+  before anything is written.
 
 ## Getting started
 

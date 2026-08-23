@@ -31,6 +31,7 @@ dependencies:
   # plugin, which keeps the Kotlin Gradle Plugin out of the build.
   timezone: ^0.11.1
   file_picker: ^12.0.0
+  google_mlkit_text_recognition: ^0.17.1
   # A folder for the automatic backup has to outlive the dialog that chose it,
   # which is a persisted SAF grant — file_picker hands back a path, not a tree
   # URI it can take permission on. Neither package declares a permission.

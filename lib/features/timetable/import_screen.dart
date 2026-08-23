@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -6,6 +7,8 @@ import '../../core/date_utils.dart';
 import '../../core/words.dart';
 import '../../domain/day_grid.dart';
 import '../../domain/timetable_import.dart';
+import '../../domain/timetable_ocr.dart';
+import '../../services/text_recognition.dart';
 import '../../state/providers.dart';
 import '../../widgets/common.dart';
 import '../../widgets/gradient_header.dart';
@@ -30,6 +33,7 @@ class _ImportTimetableScreenState
     extends ConsumerState<ImportTimetableScreen> {
   final TextEditingController _controller = TextEditingController();
   bool _saving = false;
+  bool _reading = false;
 
   @override
   void dispose() {
@@ -51,6 +55,43 @@ class _ImportTimetableScreenState
       actions,
       'Added ${Words.plural(count, 'class', 'classes')} to your timetable',
     );
+  }
+
+  /// What lands is a first draft: a cell holding parallel electives becomes one
+  /// line per elective, because only the student knows which is theirs.
+  Future<void> _readImage() async {
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    setState(() => _reading = true);
+    try {
+      final PlatformFile? picked = await FilePicker.pickFile();
+      if (picked == null) return;
+      final List<OcrLine> lines =
+          await TextRecognition.readImage(await picked.readAsBytes());
+      final TimetableGrid? grid = TimetableGridReader.read(lines);
+      final List<String> read =
+          grid == null ? <String>[] : TimetableOcr.toLines(lines, grid);
+      if (read.isEmpty) {
+        messenger.showSnackBar(SnackBar(
+          content: Text(grid == null
+              ? 'Could not find a timetable in that image. The weekdays and '
+                  'the period times both have to be readable.'
+              : 'Found the grid, but no classes in it.'),
+        ));
+        return;
+      }
+      if (!mounted) return;
+      setState(() => _controller.text = read.join('\n'));
+      messenger.showSnackBar(SnackBar(
+        content: Text('Read ${Words.plural(read.length, 'line')} — check them '
+            'against the sheet before importing.'),
+      ));
+    } catch (error) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Could not read that image: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _reading = false);
+    }
   }
 
   @override
@@ -83,6 +124,12 @@ class _ImportTimetableScreenState
           sliver: SliverList.list(children: <Widget>[
             _FormatHelp(grid: grid),
             const SizedBox(height: AppSpacing.md),
+            OutlinedButton.icon(
+              onPressed: _reading ? null : _readImage,
+              icon: const Icon(Icons.image_outlined, size: 18),
+              label: Text(_reading ? 'Reading…' : 'Read from an image'),
+            ),
+            const SizedBox(height: AppSpacing.md),
             SurfaceCard(
               child: TextField(
                 controller: _controller,
@@ -97,7 +144,7 @@ class _ImportTimetableScreenState
                 ),
                 decoration: const InputDecoration(
                   border: InputBorder.none,
-                  hintText: 'CSE2039L, Mo, 1-2, B120, DK',
+                  hintText: 'ECE2104L, Mo, 1-2, B415, SM',
                 ),
                 onChanged: (_) => setState(() {}),
               ),

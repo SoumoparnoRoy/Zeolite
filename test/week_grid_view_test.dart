@@ -42,7 +42,7 @@ TimetableData _fixture({List<ClassSlot> slots = const <ClassSlot>[]}) =>
         Subject(
           id: 1,
           name: 'Physics',
-          teacher: 'Dr Rao',
+          teacher: 'Dr A. Example',
           categoryId: 1,
           colorValue: AppColors.defaultSubjectColor,
         ),

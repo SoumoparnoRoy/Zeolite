@@ -17,16 +17,16 @@ TimetableImportResult _parse(String text) =>
 void main() {
   group('a line off the printed sheet', () {
     test('carries subject, day, time, room and teacher', () {
-      final TimetableImportResult result = _parse('CSE3708, Mo, 5, B102, PRG');
+      final TimetableImportResult result = _parse('ECE1102, Mo, 5, B204, RKM');
       expect(result.hasProblems, isFalse);
 
       final ImportedClass c = result.classes.single;
-      expect(c.subjectName, 'CSE3708');
+      expect(c.subjectName, 'ECE1102');
       expect(c.weekday, DateTime.monday);
       expect(c.startMinutes, 12 * 60 + 30);
       expect(c.endMinutes, 13 * 60 + 20);
-      expect(c.room, 'B102');
-      expect(c.teacher, 'PRG');
+      expect(c.room, 'B204');
+      expect(c.teacher, 'RKM');
     });
 
     test('room and teacher are optional', () {
@@ -37,13 +37,13 @@ void main() {
     });
 
     test('a double period spans both blocks', () {
-      final ImportedClass c = _parse('CSE2039L, Mo, 1-2').classes.single;
+      final ImportedClass c = _parse('ECE2104L, Mo, 1-2').classes.single;
       expect(c.startMinutes, 9 * 60 + 10);
       expect(c.endMinutes, 10 * 60 + 50);
     });
 
     test('the short last block imports at its real length', () {
-      final ImportedClass c = _parse('CSE2714, Tu, 9').classes.single;
+      final ImportedClass c = _parse('ECE3311, Tu, 9').classes.single;
       expect(c.startMinutes, 15 * 60 + 50);
       expect(c.endMinutes, 16 * 60 + 30);
     });
@@ -65,35 +65,35 @@ void main() {
 
   group('what the paste can get wrong', () {
     test('a line that is missing a field says so', () {
-      expect(_parse('CSE3708, Mo').problems.single.error,
+      expect(_parse('ECE1102, Mo').problems.single.error,
           contains('at least a subject'));
     });
 
     test('an unrecognised day names the token', () {
-      expect(_parse('CSE3708, Moon, 1').problems.single.error,
+      expect(_parse('ECE1102, Moon, 1').problems.single.error,
           contains('Moon'));
     });
 
     test('a block past the end of the day is refused', () {
-      expect(_parse('CSE3708, Mo, 12').problems.single.error,
+      expect(_parse('ECE1102, Mo, 12').problems.single.error,
           contains('only has 9 blocks'));
     });
 
     test('a backwards range is refused, either way of writing it', () {
-      expect(_parse('CSE3708, Mo, 4-2').problems, hasLength(1));
-      expect(_parse('CSE3708, Mo, 15:20-14:20').problems.single.error,
+      expect(_parse('ECE1102, Mo, 4-2').problems, hasLength(1));
+      expect(_parse('ECE1102, Mo, 15:20-14:20').problems.single.error,
           contains('before it starts'));
     });
 
     test('block numbers need a grid to count against', () {
       final TimetableImportResult result =
-          TimetableImport.parse('CSE3708, Mo, 5', grid: DayGrid.none);
+          TimetableImport.parse('ECE1102, Mo, 5', grid: DayGrid.none);
       expect(result.problems.single.error, contains('no blocks'));
     });
 
     test('a good line is kept even when its neighbour is broken', () {
       final TimetableImportResult result =
-          _parse('CSE3708, Mo, 5\nbroken\nMaths, Tu, 1');
+          _parse('ECE1102, Mo, 5\nbroken\nMaths, Tu, 1');
       expect(result.classes, hasLength(2));
       expect(result.problems, hasLength(1));
       expect(result.hasProblems, isTrue);
@@ -103,7 +103,7 @@ void main() {
   group('two classes that would share an attendance key', () {
     test('the second is refused and points at the first', () {
       final TimetableImportResult result =
-          _parse('CSE3708, Mo, 5\nCSE3708, Mo, 5');
+          _parse('ECE1102, Mo, 5\nECE1102, Mo, 5');
       expect(result.classes, hasLength(1));
       expect(result.problems.single.error, contains('line 1'));
     });
@@ -140,8 +140,8 @@ void main() {
 
     test('rooms are collected once each for the saved list', () {
       final TimetableImportResult result =
-          _parse('A, Mo, 1, B102\nB, Tu, 1, b102\nC, We, 1, LT-3\nD, Th, 1');
-      expect(result.roomNames, <String>['B102', 'LT-3']);
+          _parse('A, Mo, 1, B204\nB, Tu, 1, b204\nC, We, 1, LT-3\nD, Th, 1');
+      expect(result.roomNames, <String>['B204', 'LT-3']);
     });
 
     test('an empty paste is empty rather than broken', () {

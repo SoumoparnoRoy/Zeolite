@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/app_theme.dart';
 import '../core/date_utils.dart';
 import '../data/db/zeolite_repository.dart';
 import '../data/models/attendance_record.dart';
@@ -19,6 +20,7 @@ import '../domain/attendance_stats.dart';
 import '../domain/day_grid.dart';
 import '../domain/schedule_engine.dart';
 import '../domain/tag_stats.dart';
+import '../domain/timetable_import.dart';
 import '../services/backup_folder.dart';
 import '../services/backup_service.dart';
 import '../services/notification_service.dart';
@@ -664,6 +666,74 @@ class TimetableActions {
   Future<void> addSlot(ClassSlot slot) async {
     await _repo.insertSlot(slot);
     await _refresh();
+  }
+
+  /// Writes a parsed paste as subjects and weekly classes.
+  ///
+  /// A subject already on the timetable is matched by name and reused, so a
+  /// second paste extends it rather than creating a twin that would split the
+  /// attendance percentage in two.
+  Future<void> importTimetable(TimetableImportResult result) async {
+    final TimetableData? data = _ref.read(timetableProvider).value;
+    if (data == null || result.classes.isEmpty) return;
+
+    final Map<String, int> idByName = <String, int>{
+      for (final Subject subject in data.subjects)
+        if (subject.id != null) subject.name.trim().toLowerCase(): subject.id!,
+    };
+
+    final List<String> fresh = result.subjectNames
+        .where((String name) => !idByName.containsKey(name.toLowerCase()))
+        .toList();
+
+    final List<int> palette = AppColors.subjectPalette;
+    final List<int> ids = await _repo.insertSubjects(<Subject>[
+      for (int i = 0; i < fresh.length; i++)
+        Subject(
+          name: fresh[i],
+          teacher: _teacherFor(result, fresh[i]),
+          colorValue: palette[(data.subjects.length + i) % palette.length],
+        ),
+    ]);
+    for (int i = 0; i < fresh.length; i++) {
+      idByName[fresh[i].toLowerCase()] = ids[i];
+    }
+
+    final DateTime start =
+        _ref.read(settingsProvider).value?.semesterStart ?? Dates.today();
+
+    await _repo.insertSlots(<ClassSlot>[
+      for (final ImportedClass c in result.classes)
+        ClassSlot(
+          subjectId: idByName[c.subjectKey]!,
+          weekday: c.weekday,
+          startMinutes: c.startMinutes,
+          endMinutes: c.endMinutes,
+          room: c.room,
+          startDate: start,
+        ),
+    ]);
+
+    final Set<String> known =
+        data.rooms.map((Room room) => room.name.toLowerCase()).toSet();
+    for (final String room in result.roomNames) {
+      if (known.add(room.toLowerCase())) {
+        await _repo.insertRoom(Room(name: room));
+      }
+    }
+
+    await _refresh();
+  }
+
+  /// The first teacher named against the subject anywhere in the paste. A
+  /// timetable repeats it on every row, and disagreeing rows are the printer's
+  /// problem rather than something to resolve here.
+  static String? _teacherFor(TimetableImportResult result, String name) {
+    final String key = name.trim().toLowerCase();
+    for (final ImportedClass c in result.classes) {
+      if (c.subjectKey == key && c.teacher != null) return c.teacher;
+    }
+    return null;
   }
 
   Future<void> updateSlot(ClassSlot slot) async {

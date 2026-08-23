@@ -20,6 +20,7 @@ import '../../state/providers.dart';
 import '../../widgets/common.dart';
 import '../../widgets/gradient_header.dart';
 import '../subjects/class_editor_sheets.dart';
+import '../timetable/import_screen.dart';
 import '../subjects/subjects_screen.dart';
 import 'timetable_layout_section.dart';
 
@@ -110,6 +111,21 @@ class SettingsScreen extends ConsumerWidget {
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
                       builder: (BuildContext context) => const SubjectsScreen(),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              SurfaceCard(
+                padding: EdgeInsets.zero,
+                child: _Row(
+                  icon: Icons.playlist_add_rounded,
+                  title: 'Import timetable',
+                  value: 'Paste the whole week at once',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (BuildContext context) =>
+                          const ImportTimetableScreen(),
                     ),
                   ),
                 ),

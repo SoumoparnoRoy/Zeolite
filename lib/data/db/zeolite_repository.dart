@@ -226,6 +226,30 @@ class ZeoliteRepository {
     return rows.map(ClassSlot.fromMap).toList();
   }
 
+  /// Returns the new ids in the order given, which is how an import matches its
+  /// slots back to the subjects it just created.
+  Future<List<int>> insertSubjects(List<Subject> subjects) async {
+    if (subjects.isEmpty) return <int>[];
+    final Database db = await _db;
+    final List<int> ids = <int>[];
+    await db.transaction((Transaction txn) async {
+      for (final Subject subject in subjects) {
+        ids.add(await txn.insert('subjects', subject.toMap()));
+      }
+    });
+    return ids;
+  }
+
+  Future<void> insertSlots(List<ClassSlot> slots) async {
+    if (slots.isEmpty) return;
+    final Database db = await _db;
+    final Batch batch = db.batch();
+    for (final ClassSlot slot in slots) {
+      batch.insert('class_slots', slot.toMap());
+    }
+    await batch.commit(noResult: true);
+  }
+
   Future<int> insertSlot(ClassSlot slot) async {
     final Database db = await _db;
     return db.insert('class_slots', slot.toMap());

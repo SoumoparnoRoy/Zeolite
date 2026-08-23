@@ -60,6 +60,23 @@ class _RecordingActions extends TimetableActions {
   Future<void> addExtraClass(ExtraClass extra) async => extras.add(extra);
 }
 
+/// Captures a saved subject rather than writing it, so the balance the form
+/// built can be read back.
+class _SubjectRecorder extends TimetableActions {
+  _SubjectRecorder(super.ref, {required this.saved});
+
+  final List<Subject> saved;
+
+  @override
+  Future<void> updateSubject(Subject subject) async => saved.add(subject);
+
+  @override
+  Future<int> addSubject(Subject subject) async {
+    saved.add(subject);
+    return 1;
+  }
+}
+
 TimetableData _fixture({
   List<ClassSlot> slots = const <ClassSlot>[],
   List<AttendanceRecord> records = const <AttendanceRecord>[],
@@ -518,6 +535,76 @@ void main() {
       await _openSheet(tester);
 
       expect(find.text('Delete it and its attendance'), findsNothing);
+    });
+  });
+
+  group('the subject balance', () {
+    Future<List<Subject>> save(
+      WidgetTester tester, {
+      required String held,
+      required String attended,
+      String? total,
+    }) async {
+      final List<Subject> saved = <Subject>[];
+      await tester.pumpWidget(
+        _host(
+          (c, ref) => showSubjectEditor(c, ref, subject: _fixture().subjects[1]),
+          actions: (Ref ref) => _SubjectRecorder(ref, saved: saved),
+        ),
+      );
+      await _openSheet(tester);
+
+      final Finder toggle = find.text('Already attended');
+      await tester.ensureVisible(toggle);
+      await tester.pumpAndSettle();
+      await tester.tap(toggle);
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.widgetWithText(TextField, 'Held'), held);
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Attended'),
+        attended,
+      );
+      if (total != null) {
+        await tester.enterText(
+          find.widgetWithText(TextField, 'Classes all term'),
+          total,
+        );
+      }
+      await _tapButton(tester, 'Save');
+      return saved;
+    }
+
+    testWidgets('carries the three numbers onto the subject',
+        (WidgetTester tester) async {
+      final List<Subject> saved =
+          await save(tester, held: '16', attended: '14', total: '18');
+
+      expect(saved, hasLength(1));
+      expect(saved.single.priorHeld, 16);
+      expect(saved.single.priorAttended, 14);
+      expect(saved.single.expectedTotal, 18);
+    });
+
+    testWidgets('refuses to attend more classes than were held',
+        (WidgetTester tester) async {
+      final List<Subject> saved =
+          await save(tester, held: '5', attended: '9');
+
+      expect(find.text('Attended cannot be more than held.'), findsOneWidget);
+      expect(saved, isEmpty);
+    });
+
+    testWidgets('refuses a term total smaller than what is already held',
+        (WidgetTester tester) async {
+      final List<Subject> saved =
+          await save(tester, held: '16', attended: '14', total: '9');
+
+      expect(
+        find.text('The term total is less than what is held.'),
+        findsOneWidget,
+      );
+      expect(saved, isEmpty);
     });
   });
 }

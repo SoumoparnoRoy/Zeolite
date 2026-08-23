@@ -331,7 +331,7 @@ final statsProvider = Provider<OverallStats>((ref) {
         target: subject.targetPercent == null
             ? globalTarget
             : subject.targetPercent! / 100.0,
-        remainingPlanned: remaining[id] ?? 0,
+        plannedFromSlots: remaining[id] ?? 0,
       ),
     );
   }

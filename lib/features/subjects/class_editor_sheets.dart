@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
@@ -153,6 +154,10 @@ class _SubjectFormState extends ConsumerState<_SubjectForm> {
   int? _categoryId;
   late bool _overrideTarget;
   late double _target;
+  late final TextEditingController _priorHeld;
+  late final TextEditingController _priorAttended;
+  late final TextEditingController _expectedTotal;
+  late bool _carryBalance;
   String? _error;
   bool _saving = false;
 
@@ -167,6 +172,20 @@ class _SubjectFormState extends ConsumerState<_SubjectForm> {
     _categoryId = s?.categoryId;
     _overrideTarget = s?.targetPercent != null;
     _target = s?.targetPercent ?? 75;
+    _priorHeld = TextEditingController(text: _digits(s?.priorHeld));
+    _priorAttended = TextEditingController(text: _digits(s?.priorAttended));
+    _expectedTotal = TextEditingController(text: _digits(s?.expectedTotal));
+    _carryBalance = (s?.priorHeld ?? 0) > 0 || s?.expectedTotal != null;
+  }
+
+  /// Empty rather than "0", so an untouched field reads as unanswered.
+  static String _digits(int? value) =>
+      value == null || value == 0 ? '' : '$value';
+
+  int? _read(TextEditingController c) {
+    final String text = c.text.trim();
+    if (text.isEmpty) return null;
+    return int.tryParse(text);
   }
 
   @override
@@ -174,6 +193,9 @@ class _SubjectFormState extends ConsumerState<_SubjectForm> {
     _name.dispose();
     _code.dispose();
     _teacher.dispose();
+    _priorHeld.dispose();
+    _priorAttended.dispose();
+    _expectedTotal.dispose();
     super.dispose();
   }
 
@@ -183,6 +205,18 @@ class _SubjectFormState extends ConsumerState<_SubjectForm> {
       setState(() => _error = 'Give the subject a name.');
       return;
     }
+    final int held = _carryBalance ? (_read(_priorHeld) ?? 0) : 0;
+    final int attended = _carryBalance ? (_read(_priorAttended) ?? 0) : 0;
+    final int? total = _carryBalance ? _read(_expectedTotal) : null;
+    if (attended > held) {
+      setState(() => _error = 'Attended cannot be more than held.');
+      return;
+    }
+    if (total != null && total < held) {
+      setState(() => _error = 'The term total is less than what is held.');
+      return;
+    }
+
     setState(() {
       _saving = true;
       _error = null;
@@ -197,6 +231,9 @@ class _SubjectFormState extends ConsumerState<_SubjectForm> {
       targetPercent: _overrideTarget ? _target : null,
       categoryId: _categoryId,
       createdAt: widget.subject?.createdAt,
+      priorHeld: held,
+      priorAttended: attended,
+      expectedTotal: total,
     );
 
     final TimetableActions actions = ref.read(actionsProvider);
@@ -292,6 +329,46 @@ class _SubjectFormState extends ConsumerState<_SubjectForm> {
             label: '${_target.round()}%',
             onChanged: (double v) => setState(() => _target = v),
           ),
+        const SizedBox(height: AppSpacing.xl),
+        SwitchListTile.adaptive(
+          value: _carryBalance,
+          onChanged: (bool v) => setState(() => _carryBalance = v),
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Already attended'),
+          subtitle: const Text(
+            'Classes counted before this app, so the percentage is right from '
+            'the first mark',
+            style: TextStyle(fontSize: 12.5),
+          ),
+        ),
+        if (_carryBalance) ...<Widget>[
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: _CountField(
+                  controller: _priorHeld,
+                  label: 'Held',
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: _CountField(
+                  controller: _priorAttended,
+                  label: 'Attended',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _CountField(
+            controller: _expectedTotal,
+            label: 'Classes all term',
+            // Without this the app can only project from the timetable, which
+            // says nothing for a subject that has no classes on it.
+            helper: 'Optional. Lets the app say what is still to come.',
+          ),
+        ],
         if (_error != null) ...<Widget>[
           const SizedBox(height: AppSpacing.md),
           Text(
@@ -305,6 +382,35 @@ class _SubjectFormState extends ConsumerState<_SubjectForm> {
           child: Text(widget.subject == null ? 'Create subject' : 'Save'),
         ),
       ],
+    );
+  }
+}
+
+class _CountField extends StatelessWidget {
+  const _CountField({
+    required this.controller,
+    required this.label,
+    this.helper,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final String? helper;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      keyboardType: TextInputType.number,
+      inputFormatters: <TextInputFormatter>[
+        FilteringTextInputFormatter.digitsOnly,
+      ],
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: '0',
+        helperText: helper,
+        helperMaxLines: 2,
+      ),
     );
   }
 }
@@ -2496,8 +2602,7 @@ Future<bool> _confirmDeleteWithMarks(
         ),
         TextButton(
           onPressed: () => Navigator.of(context).pop(true),
-          style:
-              TextButton.styleFrom(foregroundColor: context.palette.absent),
+          style: TextButton.styleFrom(foregroundColor: context.palette.absent),
           child: const Text('Delete both'),
         ),
       ],

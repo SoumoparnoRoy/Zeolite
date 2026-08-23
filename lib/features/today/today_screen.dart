@@ -402,7 +402,7 @@ class _DayHeader extends StatelessWidget {
                 const SizedBox(width: 14),
                 Expanded(
                   child: HeaderCaption(
-                    '${stats.present} attended of ${stats.held} held\n'
+                    '${stats.attended} attended of ${stats.held} held\n'
                     'target ${settings.targetPercent.toStringAsFixed(0)}%'
                     '${_termTail(settings)}',
                   ),

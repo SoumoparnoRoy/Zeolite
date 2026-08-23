@@ -47,8 +47,13 @@ class AttendanceLogScreen extends ConsumerWidget {
     if (entries.isEmpty) {
       return PushScaffold(
         title: subject.name,
-        slivers: const <Widget>[
-          SliverFillRemaining(
+        slivers: <Widget>[
+          if (subject.priorHeld > 0)
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+              sliver: SliverToBoxAdapter(child: _CarriedIn(subject: subject)),
+            ),
+          const SliverFillRemaining(
             hasScrollBody: false,
             child: _LogEmpty(
               message: 'Once this subject has had a class, every one of them '
@@ -65,6 +70,11 @@ class AttendanceLogScreen extends ConsumerWidget {
       title: subject.name,
       subtitle: '$marked of ${entries.length} marked',
       slivers: <Widget>[
+        if (subject.priorHeld > 0)
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
+            sliver: SliverToBoxAdapter(child: _CarriedIn(subject: subject)),
+          ),
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
           sliver: SliverList.builder(
@@ -106,6 +116,40 @@ class AttendanceLogScreen extends ConsumerWidget {
       rows.add(_Row.entry(entry));
     }
     return rows;
+  }
+}
+
+/// The classes counted before the app existed. They have no dates, so they
+/// cannot be rows — without this the log looks like it has lost them.
+class _CarriedIn extends StatelessWidget {
+  const _CarriedIn({required this.subject});
+
+  final Subject subject;
+
+  @override
+  Widget build(BuildContext context) {
+    final AppPalette p = context.palette;
+    return SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            'Carried in',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: p.textFaint,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${subject.priorAttended} of ${subject.priorHeld} attended before '
+            'this app started counting',
+            style: const TextStyle(fontSize: 13, height: 1.35),
+          ),
+        ],
+      ),
+    );
   }
 }
 

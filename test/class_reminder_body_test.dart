@@ -33,7 +33,7 @@ SubjectStats _stats({int present = 0, int absent = 0, double target = 0.75}) {
     absent: absent,
     cancelled: 0,
     target: target,
-    remainingPlanned: 20,
+    plannedFromSlots: 20,
   );
 }
 
@@ -130,7 +130,7 @@ void main() {
         absent: 1,
         cancelled: 5,
         target: 0.75,
-        remainingPlanned: 10,
+        plannedFromSlots: 10,
       );
       expect(stats.held, 4);
       expect(NotificationService.reminderStandingLine(stats), stats.headline);

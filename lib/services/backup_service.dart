@@ -354,6 +354,9 @@ class BackupService {
                 ? null
                 : categoryIdMap[subject.categoryId],
             createdAt: subject.createdAt,
+            priorHeld: subject.priorHeld,
+            priorAttended: subject.priorAttended,
+            expectedTotal: subject.expectedTotal,
           ),
         );
         if (oldId != null) subjectIdMap[oldId] = newId;

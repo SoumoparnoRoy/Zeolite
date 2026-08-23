@@ -123,6 +123,8 @@ class _OverallHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final String toCome =
+        Words.plural(stats.expectedTotal - stats.held, 'class', 'classes');
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
@@ -149,9 +151,12 @@ class _OverallHeader extends StatelessWidget {
                   constraints: const BoxConstraints(maxWidth: 190),
                   child: Column(
                     children: <Widget>[
-                      _LegendLine(label: 'Attended', value: stats.present),
+                      _LegendLine(label: 'Attended', value: stats.attended),
                       const SizedBox(height: 7),
-                      _LegendLine(label: 'Missed', value: stats.absent),
+                      _LegendLine(
+                        label: 'Missed',
+                        value: stats.held - stats.attended,
+                      ),
                       const SizedBox(height: 7),
                       _LegendLine(
                         label: 'Cancelled',
@@ -169,6 +174,22 @@ class _OverallHeader extends StatelessWidget {
             ],
           ),
         ),
+        // Shown so a student cross-checking against their portal does not
+        // think one of the two is broken; dropped once they agree.
+        if (stats.termPercent != null && stats.expectedTotal > stats.held)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+            child: Text(
+              'Your portal will say ${stats.termPercent!.round()}% — it counts '
+              'the $toCome still to come as missed.',
+              style: TextStyle(
+                fontSize: 10.5,
+                height: 1.4,
+                fontWeight: FontWeight.w500,
+                color: Colors.white.withValues(alpha: 0.75),
+              ),
+            ),
+          ),
         if (settings.hasSemester) ...<Widget>[
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -284,7 +305,7 @@ class _SubjectStatsCard extends StatelessWidget {
                     const SizedBox(height: 3),
                     Text(
                       stats.hasData
-                          ? '${stats.present} of ${stats.held} attended'
+                          ? '${stats.attended} of ${stats.held} attended'
                           : 'nothing marked yet',
                       style: monoStyle(color: p.textTertiary, size: 10),
                     ),
@@ -390,7 +411,7 @@ class _SubjectDetail extends ConsumerWidget {
             Expanded(
               child: _MetricTile(
                 label: 'Attended',
-                value: '${stats.present}',
+                value: '${stats.attended}',
                 color: p.present,
               ),
             ),
@@ -398,7 +419,7 @@ class _SubjectDetail extends ConsumerWidget {
             Expanded(
               child: _MetricTile(
                 label: 'Missed',
-                value: '${stats.absent}',
+                value: '${stats.held - stats.attended}',
                 color: p.absent,
               ),
             ),

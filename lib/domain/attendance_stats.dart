@@ -35,7 +35,7 @@ class SubjectStats {
     required this.absent,
     required this.cancelled,
     required this.target,
-    required this.remainingPlanned,
+    required this.plannedFromSlots,
   });
 
   final Subject subject;
@@ -46,16 +46,31 @@ class SubjectStats {
   /// Required attendance as a fraction, e.g. 0.75.
   final double target;
 
-  /// Classes still scheduled before the semester ends.
-  final int remainingPlanned;
+  /// Classes still scheduled before the semester ends, projected from the
+  /// slots. Only used when the subject does not say its own term total.
+  final int plannedFromSlots;
+
+  int get priorHeld => subject.priorHeld;
+  int get priorAttended => subject.priorAttended;
 
   /// Classes that count towards the percentage. Cancelled ones don't.
-  int get held => present + absent;
+  int get held => present + absent + priorHeld;
+
+  /// [present] stays what was marked here, so the log still reconciles.
+  int get attended => present + priorAttended;
+
+  /// Derived from the term total when there is one, so nothing has to be kept
+  /// up to date: every class marked moves [held] and this follows.
+  int get remainingPlanned {
+    final int? total = subject.expectedTotal;
+    if (total == null) return plannedFromSlots;
+    return math.max(0, total - held);
+  }
 
   bool get hasData => held > 0;
 
   /// Current attendance as a fraction of held classes.
-  double get ratio => held == 0 ? 0 : present / held;
+  double get ratio => held == 0 ? 0 : attended / held;
 
   double get percent => ratio * 100;
 
@@ -63,23 +78,23 @@ class SubjectStats {
 
   /// How many more classes you can miss and still hold the target.
   ///
-  /// Solve `present / (held + x) >= target` for the largest whole `x`:
-  ///   `x = floor(present / target) - held`
+  /// Solve `attended / (held + x) >= target` for the largest whole `x`:
+  ///   `x = floor(attended / target) - held`
   int get canSkip {
     if (target <= 0) return 999;
-    if (present == 0) return 0;
-    final int maxTotal = (present / target).floor();
+    if (attended == 0) return 0;
+    final int maxTotal = (attended / target).floor();
     return math.max(0, maxTotal - held);
   }
 
   /// How many classes you must attend, back to back, to reach the target.
   ///
-  /// Solve `(present + y) / (held + y) >= target` for the smallest whole `y`:
-  ///   `y = ceil((target * held - present) / (1 - target))`
+  /// Solve `(attended + y) / (held + y) >= target` for the smallest whole `y`:
+  ///   `y = ceil((target * held - attended) / (1 - target))`
   int get needToAttend {
     if (meetsTarget) return 0;
     if (target >= 1) return remainingPlanned;
-    final double numerator = target * held - present;
+    final double numerator = target * held - attended;
     if (numerator <= 0) return 0;
     return math.max(0, (numerator / (1 - target)).ceil());
   }
@@ -88,7 +103,7 @@ class SubjectStats {
   double get maxAchievableRatio {
     final int total = held + remainingPlanned;
     if (total == 0) return 1;
-    return (present + remainingPlanned) / total;
+    return (attended + remainingPlanned) / total;
   }
 
   /// True when even a perfect run from here cannot reach the target.
@@ -134,7 +149,7 @@ class SubjectStats {
     required Subject subject,
     required Iterable<ClassSession> sessions,
     required double target,
-    int remainingPlanned = 0,
+    int plannedFromSlots = 0,
   }) {
     int present = 0;
     int absent = 0;
@@ -155,7 +170,7 @@ class SubjectStats {
       absent: absent,
       cancelled: cancelled,
       target: target,
-      remainingPlanned: remainingPlanned,
+      plannedFromSlots: plannedFromSlots,
     );
   }
 }
@@ -176,13 +191,42 @@ class OverallStats {
   int get cancelled =>
       subjects.fold<int>(0, (int sum, SubjectStats s) => sum + s.cancelled);
 
-  int get held => present + absent;
+  /// Carried balances included, so the total agrees with the cards above it.
+  int get attended =>
+      subjects.fold<int>(0, (int sum, SubjectStats s) => sum + s.attended);
+
+  int get held =>
+      subjects.fold<int>(0, (int sum, SubjectStats s) => sum + s.held);
 
   bool get hasData => held > 0;
 
-  double get ratio => held == 0 ? 0 : present / held;
+  double get ratio => held == 0 ? 0 : attended / held;
 
   double get percent => ratio * 100;
+
+  /// Classes the whole term will hold: what has happened plus what is left.
+  int get expectedTotal => subjects.fold<int>(
+        0,
+        (int sum, SubjectStats s) => sum + s.held + s.remainingPlanned,
+      );
+
+  /// True once every subject with attendance names its own term total. Short
+  /// of that the figure is part declared and part projected from the
+  /// timetable, which is a mixture no portal would report.
+  bool get knowsTerm {
+    final List<SubjectStats> withData =
+        subjects.where((SubjectStats s) => s.hasData).toList();
+    return withData.isNotEmpty &&
+        withData.every((SubjectStats s) => s.subject.expectedTotal != null);
+  }
+
+  /// The figure a portal prints: attendance over the whole term rather than
+  /// over what has been held, so it counts classes that have not happened yet
+  /// as missed. Always the lower of the two, and shown alongside [percent]
+  /// rather than instead of it — the subject cards are all [ratio].
+  double? get termPercent => !knowsTerm || expectedTotal == 0
+      ? null
+      : attended * 100 / expectedTotal;
 
   bool get meetsTarget => held == 0 || ratio >= target - 1e-9;
 

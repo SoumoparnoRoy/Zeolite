@@ -14,7 +14,7 @@ class AppDatabase {
   // install finds its data, so renaming it would strand every database in
   // place and read as a wipe. It is never shown to the user.
   static const String fileName = 'attend_it.db';
-  static const int schemaVersion = 4;
+  static const int schemaVersion = 5;
 
   Database? _db;
 
@@ -59,6 +59,24 @@ class AppDatabase {
           // case and an empty tag list costs nothing on screen.
           await db.execute(_tagsTable);
           await db.execute('ALTER TABLE attendance ADD COLUMN tag_id INTEGER');
+        }
+        if (oldVersion < 5) {
+          // v5 lets a subject carry attendance that predates the app, and say
+          // how many classes it holds all term. Defaulting the two counters to
+          // zero leaves every existing subject's maths exactly as it was;
+          // expected_total stays null, which means "keep projecting from the
+          // slots".
+          await db.execute(
+            'ALTER TABLE subjects ADD COLUMN prior_held INTEGER NOT NULL '
+            'DEFAULT 0',
+          );
+          await db.execute(
+            'ALTER TABLE subjects ADD COLUMN prior_attended INTEGER NOT NULL '
+            'DEFAULT 0',
+          );
+          await db.execute(
+            'ALTER TABLE subjects ADD COLUMN expected_total INTEGER',
+          );
         }
       },
     );
@@ -128,6 +146,9 @@ class AppDatabase {
         target_percent REAL,
         category_id    INTEGER,
         created_at     INTEGER NOT NULL,
+        prior_held     INTEGER NOT NULL DEFAULT 0,
+        prior_attended INTEGER NOT NULL DEFAULT 0,
+        expected_total INTEGER,
         FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE SET NULL
       )
     ''');

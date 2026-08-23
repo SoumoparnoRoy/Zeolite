@@ -17,7 +17,7 @@ SubjectStats statsOf({
     absent: absent,
     cancelled: cancelled,
     target: target,
-    remainingPlanned: remaining,
+    plannedFromSlots: remaining,
   );
 }
 
@@ -132,7 +132,7 @@ void main() {
             absent: 6,
             cancelled: 0,
             target: 0.75,
-            remainingPlanned: 20,
+            plannedFromSlots: 20,
           ),
         ],
       );

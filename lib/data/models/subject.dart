@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
@@ -15,6 +17,9 @@ class Subject {
     this.targetPercent,
     this.categoryId,
     this.createdAt,
+    this.priorHeld = 0,
+    this.priorAttended = 0,
+    this.expectedTotal,
   });
 
   final int? id;
@@ -32,6 +37,15 @@ class Subject {
 
   final DateTime? createdAt;
 
+  /// Classes held before this app started counting, and how many were
+  /// attended. Carried rather than invented as records: they have no dates.
+  final int priorHeld;
+  final int priorAttended;
+
+  /// Classes this subject holds all term. Null leaves the projection to
+  /// [ScheduleEngine], which can only work from the slots.
+  final int? expectedTotal;
+
   Color get color => Color(colorValue);
 
   /// Two-letter monogram used on avatars, e.g. "Data Structures" -> "DS".
@@ -43,7 +57,9 @@ class Subject {
         .toList();
     if (words.isEmpty) return '?';
     if (words.length == 1) {
-      return words.first.substring(0, words.first.length >= 2 ? 2 : 1).toUpperCase();
+      return words.first
+          .substring(0, words.first.length >= 2 ? 2 : 1)
+          .toUpperCase();
     }
     return (words[0][0] + words[1][0]).toUpperCase();
   }
@@ -59,6 +75,10 @@ class Subject {
     int? categoryId,
     bool clearCategory = false,
     DateTime? createdAt,
+    int? priorHeld,
+    int? priorAttended,
+    int? expectedTotal,
+    bool clearExpectedTotal = false,
   }) {
     return Subject(
       id: id ?? this.id,
@@ -70,6 +90,10 @@ class Subject {
           clearTargetPercent ? null : (targetPercent ?? this.targetPercent),
       categoryId: clearCategory ? null : (categoryId ?? this.categoryId),
       createdAt: createdAt ?? this.createdAt,
+      priorHeld: priorHeld ?? this.priorHeld,
+      priorAttended: priorAttended ?? this.priorAttended,
+      expectedTotal:
+          clearExpectedTotal ? null : (expectedTotal ?? this.expectedTotal),
     );
   }
 
@@ -81,11 +105,16 @@ class Subject {
         'color': colorValue,
         'target_percent': targetPercent,
         'category_id': categoryId,
-        'created_at':
-            (createdAt ?? DateTime.now()).millisecondsSinceEpoch,
+        'created_at': (createdAt ?? DateTime.now()).millisecondsSinceEpoch,
+        'prior_held': priorHeld,
+        'prior_attended': priorAttended,
+        'expected_total': expectedTotal,
       };
 
   factory Subject.fromMap(Map<String, Object?> map) {
+    final int held = math.max(0, (map['prior_held'] as num?)?.toInt() ?? 0);
+    final int attended =
+        math.max(0, (map['prior_attended'] as num?)?.toInt() ?? 0);
     return Subject(
       id: map['id'] as int?,
       name: (map['name'] as String?) ?? '',
@@ -97,6 +126,10 @@ class Subject {
       createdAt: map['created_at'] == null
           ? null
           : DateTime.fromMillisecondsSinceEpoch(map['created_at']! as int),
+      priorHeld: held,
+      // A hand-edited backup must not attend more classes than it held.
+      priorAttended: math.min(attended, held),
+      expectedTotal: (map['expected_total'] as num?)?.toInt(),
     );
   }
 

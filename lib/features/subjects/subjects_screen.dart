@@ -77,6 +77,93 @@ class SubjectsScreen extends ConsumerWidget {
 
 enum _SubjectAction { edit, colour, delete }
 
+/// Counting for a subject that has no classes on the timetable — a portal that
+/// reports totals is the only record it has, so a class is recorded by moving
+/// the balance rather than by marking an occurrence that does not exist.
+///
+/// Both buttons only ever add. A mis-tap is corrected by opening the subject
+/// and typing the two numbers, which is exact and one tap away, rather than by
+/// a second pair of controls that would double the width of this row.
+class _BalanceCounter extends ConsumerWidget {
+  const _BalanceCounter({required this.subject});
+
+  final Subject subject;
+
+  Future<void> _add(WidgetRef ref, {required bool attended}) {
+    return ref.read(actionsProvider).updateSubject(
+          subject.copyWith(
+            priorHeld: subject.priorHeld + 1,
+            priorAttended: subject.priorAttended + (attended ? 1 : 0),
+          ),
+        );
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final AppPalette p = context.palette;
+    return Row(
+      children: <Widget>[
+        Expanded(
+          child: Text(
+            '${subject.priorAttended} of ${subject.priorHeld} attended',
+            style: monoStyle(color: p.textTertiary, size: 10),
+          ),
+        ),
+        _CountButton(
+          icon: Icons.check_rounded,
+          label: 'Attended',
+          tint: p.present,
+          onTap: () => _add(ref, attended: true),
+        ),
+        const SizedBox(width: 6),
+        _CountButton(
+          icon: Icons.close_rounded,
+          label: 'Missed',
+          tint: p.absent,
+          onTap: () => _add(ref, attended: false),
+        ),
+        const SizedBox(width: 8),
+      ],
+    );
+  }
+}
+
+class _CountButton extends StatelessWidget {
+  const _CountButton({
+    required this.icon,
+    required this.label,
+    required this.tint,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color tint;
+  final Future<void> Function() onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: label,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          // 44 high keeps the target reachable where the icon alone would not.
+          constraints: const BoxConstraints(minWidth: 52, minHeight: 44),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: tint.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Icon(icon, size: 17, color: tint),
+        ),
+      ),
+    );
+  }
+}
+
 /// One entry in the overflow menu. A plain row rather than a [ListTile], which
 /// wants more height than a [PopupMenuItem] gives it.
 class _MenuRow extends StatelessWidget {
@@ -139,100 +226,116 @@ class _SubjectRow extends ConsumerWidget {
       p,
     );
 
+    // A subject with no class on the timetable has nothing to mark from the
+    // day screen, so counting is the only way it can be kept up to date.
+    final bool countsByHand = classCount == 0 &&
+        (subject.priorHeld > 0 || subject.expectedTotal != null);
+
     return SurfaceCard(
       padding: const EdgeInsets.fromLTRB(13, 12, 4, 12),
       onTap: () => showSubjectEditor(context, ref, subject: subject),
       onLongPress: () => showSubjectColorPicker(context, ref, subject),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          SubjectAvatar(
-            initials: subject.initials,
-            color: subject.color,
-            size: 36,
-          ),
-          const SizedBox(width: 11),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  subject.name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    height: 1.2,
-                    fontWeight: FontWeight.w700,
-                    color: p.textPrimary,
-                  ),
+          Row(
+            children: <Widget>[
+              SubjectAvatar(
+                initials: subject.initials,
+                color: subject.color,
+                size: 36,
+              ),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      subject.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        height: 1.2,
+                        fontWeight: FontWeight.w700,
+                        color: p.textPrimary,
+                      ),
+                    ),
+                    if (detail.isNotEmpty) ...<Widget>[
+                      const SizedBox(height: 4),
+                      Text(
+                        detail,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: monoStyle(color: p.textTertiary, size: 9.5),
+                      ),
+                    ],
+                  ],
                 ),
-                if (detail.isNotEmpty) ...<Widget>[
-                  const SizedBox(height: 4),
-                  Text(
-                    detail,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: monoStyle(color: p.textTertiary, size: 9.5),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                stats != null && stats.hasData
+                    ? '${stats.percent.toStringAsFixed(0)}%'
+                    : '—',
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1,
+                  fontWeight: stats?.hasData ?? false
+                      ? FontWeight.w800
+                      : FontWeight.w700,
+                  letterSpacing: -0.3,
+                  color: stats != null && stats.hasData
+                      ? percentColor
+                      : p.textFaint,
+                ),
+              ),
+              PopupMenuButton<_SubjectAction>(
+                icon: Icon(
+                  Icons.more_vert_rounded,
+                  size: 18,
+                  color: p.textFaint,
+                ),
+                color: p.surface,
+                onSelected: (_SubjectAction action) async {
+                  switch (action) {
+                    case _SubjectAction.edit:
+                      await showSubjectEditor(context, ref, subject: subject);
+                    case _SubjectAction.colour:
+                      await showSubjectColorPicker(context, ref, subject);
+                    case _SubjectAction.delete:
+                      await _confirmDelete(context, ref, data);
+                  }
+                },
+                itemBuilder: (BuildContext context) =>
+                    <PopupMenuEntry<_SubjectAction>>[
+                  const PopupMenuItem<_SubjectAction>(
+                    value: _SubjectAction.edit,
+                    child: _MenuRow(icon: Icons.edit_outlined, label: 'Edit'),
+                  ),
+                  const PopupMenuItem<_SubjectAction>(
+                    value: _SubjectAction.colour,
+                    child: _MenuRow(
+                      icon: Icons.palette_outlined,
+                      label: 'Change colour',
+                    ),
+                  ),
+                  PopupMenuItem<_SubjectAction>(
+                    value: _SubjectAction.delete,
+                    child: _MenuRow(
+                      icon: Icons.delete_outline_rounded,
+                      label: 'Delete',
+                      color: p.absent,
+                    ),
                   ),
                 ],
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            stats != null && stats.hasData
-                ? '${stats.percent.toStringAsFixed(0)}%'
-                : '—',
-            style: TextStyle(
-              fontSize: 14,
-              height: 1,
-              fontWeight:
-                  stats?.hasData ?? false ? FontWeight.w800 : FontWeight.w700,
-              letterSpacing: -0.3,
-              color:
-                  stats != null && stats.hasData ? percentColor : p.textFaint,
-            ),
-          ),
-          PopupMenuButton<_SubjectAction>(
-            icon: Icon(
-              Icons.more_vert_rounded,
-              size: 18,
-              color: p.textFaint,
-            ),
-            color: p.surface,
-            onSelected: (_SubjectAction action) async {
-              switch (action) {
-                case _SubjectAction.edit:
-                  await showSubjectEditor(context, ref, subject: subject);
-                case _SubjectAction.colour:
-                  await showSubjectColorPicker(context, ref, subject);
-                case _SubjectAction.delete:
-                  await _confirmDelete(context, ref, data);
-              }
-            },
-            itemBuilder: (BuildContext context) =>
-                <PopupMenuEntry<_SubjectAction>>[
-              const PopupMenuItem<_SubjectAction>(
-                value: _SubjectAction.edit,
-                child: _MenuRow(icon: Icons.edit_outlined, label: 'Edit'),
-              ),
-              const PopupMenuItem<_SubjectAction>(
-                value: _SubjectAction.colour,
-                child: _MenuRow(
-                  icon: Icons.palette_outlined,
-                  label: 'Change colour',
-                ),
-              ),
-              PopupMenuItem<_SubjectAction>(
-                value: _SubjectAction.delete,
-                child: _MenuRow(
-                  icon: Icons.delete_outline_rounded,
-                  label: 'Delete',
-                  color: p.absent,
-                ),
               ),
             ],
           ),
+          if (countsByHand) ...<Widget>[
+            const SizedBox(height: 10),
+            _BalanceCounter(subject: subject),
+          ],
         ],
       ),
     );
@@ -286,6 +389,10 @@ class _SubjectRow extends ConsumerWidget {
         extras == 1 ? '1 one-off class' : '$extras one-off classes',
       if (marks > 0)
         marks == 1 ? '1 attendance mark' : '$marks attendance marks',
+      // A carried balance is not a record, so counting only marks would offer
+      // to delete a subject's whole history under "nothing else is lost".
+      if (subject.priorHeld > 0)
+        '${subject.priorAttended} of ${subject.priorHeld} carried in',
     ];
 
     final String message = losses.isEmpty

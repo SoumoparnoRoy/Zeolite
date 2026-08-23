@@ -171,4 +171,72 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Physics'), findsOneWidget);
   });
+
+  testWidgets('a carried balance counts among what a delete loses',
+      (WidgetTester tester) async {
+    final TimetableData data = _fixture();
+    await tester.pumpWidget(
+      _app(
+        TimetableData(
+          categories: data.categories,
+          subjects: <Subject>[
+            const Subject(
+              id: 2,
+              name: 'Mathematics',
+              colorValue: AppColors.defaultSubjectColor,
+              priorHeld: 16,
+              priorAttended: 14,
+            ),
+          ],
+          slots: const <ClassSlot>[],
+          extras: const <ExtraClass>[],
+          holidays: const <Holiday>[],
+          records: const <AttendanceRecord>[],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.more_vert_rounded).last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete'));
+    await tester.pumpAndSettle();
+
+    // Nothing is a record, but 16 classes are still on the subject.
+    expect(
+      find.textContaining('Mathematics has 14 of 16 carried in.'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('nothing else is lost'), findsNothing);
+  });
+
+  testWidgets('a subject with no classes counts by hand',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      _app(
+        const TimetableData(
+          categories: <ClassCategory>[],
+          subjects: <Subject>[
+            Subject(
+              id: 2,
+              name: 'Mathematics',
+              colorValue: AppColors.defaultSubjectColor,
+              priorHeld: 4,
+              priorAttended: 3,
+            ),
+          ],
+          slots: <ClassSlot>[],
+          extras: <ExtraClass>[],
+          holidays: <Holiday>[],
+          records: <AttendanceRecord>[],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('3 of 4 attended'), findsOneWidget);
+    expect(find.byIcon(Icons.check_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.close_rounded), findsOneWidget);
+    expect(find.text('75%'), findsOneWidget);
+  });
 }

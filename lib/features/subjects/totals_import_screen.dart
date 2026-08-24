@@ -258,7 +258,7 @@ class _RowCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             '${figures.attended} of ${figures.held} attended · '
-            '${figures.expectedTotal} all term'
+            '${figures.expectedTotal == null ? 'term total unread' : '${figures.expectedTotal} all term'}'
             '${row.current == null ? '' : '  (now ${row.current})'}',
             style: monoStyle(color: p.textTertiary, size: 10.5),
           ),

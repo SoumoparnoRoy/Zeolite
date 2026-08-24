@@ -23,7 +23,7 @@ OcrLine _at(String text, double centreX, double centreY, {double w = 90}) {
 /// is on a screenshot narrow enough to wrap it.
 class _Row {
   const _Row(this.nameLines, this.total, this.marked, this.attended,
-      {this.percent, this.pipe = false});
+      {this.percent, this.pipe = false, this.unread = false});
 
   final List<String> nameLines;
   final int total;
@@ -33,6 +33,10 @@ class _Row {
 
   /// Whether the cell rule came back glued to the digits.
   final bool pipe;
+
+  /// Whether the number cells came back at all. A row of lone zeroes is the
+  /// case where they do not.
+  final bool unread;
 }
 
 List<OcrLine> _sheet(List<_Row> rows, {String? footer, String? footerAttended}) {
@@ -59,10 +63,12 @@ List<OcrLine> _sheet(List<_Row> rows, {String? footer, String? footerAttended}) 
       lines.add(_at(row.nameLines[n], _name, centre + offset, w: 300));
     }
     final String rule = row.pipe ? '|' : '';
-    lines
-      ..add(_at('$rule${row.total}', _total, centre, w: 40))
-      ..add(_at('${row.marked}', _marked, centre, w: 40))
-      ..add(_at('$rule${row.attended}', _attended, centre, w: 40));
+    if (!row.unread) {
+      lines
+        ..add(_at('$rule${row.total}', _total, centre, w: 40))
+        ..add(_at('${row.marked}', _marked, centre, w: 40))
+        ..add(_at('$rule${row.attended}', _attended, centre, w: 40));
+    }
     if (row.percent != null) {
       lines.add(_at(row.percent!, _percent, centre, w: 80));
     }
@@ -72,6 +78,33 @@ List<OcrLine> _sheet(List<_Row> rows, {String? footer, String? footerAttended}) 
   if (footer != null) lines.add(_at(footer, 500, below, w: 400));
   if (footerAttended != null) {
     lines.add(_at(footerAttended, 500, below + 40, w: 400));
+  }
+  return lines;
+}
+
+/// What a second, magnified read of the number columns hands back: the digits
+/// alone, with none of the names or percentages beside them.
+///
+/// [missing] names the columns that read still did not return, per row index —
+/// 0 total, 1 marked, 2 attended.
+List<OcrLine> _cells(
+  List<_Row> rows, {
+  Map<int, Set<int>> missing = const <int, Set<int>>{},
+}) {
+  final List<OcrLine> lines = <OcrLine>[];
+  for (int i = 0; i < rows.length; i++) {
+    final _Row row = rows[i];
+    final double centre = _firstRow + i * _rowHeight;
+    final Set<int> gone = missing[i] ?? const <int>{};
+    if (!gone.contains(0)) {
+      lines.add(_at('${row.total}', _total, centre, w: 40));
+    }
+    if (!gone.contains(1)) {
+      lines.add(_at('${row.marked}', _marked, centre, w: 40));
+    }
+    if (!gone.contains(2)) {
+      lines.add(_at('${row.attended}', _attended, centre, w: 40));
+    }
   }
   return lines;
 }
@@ -96,6 +129,14 @@ void main() {
   group('spotting the page', () {
     test('takes a table that names its columns', () {
       expect(AttendanceTotalsOcr.looksLikeTotals(_sheet(_threeRows)), isTrue);
+    });
+
+    test('names the number columns for a second look at them', () {
+      final OcrBox band = AttendanceTotalsOcr.numberColumns(_sheet(_threeRows))!;
+      // Wide enough for the three number headers, and short of the percentage.
+      expect(band.left, lessThan(_total));
+      expect(band.right, greaterThan(_attended));
+      expect(band.right, lessThan(_percent));
     });
 
     test('leaves a timetable alone', () {
@@ -175,6 +216,132 @@ void main() {
       expect(last.expectedTotal, 0);
       expect(last.printedPercent, isNull);
       expect(last.isTrustworthy, isTrue);
+    });
+
+    test('a row of zeroes the recogniser skipped is still its own course', () {
+      final AttendanceTotals totals = AttendanceTotalsOcr.read(_sheet(<_Row>[
+        ..._threeRows,
+        const _Row(<String>['Imaging Lab_Odd_2026-27'], 0, 0, 0,
+            percent: '-', unread: true),
+        const _Row(<String>['Thermodynamics_Odd_2026-27'], 21, 21, 14,
+            percent: '66.67%'),
+      ]))!;
+      expect(totals.rows, hasLength(5));
+
+      final TotalsRow blank = totals.rows[3];
+      expect(blank.subject, 'Imaging Lab');
+      expect(blank.expectedTotal, 0);
+      expect(blank.held, 0);
+      expect(blank.attended, 0);
+      expect(blank.isTrustworthy, isTrue);
+
+      // The row below is the one that used to be lost with it.
+      expect(totals.rows[4].subject, 'Thermodynamics');
+      expect(totals.rows[4].attended, 14);
+    });
+
+    test('a cell read on its own lands in its own column', () {
+      // The magnified read gives back digits with nothing to anchor them to
+      // but their position, so the column has to be worked out table-wide.
+      const List<_Row> sheet = <_Row>[
+        ..._threeRows,
+        _Row(<String>['Imaging Lab_Odd_2026-27'], 7, 7, 6,
+            percent: '85.71%', unread: true),
+      ];
+      final AttendanceTotals totals =
+          AttendanceTotalsOcr.read(_sheet(sheet), cells: _cells(sheet))!;
+      final TotalsRow row = totals.rows.last;
+      expect(row.subject, 'Imaging Lab');
+      expect(row.expectedTotal, 7);
+      expect(row.held, 7);
+      expect(row.attended, 6);
+    });
+
+    test('a missing attended is taken back off the printed percentage', () {
+      const List<_Row> sheet = <_Row>[
+        ..._threeRows,
+        _Row(<String>['Imaging Lab_Odd_2026-27'], 7, 7, 7,
+            percent: '100.00%', unread: true),
+      ];
+      final AttendanceTotals totals = AttendanceTotalsOcr.read(
+        _sheet(sheet),
+        cells: _cells(sheet, missing: <int, Set<int>>{3: <int>{2}}),
+      )!;
+      final TotalsRow row = totals.rows.last;
+      expect(row.held, 7);
+      expect(row.attended, 7);
+      expect(row.isTrustworthy, isTrue);
+    });
+
+    test('a missing held is taken back off the printed percentage', () {
+      const List<_Row> sheet = <_Row>[
+        ..._threeRows,
+        _Row(<String>['Imaging Lab_Odd_2026-27'], 7, 7, 6,
+            percent: '85.71%', unread: true),
+      ];
+      final AttendanceTotals totals = AttendanceTotalsOcr.read(
+        _sheet(sheet),
+        cells: _cells(sheet, missing: <int, Set<int>>{3: <int>{1}}),
+      )!;
+      final TotalsRow row = totals.rows.last;
+      expect(row.held, 7);
+      expect(row.attended, 6);
+    });
+
+    test('a percentage that cannot be squared with the digit is refused', () {
+      // 6 of 13 is 46.15% and 6 of 14 is 42.86%: no whole number of sessions
+      // gives the 45% printed, so nothing is derived from it.
+      const List<_Row> sheet = <_Row>[
+        ..._threeRows,
+        _Row(<String>['Imaging Lab_Odd_2026-27'], 7, 7, 6,
+            percent: '45.00%', unread: true),
+      ];
+      final AttendanceTotals totals = AttendanceTotalsOcr.read(
+        _sheet(sheet),
+        cells: _cells(sheet, missing: <int, Set<int>>{3: <int>{1}}),
+      )!;
+      expect(totals.rows, hasLength(3));
+    });
+
+    test('the footer pins the one term total that went unread', () {
+      const List<_Row> sheet = <_Row>[
+        ..._threeRows,
+        _Row(<String>['Imaging Lab_Odd_2026-27'], 6, 6, 4,
+            percent: '66.67%', unread: true),
+      ];
+      // 18 + 5 + 20 read, so the page's 49 leaves exactly 6 for the last row.
+      final AttendanceTotals totals = AttendanceTotalsOcr.read(
+        _sheet(sheet, footer: 'Total Session:49'),
+        cells: _cells(sheet, missing: <int, Set<int>>{3: <int>{0}}),
+      )!;
+      expect(totals.rows.last.expectedTotal, 6);
+      expect(totals.addsUp, isTrue);
+    });
+
+    test('two unread term totals are left alone, not split', () {
+      const List<_Row> sheet = <_Row>[
+        ..._threeRows,
+        _Row(<String>['Imaging Lab_Odd_2026-27'], 6, 6, 4,
+            percent: '66.67%', unread: true),
+        _Row(<String>['Thermodynamics_Odd_2026-27'], 6, 6, 4,
+            percent: '66.67%', unread: true),
+      ];
+      final AttendanceTotals totals = AttendanceTotalsOcr.read(
+        _sheet(sheet, footer: 'Total Session:55'),
+        cells: _cells(sheet,
+            missing: <int, Set<int>>{3: <int>{0}, 4: <int>{0}}),
+      )!;
+      expect(totals.rows[3].expectedTotal, isNull);
+      expect(totals.rows[4].expectedTotal, isNull);
+    });
+
+    test('a dash beside a digit is refused rather than read as zero', () {
+      final List<OcrLine> lines = _sheet(_threeRows)
+        ..add(_at('Imaging Lab_Odd_2026-27', _name, 320, w: 300))
+        ..add(_at('7', _total, 320, w: 40))
+        ..add(_at('-', _percent, 320, w: 40));
+      final AttendanceTotals totals = AttendanceTotalsOcr.read(lines)!;
+      expect(totals.rows, hasLength(3));
     });
   });
 
@@ -256,6 +423,16 @@ void main() {
         ),
       )!;
       expect(totals.rows, hasLength(3));
+      expect(totals.rows.last.subject, 'Control Systems');
+      expect(totals.rows.last.isTrustworthy, isTrue);
+    });
+
+    test('a total percentage line stays out of the last course name', () {
+      final List<OcrLine> lines = _sheet(_threeRows,
+          footer: 'Total Session:43', footerAttended: 'Total Attended Session: 34')
+        ..add(_at('Total Percentage: 79.06%', 500, 400, w: 400));
+      final AttendanceTotals totals = AttendanceTotalsOcr.read(lines)!;
+      expect(totals.rows.last.subject, 'Control Systems');
     });
   });
 

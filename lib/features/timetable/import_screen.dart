@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -67,12 +69,21 @@ class _ImportTimetableScreenState
     try {
       final PlatformFile? picked = await FilePicker.pickFile();
       if (picked == null) return;
-      final List<OcrLine> lines =
-          await TextRecognition.readImage(await picked.readAsBytes());
+      final Uint8List bytes = await picked.readAsBytes();
+      final List<OcrLine> lines = await TextRecognition.readImage(bytes);
 
       // Spotted before the timetable parse, which would only fail on it.
       if (AttendanceTotalsOcr.looksLikeTotals(lines)) {
-        final AttendanceTotals? totals = AttendanceTotalsOcr.read(lines);
+        // A second look at the number columns alone, which is the only way the
+        // single digits come back off a page this dense.
+        final OcrBox? columns = AttendanceTotalsOcr.numberColumns(lines);
+        final List<OcrLine>? cells = columns == null
+            ? null
+            : await TextRecognition.readRegion(bytes, columns);
+        final AttendanceTotals? totals = AttendanceTotalsOcr.read(
+          lines,
+          cells: cells == null || cells.isEmpty ? null : cells,
+        );
         if (!mounted) return;
         if (totals == null || totals.rows.isEmpty) {
           messenger.showSnackBar(const SnackBar(

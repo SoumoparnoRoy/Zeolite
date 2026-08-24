@@ -16,7 +16,12 @@ class TotalsRow {
   });
 
   final String subject;
-  final int expectedTotal;
+
+  /// Null when the term total was the one cell that could not be read. It maps
+  /// onto [Subject.expectedTotal], which is nullable for the same reason: the
+  /// app falls back to counting the timetable when nothing declares a total.
+  final int? expectedTotal;
+
   final int held;
   final int attended;
 
@@ -41,9 +46,21 @@ class TotalsRow {
   }
 
   /// A row cannot attend more than was held, or hold more than the term has.
-  bool get isOrdered => attended <= held && held <= expectedTotal;
+  bool get isOrdered {
+    final int? total = expectedTotal;
+    return attended <= held && (total == null || held <= total);
+  }
 
   bool get isTrustworthy => percentAgrees && isOrdered && !namesTwoCourses;
+
+  TotalsRow withTotal(int total) => TotalsRow(
+        subject: subject,
+        expectedTotal: total,
+        held: held,
+        attended: attended,
+        printedPercent: printedPercent,
+        namesTwoCourses: namesTwoCourses,
+      );
 }
 
 /// A whole portal page, with the two figures it prints at the foot.
@@ -60,8 +77,10 @@ class AttendanceTotals {
   final int? printedTotal;
   final int? printedAttended;
 
-  int get totalSum =>
-      rows.fold<int>(0, (int sum, TotalsRow r) => sum + r.expectedTotal);
+  int get totalSum => rows.fold<int>(
+        0,
+        (int sum, TotalsRow r) => sum + (r.expectedTotal ?? 0),
+      );
 
   int get attendedSum =>
       rows.fold<int>(0, (int sum, TotalsRow r) => sum + r.attended);
@@ -99,6 +118,14 @@ class AttendanceTotalsOcr {
   /// held nothing yet. Dropped rather than kept, or it lands in the name.
   static final RegExp _blankCell = RegExp(r'^[-–—.\s]*$');
 
+  /// A dash is a cell, not an absence: anchoring rows on integers alone leaves
+  /// a course that has held nothing with no band of its own, and its name is
+  /// swept into the neighbour it then refuses.
+  static bool _isBlankCell(String text) {
+    final String trimmed = text.trim();
+    return trimmed.isNotEmpty && _blankCell.hasMatch(trimmed);
+  }
+
   /// A term stamp the portal appends to every course: `_Odd_2026-27`. It wraps
   /// mid-suffix on a narrow screenshot, which is why it is stripped after the
   /// name's lines are joined rather than before.
@@ -127,6 +154,16 @@ class AttendanceTotalsOcr {
     caseSensitive: false,
   );
 
+  static final RegExp _footerPercent =
+      RegExp(r'total\s*percentage', caseSensitive: false);
+
+  /// The last row's band has no row below to bound it, so every footer line
+  /// falls into it and ends up in that course's name.
+  static bool _isFooter(String text) =>
+      _footerTotal.hasMatch(text) ||
+      _footerAttended.hasMatch(text) ||
+      _footerPercent.hasMatch(text);
+
   /// Whether this image is a totals table at all, rather than a timetable.
   ///
   /// Checked on the header words instead of the shape, so the caller can
@@ -138,7 +175,45 @@ class AttendanceTotalsOcr {
     return has('attended') && (has('percentage') || has('marked'));
   }
 
-  static AttendanceTotals? read(List<OcrLine> lines) {
+  /// Where the three number columns sit, for a caller that can read part of an
+  /// image on its own.
+  ///
+  /// Taken off the header rather than off the cells, because the cells are
+  /// exactly what is missing when this is worth doing.
+  static OcrBox? numberColumns(List<OcrLine> lines) {
+    final double headerBottom = _headerBottom(lines);
+    double left = double.infinity;
+    double right = double.negativeInfinity;
+    for (final OcrLine line in lines) {
+      if (line.box.centreY > headerBottom) continue;
+      final String text = line.text.toLowerCase();
+      final bool numeric = (text.contains('total') ||
+              text.contains('marked') ||
+              text.contains('attended') ||
+              text.contains('session')) &&
+          !text.contains('percentage') &&
+          !text.contains('course') &&
+          !text.contains('name');
+      if (!numeric) continue;
+      if (line.box.left < left) left = line.box.left;
+      if (line.box.right > right) right = line.box.right;
+    }
+    if (left >= right) return null;
+
+    double bottom = double.negativeInfinity;
+    for (final OcrLine line in lines) {
+      if (line.box.bottom > bottom) bottom = line.box.bottom;
+    }
+    return OcrBox(left, 0, right, bottom);
+  }
+
+  /// [cells] is a second, sharper reading of [numberColumns] when the caller
+  /// managed one: the digits come from there and everything else — names,
+  /// percentages, the footer — from [lines].
+  static AttendanceTotals? read(
+    List<OcrLine> lines, {
+    List<OcrLine>? cells,
+  }) {
     if (!looksLikeTotals(lines)) return null;
 
     final double headerBottom = _headerBottom(lines);
@@ -147,8 +222,22 @@ class AttendanceTotalsOcr {
         if (line.box.centreY > headerBottom) line,
     ];
 
-    final List<double> rowCentres = _rowCentres(body);
+    final List<OcrLine> numbers = <OcrLine>[
+      for (final OcrLine line in cells ?? body)
+        if (line.box.centreY > headerBottom &&
+            (_intOf(line.text) != null || _isBlankCell(line.text)))
+          line,
+    ];
+
+    final List<double> rowCentres = _rowCentres(numbers);
     if (rowCentres.length < 2) return null;
+
+    // Digits only: a dash anchors a row but sits in the percentage column, and
+    // letting it name a column shifts all three one place to the right.
+    final List<double> columns = _columnCentres(<OcrLine>[
+      for (final OcrLine l in numbers)
+        if (_intOf(l.text) != null) l,
+    ]);
 
     final List<TotalsRow> rows = <TotalsRow>[];
     for (int i = 0; i < rowCentres.length; i++) {
@@ -158,18 +247,33 @@ class AttendanceTotalsOcr {
       final double bottom = i == rowCentres.length - 1
           ? double.infinity
           : (rowCentres[i] + rowCentres[i + 1]) / 2;
-      final TotalsRow? row = _rowFrom(<OcrLine>[
-        for (final OcrLine l in body)
-          if (l.box.centreY > top && l.box.centreY <= bottom) l,
-      ]);
+      bool inBand(OcrLine l) =>
+          l.box.centreY > top && l.box.centreY <= bottom;
+
+      final TotalsRow? row = _rowFrom(
+        band: <OcrLine>[
+          for (final OcrLine l in body)
+            if (inBand(l)) l,
+        ],
+        cells: <OcrLine>[
+          for (final OcrLine l in numbers)
+            if (inBand(l)) l,
+        ],
+        columns: columns,
+      );
       if (row != null) rows.add(row);
     }
     if (rows.isEmpty) return null;
 
+    final int? printedTotal =
+        _footerValue(lines, _footerTotal, skip: _footerAttended);
+    final int? printedAttended = _footerValue(lines, _footerAttended);
+
+    final List<TotalsRow> filled = _fillLastTotal(rows, printedTotal);
     final AttendanceTotals read = AttendanceTotals(
-      rows: rows,
-      printedTotal: _footerValue(lines, _footerTotal, skip: _footerAttended),
-      printedAttended: _footerValue(lines, _footerAttended),
+      rows: filled,
+      printedTotal: printedTotal,
+      printedAttended: printedAttended,
     );
 
     // A page's own total cannot be smaller than the rows it is made of, so a
@@ -177,7 +281,7 @@ class AttendanceTotalsOcr {
     // sits in a coloured band and loses digits easily. Dropping it says
     // nothing, which beats claiming the page disagrees when it does not.
     return AttendanceTotals(
-      rows: rows,
+      rows: filled,
       printedTotal: (read.printedTotal ?? read.totalSum) < read.totalSum
           ? null
           : read.printedTotal,
@@ -186,6 +290,31 @@ class AttendanceTotalsOcr {
               ? null
               : read.printedAttended,
     );
+  }
+
+  /// The page's own total pins the one term total that could not be read.
+  ///
+  /// Only ever with a single unknown left: two of them and the residual could
+  /// be split any number of ways, which is guessing rather than deriving.
+  static List<TotalsRow> _fillLastTotal(List<TotalsRow> rows, int? printed) {
+    if (printed == null) return rows;
+    final List<int> unknown = <int>[
+      for (int i = 0; i < rows.length; i++)
+        if (rows[i].expectedTotal == null) i,
+    ];
+    if (unknown.length != 1) return rows;
+
+    final int known = rows.fold<int>(
+      0,
+      (int sum, TotalsRow r) => sum + (r.expectedTotal ?? 0),
+    );
+    final int residual = printed - known;
+    final TotalsRow row = rows[unknown.first];
+    if (residual < row.held) return rows;
+    return <TotalsRow>[
+      for (int i = 0; i < rows.length; i++)
+        i == unknown.first ? row.withTotal(residual) : rows[i],
+    ];
   }
 
   static const List<String> _headerWords = <String>[
@@ -222,23 +351,22 @@ class AttendanceTotalsOcr {
     return bottom;
   }
 
-  /// One centre per row, clustered from the number cells alone.
-  static List<double> _rowCentres(List<OcrLine> body) {
-    final List<OcrLine> numbers = <OcrLine>[
-      for (final OcrLine l in body)
-        if (_intOf(l.text) != null) l,
-    ]..sort((OcrLine a, OcrLine b) => a.box.centreY.compareTo(b.box.centreY));
-    if (numbers.isEmpty) return const <double>[];
+  /// One centre per row, clustered from the cells alone.
+  static List<double> _rowCentres(List<OcrLine> numbers) {
+    final List<OcrLine> sorted = <OcrLine>[...numbers]
+      ..sort((OcrLine a, OcrLine b) => a.box.centreY.compareTo(b.box.centreY));
+    if (sorted.isEmpty) return const <double>[];
 
-    final double tolerance = _medianHeight(numbers) * 0.6;
+    final double tolerance = _medianHeight(sorted) * 0.6;
     final List<double> centres = <double>[];
     final List<double> current = <double>[];
-    for (final OcrLine line in numbers) {
+    for (final OcrLine line in sorted) {
       if (current.isEmpty || line.box.centreY - current.last <= tolerance) {
         current.add(line.box.centreY);
       } else {
-        centres.add(current.reduce((double a, double b) => a + b) /
-            current.length);
+        centres.add(
+          current.reduce((double a, double b) => a + b) / current.length,
+        );
         current
           ..clear()
           ..add(line.box.centreY);
@@ -250,6 +378,43 @@ class AttendanceTotalsOcr {
       );
     }
     return centres;
+  }
+
+  /// Worked out once over every cell rather than per row, which is the point:
+  /// a row missing a cell cannot say which of its own columns are which, but
+  /// the table can say it for them.
+  static List<double> _columnCentres(List<OcrLine> numbers) {
+    if (numbers.isEmpty) return const <double>[];
+    final List<double> xs = <double>[
+      for (final OcrLine l in numbers) l.box.centreX,
+    ]..sort();
+
+    final List<double> widths = <double>[
+      for (final OcrLine l in numbers) l.box.width,
+    ]..sort();
+    final double tolerance = widths[widths.length ~/ 2] * 2;
+
+    final List<List<double>> groups = <List<double>>[
+      <double>[xs.first]
+    ];
+    for (int i = 1; i < xs.length; i++) {
+      if (xs[i] - groups.last.last <= tolerance) {
+        groups.last.add(xs[i]);
+      } else {
+        groups.add(<double>[xs[i]]);
+      }
+    }
+
+    final List<double> centres = <double>[
+      for (final List<double> g in groups)
+        g.reduce((double a, double b) => a + b) / g.length,
+    ];
+    // A wrapped course name can end in digits of its own — a term stamp broken
+    // across lines leaves a bare `27` in the name column — so the numbers are
+    // taken from the right.
+    return centres.length <= 3
+        ? centres
+        : centres.sublist(centres.length - 3);
   }
 
   /// The digits in a cell, whatever rule was glued to them.
@@ -265,36 +430,83 @@ class AttendanceTotalsOcr {
     return heights[heights.length ~/ 2];
   }
 
-  /// Total, marked and attended are the last three numbers across the row.
-  ///
-  /// Taken from the right rather than the left because a wrapped course name
-  /// can end in digits of its own — a term stamp broken across lines leaves a
-  /// bare `27` sitting in the name column.
-  static TotalsRow? _rowFrom(List<OcrLine> band) {
-    final List<OcrLine> numbers = <OcrLine>[
-      for (final OcrLine l in band)
+  static TotalsRow? _rowFrom({
+    required List<OcrLine> band,
+    required List<OcrLine> cells,
+    required List<double> columns,
+  }) {
+    final List<OcrLine> digits = <OcrLine>[
+      for (final OcrLine l in cells)
         if (_intOf(l.text) != null) l,
     ]..sort((OcrLine a, OcrLine b) => a.box.centreX.compareTo(b.box.centreX));
-    if (numbers.length < 3) return null;
 
-    final List<OcrLine> cells = numbers.sublist(numbers.length - 3);
-    final int total = _intOf(cells[0].text)!;
-    final int held = _intOf(cells[1].text)!;
-    final int attended = _intOf(cells[2].text)!;
+    int? total;
+    int? held;
+    int? attended;
+    final List<OcrLine> placed = <OcrLine>[];
 
-    double? printed;
-    for (final OcrLine line in band) {
-      final RegExpMatch? match = _percent.firstMatch(line.text.trim());
-      if (match != null) {
-        printed = double.tryParse(match.group(1)!.replaceAll(',', '.'));
+    if (columns.length == 3) {
+      final double reach = _reach(columns);
+      for (final OcrLine cell in digits) {
+        final int column = _nearest(columns, cell.box.centreX, reach);
+        if (column < 0) continue;
+        placed.add(cell);
+        final int value = _intOf(cell.text)!;
+        switch (column) {
+          case 0:
+            total = value;
+          case 1:
+            held = value;
+          case 2:
+            attended = value;
+        }
       }
+    } else if (digits.length >= 3) {
+      placed.addAll(digits.sublist(digits.length - 3));
+      total = _intOf(placed[0].text);
+      held = _intOf(placed[1].text);
+      attended = _intOf(placed[2].text);
+    }
+
+    final double? printed = _printedPercent(band);
+
+    // The page shows its working, so one unread cell out of held and attended
+    // is not lost — the other one and the percentage give it back. Checked
+    // against the printed figure afterwards rather than trusted.
+    if (printed != null) {
+      if (attended == null && held != null) {
+        attended = (held * printed / 100).round();
+      } else if (held == null && attended != null && printed > 0) {
+        held = (attended * 100 / printed).round();
+      }
+      if (held != null &&
+          attended != null &&
+          (held == 0
+              ? attended != 0
+              : (attended * 100 / held - printed).abs() >= 0.55)) {
+        held = null;
+        attended = null;
+      }
+    }
+
+    // A dash with no digits beside it means the term has not started, and the
+    // figures stay editable on the subject. A dash *with* digits is ambiguous —
+    // an unread cell and a printed zero look the same here — so it is refused.
+    if (held == null || attended == null) {
+      final bool blank = digits.isEmpty &&
+          cells.any((OcrLine l) => _isBlankCell(l.text));
+      if (!blank) return null;
+      total = 0;
+      held = 0;
+      attended = 0;
     }
 
     final List<OcrLine> nameLines = <OcrLine>[
       for (final OcrLine l in band)
-        if (!cells.contains(l) &&
-            !_percent.hasMatch(l.text.trim()) &&
-            !_blankCell.hasMatch(l.text.trim()))
+        if (!_percent.hasMatch(l.text.trim()) &&
+            !_blankCell.hasMatch(l.text.trim()) &&
+            !_isFooter(l.text) &&
+            _intOf(l.text) == null)
           l,
     ]..sort((OcrLine a, OcrLine b) {
         final int byRow = a.box.centreY.compareTo(b.box.centreY);
@@ -314,6 +526,40 @@ class AttendanceTotalsOcr {
       printedPercent: printed,
       namesTwoCourses: _stampInside.hasMatch(name),
     );
+  }
+
+  static double? _printedPercent(List<OcrLine> band) {
+    double? printed;
+    for (final OcrLine line in band) {
+      final RegExpMatch? match = _percent.firstMatch(line.text.trim());
+      if (match != null) {
+        printed = double.tryParse(match.group(1)!.replaceAll(',', '.'));
+      }
+    }
+    return printed;
+  }
+
+  /// How far from a column's centre a cell may sit and still belong to it.
+  static double _reach(List<double> columns) {
+    double gap = double.infinity;
+    for (int i = 1; i < columns.length; i++) {
+      final double between = columns[i] - columns[i - 1];
+      if (between < gap) gap = between;
+    }
+    return gap / 2;
+  }
+
+  static int _nearest(List<double> columns, double x, double reach) {
+    int best = -1;
+    double closest = reach;
+    for (int i = 0; i < columns.length; i++) {
+      final double distance = (columns[i] - x).abs();
+      if (distance < closest) {
+        closest = distance;
+        best = i;
+      }
+    }
+    return best;
   }
 
   /// The course name with the portal's term stamp taken off.

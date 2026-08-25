@@ -52,6 +52,9 @@ class TodayScreen extends ConsumerWidget {
 
   static const double _pad = 20;
 
+  /// Clearance under the grid for the floating button.
+  static const double _gridBottomPad = 96;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final AppPalette p = context.palette;
@@ -121,7 +124,7 @@ class TodayScreen extends ConsumerWidget {
       slivers: view == HomeView.grid
           ? <Widget>[
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(14, 0, 14, 96),
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, _gridBottomPad),
                 // The viewport, not what is left to paint — that shrinks as
                 // you scroll and would resize the blocks under your finger.
                 sliver: SliverLayoutBuilder(
@@ -129,8 +132,11 @@ class TodayScreen extends ConsumerWidget {
                       SliverToBoxAdapter(
                     child: WeekGridView(
                       weekStart: gridWeek,
-                      availableHeight:
-                          c.viewportMainAxisExtent - c.precedingScrollExtent,
+                      // Less this sliver's own padding, which the viewport
+                      // extent does not know about.
+                      availableHeight: c.viewportMainAxisExtent -
+                          c.precedingScrollExtent -
+                          _gridBottomPad,
                     ),
                   ),
                 ),

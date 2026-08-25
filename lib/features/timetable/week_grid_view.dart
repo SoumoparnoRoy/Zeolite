@@ -49,6 +49,43 @@ class WeekGridView extends ConsumerWidget {
     final Map<int, List<ClassSession>> byDay =
         engine?.sessionsForWeekOf(weekStart) ?? <int, List<ClassSession>>{};
 
+    // The break splits the grid into two bands of blocks so the strip between
+    // them can run the whole width. Drawing it inside each day column instead
+    // would leave it broken by the column gaps, and a dashed line across seven
+    // columns reads as more empty cells rather than as a pause in the day.
+    final int split = grid.hasBreak ? grid.breakAfterBlock : grid.blockCount;
+
+    Widget rows(int from, int to) => Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            _TimeGutter(
+              grid: grid,
+              use24Hour: use24Hour,
+              blockHeight: blockHeight,
+              gap: gap,
+              width: gutterWidth,
+              from: from,
+              to: to,
+            ),
+            for (int i = 0; i < 7; i++) ...<Widget>[
+              SizedBox(width: gap),
+              Expanded(
+                child: _DayColumn(
+                  date: Dates.addDays(weekStart, i),
+                  sessions: byDay[Dates.keyOf(Dates.addDays(weekStart, i))] ??
+                      const <ClassSession>[],
+                  grid: grid,
+                  use24Hour: use24Hour,
+                  blockHeight: blockHeight,
+                  gap: gap,
+                  from: from,
+                  to: to,
+                ),
+              ),
+            ],
+          ],
+        );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
@@ -62,33 +99,60 @@ class WeekGridView extends ConsumerWidget {
           ],
         ),
         SizedBox(height: gap),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            _TimeGutter(
-              grid: grid,
-              use24Hour: use24Hour,
-              blockHeight: blockHeight,
-              gap: gap,
-              width: gutterWidth,
-            ),
-            for (int i = 0; i < 7; i++) ...<Widget>[
-              SizedBox(width: gap),
-              Expanded(
-                child: _DayColumn(
-                  date: Dates.addDays(weekStart, i),
-                  sessions: byDay[Dates.keyOf(Dates.addDays(weekStart, i))] ??
-                      const <ClassSession>[],
-                  grid: grid,
-                  use24Hour: use24Hour,
-                  blockHeight: blockHeight,
-                  gap: gap,
-                ),
-              ),
-            ],
-          ],
-        ),
+        rows(0, split),
+        if (grid.hasBreak) ...<Widget>[
+          SizedBox(height: gap),
+          _BreakBand(grid: grid, use24Hour: use24Hour, scale: scale),
+          SizedBox(height: gap),
+          rows(split, grid.blockCount),
+        ],
       ],
+    );
+  }
+}
+
+/// The gap between the morning and the afternoon.
+///
+/// Deliberately shorter and flatter than a block: it is not somewhere a class
+/// can go, and giving it a cell's height would invite tapping it.
+class _BreakBand extends StatelessWidget {
+  const _BreakBand({
+    required this.grid,
+    required this.use24Hour,
+    required this.scale,
+  });
+
+  final DayGrid grid;
+  final bool use24Hour;
+  final double scale;
+
+  @override
+  Widget build(BuildContext context) {
+    final AppPalette p = context.palette;
+    final String from = Clock.format(grid.breakStartMinutes,
+        use24Hour: use24Hour);
+    final String to = Clock.format(grid.breakEndMinutes, use24Hour: use24Hour);
+
+    return Container(
+      height: 20 * scale,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: p.isDark
+            ? Colors.white.withValues(alpha: 0.03)
+            : Colors.white.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+      ),
+      child: Text(
+        'Break  $from – $to',
+        maxLines: 1,
+        softWrap: false,
+        overflow: TextOverflow.ellipsis,
+        style: monoStyle(
+          color: p.textFaint,
+          size: 8,
+          weight: FontWeight.w700,
+        ),
+      ),
     );
   }
 }
@@ -159,6 +223,8 @@ class _TimeGutter extends StatelessWidget {
     required this.blockHeight,
     required this.gap,
     required this.width,
+    required this.from,
+    required this.to,
   });
 
   final DayGrid grid;
@@ -166,6 +232,10 @@ class _TimeGutter extends StatelessWidget {
   final double blockHeight;
   final double gap;
   final double width;
+
+  /// Half-open range of blocks, so the two sides of a break each draw their own.
+  final int from;
+  final int to;
 
   /// When a block starts, without the meridiem.
   ///
@@ -187,8 +257,8 @@ class _TimeGutter extends StatelessWidget {
       width: width,
       child: Column(
         children: <Widget>[
-          for (int i = 0; i < grid.blockCount; i++) ...<Widget>[
-            if (i > 0) SizedBox(height: gap),
+          for (int i = from; i < to; i++) ...<Widget>[
+            if (i > from) SizedBox(height: gap),
             SizedBox(
               height: blockHeight,
               child: Center(
@@ -220,6 +290,8 @@ class _DayColumn extends ConsumerWidget {
     required this.use24Hour,
     required this.blockHeight,
     required this.gap,
+    required this.from,
+    required this.to,
   });
 
   final DateTime date;
@@ -228,6 +300,9 @@ class _DayColumn extends ConsumerWidget {
   final bool use24Hour;
   final double blockHeight;
   final double gap;
+
+  final int from;
+  final int to;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -245,8 +320,8 @@ class _DayColumn extends ConsumerWidget {
     }
 
     final List<Widget> cells = <Widget>[];
-    int block = 0;
-    while (block < grid.blockCount) {
+    int block = from;
+    while (block < to) {
       // Copied out of the loop variable before any closure captures it — a
       // callback that closed over `block` itself would read whatever the loop
       // had advanced to by the time it ran, which is one past the last block.
@@ -280,7 +355,7 @@ class _DayColumn extends ConsumerWidget {
         final int blocks = grid.blocksFor(session.durationMinutes);
         if (blocks > span) span = blocks;
       }
-      final int remaining = grid.blockCount - index;
+      final int remaining = to - index;
       if (span > remaining) span = remaining;
 
       cells.add(

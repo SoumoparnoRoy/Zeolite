@@ -33,6 +33,18 @@ const AppSettings _settings = AppSettings(
   blockMinutes: 50,
 );
 
+/// The same day with a 40-minute break after the fourth block, which puts it
+/// at 12:20 and pushes the afternoon to 13:00.
+const AppSettings _withBreak = AppSettings(
+  onboarded: true,
+  defaultClassDurationMinutes: 50,
+  dayStartMinutes: 9 * 60,
+  dayEndMinutes: 17 * 60,
+  blockMinutes: 50,
+  breakAfterBlock: 4,
+  breakMinutes: 40,
+);
+
 TimetableData _fixture({List<ClassSlot> slots = const <ClassSlot>[]}) =>
     TimetableData(
       categories: const <ClassCategory>[
@@ -71,6 +83,42 @@ Widget _app(TimetableData data, {AppSettings settings = _settings}) {
 }
 
 void main() {
+  testWidgets('a break is drawn as a labelled row across the grid',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(_app(_fixture(), settings: _withBreak));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Break'), findsOneWidget);
+    expect(find.textContaining('12:20 pm – 1:00 pm'), findsOneWidget);
+
+    final double grid = tester.getSize(find.byType(WeekGridView)).width;
+    final Finder band = find
+        .ancestor(
+          of: find.textContaining('Break'),
+          matching: find.byType(Container),
+        )
+        .first;
+    expect(tester.getSize(band).width, closeTo(grid, 0.5));
+  });
+
+  testWidgets('no break, no row', (WidgetTester tester) async {
+    await tester.pumpWidget(_app(_fixture()));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Break'), findsNothing);
+  });
+
+  testWidgets('the afternoon still starts where the break left off',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(_app(_fixture(), settings: _withBreak));
+    await tester.pumpAndSettle();
+
+    // Four blocks before it, and the first one after starts at 13:00 rather
+    // than carrying on from noon.
+    expect(find.text('9:00'), findsOneWidget);
+    expect(find.text('1:00'), findsOneWidget);
+  });
+
   testWidgets('lays out one row per block', (WidgetTester tester) async {
     await tester.pumpWidget(_app(_fixture()));
     await tester.pumpAndSettle();

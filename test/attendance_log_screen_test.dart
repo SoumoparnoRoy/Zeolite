@@ -133,13 +133,15 @@ void main() {
     expect(find.text(Dates.formatFull(Dates.addDays(today, -3))), findsOneWidget);
   });
 
-  testWidgets('explains a mark whose weekly class no longer exists',
+  testWidgets('explains a mark with no class sitting under it',
       (WidgetTester tester) async {
     await tester.pumpWidget(_app(_fixture()));
     await tester.pumpAndSettle();
 
+    // Worded for both ways one appears: a deleted rule, and a mark imported
+    // against a timetable that was never built.
     expect(
-      find.textContaining('has been deleted'),
+      find.textContaining('No class on your timetable sits here'),
       findsOneWidget,
     );
   });

@@ -68,6 +68,7 @@ class TimetableImport {
         endMinutes: span.end,
         room: at(3),
         teacher: at(4),
+        blocks: span.blocks,
       ),
     );
   }
@@ -131,7 +132,11 @@ class TimetableImport {
         return _Span.bad('the day only has ${grid.blockCount} blocks');
       }
       if (last < first) return _Span.bad('block $last comes before $first');
-      return _Span(grid.startOf(first - 1), grid.endOf(last - 1));
+      return _Span(
+        grid.startOf(first - 1),
+        grid.endOf(last - 1),
+        blocks: last - first + 1,
+      );
     }
 
     final RegExp pattern =
@@ -143,7 +148,15 @@ class TimetableImport {
     final int end =
         int.parse(clock.group(3)!) * 60 + int.parse(clock.group(4)!);
     if (end <= start) return _Span.bad('ends before it starts');
-    return _Span(start, end);
+    return _Span(
+      start,
+      end,
+      // Clock times need not line up with the grid; a span that is not a whole
+      // number of blocks counts as one rather than being rounded into a claim.
+      blocks: grid.isConfigured && (end - start) % grid.blockMinutes == 0
+          ? (end - start) ~/ grid.blockMinutes
+          : 1,
+    );
   }
 }
 
@@ -156,6 +169,7 @@ class ImportedClass {
     required this.endMinutes,
     this.room,
     this.teacher,
+    this.blocks = 1,
   });
 
   final String subjectName;
@@ -164,6 +178,10 @@ class ImportedClass {
   final int endMinutes;
   final String? room;
   final String? teacher;
+
+  /// How many of the day's blocks this class fills, which is what an
+  /// institution counting a two-hour lab twice is really counting.
+  final int blocks;
 
   /// Subjects are matched by name, trimmed and case-insensitively, so the same
   /// code typed twice attaches to one subject rather than making two.
@@ -243,10 +261,11 @@ extension _FirstOrNull<T> on List<T> {
 
 @immutable
 class _Span {
-  const _Span(this.start, this.end) : error = null;
-  const _Span.bad(this.error) : start = 0, end = 0;
+  const _Span(this.start, this.end, {this.blocks = 1}) : error = null;
+  const _Span.bad(this.error) : start = 0, end = 0, blocks = 1;
 
   final int start;
   final int end;
+  final int blocks;
   final String? error;
 }

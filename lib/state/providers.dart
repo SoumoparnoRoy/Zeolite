@@ -18,6 +18,7 @@ import '../data/settings/app_settings.dart';
 import '../domain/attendance_log.dart';
 import '../domain/attendance_stats.dart';
 import '../domain/attendance_totals_import.dart';
+import '../domain/notion_import.dart';
 import '../domain/attendance_totals_ocr.dart';
 import '../domain/day_grid.dart';
 import '../domain/schedule_engine.dart';
@@ -714,7 +715,13 @@ class TimetableActions {
   /// Additive, so nothing here destroys data — but ten subjects and twenty-one
   /// classes arrive in one tap, and taking them back out again is a delete per
   /// subject. That asymmetry is what the snapshot is for.
-  Future<void> importTimetable(TimetableImportResult result) async {
+  /// [weighByBlocks] gives a class that fills two blocks a weight of two, for
+  /// an institution that counts it that way. Off by default, so a paste
+  /// behaves exactly as it always has unless the user asks.
+  Future<void> importTimetable(
+    TimetableImportResult result, {
+    bool weighByBlocks = false,
+  }) async {
     final TimetableData? data = _ref.read(timetableProvider).value;
     if (data == null || result.classes.isEmpty) return;
 
@@ -753,6 +760,7 @@ class TimetableActions {
           startMinutes: c.startMinutes,
           endMinutes: c.endMinutes,
           room: c.room,
+          weight: weighByBlocks ? c.blocks : 1,
           startDate: start,
         ),
     ]);
@@ -830,6 +838,81 @@ class TimetableActions {
     await _refresh();
     _undo.arm(before);
     return decisions.length;
+  }
+
+  /// Writes a Notion class log as marks against the subjects it names.
+  ///
+  /// Additive like the other two imports: a subject the user unticked is not
+  /// touched. A [NotionMatch.overlap] subject has its marks inside the
+  /// export's own span cleared first — the export is the whole truth for those
+  /// dates, so keeping both would double the term.
+  Future<int> importNotionLog(List<NotionPlanSubject> chosen) async {
+    final TimetableData? data = _ref.read(timetableProvider).value;
+    if (data == null || chosen.isEmpty) return 0;
+
+    final DatabaseSnapshot before = await _repo.snapshot();
+    final List<int> palette = AppColors.subjectPalette;
+
+    // A tag per label the file actually uses, matched against the user's own
+    // list first so an import never makes a second "Proxy".
+    final Map<String, int> tagIds = <String, int>{};
+    for (final NotionPlanSubject planned in chosen) {
+      for (final NotionPlacement placed in planned.placements) {
+        final String? name = placed.row.tagName;
+        if (name == null || tagIds.containsKey(name)) continue;
+        final Tag? existing = data.tags
+            .where((Tag t) =>
+                t.name.trim().toLowerCase() == name.toLowerCase())
+            .firstOrNull;
+        tagIds[name] =
+            existing?.id ?? await _repo.insertTag(Tag(name: name));
+      }
+    }
+
+    final List<AttendanceRecord> records = <AttendanceRecord>[];
+    int created = 0;
+
+    for (final NotionPlanSubject planned in chosen) {
+      if (planned.placements.isEmpty) continue;
+
+      int? id = planned.subject?.id;
+      if (id == null) {
+        id = await _repo.insertSubject(
+          Subject(
+            name: planned.name,
+            code: planned.code,
+            colorValue:
+                palette[(data.subjects.length + created) % palette.length],
+          ),
+        );
+        created++;
+      } else if (planned.match == NotionMatch.overlap) {
+        final List<DateTime> dates = planned.placements
+            .map((NotionPlacement p) => p.row.date)
+            .toList()
+          ..sort();
+        await _repo.clearAttendanceBetween(id, dates.first, dates.last);
+      }
+
+      for (final NotionPlacement placed in planned.placements) {
+        records.add(
+          AttendanceRecord(
+            subjectId: id,
+            date: placed.row.date,
+            startMinutes: placed.startMinutes,
+            status: placed.row.status,
+            weight: placed.weight,
+            tagId: tagIds[placed.row.tagName],
+            markedAt: DateTime.now(),
+          ),
+        );
+      }
+    }
+
+    await _repo.setManyAttendance(records);
+    await _refresh();
+    _undo.arm(before);
+    return records.length;
   }
 
   /// The first teacher named against the subject anywhere in the paste. A

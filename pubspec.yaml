@@ -37,6 +37,9 @@ dependencies:
   # URI it can take permission on. Neither package declares a permission.
   saf_util: ^3.1.0
   saf_stream: ^4.0.1
+  # A Notion export arrives as a zip holding another zip, which no phone file
+  # manager opens comfortably. Pure Dart, MIT.
+  archive: ^4.2.0
 
 dev_dependencies:
   flutter_test:

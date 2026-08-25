@@ -150,4 +150,23 @@ void main() {
       expect(result.hasProblems, isFalse);
     });
   });
+  group('how many blocks a class fills', () {
+    test('a single block is one', () {
+      expect(_parse('Maths, We, 2').classes.single.blocks, 1);
+    });
+
+    test('a block range counts them', () {
+      expect(_parse('Maths, We, 2-4').classes.single.blocks, 3);
+    });
+
+    test('clock times that divide the grid are counted too', () {
+      // 9:10-10:50 is two 50-minute blocks.
+      expect(_parse('Maths, We, 9:10-10:50').classes.single.blocks, 2);
+    });
+
+    test('a span the grid cannot divide claims nothing', () {
+      expect(_parse('Maths, We, 9:10-10:20').classes.single.blocks, 1);
+    });
+  });
+
 }

@@ -13,6 +13,7 @@ import '../../data/models/holiday.dart';
 import '../../data/models/subject.dart';
 import '../../data/settings/app_settings.dart';
 import '../../domain/holiday_runs.dart';
+import '../../domain/notion_export.dart';
 import '../../services/backup_folder.dart';
 import '../../services/backup_service.dart';
 import '../../services/notification_service.dart';
@@ -21,6 +22,7 @@ import '../../widgets/common.dart';
 import '../../widgets/gradient_header.dart';
 import '../../widgets/undo_snack.dart';
 import '../subjects/class_editor_sheets.dart';
+import '../subjects/notion_import_screen.dart';
 import '../timetable/import_screen.dart';
 import '../subjects/subjects_screen.dart';
 import 'timetable_layout_section.dart';
@@ -129,6 +131,16 @@ class SettingsScreen extends ConsumerWidget {
                           const ImportTimetableScreen(),
                     ),
                   ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              SurfaceCard(
+                padding: EdgeInsets.zero,
+                child: _Row(
+                  icon: Icons.history_rounded,
+                  title: 'Import a class log',
+                  value: 'A Notion export of what you have attended',
+                  onTap: () => _importNotionLog(context, ref),
                 ),
               ),
               const SizedBox(height: AppSpacing.sm),
@@ -846,6 +858,36 @@ class SettingsScreen extends ConsumerWidget {
         ),
       );
     }
+  }
+
+  /// Reads the file and hands it to the preview, which owns the writing — the
+  /// same split the portal page's import uses.
+  Future<void> _importNotionLog(BuildContext context, WidgetRef ref) async {
+    final PlatformFile? picked = await FilePicker.pickFile(
+      dialogTitle: 'Choose a Notion export',
+    );
+    if (picked == null || !context.mounted) return;
+
+    final NotionExport export = NotionExport.read(await picked.readAsBytes());
+    if (!context.mounted) return;
+
+    if (export.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(export.problems.isEmpty
+              ? 'No classes could be read out of that file.'
+              : export.problems.first),
+          duration: const Duration(seconds: 6),
+        ),
+      );
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (BuildContext context) => NotionImportScreen(export: export),
+      ),
+    );
   }
 
   /// Confirms before restoring, because the file dialog made this two taps from

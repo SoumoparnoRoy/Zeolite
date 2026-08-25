@@ -39,6 +39,10 @@ class _ImportTimetableScreenState
   bool _saving = false;
   bool _reading = false;
 
+  /// Off unless asked for: most timetables count every class once, and turning
+  /// this on by default would silently double every lab already being pasted.
+  bool _weighByBlocks = false;
+
   @override
   void dispose() {
     _controller.dispose();
@@ -52,7 +56,7 @@ class _ImportTimetableScreenState
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
     final TimetableActions actions = ref.read(actionsProvider);
     final int count = result.classes.length;
-    await actions.importTimetable(result);
+    await actions.importTimetable(result, weighByBlocks: _weighByBlocks);
     if (mounted) Navigator.of(context).pop();
     showUndoSnack(
       messenger,
@@ -188,6 +192,14 @@ class _ImportTimetableScreenState
               for (final ImportLine line in result.problems)
                 _ProblemRow(line: line),
             ],
+            if (result.classes.isNotEmpty &&
+                result.classes.any((ImportedClass c) => c.blocks > 1)) ...<Widget>[
+              const SizedBox(height: AppSpacing.xl),
+              _BlockWeightChoice(
+                value: _weighByBlocks,
+                onChanged: (bool v) => setState(() => _weighByBlocks = v),
+              ),
+            ],
             if (result.classes.isNotEmpty) ...<Widget>[
               const SizedBox(height: AppSpacing.xl),
               const SectionHeader('What will be added'),
@@ -227,6 +239,55 @@ class _FormatHelp extends StatelessWidget {
       'Subjects are matched by name, so the same one typed twice is one '
       'subject. Nothing is written until you say so, and importing adds to '
       'what you already have.',
+    );
+  }
+}
+
+/// Offered only when the paste actually holds a class longer than one block,
+/// so a timetable of single periods never has to read the question.
+class _BlockWeightChoice extends StatelessWidget {
+  const _BlockWeightChoice({required this.value, required this.onChanged});
+
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final AppPalette p = context.palette;
+    return SurfaceCard(
+      onTap: () => onChanged(!value),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Checkbox.adaptive(
+            value: value,
+            onChanged: (bool? v) => onChanged(v ?? false),
+            visualDensity: VisualDensity.compact,
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const Text(
+                  'Count a two-block class as two',
+                  style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'For an institution that counts a two-hour lab twice towards '
+                  'attendance. You can change this per class afterwards.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.4,
+                    color: p.textTertiary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

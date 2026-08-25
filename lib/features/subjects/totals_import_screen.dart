@@ -201,9 +201,16 @@ class _RowCard extends StatelessWidget {
     final AppPalette p = context.palette;
     final TotalsRow figures = row.row;
 
+    // Nothing to bring in and nothing to correct by hand, so unlike the other
+    // refusals this one cannot be ticked back on.
+    final bool refused = figures.numbersUnread;
+
     final String? warning = figures.namesTwoCourses
         ? 'Two courses ran together here, so one of them lost its numbers. '
             'Read the page again from a larger image.'
+        : refused
+        ? 'The numbers beside this course could not be read, so there is '
+            'nothing to bring in. Read the page again from a larger image.'
         : !figures.isOrdered
         ? 'More attended than held — one of the three was misread.'
         : !figures.percentAgrees
@@ -217,7 +224,7 @@ class _RowCard extends StatelessWidget {
                 : null;
 
     return SurfaceCard(
-      onTap: onToggle,
+      onTap: refused ? null : onToggle,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -225,7 +232,7 @@ class _RowCard extends StatelessWidget {
             children: <Widget>[
               Checkbox.adaptive(
                 value: !excluded,
-                onChanged: (_) => onToggle(),
+                onChanged: refused ? null : (_) => onToggle(),
                 visualDensity: VisualDensity.compact,
               ),
               const SizedBox(width: 4),
@@ -257,9 +264,12 @@ class _RowCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '${figures.attended} of ${figures.held} attended · '
-            '${figures.expectedTotal == null ? 'term total unread' : '${figures.expectedTotal} all term'}'
-            '${row.current == null ? '' : '  (now ${row.current})'}',
+            refused
+                ? 'numbers unread'
+                    '${row.current == null ? '' : '  (now ${row.current})'}'
+                : '${figures.attended} of ${figures.held} attended · '
+                    '${figures.expectedTotal == null ? 'term total unread' : '${figures.expectedTotal} all term'}'
+                    '${row.current == null ? '' : '  (now ${row.current})'}',
             style: monoStyle(color: p.textTertiary, size: 10.5),
           ),
           if (warning != null) ...<Widget>[

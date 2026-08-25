@@ -156,6 +156,64 @@ void main() {
     expect(find.text('Bring in 1'), findsOneWidget);
   });
 
+  testWidgets('a row whose numbers went unread is shown, not hidden',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      _app(
+        const AttendanceTotals(
+          rows: <TotalsRow>[
+            ..._rows,
+            TotalsRow(
+              subject: 'Thermodynamics',
+              expectedTotal: null,
+              held: 0,
+              attended: 0,
+              numbersUnread: true,
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Thermodynamics'), findsOneWidget);
+    expect(find.textContaining('numbers unread'), findsOneWidget);
+    expect(
+      find.textContaining('could not be read, so there is nothing to bring in'),
+      findsOneWidget,
+    );
+    expect(find.text('Bring in 2'), findsOneWidget);
+  });
+
+  testWidgets('an unread row cannot be ticked back on',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      _app(
+        const AttendanceTotals(
+          rows: <TotalsRow>[
+            ..._rows,
+            TotalsRow(
+              subject: 'Thermodynamics',
+              expectedTotal: null,
+              held: 0,
+              attended: 0,
+              numbersUnread: true,
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Bring in 2'), findsOneWidget);
+    await tester.tap(find.text('Thermodynamics'));
+    await tester.pumpAndSettle();
+
+    // Letting this one through would write zeroes over a stored subject, so
+    // the tap is ignored rather than merely discouraged.
+    expect(find.text('Bring in 2'), findsOneWidget);
+  });
+
   testWidgets('a page that does not add up says so before anything is applied',
       (WidgetTester tester) async {
     await tester.pumpWidget(

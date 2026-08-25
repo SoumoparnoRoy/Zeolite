@@ -323,7 +323,12 @@ void main() {
         _sheet(sheet),
         cells: _cells(sheet, missing: <int, Set<int>>{3: <int>{1}}),
       )!;
-      expect(totals.rows, hasLength(3));
+
+      expect(totals.rows, hasLength(4));
+      expect(totals.rows.last.subject, 'Imaging Lab');
+      expect(totals.rows.last.numbersUnread, isTrue);
+      expect(totals.rows.last.held, 0);
+      expect(totals.rows.last.attended, 0);
     });
 
     test('the footer pins the one term total that went unread', () {
@@ -364,7 +369,13 @@ void main() {
         ..add(_at('7', _total, 320, w: 40))
         ..add(_at('-', _percent, 320, w: 40));
       final AttendanceTotals totals = AttendanceTotalsOcr.read(lines)!;
-      expect(totals.rows, hasLength(3));
+
+      expect(totals.rows, hasLength(4));
+      final TotalsRow refused = totals.rows.last;
+      expect(refused.subject, 'Imaging Lab');
+      expect(refused.numbersUnread, isTrue);
+      expect(refused.isTrustworthy, isFalse);
+      expect(totals.suspect, contains(refused));
     });
   });
 
@@ -574,6 +585,65 @@ void main() {
       expect(page.rows, hasLength(3));
       expect(page.printedTotal, 43);
       expect(page.printedAttended, 34);
+    });
+  });
+
+  group('a row whose numbers cannot be read', () {
+    test('counts nothing towards the page, so the footer still disagrees', () {
+      final List<OcrLine> lines = _sheet(
+        _threeRows,
+        footer: 'Total Session:50',
+        footerAttended: 'Total Attended Session: 40',
+      )
+        ..add(_at('Imaging Lab_Odd_2026-27', _name, 320, w: 300))
+        ..add(_at('7', _total, 320, w: 40))
+        ..add(_at('-', _percent, 320, w: 40));
+      final AttendanceTotals totals = AttendanceTotalsOcr.read(lines)!;
+
+      expect(totals.rows, hasLength(4));
+      expect(totals.attendedSum, 34);
+      expect(totals.addsUp, isFalse);
+    });
+
+    test('stops the footer pinning a term total it no longer covers', () {
+      // 45 is all three rows, so what is left over after the two readable
+      // ones is not the third row's alone.
+      const List<_Row> sheet = <_Row>[
+        _Row(<String>['Signal Theory_Odd_2026-27'], 18, 16, 14,
+            percent: '87.50%'),
+        _Row(<String>['Control Systems_Odd_2026-27'], 20, 19, 16,
+            percent: '84.21%'),
+      ];
+      final List<OcrLine> lines = _sheet(sheet, footer: 'Total Session:45')
+        ..add(_at('Imaging Lab_Odd_2026-27', _name, 260, w: 300))
+        ..add(_at('7', _total, 260, w: 40))
+        ..add(_at('-', _percent, 260, w: 40));
+      final AttendanceTotals totals = AttendanceTotalsOcr.read(lines)!;
+
+      final TotalsRow unreadable =
+          totals.rows.firstWhere((TotalsRow r) => r.numbersUnread);
+      expect(unreadable.expectedTotal, isNull);
+      for (final TotalsRow r in totals.rows) {
+        expect(r.numbersUnread || r.expectedTotal != null, isTrue);
+      }
+    });
+
+    test('a course with no sessions yet is not refused', () {
+      // A dash and no digits at all is a term that has not started, which is
+      // readable — it must not be swept up by the refusal above.
+      final AttendanceTotals totals = AttendanceTotalsOcr.read(
+        _sheet(const <_Row>[
+          _Row(<String>['Signal Theory_Odd_2026-27'], 18, 16, 14,
+              percent: '87.50%'),
+          _Row(<String>['Imaging Lab_Odd_2026-27'], 0, 0, 0,
+              percent: '-', unread: true),
+        ]),
+      )!;
+
+      final TotalsRow blank = totals.rows.last;
+      expect(blank.subject, 'Imaging Lab');
+      expect(blank.numbersUnread, isFalse);
+      expect(blank.isTrustworthy, isTrue);
     });
   });
 

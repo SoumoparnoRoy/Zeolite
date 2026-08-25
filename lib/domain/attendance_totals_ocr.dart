@@ -13,6 +13,7 @@ class TotalsRow {
     required this.attended,
     this.printedPercent,
     this.namesTwoCourses = false,
+    this.numbersUnread = false,
   });
 
   final String subject;
@@ -33,6 +34,15 @@ class TotalsRow {
   /// swept into the row below.
   final bool namesTwoCourses;
 
+  /// Set when the row's band had digits but none of them could be placed under
+  /// held and attended.
+  ///
+  /// The course is real and its name was read, so it is shown and refused
+  /// rather than dropped: a course that vanishes silently is one the reader
+  /// has no reason to go looking for, and the page's own totals are the only
+  /// thing that would ever hint at it.
+  final bool numbersUnread;
+
   /// Whether the printed percentage agrees with the two numbers beside it.
   ///
   /// This is the check a timetable sheet could never offer: the portal shows
@@ -51,7 +61,8 @@ class TotalsRow {
     return attended <= held && (total == null || held <= total);
   }
 
-  bool get isTrustworthy => percentAgrees && isOrdered && !namesTwoCourses;
+  bool get isTrustworthy =>
+      percentAgrees && isOrdered && !namesTwoCourses && !numbersUnread;
 
   TotalsRow withTotal(int total) => TotalsRow(
         subject: subject,
@@ -60,6 +71,7 @@ class TotalsRow {
         attended: attended,
         printedPercent: printedPercent,
         namesTwoCourses: namesTwoCourses,
+        numbersUnread: numbersUnread,
       );
 }
 
@@ -388,6 +400,9 @@ class AttendanceTotalsOcr {
   /// be split any number of ways, which is guessing rather than deriving.
   static List<TotalsRow> _fillLastTotal(List<TotalsRow> rows, int? printed) {
     if (printed == null) return rows;
+    // The printed total counts the unreadable row's sessions too, so the
+    // residual is not one course's — it is two courses' added together.
+    if (rows.any((TotalsRow r) => r.numbersUnread)) return rows;
     final List<int> unknown = <int>[
       for (int i = 0; i < rows.length; i++)
         if (rows[i].expectedTotal == null) i,
@@ -579,19 +594,45 @@ class AttendanceTotalsOcr {
       }
     }
 
+    final String name = _nameFrom(band);
+    // Without a name there is no course to show, only a stray band — a footer
+    // fragment or a rule the recogniser read as a digit.
+    if (name.isEmpty) return null;
+
     // A dash with no digits beside it means the term has not started, and the
     // figures stay editable on the subject. A dash *with* digits is ambiguous —
     // an unread cell and a printed zero look the same here — so it is refused.
     if (held == null || attended == null) {
       final bool blank = digits.isEmpty &&
           cells.any((OcrLine l) => _isBlankCell(l.text));
-      if (!blank) return null;
+      if (!blank) {
+        return TotalsRow(
+          subject: name,
+          expectedTotal: null,
+          held: 0,
+          attended: 0,
+          printedPercent: printed,
+          namesTwoCourses: _stampInside.hasMatch(name),
+          numbersUnread: true,
+        );
+      }
       total = 0;
       held = 0;
       attended = 0;
     }
 
-    final List<OcrLine> nameLines = <OcrLine>[
+    return TotalsRow(
+      subject: name,
+      expectedTotal: total,
+      held: held,
+      attended: attended,
+      printedPercent: printed,
+      namesTwoCourses: _stampInside.hasMatch(name),
+    );
+  }
+
+  static String _nameFrom(List<OcrLine> band) {
+    final List<OcrLine> lines = <OcrLine>[
       for (final OcrLine l in band)
         if (!_percent.hasMatch(l.text.trim()) &&
             !_blankCell.hasMatch(l.text.trim()) &&
@@ -602,20 +643,7 @@ class AttendanceTotalsOcr {
         final int byRow = a.box.centreY.compareTo(b.box.centreY);
         return byRow != 0 ? byRow : a.box.centreX.compareTo(b.box.centreX);
       });
-
-    final String name = cleanName(
-      nameLines.map((OcrLine l) => l.text).join(' '),
-    );
-    if (name.isEmpty) return null;
-
-    return TotalsRow(
-      subject: name,
-      expectedTotal: total,
-      held: held,
-      attended: attended,
-      printedPercent: printed,
-      namesTwoCourses: _stampInside.hasMatch(name),
-    );
+    return cleanName(lines.map((OcrLine l) => l.text).join(' '));
   }
 
   static double? _printedPercent(List<OcrLine> band) {

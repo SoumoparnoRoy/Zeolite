@@ -255,6 +255,64 @@ void main() {
     expect(target.height, greaterThanOrEqualTo(44));
   });
 
+  /// Height of one free block, measured off the empty cell's own box.
+  Future<double> blockHeightAt(WidgetTester tester, Size size) async {
+    tester.view.physicalSize = size;
+    tester.view.devicePixelRatio = 1;
+    await tester.pumpWidget(_host(const TodayScreen(), AppTheme.light()));
+    await tester.pumpAndSettle();
+    // The chosen view outlives a pump, so a second measurement is already on
+    // the grid and has no toggle left to press.
+    final Finder toggle = find.byTooltip('Show the week grid');
+    if (toggle.evaluate().isNotEmpty) {
+      await tester.tap(toggle);
+      await tester.pumpAndSettle();
+    }
+    expect(tester.takeException(), isNull);
+    return tester
+        .getSize(
+          find
+              .ancestor(
+                of: find.byIcon(Icons.add_rounded).first,
+                matching: find.byType(Material),
+              )
+              .first,
+        )
+        .height;
+  }
+
+  testWidgets('the week grid spends the height the screen actually has',
+      (WidgetTester tester) async {
+    addTearDown(tester.view.reset);
+
+    final double shortScreen = await blockHeightAt(tester, _smallPhone);
+    final double tallScreen =
+        await blockHeightAt(tester, const Size(320, 1100));
+
+    // Same width, more height: the blocks take the difference rather than
+    // leaving it empty below the grid.
+    expect(tallScreen, greaterThan(shortScreen));
+  });
+
+  testWidgets('a block is never squashed and never a slab',
+      (WidgetTester tester) async {
+    addTearDown(tester.view.reset);
+
+    for (final Size size in <Size>[
+      _smallPhone,
+      const Size(320, 1100),
+      const Size(600, 900),
+      _tablet,
+    ]) {
+      final double block = await blockHeightAt(tester, size);
+      final double scale = AppScale.of(size);
+      expect(block, greaterThanOrEqualTo(46 * scale - 0.5),
+          reason: 'too squashed at $size');
+      expect(block, lessThanOrEqualTo(88 * scale + 0.5),
+          reason: 'too tall at $size');
+    }
+  });
+
   testWidgets('the week grid fits all seven days without scrolling sideways',
       (WidgetTester tester) async {
     tester.view.physicalSize = _smallPhone;

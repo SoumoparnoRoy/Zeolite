@@ -45,7 +45,10 @@ const AppSettings _withBreak = AppSettings(
   breakMinutes: 40,
 );
 
-TimetableData _fixture({List<ClassSlot> slots = const <ClassSlot>[]}) =>
+TimetableData _fixture({
+  List<ClassSlot> slots = const <ClassSlot>[],
+  List<Holiday> holidays = const <Holiday>[],
+}) =>
     TimetableData(
       categories: const <ClassCategory>[
         ClassCategory(id: 1, name: 'Lab', defaultDurationMinutes: 100),
@@ -61,7 +64,7 @@ TimetableData _fixture({List<ClassSlot> slots = const <ClassSlot>[]}) =>
       ],
       slots: slots,
       extras: <ExtraClass>[],
-      holidays: const <Holiday>[],
+      holidays: holidays,
       records: <AttendanceRecord>[],
     );
 
@@ -117,6 +120,48 @@ void main() {
     // than carrying on from noon.
     expect(find.text('9:00'), findsOneWidget);
     expect(find.text('1:00'), findsOneWidget);
+  });
+
+  testWidgets('a holiday is named in the grid, not left blank',
+      (WidgetTester tester) async {
+    final DateTime monday = Dates.startOfWeek(Dates.today());
+    await tester.pumpWidget(
+      _app(
+        _fixture(
+          slots: <ClassSlot>[
+            ClassSlot(
+              id: 1,
+              subjectId: 1,
+              weekday: DateTime.monday,
+              startMinutes: 9 * 60,
+              endMinutes: 10 * 60,
+              startDate: Dates.addDays(monday, -30),
+            ),
+          ],
+          holidays: <Holiday>[Holiday(date: monday, name: 'Founders Day')],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // The recurring class is gone, as it should be — but the day says why.
+    expect(find.text('PH'), findsNothing);
+    expect(find.text('Founders Day'), findsOneWidget);
+  });
+
+  testWidgets('a one-off class on a holiday still shows',
+      (WidgetTester tester) async {
+    final DateTime monday = Dates.startOfWeek(Dates.today());
+    await tester.pumpWidget(
+      _app(
+        _fixture(holidays: <Holiday>[Holiday(date: monday, name: 'Rest day')]),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Nothing recurring, so the whole column is the holiday panel, named once
+    // rather than once per free block.
+    expect(find.text('Rest day'), findsOneWidget);
   });
 
   testWidgets('lays out one row per block', (WidgetTester tester) async {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show SliverConstraints;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
@@ -121,8 +122,17 @@ class TodayScreen extends ConsumerWidget {
           ? <Widget>[
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(14, 0, 14, 96),
-                sliver: SliverToBoxAdapter(
-                  child: WeekGridView(weekStart: gridWeek),
+                // The viewport, not what is left to paint — that shrinks as
+                // you scroll and would resize the blocks under your finger.
+                sliver: SliverLayoutBuilder(
+                  builder: (BuildContext context, SliverConstraints c) =>
+                      SliverToBoxAdapter(
+                    child: WeekGridView(
+                      weekStart: gridWeek,
+                      availableHeight:
+                          c.viewportMainAxisExtent - c.precedingScrollExtent,
+                    ),
+                  ),
                 ),
               ),
             ]

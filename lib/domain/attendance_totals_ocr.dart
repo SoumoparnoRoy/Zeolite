@@ -142,9 +142,23 @@ class AttendanceTotalsOcr {
 
   /// The same stamp anywhere but the end, which means two rows were read as
   /// one — the second course's name landed in the first course's band.
+  ///
+  /// What follows has to contain a letter. A cell the recogniser glued onto
+  /// the name leaves digits after the stamp, and that is one course with a
+  /// misread cell rather than two courses.
   static final RegExp _stampInside = RegExp(
-    r'[_\s]' '$_term' r'[_\s]*\d{4}\s*-?\s*\d{0,4}[_\s]+\S',
+    r'[_\s]' '$_term' r'[_\s]*\d{4}\s*-?\s*\d{0,4}[_\s]+\S*[A-Za-z]',
     caseSensitive: false,
+  );
+
+  static final RegExp _letter = RegExp('[A-Za-z]');
+
+  /// A number cell that came back glued to the name beside it.
+  ///
+  /// Group 1 is the rule and space between the two and has to be there:
+  /// without it the `27` of `_Odd_2026-27` is a cell as well.
+  static final RegExp _trailingCell = RegExp(
+    '($_rule)' r'(\d{1,3}(?:[.,]\d+)?\s*%|\d{1,4})' '$_rule' r'$',
   );
 
   static final RegExp _footerTotal =
@@ -217,13 +231,21 @@ class AttendanceTotalsOcr {
     if (!looksLikeTotals(lines)) return null;
 
     final double headerBottom = _headerBottom(lines);
+    final List<OcrLine> peeled = <OcrLine>[];
     final List<OcrLine> body = <OcrLine>[
-      for (final OcrLine line in lines)
+      for (final OcrLine line
+          in _splitTrailingCells(lines, numberColumns(lines), peeled))
         if (line.box.centreY > headerBottom) line,
     ];
 
+    // A cell peeled off a name is one the sharper read did not return either,
+    // or the name would not have carried it, so it joins [cells] rather than
+    // competing with it.
+    final List<OcrLine> read = cells == null
+        ? body
+        : <OcrLine>[...cells, ...peeled];
     final List<OcrLine> numbers = <OcrLine>[
-      for (final OcrLine line in cells ?? body)
+      for (final OcrLine line in read)
         if (line.box.centreY > headerBottom &&
             (_intOf(line.text) != null || _isBlankCell(line.text)))
           line,
@@ -270,7 +292,7 @@ class AttendanceTotalsOcr {
     final int? printedAttended = _footerValue(lines, _footerAttended);
 
     final List<TotalsRow> filled = _fillLastTotal(rows, printedTotal);
-    final AttendanceTotals read = AttendanceTotals(
+    final AttendanceTotals page = AttendanceTotals(
       rows: filled,
       printedTotal: printedTotal,
       printedAttended: printedAttended,
@@ -282,14 +304,82 @@ class AttendanceTotalsOcr {
     // nothing, which beats claiming the page disagrees when it does not.
     return AttendanceTotals(
       rows: filled,
-      printedTotal: (read.printedTotal ?? read.totalSum) < read.totalSum
+      printedTotal: (page.printedTotal ?? page.totalSum) < page.totalSum
           ? null
-          : read.printedTotal,
+          : page.printedTotal,
       printedAttended:
-          (read.printedAttended ?? read.attendedSum) < read.attendedSum
+          (page.printedAttended ?? page.attendedSum) < page.attendedSum
               ? null
-              : read.printedAttended,
+              : page.printedAttended,
     );
+  }
+
+  /// Peels cells the recogniser read as part of the name back off it.
+  ///
+  /// One merge costs a row twice: the number is lost, and the term stamp is
+  /// left in the middle of the name, where [_stampInside] reads it as two
+  /// courses run together and refuses the row outright.
+  ///
+  /// A cell has to reach into [block], the number columns off the header,
+  /// which is what stops a course whose name genuinely ends in a digit from
+  /// being cut short. Position within the line is apportioned by character
+  /// count, which is rough — the gap the recogniser swallowed is one space in
+  /// the text and most of a column on the page.
+  static List<OcrLine> _splitTrailingCells(
+    List<OcrLine> lines,
+    OcrBox? block,
+    List<OcrLine> into,
+  ) {
+    if (block == null) return lines;
+    final List<OcrLine> split = <OcrLine>[];
+    for (final OcrLine line in lines) {
+      final String raw = line.text;
+      // The footer carries a number of its own, and cutting it loose leaves a
+      // cell below the last row that would anchor a row that is not there.
+      if (raw.isEmpty || _isFooter(raw)) {
+        split.add(line);
+        continue;
+      }
+      final double perChar = line.box.width / raw.length;
+      double x(int i) => line.box.left + perChar * i;
+
+      int end = raw.trimRight().length;
+      final List<OcrLine> cells = <OcrLine>[];
+      while (true) {
+        final RegExpMatch? match =
+            _trailingCell.firstMatch(raw.substring(0, end));
+        if (match == null ||
+            match.group(1)!.isEmpty ||
+            !_letter.hasMatch(raw.substring(0, match.start))) {
+          break;
+        }
+        // Measured on the cell's right edge, which for the first one off a
+        // line is the line's own and needs no apportioning at all.
+        final double right = x(end);
+        if (right <= block.left) break;
+        cells.add(
+          OcrLine(
+            raw.substring(match.start, end).trim(),
+            OcrBox(x(match.start), line.box.top, right, line.box.bottom),
+          ),
+        );
+        end = match.start;
+      }
+      if (cells.isEmpty) {
+        split.add(line);
+        continue;
+      }
+      into.addAll(cells);
+      split
+        ..add(
+          OcrLine(
+            raw.substring(0, end),
+            OcrBox(line.box.left, line.box.top, x(end), line.box.bottom),
+          ),
+        )
+        ..addAll(cells.reversed);
+    }
+    return split;
   }
 
   /// The page's own total pins the one term total that could not be read.

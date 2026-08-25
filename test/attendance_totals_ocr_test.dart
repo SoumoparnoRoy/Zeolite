@@ -23,7 +23,10 @@ OcrLine _at(String text, double centreX, double centreY, {double w = 90}) {
 /// is on a screenshot narrow enough to wrap it.
 class _Row {
   const _Row(this.nameLines, this.total, this.marked, this.attended,
-      {this.percent, this.pipe = false, this.unread = false});
+      {this.percent,
+      this.pipe = false,
+      this.unread = false,
+      this.merged = false});
 
   final List<String> nameLines;
   final int total;
@@ -37,6 +40,10 @@ class _Row {
   /// Whether the number cells came back at all. A row of lone zeroes is the
   /// case where they do not.
   final bool unread;
+
+  /// Whether the term total came back glued to the end of the name, as one
+  /// line reaching from the name column into the total's.
+  final bool merged;
 }
 
 List<OcrLine> _sheet(List<_Row> rows, {String? footer, String? footerAttended}) {
@@ -60,12 +67,26 @@ List<OcrLine> _sheet(List<_Row> rows, {String? footer, String? footerAttended}) 
       // Wrapped name lines straddle the centre the numbers sit on.
       final double offset =
           (n - (row.nameLines.length - 1) / 2) * 22;
+      final bool last = n == row.nameLines.length - 1;
+      if (row.merged && last) {
+        // One line from the name column to the far side of the total's, which
+        // is what the recogniser hands back when it runs the two together.
+        lines.add(
+          OcrLine(
+            '${row.nameLines[n]} |${row.total}',
+            OcrBox(_name - 150, centre - 11, _total + 20, centre + 11),
+          ),
+        );
+        continue;
+      }
       lines.add(_at(row.nameLines[n], _name, centre + offset, w: 300));
     }
     final String rule = row.pipe ? '|' : '';
     if (!row.unread) {
+      if (!row.merged) {
+        lines.add(_at('$rule${row.total}', _total, centre, w: 40));
+      }
       lines
-        ..add(_at('$rule${row.total}', _total, centre, w: 40))
         ..add(_at('${row.marked}', _marked, centre, w: 40))
         ..add(_at('$rule${row.attended}', _attended, centre, w: 40));
     }
@@ -96,7 +117,9 @@ List<OcrLine> _cells(
     final _Row row = rows[i];
     final double centre = _firstRow + i * _rowHeight;
     final Set<int> gone = missing[i] ?? const <int>{};
-    if (!gone.contains(0)) {
+    // A total the name ran into is one this read did not get either: it sits
+    // on the name's line, outside the band this read was given.
+    if (!gone.contains(0) && !row.merged) {
       lines.add(_at('${row.total}', _total, centre, w: 40));
     }
     if (!gone.contains(1)) {
@@ -454,6 +477,106 @@ void main() {
     });
   });
 
+  group('a cell glued onto the name beside it', () {
+    test('is taken back off the name and counted as its own column', () {
+      final List<_Row> rows = <_Row>[
+        const _Row(<String>['Signal Theory_Odd_2026-27'], 18, 16, 14,
+            percent: '87.50%', merged: true),
+        ..._threeRows.sublist(1),
+      ];
+      final AttendanceTotals page = AttendanceTotalsOcr.read(_sheet(rows))!;
+
+      expect(page.rows, hasLength(3));
+      expect(page.rows.first.subject, 'Signal Theory');
+      expect(page.rows.first.expectedTotal, 18);
+      expect(page.rows.first.held, 16);
+      expect(page.rows.first.attended, 14);
+      expect(page.rows.first.isTrustworthy, isTrue);
+    });
+
+    test('reaches the caller that read the number columns separately', () {
+      final List<_Row> rows = <_Row>[
+        const _Row(<String>['Signal Theory_Odd_2026-27'], 18, 16, 14,
+            percent: '87.50%', merged: true),
+        ..._threeRows.sublist(1),
+      ];
+      // The sharper read missed it too, so the split is the only way back.
+      final AttendanceTotals page = AttendanceTotalsOcr.read(
+        _sheet(rows),
+        cells: _cells(rows, missing: <int, Set<int>>{
+          0: <int>{0}
+        }),
+      )!;
+
+      expect(page.rows.first.expectedTotal, 18);
+      expect(page.rows.first.subject, 'Signal Theory');
+    });
+
+    test('leaves the year of a term stamp where it is', () {
+      // `_Odd_2026-27` ends in digits with nothing between them and the name,
+      // which is what separates a stamp from a cell.
+      final AttendanceTotals page =
+          AttendanceTotalsOcr.read(_sheet(_threeRows))!;
+
+      expect(page.rows.first.subject, 'Signal Theory');
+      expect(page.rows.first.expectedTotal, 18);
+    });
+
+    test('leaves a name whose line stops short of the number columns', () {
+      final AttendanceTotals page = AttendanceTotalsOcr.read(
+        _sheet(const <_Row>[
+          _Row(<String>['Workshop Practice 2_Odd_2026-27'], 18, 16, 14,
+              percent: '87.50%'),
+          _Row(<String>['Control Systems_Odd_2026-27'], 20, 19, 16,
+              percent: '84.21%'),
+        ]),
+      )!;
+
+      expect(page.rows.first.subject, 'Workshop Practice 2');
+      expect(page.rows.first.expectedTotal, 18);
+    });
+
+    test('two merges stop crowding out the one total that is really gone', () {
+      // The page's total can only pin a term total when it is the last one
+      // unknown, so every merge left standing costs the unread cell as well.
+      const List<_Row> rows = <_Row>[
+        _Row(<String>['Signal Theory_Odd_2026-27'], 21, 21, 21,
+            percent: '100.00%', merged: true),
+        _Row(<String>['Signal Theory Lab_Odd_2026-27'], 7, 7, 7,
+            percent: '100.00%', merged: true),
+        _Row(<String>['Control Systems_Odd_2026-27'], 5, 5, 4,
+            percent: '80.00%'),
+        _Row(<String>['Thermodynamics_Odd_2026-27'], 21, 21, 18,
+            percent: '85.71%'),
+      ];
+      final AttendanceTotals page = AttendanceTotalsOcr.read(
+        _sheet(rows, footer: 'Total Session:54'),
+        // The lone digit of the third row's total went unread on both passes.
+        cells: _cells(rows, missing: <int, Set<int>>{
+          2: <int>{0}
+        }),
+      )!;
+
+      expect(page.rows.map((TotalsRow r) => r.expectedTotal),
+          <int>[21, 7, 5, 21]);
+      expect(page.totalSum, 54);
+      expect(page.addsUp, isTrue);
+      expect(page.suspect, isEmpty);
+    });
+
+    test('the footer keeps its own number', () {
+      final AttendanceTotals page = AttendanceTotalsOcr.read(
+        _sheet(_threeRows,
+            footer: 'Total Session:43',
+            footerAttended: 'Total Attended Session: 34'),
+      )!;
+
+      expect(page.rows, hasLength(3));
+      expect(page.printedTotal, 43);
+      expect(page.printedAttended, 34);
+    });
+  });
+
   group('two courses read as one', () {
     test('a stamp left in the middle of the name says the row is merged', () {
       // Happens when a row's numbers go unread: its name falls into the band
@@ -472,6 +595,22 @@ void main() {
       final TotalsRow row = totals.rows.first;
       expect(row.namesTwoCourses, isTrue);
       expect(row.isTrustworthy, isFalse);
+    });
+
+    test('a stamp followed by digits alone is one course, not two', () {
+      const String name =
+          'Signal Theory_Odd_2026-27 |18 Control Systems_Odd_2026-27';
+      expect(AttendanceTotalsOcr.cleanName(name), isNot('Signal Theory'));
+
+      final AttendanceTotals page = AttendanceTotalsOcr.read(
+        _sheet(<_Row>[
+          const _Row(<String>['Signal Theory_Odd_2026-27'], 18, 16, 14,
+              percent: '87.50%', merged: true),
+          ..._threeRows.sublist(1),
+        ]),
+      )!;
+      expect(page.rows.first.namesTwoCourses, isFalse);
+      expect(page.suspect, isEmpty);
     });
 
     test('a stamp at the end is just a stamp', () {

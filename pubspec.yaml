@@ -42,6 +42,20 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  # Rerun `dart run flutter_launcher_icons` after changing anything in
+  # assets/icon.
+  flutter_launcher_icons: ^0.14.4
+
+# The source layers stay out of `flutter: assets:`: they feed the generator,
+# and bundling them would put a megabyte of PNG in the APK for nothing.
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: assets/icon/zeolite_icon.png
+  adaptive_icon_background: "#F3F1FF"
+  adaptive_icon_foreground: assets/icon/zeolite_icon_foreground.png
+  # Below 26 there is no adaptive icon, so the legacy bitmap still gets built.
+  min_sdk_android: 24
 
 flutter:
   uses-material-design: true

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
 
 import '../../core/date_utils.dart';
@@ -17,6 +19,7 @@ class AttendanceRecord {
     required this.date,
     required this.startMinutes,
     required this.status,
+    this.weight = 1,
     this.tagId,
     this.note,
     this.markedAt,
@@ -27,6 +30,13 @@ class AttendanceRecord {
   final DateTime date;
   final int startMinutes;
   final AttendanceStatus status;
+
+  /// How many classes this one occurrence is worth.
+  ///
+  /// Copied off the occurrence when the mark is made rather than read back
+  /// through the rule, so correcting a slot's length later cannot silently
+  /// restate a term of history.
+  final int weight;
 
   /// Optional label from the user's own list — "Proxy", "Online". Null means
   /// untagged, which is what every mark made before tags existed still is.
@@ -47,6 +57,7 @@ class AttendanceRecord {
     DateTime? date,
     int? startMinutes,
     AttendanceStatus? status,
+    int? weight,
     int? tagId,
     bool clearTag = false,
     String? note,
@@ -58,6 +69,7 @@ class AttendanceRecord {
       date: date ?? this.date,
       startMinutes: startMinutes ?? this.startMinutes,
       status: status ?? this.status,
+      weight: weight ?? this.weight,
       tagId: clearTag ? null : (tagId ?? this.tagId),
       note: note ?? this.note,
       markedAt: markedAt ?? this.markedAt,
@@ -70,6 +82,7 @@ class AttendanceRecord {
         'date': Dates.keyOf(date),
         'start_minutes': startMinutes,
         'status': status.name,
+        'weight': weight,
         'tag_id': tagId,
         'note': note,
         'marked_at': (markedAt ?? DateTime.now()).millisecondsSinceEpoch,
@@ -83,6 +96,8 @@ class AttendanceRecord {
       startMinutes: (map['start_minutes'] as int?) ?? 0,
       status: AttendanceStatus.fromName(map['status'] as String?) ??
           AttendanceStatus.present,
+      // A hand-edited backup must not make an occurrence worth nothing.
+      weight: math.max(1, (map['weight'] as num?)?.toInt() ?? 1),
       tagId: map['tag_id'] as int?,
       note: map['note'] as String?,
       markedAt: map['marked_at'] == null

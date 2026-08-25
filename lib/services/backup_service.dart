@@ -52,10 +52,14 @@ class BackupService {
   final BackupFolder _folder;
 
   /// v2 added class categories, v3 the saved room list and the day-grid
-  /// settings, v4 attendance tags. Older backups still import: a missing key
-  /// just means that feature was unused when the file was written, which is
-  /// exactly what an empty list or a zero block length already mean.
-  static const int formatVersion = 4;
+  /// settings, v4 attendance tags, v5 what a class counts as. Older backups
+  /// still import: a missing key just means that feature was unused when the
+  /// file was written, which is exactly what an empty list, a zero block
+  /// length or a weight of one already mean.
+  ///
+  /// Bumped for v5 rather than left alone so an older build refuses the file
+  /// outright instead of dropping the weights on the way back in.
+  static const int formatVersion = 5;
 
   /// Written into every export so an import can tell our files from anything
   /// else pasted in.
@@ -377,6 +381,7 @@ class BackupService {
             startMinutes: slot.startMinutes,
             endMinutes: slot.endMinutes,
             room: slot.room,
+            weight: slot.weight,
             startDate: slot.startDate,
             endDate: slot.endDate,
           ),
@@ -397,6 +402,7 @@ class BackupService {
             startMinutes: extra.startMinutes,
             endMinutes: extra.endMinutes,
             room: extra.room,
+            weight: extra.weight,
             note: extra.note,
           ),
         );
@@ -416,6 +422,7 @@ class BackupService {
             date: record.date,
             startMinutes: record.startMinutes,
             status: record.status,
+            weight: record.weight,
             // An unknown tag id drops to null rather than failing the import.
             // The mark is the data worth keeping; the label is not worth
             // rejecting a whole backup over.

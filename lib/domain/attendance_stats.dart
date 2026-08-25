@@ -36,9 +36,14 @@ class SubjectStats {
     required this.cancelled,
     required this.target,
     required this.plannedFromSlots,
+    this.weighted = false,
   });
 
   final Subject subject;
+
+  /// Counted in periods, not in marks: a class worth two contributes two. The
+  /// three read as marks for every subject where nothing counts twice, which
+  /// is what [weighted] distinguishes.
   final int present;
   final int absent;
   final int cancelled;
@@ -49,6 +54,16 @@ class SubjectStats {
   /// Classes still scheduled before the semester ends, projected from the
   /// slots. Only used when the subject does not say its own term total.
   final int plannedFromSlots;
+
+  /// Whether any class here counts as more than one. Only the wording depends
+  /// on it — "two more periods" is honest where skipping one lab costs two,
+  /// and nobody else should have to meet the word.
+  final bool weighted;
+
+  /// The unit the headlines count in.
+  String get _unit => weighted ? 'period' : 'class';
+
+  String get _units => weighted ? 'periods' : 'classes';
 
   int get priorHeld => subject.priorHeld;
   int get priorAttended => subject.priorAttended;
@@ -130,15 +145,15 @@ class SubjectStats {
         return 'No classes marked yet';
       case AttendanceHealth.safe:
         return canSkip == 1
-            ? 'You can skip 1 more class'
-            : 'You can skip $canSkip more classes';
+            ? 'You can skip 1 more $_unit'
+            : 'You can skip $canSkip more $_units';
       case AttendanceHealth.tight:
         return canSkip == 0
             ? 'Right on target — attending the next one keeps you here'
-            : 'You can skip 1 more class';
+            : 'You can skip 1 more $_unit';
       case AttendanceHealth.atRisk:
         return needToAttend == 1
-            ? 'One more class brings you back to target'
+            ? 'One more $_unit brings you back to target'
             : 'Attending the next $needToAttend brings you back to target';
       case AttendanceHealth.lost:
         return 'Target is out of reach this semester';
@@ -154,14 +169,20 @@ class SubjectStats {
     int present = 0;
     int absent = 0;
     int cancelled = 0;
+    bool weighted = false;
     for (final ClassSession session in sessions) {
       final AttendanceStatus? status = session.status;
+      if (status == null) continue;
+      // The mark's own weight, not the rule's: editing a slot must not restate
+      // what a past class was worth.
+      final int weight = session.record?.weight ?? session.weight;
+      if (weight != 1) weighted = true;
       if (status == AttendanceStatus.present) {
-        present++;
+        present += weight;
       } else if (status == AttendanceStatus.absent) {
-        absent++;
-      } else if (status == AttendanceStatus.cancelled) {
-        cancelled++;
+        absent += weight;
+      } else {
+        cancelled += weight;
       }
     }
     return SubjectStats(
@@ -171,6 +192,7 @@ class SubjectStats {
       cancelled: cancelled,
       target: target,
       plannedFromSlots: plannedFromSlots,
+      weighted: weighted,
     );
   }
 }

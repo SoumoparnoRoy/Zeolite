@@ -61,6 +61,7 @@ class _RecordingActions extends TimetableActions {
     required int startMinutes,
     required AttendanceStatus? current,
     required AttendanceStatus status,
+    int weight = 1,
     int? tagId,
   }) async {
     called = true;

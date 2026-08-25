@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
 
 import '../../core/date_utils.dart';
@@ -17,6 +19,7 @@ class ClassSlot {
     required this.startMinutes,
     required this.endMinutes,
     this.room,
+    this.weight = 1,
     required this.startDate,
     this.endDate,
   });
@@ -30,6 +33,10 @@ class ClassSlot {
   final int startMinutes;
   final int endMinutes;
   final String? room;
+
+  /// How many classes one occurrence of this rule counts as. 1 unless the
+  /// institution counts a longer class more than once.
+  final int weight;
 
   /// First date this rule applies from (inclusive). Recurrence runs forward
   /// from here, which is exactly the "repeats every week from now on" model.
@@ -67,6 +74,7 @@ class ClassSlot {
     int? startMinutes,
     int? endMinutes,
     String? room,
+    int? weight,
     DateTime? startDate,
     DateTime? endDate,
     bool clearEndDate = false,
@@ -78,6 +86,7 @@ class ClassSlot {
       startMinutes: startMinutes ?? this.startMinutes,
       endMinutes: endMinutes ?? this.endMinutes,
       room: room ?? this.room,
+      weight: weight ?? this.weight,
       startDate: startDate ?? this.startDate,
       endDate: clearEndDate ? null : (endDate ?? this.endDate),
     );
@@ -90,6 +99,7 @@ class ClassSlot {
         'start_minutes': startMinutes,
         'end_minutes': endMinutes,
         'room': room,
+        'weight': weight,
         'start_date': Dates.keyOf(startDate),
         'end_date': endDate == null ? null : Dates.keyOf(endDate!),
       };
@@ -102,6 +112,7 @@ class ClassSlot {
       startMinutes: (map['start_minutes'] as int?) ?? 0,
       endMinutes: (map['end_minutes'] as int?) ?? 0,
       room: map['room'] as String?,
+      weight: math.max(1, (map['weight'] as num?)?.toInt() ?? 1),
       startDate: Dates.fromKey((map['start_date'] as int?) ?? 19700101),
       endDate: map['end_date'] == null
           ? null

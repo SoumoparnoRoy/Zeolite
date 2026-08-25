@@ -18,6 +18,7 @@ class ClassSession {
     required this.startMinutes,
     required this.endMinutes,
     this.room,
+    this.weight = 1,
     this.slotId,
     this.extraClassId,
     this.record,
@@ -28,6 +29,10 @@ class ClassSession {
   final int startMinutes;
   final int endMinutes;
   final String? room;
+
+  /// How many classes this occurrence counts as, carried down from the rule
+  /// or the extra that produced it. See [ClassSlot.weight].
+  final int weight;
 
   /// Set when this session came from a recurring rule.
   final int? slotId;
@@ -85,6 +90,7 @@ class ClassSession {
       startMinutes: startMinutes,
       endMinutes: endMinutes,
       room: room,
+      weight: weight,
       slotId: slotId,
       extraClassId: extraClassId,
       record: clearRecord ? null : (record ?? this.record),

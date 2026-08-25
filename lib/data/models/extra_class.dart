@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
 
 import '../../core/date_utils.dart';
@@ -13,6 +15,7 @@ class ExtraClass {
     required this.startMinutes,
     required this.endMinutes,
     this.room,
+    this.weight = 1,
     this.note,
   });
 
@@ -22,6 +25,10 @@ class ExtraClass {
   final int startMinutes;
   final int endMinutes;
   final String? room;
+
+  /// See [ClassSlot.weight] — a one-off lab counts the same as a recurring one.
+  final int weight;
+
   final String? note;
 
   int get durationMinutes => endMinutes - startMinutes;
@@ -33,6 +40,7 @@ class ExtraClass {
     int? startMinutes,
     int? endMinutes,
     String? room,
+    int? weight,
     String? note,
   }) {
     return ExtraClass(
@@ -42,6 +50,7 @@ class ExtraClass {
       startMinutes: startMinutes ?? this.startMinutes,
       endMinutes: endMinutes ?? this.endMinutes,
       room: room ?? this.room,
+      weight: weight ?? this.weight,
       note: note ?? this.note,
     );
   }
@@ -53,6 +62,7 @@ class ExtraClass {
         'start_minutes': startMinutes,
         'end_minutes': endMinutes,
         'room': room,
+        'weight': weight,
         'note': note,
       };
 
@@ -64,6 +74,7 @@ class ExtraClass {
       startMinutes: (map['start_minutes'] as int?) ?? 0,
       endMinutes: (map['end_minutes'] as int?) ?? 0,
       room: map['room'] as String?,
+      weight: math.max(1, (map['weight'] as num?)?.toInt() ?? 1),
       note: map['note'] as String?,
     );
   }

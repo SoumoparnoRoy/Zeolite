@@ -308,11 +308,23 @@ final statsProvider = Provider<OverallStats>((ref) {
   final AppSettings term = settings ?? const AppSettings();
   final Map<int, Map<AttendanceStatus, int>> counts =
       <int, Map<AttendanceStatus, int>>{};
+  // Subjects where something counts as more than one class, which is all the
+  // headlines need in order to say "periods" instead.
+  final Set<int> weighted = <int>{};
   for (final AttendanceRecord record in data.records) {
     if (!term.countsInTerm(record.date)) continue;
+    if (record.weight != 1) weighted.add(record.subjectId);
     counts.putIfAbsent(record.subjectId, () => <AttendanceStatus, int>{});
     counts[record.subjectId]![record.status] =
-        (counts[record.subjectId]![record.status] ?? 0) + 1;
+        (counts[record.subjectId]![record.status] ?? 0) + record.weight;
+  }
+  // A subject can be weighted before anything is marked against it, and the
+  // projection it is about to be judged on is already in periods.
+  for (final ClassSlot slot in data.slots) {
+    if (slot.weight != 1) weighted.add(slot.subjectId);
+  }
+  for (final ExtraClass extra in data.extras) {
+    if (extra.weight != 1) weighted.add(extra.subjectId);
   }
 
   final Map<int, int> remaining =
@@ -334,6 +346,7 @@ final statsProvider = Provider<OverallStats>((ref) {
             ? globalTarget
             : subject.targetPercent! / 100.0,
         plannedFromSlots: remaining[id] ?? 0,
+        weighted: weighted.contains(id),
       ),
     );
   }
@@ -936,6 +949,7 @@ class TimetableActions {
       startMinutes: session.startMinutes,
       current: session.status,
       status: status,
+      weight: session.record?.weight ?? session.weight,
       // Carried across a status change on purpose. `setAttendance` replaces the
       // row, so without this, correcting Present to Absent would silently drop
       // the tag — and the tag describes the class, not the verdict. Clearing
@@ -957,6 +971,7 @@ class TimetableActions {
     required int startMinutes,
     required AttendanceStatus? current,
     required AttendanceStatus status,
+    int weight = 1,
     int? tagId,
   }) async {
     if (current == status) {
@@ -973,6 +988,7 @@ class TimetableActions {
         date: date,
         startMinutes: startMinutes,
         status: status,
+        weight: weight,
         tagId: tagId,
         markedAt: DateTime.now(),
       ),
@@ -1047,6 +1063,7 @@ class TimetableActions {
           date: session.date,
           startMinutes: session.startMinutes,
           status: status,
+          weight: session.weight,
           markedAt: DateTime.now(),
         ),
       );

@@ -14,7 +14,7 @@ class AppDatabase {
   // install finds its data, so renaming it would strand every database in
   // place and read as a wipe. It is never shown to the user.
   static const String fileName = 'attend_it.db';
-  static const int schemaVersion = 5;
+  static const int schemaVersion = 6;
 
   Database? _db;
 
@@ -77,6 +77,21 @@ class AppDatabase {
           await db.execute(
             'ALTER TABLE subjects ADD COLUMN expected_total INTEGER',
           );
+        }
+        if (oldVersion < 6) {
+          // v6 lets one class count as more than one towards attendance, for
+          // an institution that counts a two-period lab twice. Defaulting to 1
+          // everywhere leaves every existing figure exactly as it was, and a
+          // student whose classes all count once never meets the field.
+          for (final String table in <String>[
+            'class_slots',
+            'extra_classes',
+            'attendance',
+          ]) {
+            await db.execute(
+              'ALTER TABLE $table ADD COLUMN weight INTEGER NOT NULL DEFAULT 1',
+            );
+          }
         }
       },
     );
@@ -162,6 +177,7 @@ class AppDatabase {
         start_minutes INTEGER NOT NULL,
         end_minutes   INTEGER NOT NULL,
         room          TEXT,
+        weight        INTEGER NOT NULL DEFAULT 1,
         start_date    INTEGER NOT NULL,
         end_date      INTEGER,
         FOREIGN KEY (subject_id) REFERENCES subjects (id) ON DELETE CASCADE
@@ -177,6 +193,7 @@ class AppDatabase {
         start_minutes INTEGER NOT NULL,
         end_minutes   INTEGER NOT NULL,
         room          TEXT,
+        weight        INTEGER NOT NULL DEFAULT 1,
         note          TEXT,
         FOREIGN KEY (subject_id) REFERENCES subjects (id) ON DELETE CASCADE
       )
@@ -190,6 +207,7 @@ class AppDatabase {
         date          INTEGER NOT NULL,
         start_minutes INTEGER NOT NULL,
         status        TEXT    NOT NULL,
+        weight        INTEGER NOT NULL DEFAULT 1,
         tag_id        INTEGER,
         note          TEXT,
         marked_at     INTEGER NOT NULL,

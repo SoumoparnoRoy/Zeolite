@@ -18,6 +18,7 @@ class AttendanceLogEntry {
     required this.status,
     this.endMinutes,
     this.room,
+    this.weight = 1,
     this.tagId,
     this.isOrphaned = false,
   });
@@ -30,6 +31,11 @@ class AttendanceLogEntry {
   final String? room;
 
   final AttendanceStatus? status;
+
+  /// What this occurrence counts as. Carried for the same reason as [tagId]:
+  /// the row is replaced on write, so a status correction would otherwise
+  /// reduce a two-period lab to one.
+  final int weight;
 
   /// The mark's tag, carried so correcting a status here does not silently
   /// drop it — `setAttendance` replaces the whole row.
@@ -87,6 +93,7 @@ List<AttendanceLogEntry> buildAttendanceLog({
         endMinutes: session.endMinutes,
         room: session.room,
         status: bySubjectKey[key]?.status,
+        weight: bySubjectKey[key]?.weight ?? session.weight,
         tagId: bySubjectKey[key]?.tagId,
       ),
     );
@@ -100,6 +107,7 @@ List<AttendanceLogEntry> buildAttendanceLog({
         date: record.date,
         startMinutes: record.startMinutes,
         status: record.status,
+        weight: record.weight,
         tagId: record.tagId,
         isOrphaned: true,
       ),

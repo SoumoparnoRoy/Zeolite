@@ -80,6 +80,7 @@ class ScheduleEngine {
             startMinutes: slot.startMinutes,
             endMinutes: slot.endMinutes,
             room: slot.room,
+            weight: slot.weight,
             slotId: slot.id,
             record: _lookupRecord(subject.id, day, slot.startMinutes),
           ),
@@ -99,6 +100,7 @@ class ScheduleEngine {
           startMinutes: extra.startMinutes,
           endMinutes: extra.endMinutes,
           room: extra.room,
+          weight: extra.weight,
           extraClassId: extra.id,
           record: _lookupRecord(subject.id, day, extra.startMinutes),
         ),
@@ -165,13 +167,17 @@ class ScheduleEngine {
   ///
   /// A session already marked is not one of them — a cancelled class will not
   /// be attended, and one marked early is already in the held total.
+  ///
+  /// Counted in the same unit as [SubjectStats.held], so a class that counts
+  /// twice contributes two. Mixing the units here would put a weighted class
+  /// on both sides of `maxAchievableRatio` at different sizes.
   int remainingSessionsFor(int subjectId, {DateTime? from}) {
     if (semesterEnd == null) return 0;
     final DateTime start = Dates.addDays(from ?? Dates.today(), 1);
     if (Dates.keyOf(start) > Dates.keyOf(semesterEnd!)) return 0;
     return sessionsBetween(start, semesterEnd!)
         .where((ClassSession s) => s.subject.id == subjectId && !s.isMarked)
-        .length;
+        .fold<int>(0, (int sum, ClassSession s) => sum + s.weight);
   }
 
   /// Remaining sessions for every subject in one pass — much cheaper than
@@ -184,7 +190,7 @@ class ScheduleEngine {
     for (final ClassSession session in sessionsBetween(start, semesterEnd!)) {
       final int? id = session.subject.id;
       if (id == null || session.isMarked) continue;
-      counts[id] = (counts[id] ?? 0) + 1;
+      counts[id] = (counts[id] ?? 0) + session.weight;
     }
     return counts;
   }

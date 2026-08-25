@@ -264,6 +264,7 @@ class _LogTile extends ConsumerWidget {
                           startMinutes: entry.startMinutes,
                           current: entry.status,
                           status: status,
+                          weight: entry.weight,
                           tagId: entry.tagId,
                         ),
                   ),

@@ -24,7 +24,17 @@ class SessionCard extends StatefulWidget {
     this.tagName,
     this.onTag,
     this.isNext = false,
+    this.nextColor,
   });
+
+  /// Also how far each spine paints past its own card, so the two cannot drift.
+  static const double gap = 14;
+
+  /// Shared so a card and the one above it cannot disagree.
+  static Color spineColorOf(ClassSession session, AppPalette palette) =>
+      session.status == AttendanceStatus.cancelled
+          ? palette.textFaint
+          : session.subject.color;
 
   final ClassSession session;
   final void Function(AttendanceStatus status) onMark;
@@ -39,6 +49,8 @@ class SessionCard extends StatefulWidget {
   /// up here for the same reason as [categoryName] — the card stays a plain
   /// widget with no data layer behind it.
   final String? tagName;
+
+  final Color? nextColor;
 
   /// Opens the tag picker. Null when there are no tags to choose from, which
   /// is how the control stays invisible until Settings has one.
@@ -69,9 +81,7 @@ class _SessionCardState extends State<SessionCard> {
   Widget build(BuildContext context) {
     final AppPalette p = context.palette;
     final ClassSession session = widget.session;
-    final AttendanceStatus? status = session.status;
-    final bool isCancelled = status == AttendanceStatus.cancelled;
-    final Color spine = isCancelled ? p.textFaint : session.subject.color;
+    final Color spine = SessionCard.spineColorOf(session, p);
 
     return IntrinsicHeight(
       child: Row(
@@ -122,7 +132,7 @@ class _SessionCardState extends State<SessionCard> {
             ),
           ),
           const SizedBox(width: 12),
-          _Spine(color: spine),
+          _Spine(color: spine, next: widget.nextColor),
           const SizedBox(width: 12),
           Expanded(child: _body(context)),
         ],
@@ -274,15 +284,19 @@ class _SessionCardState extends State<SessionCard> {
   }
 }
 
-/// The vertical rule in the subject's colour, fading downward so a run of
-/// classes reads as one timeline rather than as a row of coloured bars.
+/// The vertical rule, painted through the gap below so a day is one line.
 class _Spine extends StatelessWidget {
-  const _Spine({required this.color});
+  const _Spine({required this.color, this.next});
 
   final Color color;
+  final Color? next;
+
+  /// Late, or no part of the card reads as its own colour.
+  static const double _hold = 0.62;
 
   @override
   Widget build(BuildContext context) {
+    final Color? below = next;
     return SizedBox(
       width: 8,
       child: Stack(
@@ -291,7 +305,7 @@ class _Spine extends StatelessWidget {
           Positioned(
             left: 3,
             top: 0,
-            bottom: 0,
+            bottom: below == null ? 0 : -SessionCard.gap,
             width: 2,
             child: DecoratedBox(
               decoration: BoxDecoration(
@@ -299,7 +313,10 @@ class _Spine extends StatelessWidget {
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: <Color>[color, color.withValues(alpha: 0.12)],
+                  colors: below == null
+                      ? <Color>[color, color.withValues(alpha: 0.12)]
+                      : <Color>[color, color, below],
+                  stops: below == null ? null : const <double>[0, _hold, 1],
                 ),
               ),
             ),

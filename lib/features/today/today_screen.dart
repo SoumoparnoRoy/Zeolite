@@ -229,13 +229,20 @@ class TodayScreen extends ConsumerWidget {
                 padding: const EdgeInsets.fromLTRB(_pad, 0, _pad, 96),
                 sliver: SliverList.separated(
                   itemCount: sessions.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 14),
+                  separatorBuilder: (_, __) =>
+                      const SizedBox(height: SessionCard.gap),
                   itemBuilder: (BuildContext context, int index) {
                     final ClassSession session = sessions[index];
                     final List<Tag> tags = data?.tags ?? const <Tag>[];
                     return SessionCard(
                       session: session,
                       use24Hour: settings.use24HourTime,
+                      nextColor: index + 1 < sessions.length
+                          ? SessionCard.spineColorOf(
+                              sessions[index + 1],
+                              context.palette,
+                            )
+                          : null,
                       categoryName: data?.categoryFor(session.subject)?.name,
                       tagName: data?.tagById(session.record?.tagId)?.name,
                       isNext: next != null &&

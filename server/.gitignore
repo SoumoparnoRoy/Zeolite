@@ -1,0 +1,5 @@
+node_modules/
+.env
+# The repo root ignores .env.* — this one documents the variable names and
+# holds no values, so it has to come back.
+!.env.example

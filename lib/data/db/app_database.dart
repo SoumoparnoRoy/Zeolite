@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
@@ -6,15 +7,26 @@ import 'package:sqflite/sqflite.dart';
 /// Everything is local to the device: no accounts, no network, works on a train
 /// with no signal.
 class AppDatabase {
-  AppDatabase._();
+  AppDatabase._()
+      : _factory = null,
+        _path = null;
+
+  /// Lets the migration test run the real `onUpgrade` on desktop SQLite.
+  @visibleForTesting
+  AppDatabase.at(String path, {required DatabaseFactory factory})
+      : _path = path,
+        _factory = factory;
 
   static final AppDatabase instance = AppDatabase._();
+
+  final DatabaseFactory? _factory;
+  final String? _path;
 
   // Keeps its pre-Zeolite name deliberately: the filename is how an existing
   // install finds its data, so renaming it would strand every database in
   // place and read as a wipe. It is never shown to the user.
   static const String fileName = 'attend_it.db';
-  static const int schemaVersion = 6;
+  static const int schemaVersion = 7;
 
   Database? _db;
 
@@ -23,77 +35,83 @@ class AppDatabase {
   }
 
   Future<Database> _open() async {
-    final String dir = await getDatabasesPath();
-    final String path = p.join(dir, fileName);
-    return openDatabase(
+    final String path = _path ?? p.join(await getDatabasesPath(), fileName);
+    return (_factory ?? databaseFactory).openDatabase(
       path,
-      version: schemaVersion,
-      onConfigure: (Database db) async {
-        await db.execute('PRAGMA foreign_keys = ON');
-      },
-      onCreate: (Database db, int version) async {
-        await _createSchema(db);
-      },
-      onUpgrade: (Database db, int oldVersion, int newVersion) async {
-        // Migrations run in order so an old install can climb to current
-        // without losing anything already recorded.
-        if (oldVersion < 2) {
-          // v2 introduced class categories (Theory, Lab, ...) which carry a
-          // default class length, and linked subjects to them.
-          await db.execute(_categoriesTable);
-          await db.execute(
-            'ALTER TABLE subjects ADD COLUMN category_id INTEGER',
-          );
-          await _seedCategories(db);
-        }
-        if (oldVersion < 3) {
-          // v3 added the saved room list. Nothing is seeded and no existing
-          // column changes: `class_slots.room` stays free text, so an install
-          // that never opens the new screen behaves exactly as before.
-          await db.execute(_roomsTable);
-        }
-        if (oldVersion < 4) {
-          // v4 added attendance tags. The column is nullable with no default,
-          // so every existing mark reads as untagged — which is what it is.
-          // Nothing is seeded: the three statuses already cover the common
-          // case and an empty tag list costs nothing on screen.
-          await db.execute(_tagsTable);
-          await db.execute('ALTER TABLE attendance ADD COLUMN tag_id INTEGER');
-        }
-        if (oldVersion < 5) {
-          // v5 lets a subject carry attendance that predates the app, and say
-          // how many classes it holds all term. Defaulting the two counters to
-          // zero leaves every existing subject's maths exactly as it was;
-          // expected_total stays null, which means "keep projecting from the
-          // slots".
-          await db.execute(
-            'ALTER TABLE subjects ADD COLUMN prior_held INTEGER NOT NULL '
-            'DEFAULT 0',
-          );
-          await db.execute(
-            'ALTER TABLE subjects ADD COLUMN prior_attended INTEGER NOT NULL '
-            'DEFAULT 0',
-          );
-          await db.execute(
-            'ALTER TABLE subjects ADD COLUMN expected_total INTEGER',
-          );
-        }
-        if (oldVersion < 6) {
-          // v6 lets one class count as more than one towards attendance, for
-          // an institution that counts a two-period lab twice. Defaulting to 1
-          // everywhere leaves every existing figure exactly as it was, and a
-          // student whose classes all count once never meets the field.
-          for (final String table in <String>[
-            'class_slots',
-            'extra_classes',
-            'attendance',
-          ]) {
+      options: OpenDatabaseOptions(
+        version: schemaVersion,
+        onConfigure: (Database db) async {
+          await db.execute('PRAGMA foreign_keys = ON');
+        },
+        onCreate: (Database db, int version) async {
+          await _createSchema(db);
+        },
+        onUpgrade: (Database db, int oldVersion, int newVersion) async {
+          // Migrations run in order so an old install can climb to current
+          // without losing anything already recorded.
+          if (oldVersion < 2) {
+            // v2 introduced class categories (Theory, Lab, ...) which carry a
+            // default class length, and linked subjects to them.
+            await db.execute(_categoriesTable);
             await db.execute(
-              'ALTER TABLE $table ADD COLUMN weight INTEGER NOT NULL DEFAULT 1',
+              'ALTER TABLE subjects ADD COLUMN category_id INTEGER',
+            );
+            await _seedCategories(db);
+          }
+          if (oldVersion < 3) {
+            // v3 added the saved room list. Nothing is seeded and no existing
+            // column changes: `class_slots.room` stays free text, so an install
+            // that never opens the new screen behaves exactly as before.
+            await db.execute(_roomsTable);
+          }
+          if (oldVersion < 4) {
+            // v4 added attendance tags. The column is nullable with no default,
+            // so every existing mark reads as untagged — which is what it is.
+            // Nothing is seeded: the three statuses already cover the common
+            // case and an empty tag list costs nothing on screen.
+            await db.execute(_tagsTable);
+            await db.execute('ALTER TABLE attendance ADD COLUMN tag_id INTEGER');
+          }
+          if (oldVersion < 5) {
+            // v5 lets a subject carry attendance that predates the app, and say
+            // how many classes it holds all term. Defaulting the two counters to
+            // zero leaves every existing subject's maths exactly as it was;
+            // expected_total stays null, which means "keep projecting from the
+            // slots".
+            await db.execute(
+              'ALTER TABLE subjects ADD COLUMN prior_held INTEGER NOT NULL '
+              'DEFAULT 0',
+            );
+            await db.execute(
+              'ALTER TABLE subjects ADD COLUMN prior_attended INTEGER NOT NULL '
+              'DEFAULT 0',
+            );
+            await db.execute(
+              'ALTER TABLE subjects ADD COLUMN expected_total INTEGER',
             );
           }
-        }
-      },
+          if (oldVersion < 6) {
+            // v6 lets one class count as more than one towards attendance, for
+            // an institution that counts a two-period lab twice. Defaulting to 1
+            // everywhere leaves every existing figure exactly as it was, and a
+            // student whose classes all count once never meets the field.
+            for (final String table in <String>[
+              'class_slots',
+              'extra_classes',
+              'attendance',
+            ]) {
+              await db.execute(
+                'ALTER TABLE $table ADD COLUMN weight INTEGER NOT NULL DEFAULT 1',
+              );
+            }
+          }
+          if (oldVersion < 7) {
+            // v7 adds the sync ledger. Nothing existing changes, and an empty
+            // table reads as "nothing has ever been synced", which is true.
+            await db.execute(_remoteLinksTable);
+          }
+        },
+      ),
     );
   }
 
@@ -126,6 +144,22 @@ class AppDatabase {
       )
     ''';
 
+  /// What a target was last known to hold. Not a queue — see SyncPlan.
+  static const String _remoteLinksTable = '''
+      CREATE TABLE remote_links (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        target      TEXT    NOT NULL,
+        kind        TEXT    NOT NULL,
+        local_key   TEXT    NOT NULL,
+        remote_id   TEXT    NOT NULL,
+        local_hash  TEXT    NOT NULL,
+        remote_hash TEXT    NOT NULL,
+        synced_at   INTEGER NOT NULL,
+        origin      TEXT    NOT NULL,
+        UNIQUE (target, kind, local_key) ON CONFLICT REPLACE
+      )
+    ''';
+
   /// Two categories most timetables need on day one. They are ordinary rows —
   /// the user can rename, retime or delete them like any other.
   static Future<void> _seedCategories(Database db) async {
@@ -150,6 +184,7 @@ class AppDatabase {
     batch.execute(_categoriesTable);
     batch.execute(_roomsTable);
     batch.execute(_tagsTable);
+    batch.execute(_remoteLinksTable);
 
     batch.execute('''
       CREATE TABLE subjects (
@@ -256,6 +291,9 @@ class AppDatabase {
     batch.delete('categories');
     batch.delete('rooms');
     batch.delete('tags');
+    // The ledger goes with the data it describes; a later run re-links to
+    // pages that are still there rather than duplicating them.
+    batch.delete('remote_links');
     await batch.commit(noResult: true);
   }
 }

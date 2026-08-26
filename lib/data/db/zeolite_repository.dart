@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../../core/date_utils.dart';
+import '../../domain/sync/sync_target.dart';
 import '../models/attendance_record.dart';
 import '../models/attendance_status.dart';
 import '../models/class_category.dart';
@@ -482,13 +484,74 @@ class ZeoliteRepository {
     );
   }
 
+  // ------------------------------------------------------------ sync ledger
+
+  Future<List<RemoteLink>> getRemoteLinks(String target, SyncKind kind) async {
+    final Database db = await _db;
+    final List<Map<String, Object?>> rows = await db.query(
+      'remote_links',
+      where: 'target = ? AND kind = ?',
+      whereArgs: <Object?>[target, kind.name],
+    );
+    return rows.map(RemoteLink.fromMap).toList();
+  }
+
+  /// The unique index on `(target, kind, local_key)` replaces on conflict, so
+  /// re-recording a link after a push is the same call as recording it.
+  Future<void> setRemoteLinks(List<RemoteLink> links) async {
+    if (links.isEmpty) return;
+    final Database db = await _db;
+    final Batch batch = db.batch();
+    for (final RemoteLink link in links) {
+      batch.insert(
+        'remote_links',
+        link.toMap()..remove('id'),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<void> deleteRemoteLinks(
+    String target,
+    SyncKind kind,
+    List<String> localKeys,
+  ) async {
+    if (localKeys.isEmpty) return;
+    final Database db = await _db;
+    final String placeholders =
+        List<String>.filled(localKeys.length, '?').join(', ');
+    await db.delete(
+      'remote_links',
+      where: 'target = ? AND kind = ? AND local_key IN ($placeholders)',
+      whereArgs: <Object?>[target, kind.name, ...localKeys],
+    );
+  }
+
+  /// Disconnecting a target forgets its ledger and nothing else — the marks
+  /// stay, and so do the pages.
+  Future<void> deleteRemoteLinksFor(String target) async {
+    final Database db = await _db;
+    await db.delete(
+      'remote_links',
+      where: 'target = ?',
+      whereArgs: <Object?>[target],
+    );
+  }
+
   // ------------------------------------------------------------------- admin
 
   Future<void> clearAll() => _appDb.clearAll();
 
-  /// Every table, parents before children — the order rows have to go back in
-  /// while foreign keys are on.
-  static const List<String> _tables = <String>[
+  /// Every table undo and its restore cover, parents before children — the
+  /// order rows have to go back in while foreign keys are on.
+  ///
+  /// `remote_links` is deliberately absent. It records what a target was last
+  /// known to hold, which undoing a local edit does not change; rolling it back
+  /// with everything else would leave the ledger describing a state that no
+  /// longer exists on either side.
+  @visibleForTesting
+  static const List<String> snapshotTables = <String>[
     'categories',
     'rooms',
     'tags',
@@ -502,7 +565,7 @@ class ZeoliteRepository {
   Future<DatabaseSnapshot> snapshot() async {
     final Database db = await _db;
     final DatabaseSnapshot snapshot = <String, List<Map<String, Object?>>>{};
-    for (final String table in _tables) {
+    for (final String table in snapshotTables) {
       snapshot[table] = await db.query(table);
     }
     return snapshot;
@@ -517,10 +580,10 @@ class ZeoliteRepository {
   Future<void> restore(DatabaseSnapshot snapshot) async {
     final Database db = await _db;
     await db.transaction((Transaction txn) async {
-      for (final String table in _tables.reversed) {
+      for (final String table in snapshotTables.reversed) {
         await txn.delete(table);
       }
-      for (final String table in _tables) {
+      for (final String table in snapshotTables) {
         for (final Map<String, Object?> row
             in snapshot[table] ?? const <Map<String, Object?>>[]) {
           await txn.insert(table, row);

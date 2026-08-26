@@ -48,6 +48,9 @@ dev_dependencies:
   # Rerun `dart run flutter_launcher_icons` after changing anything in
   # assets/icon.
   flutter_launcher_icons: ^0.14.4
+  # Runs the real SQLite on the desktop so migrations can be tested rather than
+  # only seen to work on the tablet. Test-only: nothing imports it from lib/.
+  sqflite_common_ffi: ^2.3.6
 
 # The source layers stay out of `flutter: assets:`: they feed the generator,
 # and bundling them would put a megabyte of PNG in the APK for nothing.

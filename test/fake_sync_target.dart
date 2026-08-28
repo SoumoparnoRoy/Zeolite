@@ -8,6 +8,9 @@ class FakeSyncTarget implements SyncTarget {
   @override
   String get id => 'fake';
 
+  @override
+  bool trustsPulls = false;
+
   /// Page id to the hash the target would report for it.
   Map<String, String> pages;
 

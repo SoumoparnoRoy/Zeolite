@@ -76,6 +76,7 @@ void main() {
     // With the permission granted, "no network" is no longer a build property
     // and has to be one of the code instead.
     const List<String> allowed = <String>[
+      'lib/services/firebase/',
       'lib/services/notion/',
       'lib/services/sync/',
     ];

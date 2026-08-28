@@ -215,6 +215,7 @@ class RemoteState {
     required this.remoteId,
     required this.hash,
     this.editedAt,
+    this.deleted = false,
   });
 
   final SyncKind kind;
@@ -226,6 +227,11 @@ class RemoteState {
   final String remoteId;
   final String hash;
   final DateTime? editedAt;
+
+  /// A tombstone: the row was deleted on another device. Removing the document
+  /// outright would leave every other device holding a row and a link with
+  /// nothing to compare against, and the next push would put it straight back.
+  final bool deleted;
 }
 
 /// Why a call did not go through. The coordinator treats these differently:
@@ -258,6 +264,11 @@ class SyncOutcome {
 abstract class SyncTarget {
   /// Stored in `remote_links.target`, so it has to stay stable once shipped.
   String get id;
+
+  /// True for a target holding only what this app wrote, where a pull is the
+  /// user's own second device. False where a person edits by hand and a pull
+  /// has to go through the preview first.
+  bool get trustsPulls;
 
   /// What the target holds now, or null when it could not be read this run —
   /// the planner then pushes without claiming to know the far side.

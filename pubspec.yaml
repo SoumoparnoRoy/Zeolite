@@ -59,6 +59,7 @@ dev_dependencies:
   # Already present transitively; declared so the backup test can swap in the
   # in-memory store, since SettingsService uses the async prefs API.
   shared_preferences_platform_interface: ^2.4.1
+  fake_cloud_firestore: ^4.2.0
 
 # The source layers stay out of `flutter: assets:`: they feed the generator,
 # and bundling them would put a megabyte of PNG in the APK for nothing.

@@ -10,8 +10,10 @@ void main() {
   final File settings =
       File('lib/features/settings/settings_screen.dart');
 
+  /// Takes a full permission name: the ones a dependency drags in are not all
+  /// under `android.permission`.
   RegExp removed(String permission) => RegExp(
-        'android.permission.$permission"\\s*\\n\\s*tools:node="remove"',
+        '$permission"\\s*\\n\\s*tools:node="remove"',
       );
 
   test('the manifest refuses both ways data leaves the device', () {
@@ -36,9 +38,33 @@ void main() {
 
     expect(xml,
         contains('<uses-permission android:name="android.permission.INTERNET" />'));
-    expect(removed('INTERNET').hasMatch(xml), isFalse,
+    expect(removed('android.permission.INTERNET').hasMatch(xml), isFalse,
         reason: 'Notion sync cannot reach the network without it');
-    expect(removed('ACCESS_NETWORK_STATE').hasMatch(xml), isTrue);
+    // Analytics disables itself without this and says so only in logcat.
+    expect(
+      xml,
+      contains(
+          '<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />'),
+    );
+
+    // Everything a dependency drags in that this app has no use for. Analytics
+    // arrives with the whole advertising stack, and a listing saying an
+    // attendance app measures ad campaigns invites the question. The merged
+    // manifest is where these actually resolve, so a build stays the check that
+    // matters — this holds the intent in place between builds.
+    for (final String unwanted in <String>[
+      'android.permission.ACCESS_ADSERVICES_ATTRIBUTION',
+      'android.permission.ACCESS_ADSERVICES_AD_ID',
+      'com.google.android.gms.permission.AD_ID',
+      'com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE',
+    ]) {
+      expect(removed(unwanted).hasMatch(xml), isTrue, reason: unwanted);
+    }
+    // Removing the permission does not stop the SDK asking for the id.
+    expect(
+      xml,
+      contains('android:name="google_analytics_adid_collection_enabled"'),
+    );
   });
 
   test('the promise in Settings is the one being kept', () {

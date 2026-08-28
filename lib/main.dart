@@ -1,3 +1,4 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -11,6 +12,16 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   _registerFontLicences();
+
+  // Options come from google-services.json via the Gradle plugin rather than a
+  // generated firebase_options.dart: this ships Android only, and one config
+  // file is one fewer thing to keep in step. A failure must not block launch —
+  // everything except sync works with no Firebase at all.
+  try {
+    await Firebase.initializeApp();
+  } catch (error) {
+    debugPrint('Firebase unavailable, continuing offline: $error');
+  }
 
   // Set the chrome dark before the first frame so launch never flashes light.
   // Once MaterialApp is up its AppBarTheme takes over and follows whichever

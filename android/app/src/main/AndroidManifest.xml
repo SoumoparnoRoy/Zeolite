@@ -11,9 +11,20 @@
     <!-- Notion sync needs this. Restoring it also re-opens ML Kit's telemetry
          transport, which declares the same permission and exposes no opt-out. -->
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- Nothing reads connectivity: an offline sync result comes from a request
-         that failed. One less permission on the listing. -->
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"
+    <!-- Nothing here reads connectivity, but Analytics silently disables
+         itself without it and says so only in logcat. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- The advertising stack Analytics arrives with. Nothing here advertises
+         or measures a campaign, and a study app's listing should not say
+         otherwise. WAKE_LOCK stays — it is what schedules the upload batch. -->
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID"
+        tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_ADSERVICES_ATTRIBUTION"
+        tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_ADSERVICES_AD_ID"
+        tools:node="remove" />
+    <uses-permission android:name="com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE"
         tools:node="remove" />
 
     <application
@@ -23,6 +34,11 @@
         android:allowBackup="false"
         android:fullBackupContent="false"
         android:dataExtractionRules="@xml/data_extraction_rules">
+        <!-- Removing the permission alone would not stop the SDK asking. -->
+        <meta-data
+            android:name="google_analytics_adid_collection_enabled"
+            android:value="false" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

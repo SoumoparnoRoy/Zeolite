@@ -40,6 +40,11 @@ dependencies:
   # A Notion export arrives as a zip holding another zip, which no phone file
   # manager opens comfortably. Pure Dart, MIT.
   archive: ^4.2.0
+  firebase_core: ^4.14.0
+  firebase_auth: ^6.6.1
+  cloud_firestore: ^6.9.0
+  google_sign_in: ^7.2.0
+  firebase_analytics: ^12.5.0
 
 dev_dependencies:
   flutter_test:

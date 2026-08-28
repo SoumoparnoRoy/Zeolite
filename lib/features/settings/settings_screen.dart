@@ -18,11 +18,13 @@ import '../../services/backup_folder.dart';
 import '../../services/backup_service.dart';
 import '../../services/notification_service.dart';
 import '../../state/providers.dart';
+import '../../state/auth_providers.dart';
 import '../../widgets/common.dart';
 import '../../widgets/gradient_header.dart';
 import '../../widgets/undo_snack.dart';
 import '../subjects/class_editor_sheets.dart';
 import '../subjects/notion_import_screen.dart';
+import 'account_screen.dart';
 import '../timetable/import_screen.dart';
 import '../subjects/subjects_screen.dart';
 import 'timetable_layout_section.dart';
@@ -459,6 +461,22 @@ class SettingsScreen extends ConsumerWidget {
                   value: settings.use24HourTime,
                   onChanged: (bool v) =>
                       controller.save(settings.copyWith(use24HourTime: v)),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xl),
+              const SectionHeader('Account'),
+              SurfaceCard(
+                padding: EdgeInsets.zero,
+                child: _Row(
+                  icon: Icons.cloud_outlined,
+                  title: 'Backup and sync',
+                  value: ref.watch(signedInUserProvider).value?.email ??
+                      'Not signed in — everything stays on this device',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (BuildContext context) => const AccountScreen(),
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: AppSpacing.xl),

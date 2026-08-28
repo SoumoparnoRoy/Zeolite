@@ -1,0 +1,17 @@
+rules_version = '2';
+
+// Every document belongs to exactly one signed-in user and lives under their
+// uid. There is no shared data, no public read, and nothing a user may see
+// that is not their own, so one rule covers the whole database.
+//
+// Deliberately not validating field shapes here. The device is the source of
+// truth and re-pushes anything malformed on the next run, so a schema check
+// would buy little and give a second place for the schema to drift from
+// FirestoreSyncTarget. Isolation is the part that has to be right.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{uid}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}

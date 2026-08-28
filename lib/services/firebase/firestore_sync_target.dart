@@ -27,6 +27,15 @@ class FirestoreSyncTarget implements SyncTarget {
   static const Map<SyncKind, String> _collections = <SyncKind, String>{
     SyncKind.attendance: 'attendance',
     SyncKind.subject: 'subjects',
+    SyncKind.category: 'categories',
+    SyncKind.room: 'rooms',
+    SyncKind.tag: 'tags',
+    SyncKind.holiday: 'holidays',
+    SyncKind.slot: 'slots',
+    SyncKind.extraClass: 'extraClasses',
+    // The one settings row lives under its own collection so it cannot
+    // collide with anything and reads as one document, which is what it is.
+    SyncKind.settings: 'meta',
   };
 
   CollectionReference<Map<String, Object?>> _collection(SyncKind kind) =>
@@ -61,9 +70,9 @@ class FirestoreSyncTarget implements SyncTarget {
   /// been offline has to be able to learn the row is gone; a missing document
   /// only tells it the row was never pushed.
   @override
-  Future<SyncOutcome> archive(String remoteId) async {
+  Future<SyncOutcome> archive(SyncKind kind, String remoteId) async {
     return _guard(() async {
-      await _collection(SyncKind.attendance).doc(remoteId).set(
+      await _collection(kind).doc(remoteId).set(
         <String, Object?>{
           'deletedAt': DateTime.now().millisecondsSinceEpoch,
         },

@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../domain/sync/sync_merge.dart';
 import '../domain/sync/sync_status.dart';
 import '../domain/sync/sync_target.dart';
 import '../services/firebase/firestore_sync_target.dart';
@@ -22,6 +23,7 @@ final syncCoordinatorProvider = Provider<SyncCoordinator?>((ref) {
   if (target == null) return null;
   return SyncCoordinator(
     repository: ref.watch(repositoryProvider),
+    settings: ref.watch(settingsServiceProvider),
     target: target,
   );
 });
@@ -45,6 +47,23 @@ class SyncController extends Notifier<SyncStatus> {
     // account nobody is in reads as a promise the app is not keeping.
     ref.watch(syncTargetProvider);
     return const SyncStatus();
+  }
+
+  /// The merge screen's answer, applied. Routed through here rather than
+  /// called on [TimetableActions] directly so the status card learns the run
+  /// happened — otherwise Settings goes on offering a review of a difference
+  /// that has already been settled.
+  Future<SyncRunResult?> merge(Map<String, SyncSide> decisions) async {
+    final SyncCoordinator? coordinator = ref.read(syncCoordinatorProvider);
+    if (coordinator == null) return null;
+
+    state = coordinator.status.running();
+    final SyncRunResult result = await ref
+        .read(actionsProvider)
+        .applySyncMerge(coordinator, decisions);
+    _last = result;
+    state = coordinator.status;
+    return result;
   }
 
   /// Never awaited by a write path. Marking has already succeeded locally by

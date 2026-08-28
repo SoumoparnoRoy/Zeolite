@@ -2,12 +2,34 @@ import 'package:flutter/foundation.dart';
 
 import '../../core/date_utils.dart';
 import '../../data/models/attendance_record.dart';
+import '../../data/models/class_category.dart';
+import '../../data/models/class_slot.dart';
+import '../../data/models/extra_class.dart';
+import '../../data/models/holiday.dart';
+import '../../data/models/room.dart';
 import '../../data/models/subject.dart';
+import '../../data/models/tag.dart';
+import '../../data/settings/app_settings.dart';
 
 /// What a synced row is.
+///
+/// Only [slot] and [extraClass] carry a uuid. The rest key on something the
+/// data already has — a holiday on its date, a tag, room or category on its
+/// name — which is both smaller and better: two devices set up separately
+/// still agree that "Proxy" is "Proxy", where two issued ids never would.
 enum SyncKind {
   attendance,
-  subject;
+  subject,
+  category,
+  room,
+  tag,
+  holiday,
+  slot,
+  extraClass,
+
+  /// The handful of settings that decide which occurrences exist at all.
+  /// One row, because they are one document and not a table.
+  settings;
 
   static SyncKind? fromName(String? value) {
     if (value == null) return null;
@@ -55,10 +77,13 @@ class SyncItem {
 
   /// A mark, as a target would see it.
   ///
-  /// `tagId` is left out on purpose: it points at a row in the local tag list,
-  /// so it means nothing anywhere else, and including it would push rows on
-  /// which nothing a target can show has changed.
-  factory SyncItem.attendance(AttendanceRecord record, String subjectUuid) {
+  /// The tag travels by name rather than by `tagId`, which points at a row in
+  /// the local tag list and means nothing anywhere else.
+  factory SyncItem.attendance(
+    AttendanceRecord record,
+    String subjectUuid, {
+    String? tagName,
+  }) {
     return SyncItem(
       kind: SyncKind.attendance,
       localKey: keyFor(subjectUuid, record.date, record.startMinutes),
@@ -66,15 +91,16 @@ class SyncItem {
         'status': record.status.name,
         'weight': record.weight,
         'note': record.note,
+        'tag': tagName,
       },
       changedAt: record.markedAt,
     );
   }
 
   /// A subject travels too, or a second device receives marks keyed on a uuid
-  /// it cannot name. `id` and `categoryId` stay behind for the same reason the
-  /// mark's key does not use them.
-  factory SyncItem.subject(Subject subject) {
+  /// it cannot name. `id` stays behind; the category travels **by name**,
+  /// since its own id means nothing on the far side.
+  factory SyncItem.subject(Subject subject, {String? categoryName}) {
     return SyncItem(
       kind: SyncKind.subject,
       localKey: subject.uuid ?? '',
@@ -87,10 +113,103 @@ class SyncItem {
         'priorHeld': subject.priorHeld,
         'priorAttended': subject.priorAttended,
         'expectedTotal': subject.expectedTotal,
+        'category': categoryName,
       },
       changedAt: subject.createdAt,
     );
   }
+
+  factory SyncItem.category(ClassCategory category) => SyncItem(
+        kind: SyncKind.category,
+        localKey: category.name,
+        fields: <String, Object?>{
+          'defaultMinutes': category.defaultDurationMinutes,
+        },
+        changedAt: category.createdAt,
+      );
+
+  /// Rooms and tags are a name and an order, and the name is the key — so the
+  /// only thing left to carry is where the user put it in their list.
+  factory SyncItem.room(Room room) => SyncItem(
+        kind: SyncKind.room,
+        localKey: room.name,
+        fields: <String, Object?>{'position': room.position},
+      );
+
+  factory SyncItem.tag(Tag tag) => SyncItem(
+        kind: SyncKind.tag,
+        localKey: tag.name,
+        fields: <String, Object?>{'position': tag.position},
+      );
+
+  factory SyncItem.holiday(Holiday holiday) => SyncItem(
+        kind: SyncKind.holiday,
+        localKey: '${Dates.keyOf(holiday.date)}',
+        fields: <String, Object?>{'name': holiday.name},
+      );
+
+  /// The rule, not its occurrences. `subject` is the far side's key for the
+  /// course, never the local row id.
+  factory SyncItem.slot(ClassSlot slot, String subjectUuid) => SyncItem(
+        kind: SyncKind.slot,
+        localKey: slot.uuid ?? '',
+        fields: <String, Object?>{
+          'subject': subjectUuid,
+          'weekday': slot.weekday,
+          'startMinutes': slot.startMinutes,
+          'endMinutes': slot.endMinutes,
+          'room': slot.room,
+          'weight': slot.weight,
+          'startDate': Dates.keyOf(slot.startDate),
+          'endDate':
+              slot.endDate == null ? null : Dates.keyOf(slot.endDate!),
+        },
+      );
+
+  factory SyncItem.extraClass(ExtraClass extra, String subjectUuid) =>
+      SyncItem(
+        kind: SyncKind.extraClass,
+        localKey: extra.uuid ?? '',
+        fields: <String, Object?>{
+          'subject': subjectUuid,
+          'date': Dates.keyOf(extra.date),
+          'startMinutes': extra.startMinutes,
+          'endMinutes': extra.endMinutes,
+          'room': extra.room,
+          'weight': extra.weight,
+          'note': extra.note,
+        },
+      );
+
+  /// Only what shapes the timetable. Theme, notifications and the backup
+  /// folder stay on the device that set them: they describe the device, not
+  /// the course, and a folder grant is meaningless anywhere else.
+  ///
+  /// One row rather than a table, so it is the one synced thing with no
+  /// natural key of its own — [settingsKey] is simply where it lives.
+  factory SyncItem.settings(AppSettings settings, {DateTime? changedAt}) =>
+      SyncItem(
+        kind: SyncKind.settings,
+        localKey: settingsKey,
+        fields: <String, Object?>{
+          'semesterStart': settings.semesterStart == null
+              ? null
+              : Dates.keyOf(settings.semesterStart!),
+          'semesterEnd': settings.semesterEnd == null
+              ? null
+              : Dates.keyOf(settings.semesterEnd!),
+          'targetPercent': settings.targetPercent,
+          'defaultClassMinutes': settings.defaultClassDurationMinutes,
+          'dayStartMinutes': settings.dayStartMinutes,
+          'dayEndMinutes': settings.dayEndMinutes,
+          'blockMinutes': settings.blockMinutes,
+          'breakAfterBlock': settings.breakAfterBlock,
+          'breakMinutes': settings.breakMinutes,
+        },
+        changedAt: changedAt,
+      );
+
+  static const String settingsKey = 'schedule';
 
   final SyncKind kind;
 
@@ -108,8 +227,15 @@ class SyncItem {
   /// Fingerprint of [fields]: two items with the same hash need no push.
   String get hash => _fnv1a(_canonical);
 
+  /// Null fields are left out rather than written as `k=null`, so a field
+  /// that is unset hashes the same as one that was never there. That is what
+  /// lets the payload gain a field — a subject's category, a mark's tag —
+  /// without every row that does not use it looking changed on both sides.
   String get _canonical {
-    final List<String> keys = fields.keys.toList()..sort();
+    final List<String> keys = fields.keys
+        .where((String k) => fields[k] != null)
+        .toList()
+      ..sort();
     return keys.map((String k) => '$k=${fields[k]}').join(' ');
   }
 }
@@ -286,5 +412,8 @@ abstract class SyncTarget {
 
   Future<SyncOutcome> update(SyncItem item, String remoteId);
 
-  Future<SyncOutcome> archive(String remoteId);
+  /// [kind] is carried because a target files each kind separately, and a
+  /// tombstone written into the wrong collection would delete nothing and
+  /// resurrect the row on the next run.
+  Future<SyncOutcome> archive(SyncKind kind, String remoteId);
 }

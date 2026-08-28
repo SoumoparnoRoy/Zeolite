@@ -4,7 +4,15 @@ import '../../core/date_utils.dart';
 import '../../data/db/zeolite_repository.dart';
 import '../../data/models/attendance_record.dart';
 import '../../data/models/attendance_status.dart';
+import '../../data/models/class_category.dart';
+import '../../data/models/class_slot.dart';
+import '../../data/models/extra_class.dart';
+import '../../data/models/holiday.dart';
+import '../../data/models/room.dart';
 import '../../data/models/subject.dart';
+import '../../data/models/tag.dart';
+import '../../data/settings/app_settings.dart';
+import '../../domain/sync/sync_merge.dart';
 import '../../domain/sync/sync_plan.dart';
 import '../../domain/sync/sync_status.dart';
 import '../../domain/sync/sync_target.dart';
@@ -65,14 +73,17 @@ class SyncRunResult {
 class SyncCoordinator {
   SyncCoordinator({
     required ZeoliteRepository repository,
+    required SettingsService settings,
     required this.target,
     SyncBackoff backoff = const SyncBackoff(),
     DateTime Function() now = DateTime.now,
   })  : _repository = repository,
+        _settings = settings,
         _backoff = backoff,
         _now = now;
 
   final ZeoliteRepository _repository;
+  final SettingsService _settings;
   final SyncTarget target;
   final SyncBackoff _backoff;
   final DateTime Function() _now;
@@ -85,10 +96,35 @@ class SyncCoordinator {
   /// anything back until a run had succeeded at least once.
   DateTime? _attemptedAt;
 
-  /// Subjects before attendance, because a mark is keyed on its subject's uuid
-  /// and a device receiving marks first would hold rows it cannot name.
+  /// Parents before children, because every reference travels as the far
+  /// side's key and a row that arrives first would point at nothing: a mark is
+  /// keyed on its subject, a slot names its subject, a subject names its
+  /// category and a mark names its tag.
   static const List<SyncKind> _order = <SyncKind>[
+    SyncKind.settings,
+    SyncKind.category,
+    SyncKind.room,
+    SyncKind.tag,
+    SyncKind.holiday,
     SyncKind.subject,
+    SyncKind.slot,
+    SyncKind.extraClass,
+    SyncKind.attendance,
+  ];
+
+  /// What counts as "this side holds something" when deciding whether to ask.
+  ///
+  /// The question exists to protect history, and settings, categories, rooms
+  /// and tags are not history: the settings row exists from first launch and
+  /// the app seeds categories itself, so counting any of them would make an
+  /// empty side impossible and put every fresh install through a merge with
+  /// nothing to merge. They also all key on a name, so they combine without a
+  /// decision anyway.
+  static const List<SyncKind> _content = <SyncKind>[
+    SyncKind.holiday,
+    SyncKind.subject,
+    SyncKind.slot,
+    SyncKind.extraClass,
     SyncKind.attendance,
   ];
 
@@ -101,34 +137,54 @@ class SyncCoordinator {
     return _now().difference(last) >= _backoff.delayFor(_status.failures);
   }
 
-  Future<SyncRunResult> run({bool force = false}) async {
+  /// What the two sides hold, with no ledger between them — the question the
+  /// merge screen exists to answer. Reads both sides and writes nothing, so it
+  /// is safe to open, back out of, and open again.
+  ///
+  /// Null when the account could not be read: offering a merge against a side
+  /// that failed to load would show every local row as unique and invite the
+  /// user to "resolve" a difference that does not exist.
+  Future<SyncMergePlan?> previewMerge() async {
+    final _Local local = await _readLocal();
+    final List<SyncMergeRow> onlyHere = <SyncMergeRow>[];
+    final List<SyncMergeRow> onlyThere = <SyncMergeRow>[];
+    final List<SyncMergeRow> differing = <SyncMergeRow>[];
+    final List<SyncMergeRow> agreed = <SyncMergeRow>[];
+
+    for (final SyncKind kind in _order) {
+      final List<RemoteState>? remote = await target.fetch(kind);
+      if (remote == null) return null;
+      final SyncMergePlan part =
+          SyncMergePlan.from(local: local.items[kind]!, remote: remote);
+      onlyHere.addAll(part.onlyHere);
+      onlyThere.addAll(part.onlyThere);
+      differing.addAll(part.differing);
+      agreed.addAll(part.agreed);
+    }
+
+    return SyncMergePlan(
+      onlyHere: onlyHere,
+      onlyThere: onlyThere,
+      differing: differing,
+      agreed: agreed,
+    );
+  }
+
+  /// [merge] holds one decision per differing key. Its presence is also what
+  /// says the first-run question has been answered, so the guard below stands
+  /// down rather than asking again and looping.
+  Future<SyncRunResult> run({
+    bool force = false,
+    Map<String, SyncSide>? merge,
+  }) async {
     if (!force && !canRunNow()) {
       return const SyncRunResult(outcome: SyncRunOutcome.deferred);
     }
     _status = _status.running();
     _attemptedAt = _now();
 
-    final List<Subject> subjects = await _repository.getSubjects();
-    final Map<int, String> uuidById = <int, String>{
-      for (final Subject s in subjects)
-        if (s.id != null && s.uuid != null) s.id!: s.uuid!,
-    };
-    final Map<String, Subject> subjectByUuid = <String, Subject>{
-      for (final Subject s in subjects)
-        if (s.uuid != null) s.uuid!: s,
-    };
-
-    final Map<SyncKind, List<SyncItem>> local = <SyncKind, List<SyncItem>>{
-      SyncKind.subject: <SyncItem>[
-        for (final Subject s in subjects)
-          if (s.uuid != null) SyncItem.subject(s),
-      ],
-      SyncKind.attendance: <SyncItem>[
-        for (final AttendanceRecord r in await _repository.getAttendance())
-          if (uuidById[r.subjectId] != null)
-            SyncItem.attendance(r, uuidById[r.subjectId]!),
-      ],
-    };
+    final _Local read = await _readLocal();
+    final Map<SyncKind, List<SyncItem>> local = read.items;
 
     final Map<SyncKind, List<RemoteLink>> links = <SyncKind, List<RemoteLink>>{
       for (final SyncKind kind in _order)
@@ -139,8 +195,7 @@ class SyncCoordinator {
       for (final SyncKind kind in _order) kind: await target.fetch(kind),
     };
 
-    final _Merge merge = _firstRunMerge(local, links, remote);
-    if (merge == _Merge.review) {
+    if (merge == null && _firstRunMerge(local, links, remote) == _Merge.review) {
       _status = _status.succeeded(_now());
       return SyncRunResult(
         outcome: SyncRunOutcome.reviewNeeded,
@@ -156,10 +211,11 @@ class SyncCoordinator {
     for (final SyncKind kind in _order) {
       final SyncFailure? stop = await _runKind(
         kind: kind,
-        local: local[kind]!,
+        items: local[kind]!,
         links: links[kind]!,
         remote: remote[kind],
-        subjectByUuid: subjectByUuid,
+        local: read,
+        merge: merge,
         tally: tally,
       );
       if (stop != null) {
@@ -188,17 +244,112 @@ class SyncCoordinator {
     );
   }
 
+  /// The local side of a run, read once. A row whose parent has no key is left
+  /// out entirely rather than sent under a local id — a subject with no uuid
+  /// takes its marks and its slots down with it.
+  Future<_Local> _readLocal() async {
+    final List<Subject> subjects = await _repository.getSubjects();
+    final List<ClassCategory> categories = await _repository.getCategories();
+    final List<Room> rooms = await _repository.getRooms();
+    final List<Tag> tags = await _repository.getTags();
+    final List<Holiday> holidays = await _repository.getHolidays();
+    final List<ClassSlot> slots = await _repository.getSlots();
+    final List<ExtraClass> extras = await _repository.getExtraClasses();
+    final AppSettings settings = await _settings.load();
+
+    final Map<int, String> uuidById = <int, String>{
+      for (final Subject s in subjects)
+        if (s.id != null && s.uuid != null) s.id!: s.uuid!,
+    };
+    final Map<int, String> categoryNameById = <int, String>{
+      for (final ClassCategory c in categories)
+        if (c.id != null) c.id!: c.name,
+    };
+    final Map<int, String> tagNameById = <int, String>{
+      for (final Tag t in tags)
+        if (t.id != null) t.id!: t.name,
+    };
+
+    final _Local local = _Local(
+      subjectByUuid: <String, Subject>{
+        for (final Subject s in subjects)
+          if (s.uuid != null) s.uuid!: s,
+      },
+      categoryByName: <String, ClassCategory>{
+        for (final ClassCategory c in categories) c.name: c,
+      },
+      roomByName: <String, Room>{for (final Room r in rooms) r.name: r},
+      tagByName: <String, Tag>{for (final Tag t in tags) t.name: t},
+      holidayByKey: <String, Holiday>{
+        for (final Holiday h in holidays) '${Dates.keyOf(h.date)}': h,
+      },
+      slotByUuid: <String, ClassSlot>{
+        for (final ClassSlot s in slots)
+          if (s.uuid != null) s.uuid!: s,
+      },
+      extraByUuid: <String, ExtraClass>{
+        for (final ExtraClass e in extras)
+          if (e.uuid != null) e.uuid!: e,
+      },
+    );
+
+    local.items.addAll(<SyncKind, List<SyncItem>>{
+      SyncKind.settings: <SyncItem>[
+        SyncItem.settings(settings, changedAt: settings.scheduleChangedAt),
+      ],
+      SyncKind.category: <SyncItem>[
+        for (final ClassCategory c in categories) SyncItem.category(c),
+      ],
+      SyncKind.room: <SyncItem>[for (final Room r in rooms) SyncItem.room(r)],
+      SyncKind.tag: <SyncItem>[for (final Tag t in tags) SyncItem.tag(t)],
+      SyncKind.holiday: <SyncItem>[
+        for (final Holiday h in holidays) SyncItem.holiday(h),
+      ],
+      SyncKind.subject: <SyncItem>[
+        for (final Subject s in subjects)
+          if (s.uuid != null)
+            SyncItem.subject(
+              s,
+              categoryName:
+                  s.categoryId == null ? null : categoryNameById[s.categoryId],
+            ),
+      ],
+      SyncKind.slot: <SyncItem>[
+        for (final ClassSlot s in slots)
+          if (s.uuid != null && uuidById[s.subjectId] != null)
+            SyncItem.slot(s, uuidById[s.subjectId]!),
+      ],
+      SyncKind.extraClass: <SyncItem>[
+        for (final ExtraClass e in extras)
+          if (e.uuid != null && uuidById[e.subjectId] != null)
+            SyncItem.extraClass(e, uuidById[e.subjectId]!),
+      ],
+      SyncKind.attendance: <SyncItem>[
+        for (final AttendanceRecord r in await _repository.getAttendance())
+          if (uuidById[r.subjectId] != null)
+            SyncItem.attendance(
+              r,
+              uuidById[r.subjectId]!,
+              tagName: r.tagId == null ? null : tagNameById[r.tagId],
+            ),
+      ],
+    });
+
+    return local;
+  }
+
   /// Returns the failure that ended the run early, or null if it finished.
   Future<SyncFailure?> _runKind({
     required SyncKind kind,
-    required List<SyncItem> local,
+    required List<SyncItem> items,
     required List<RemoteLink> links,
     required List<RemoteState>? remote,
-    required Map<String, Subject> subjectByUuid,
+    required _Local local,
+    required Map<String, SyncSide>? merge,
     required _Tally tally,
   }) async {
     final SyncPlan plan =
-        SyncPlan.from(local: local, links: links, remote: remote);
+        SyncPlan.from(local: items, links: links, remote: remote);
     final Map<String, RemoteState> remoteByKey = <String, RemoteState>{
       for (final RemoteState state in remote ?? const <RemoteState>[])
         state.localKey: state,
@@ -212,7 +363,7 @@ class SyncCoordinator {
         tally.review.add(pull);
         continue;
       }
-      final RemoteLink? link = await _applyPull(pull, kind, subjectByUuid);
+      final RemoteLink? link = await _applyPull(pull, kind, local);
       if (link == null) {
         forget.add(pull.remote.localKey);
       } else {
@@ -223,12 +374,18 @@ class SyncCoordinator {
 
     for (final SyncPush push in plan.pushes) {
       final RemoteState? state = remoteByKey[push.item.localKey];
-      if (push.kind == SyncPushKind.conflict &&
-          _remoteWins(push.item, state)) {
+      // With no ledger every shared row plans as an adopt, so a merge decision
+      // of "keep the account's copy" has to be honoured here — otherwise the
+      // push would send the local row the user just chose against.
+      final bool chosenAway =
+          merge?[push.item.localKey] == SyncSide.there && state != null;
+      if (chosenAway ||
+          (push.kind == SyncPushKind.conflict &&
+              _remoteWins(push.item, state))) {
         final RemoteLink? link = await _applyPull(
           SyncPull(remote: state!, link: push.link),
           kind,
-          subjectByUuid,
+          local,
         );
         if (link == null) {
           forget.add(state.localKey);
@@ -270,7 +427,8 @@ class SyncCoordinator {
 
     for (final SyncDrop drop in plan.drops) {
       if (drop.kind == SyncDropKind.archive) {
-        final SyncOutcome outcome = await target.archive(drop.link.remoteId);
+        final SyncOutcome outcome =
+            await target.archive(kind, drop.link.remoteId);
         if (!outcome.ok) {
           tally.message ??= outcome.message;
           if (_endsRun(outcome.failure!)) {
@@ -318,17 +476,24 @@ class SyncCoordinator {
   Future<RemoteLink?> _applyPull(
     SyncPull pull,
     SyncKind kind,
-    Map<String, Subject> subjectByUuid,
+    _Local local,
   ) async {
     final RemoteState state = pull.remote;
     if (state.deleted) {
-      await _deleteLocal(kind, state.localKey, subjectByUuid);
+      await _deleteLocal(kind, state.localKey, local);
       return null;
     }
 
     final SyncItem? applied = switch (kind) {
-      SyncKind.subject => await _applySubject(state, subjectByUuid),
-      SyncKind.attendance => await _applyAttendance(state, subjectByUuid),
+      SyncKind.settings => await _applySettings(state),
+      SyncKind.category => await _applyCategory(state, local),
+      SyncKind.room => await _applyRoom(state, local),
+      SyncKind.tag => await _applyTag(state, local),
+      SyncKind.holiday => await _applyHoliday(state, local),
+      SyncKind.subject => await _applySubject(state, local),
+      SyncKind.slot => await _applySlot(state, local),
+      SyncKind.extraClass => await _applyExtraClass(state, local),
+      SyncKind.attendance => await _applyAttendance(state, local),
     };
     if (applied == null) return null;
 
@@ -348,15 +513,119 @@ class SyncCoordinator {
     );
   }
 
-  Future<SyncItem?> _applySubject(
-    RemoteState state,
-    Map<String, Subject> subjectByUuid,
-  ) async {
-    final Subject? existing = subjectByUuid[state.localKey];
+  /// Merged field by field rather than replacing the object, so the settings
+  /// that never travel — theme, notifications, the backup folder — survive a
+  /// pull from a device that has different ones.
+  Future<SyncItem?> _applySettings(RemoteState state) async {
+    final Map<String, Object?> f = state.fields;
+    final AppSettings current = await _settings.load();
+
+    final AppSettings merged = current.copyWith(
+      semesterStart: _date(f['semesterStart']),
+      semesterEnd: _date(f['semesterEnd']),
+      targetPercent: _double(f['targetPercent']),
+      defaultClassDurationMinutes: _int(f['defaultClassMinutes']),
+      dayStartMinutes: _int(f['dayStartMinutes']),
+      dayEndMinutes: _int(f['dayEndMinutes']),
+      blockMinutes: _int(f['blockMinutes']),
+      breakAfterBlock: _int(f['breakAfterBlock']),
+      breakMinutes: _int(f['breakMinutes']),
+      scheduleChangedAt: state.editedAt,
+    );
+    await _settings.save(merged);
+    return SyncItem.settings(merged, changedAt: merged.scheduleChangedAt);
+  }
+
+  Future<SyncItem?> _applyCategory(RemoteState state, _Local local) async {
+    final ClassCategory? existing = local.categoryByName[state.localKey];
+    final ClassCategory category = ClassCategory(
+      id: existing?.id,
+      name: state.localKey,
+      defaultDurationMinutes: _int(state.fields['defaultMinutes']) ??
+          existing?.defaultDurationMinutes ??
+          60,
+      createdAt: state.editedAt ?? existing?.createdAt,
+    );
+
+    if (existing == null) {
+      final int id = await _repository.insertCategory(category);
+      local.categoryByName[state.localKey] = ClassCategory(
+        id: id,
+        name: category.name,
+        defaultDurationMinutes: category.defaultDurationMinutes,
+        createdAt: category.createdAt,
+      );
+    } else {
+      await _repository.updateCategory(category);
+      local.categoryByName[state.localKey] = category;
+    }
+    return SyncItem.category(category);
+  }
+
+  Future<SyncItem?> _applyRoom(RemoteState state, _Local local) async {
+    final Room? existing = local.roomByName[state.localKey];
+    final Room room = Room(
+      id: existing?.id,
+      name: state.localKey,
+      position: _int(state.fields['position']) ?? existing?.position ?? 0,
+    );
+
+    if (existing == null) {
+      final int id = await _repository.insertRoom(room);
+      local.roomByName[state.localKey] =
+          Room(id: id, name: room.name, position: room.position);
+    } else {
+      await _repository.updateRoom(room);
+      local.roomByName[state.localKey] = room;
+    }
+    return SyncItem.room(room);
+  }
+
+  Future<SyncItem?> _applyTag(RemoteState state, _Local local) async {
+    final Tag? existing = local.tagByName[state.localKey];
+    final Tag tag = Tag(
+      id: existing?.id,
+      name: state.localKey,
+      position: _int(state.fields['position']) ?? existing?.position ?? 0,
+    );
+
+    if (existing == null) {
+      final int id = await _repository.insertTag(tag);
+      local.tagByName[state.localKey] =
+          Tag(id: id, name: tag.name, position: tag.position);
+    } else {
+      await _repository.updateTag(tag);
+      local.tagByName[state.localKey] = tag;
+    }
+    return SyncItem.tag(tag);
+  }
+
+  /// The date is the key and the table already makes it unique, so a pulled
+  /// holiday is replaced rather than updated — there is no other field that
+  /// could have moved.
+  Future<SyncItem?> _applyHoliday(RemoteState state, _Local local) async {
+    final int? dateKey = int.tryParse(state.localKey);
+    final String? name = state.fields['name'] as String?;
+    if (dateKey == null || name == null) return null;
+
+    final Holiday? existing = local.holidayByKey[state.localKey];
+    if (existing?.id != null) {
+      await _repository.deleteHoliday(existing!.id!);
+    }
+    final Holiday holiday = Holiday(date: Dates.fromKey(dateKey), name: name);
+    final int id = await _repository.insertHoliday(holiday);
+    local.holidayByKey[state.localKey] =
+        Holiday(id: id, date: holiday.date, name: holiday.name);
+    return SyncItem.holiday(holiday);
+  }
+
+  Future<SyncItem?> _applySubject(RemoteState state, _Local local) async {
+    final Subject? existing = local.subjectByUuid[state.localKey];
     final Map<String, Object?> f = state.fields;
     final String? name = f['name'] as String?;
     if (name == null || name.isEmpty) return null;
 
+    final String? categoryName = f['category'] as String?;
     final Subject subject = Subject(
       id: existing?.id,
       uuid: state.localKey,
@@ -365,7 +634,10 @@ class SyncCoordinator {
       teacher: f['teacher'] as String?,
       colorValue: _int(f['color']) ?? existing?.colorValue ?? 0xff607d8b,
       targetPercent: _double(f['targetPercent']),
-      categoryId: existing?.categoryId,
+      // Categories sync first, so a named one is already here unless the far
+      // side never had it.
+      categoryId:
+          categoryName == null ? null : local.categoryByName[categoryName]?.id,
       createdAt: state.editedAt ?? existing?.createdAt,
       priorHeld: _int(f['priorHeld']) ?? 0,
       priorAttended: _int(f['priorAttended']) ?? 0,
@@ -374,20 +646,81 @@ class SyncCoordinator {
 
     if (existing == null) {
       final int id = await _repository.insertSubject(subject);
-      subjectByUuid[state.localKey] = subject.copyWith(id: id);
+      local.subjectByUuid[state.localKey] = subject.copyWith(id: id);
     } else {
       await _repository.updateSubject(subject);
-      subjectByUuid[state.localKey] = subject;
+      local.subjectByUuid[state.localKey] = subject;
     }
-    return SyncItem.subject(subject);
+    return SyncItem.subject(subject, categoryName: categoryName);
   }
 
-  Future<SyncItem?> _applyAttendance(
-    RemoteState state,
-    Map<String, Subject> subjectByUuid,
-  ) async {
+  Future<SyncItem?> _applySlot(RemoteState state, _Local local) async {
+    final Map<String, Object?> f = state.fields;
+    final String? subjectUuid = f['subject'] as String?;
+    final Subject? subject =
+        subjectUuid == null ? null : local.subjectByUuid[subjectUuid];
+    final int? startDate = _int(f['startDate']);
+    if (subject?.id == null || startDate == null) return null;
+
+    final int? endDate = _int(f['endDate']);
+    final ClassSlot? existing = local.slotByUuid[state.localKey];
+    final ClassSlot slot = ClassSlot(
+      id: existing?.id,
+      uuid: state.localKey,
+      subjectId: subject!.id!,
+      weekday: _int(f['weekday']) ?? DateTime.monday,
+      startMinutes: _int(f['startMinutes']) ?? 0,
+      endMinutes: _int(f['endMinutes']) ?? 0,
+      room: f['room'] as String?,
+      weight: _int(f['weight']) ?? 1,
+      startDate: Dates.fromKey(startDate),
+      endDate: endDate == null ? null : Dates.fromKey(endDate),
+    );
+
+    if (existing == null) {
+      final int id = await _repository.insertSlot(slot);
+      local.slotByUuid[state.localKey] = slot.copyWith(id: id);
+    } else {
+      await _repository.updateSlot(slot);
+      local.slotByUuid[state.localKey] = slot;
+    }
+    return SyncItem.slot(slot, subjectUuid!);
+  }
+
+  Future<SyncItem?> _applyExtraClass(RemoteState state, _Local local) async {
+    final Map<String, Object?> f = state.fields;
+    final String? subjectUuid = f['subject'] as String?;
+    final Subject? subject =
+        subjectUuid == null ? null : local.subjectByUuid[subjectUuid];
+    final int? date = _int(f['date']);
+    if (subject?.id == null || date == null) return null;
+
+    final ExtraClass? existing = local.extraByUuid[state.localKey];
+    final ExtraClass extra = ExtraClass(
+      id: existing?.id,
+      uuid: state.localKey,
+      subjectId: subject!.id!,
+      date: Dates.fromKey(date),
+      startMinutes: _int(f['startMinutes']) ?? 0,
+      endMinutes: _int(f['endMinutes']) ?? 0,
+      room: f['room'] as String?,
+      weight: _int(f['weight']) ?? 1,
+      note: f['note'] as String?,
+    );
+
+    if (existing == null) {
+      final int id = await _repository.insertExtraClass(extra);
+      local.extraByUuid[state.localKey] = extra.copyWith(id: id);
+    } else {
+      await _repository.updateExtraClass(extra);
+      local.extraByUuid[state.localKey] = extra;
+    }
+    return SyncItem.extraClass(extra, subjectUuid!);
+  }
+
+  Future<SyncItem?> _applyAttendance(RemoteState state, _Local local) async {
     final _MarkKey? key = _MarkKey.parse(state.localKey);
-    final Subject? subject = key == null ? null : subjectByUuid[key.uuid];
+    final Subject? subject = key == null ? null : local.subjectByUuid[key.uuid];
     // A mark for a subject this device has never heard of. Subjects sync
     // first, so the only way here is a subject that failed to apply; the row
     // stays unlinked and the next run offers it again.
@@ -397,31 +730,60 @@ class SyncCoordinator {
         AttendanceStatus.fromName(state.fields['status'] as String?);
     if (status == null) return null;
 
+    final String? tagName = state.fields['tag'] as String?;
     final AttendanceRecord record = AttendanceRecord(
       subjectId: subject!.id!,
       date: key.date,
       startMinutes: key.startMinutes,
       status: status,
       weight: _int(state.fields['weight']) ?? 1,
+      tagId: tagName == null ? null : local.tagByName[tagName]?.id,
       note: state.fields['note'] as String?,
       markedAt: state.editedAt,
     );
     await _repository.setAttendance(record);
-    return SyncItem.attendance(record, key.uuid);
+    return SyncItem.attendance(record, key.uuid, tagName: tagName);
   }
 
   Future<void> _deleteLocal(
     SyncKind kind,
     String localKey,
-    Map<String, Subject> subjectByUuid,
+    _Local local,
   ) async {
     switch (kind) {
+      // The row always exists, and clearing the semester dates because another
+      // device stopped holding them is not a deletion anyone asked for.
+      case SyncKind.settings:
+        return;
+      case SyncKind.category:
+        final ClassCategory? category = local.categoryByName.remove(localKey);
+        if (category?.id != null) {
+          await _repository.deleteCategory(category!.id!);
+        }
+      case SyncKind.room:
+        final Room? room = local.roomByName.remove(localKey);
+        if (room?.id != null) await _repository.deleteRoom(room!.id!);
+      case SyncKind.tag:
+        final Tag? tag = local.tagByName.remove(localKey);
+        if (tag?.id != null) await _repository.deleteTag(tag!.id!);
+      case SyncKind.holiday:
+        final Holiday? holiday = local.holidayByKey.remove(localKey);
+        if (holiday?.id != null) {
+          await _repository.deleteHoliday(holiday!.id!);
+        }
       case SyncKind.subject:
-        final Subject? subject = subjectByUuid.remove(localKey);
+        final Subject? subject = local.subjectByUuid.remove(localKey);
         if (subject?.id != null) await _repository.deleteSubject(subject!.id!);
+      case SyncKind.slot:
+        final ClassSlot? slot = local.slotByUuid.remove(localKey);
+        if (slot?.id != null) await _repository.deleteSlot(slot!.id!);
+      case SyncKind.extraClass:
+        final ExtraClass? extra = local.extraByUuid.remove(localKey);
+        if (extra?.id != null) await _repository.deleteExtraClass(extra!.id!);
       case SyncKind.attendance:
         final _MarkKey? key = _MarkKey.parse(localKey);
-        final Subject? subject = key == null ? null : subjectByUuid[key.uuid];
+        final Subject? subject =
+            key == null ? null : local.subjectByUuid[key.uuid];
         if (key == null || subject?.id == null) return;
         await _repository.clearAttendance(
           subject!.id!,
@@ -458,17 +820,43 @@ class SyncCoordinator {
     Map<SyncKind, List<RemoteLink>> links,
     Map<SyncKind, List<RemoteState>?> remote,
   ) {
-    final bool linked =
-        _order.any((SyncKind k) => links[k]!.isNotEmpty);
+    final bool linked = _order.any((SyncKind k) => links[k]!.isNotEmpty);
     if (linked) return _Merge.proceed;
-    final bool hasLocal = _order.any((SyncKind k) => local[k]!.isNotEmpty);
-    final bool hasRemote = _order.every((SyncKind k) => remote[k] != null) &&
-        _order.any((SyncKind k) => remote[k]!.isNotEmpty);
+
+    final bool hasLocal = _content.any((SyncKind k) => local[k]!.isNotEmpty);
+    final bool hasRemote = _content.every((SyncKind k) => remote[k] != null) &&
+        _content.any((SyncKind k) => remote[k]!.isNotEmpty);
     return hasLocal && hasRemote ? _Merge.review : _Merge.proceed;
   }
 }
 
 enum _Merge { proceed, review }
+
+/// Every lookup a pull needs to turn a far-side key back into a local row.
+///
+/// Mutable, and updated as rows are applied: a slot arriving in the same run
+/// as the subject it names has to find it.
+class _Local {
+  _Local({
+    required this.subjectByUuid,
+    required this.categoryByName,
+    required this.roomByName,
+    required this.tagByName,
+    required this.holidayByKey,
+    required this.slotByUuid,
+    required this.extraByUuid,
+  });
+
+  final Map<String, Subject> subjectByUuid;
+  final Map<String, ClassCategory> categoryByName;
+  final Map<String, Room> roomByName;
+  final Map<String, Tag> tagByName;
+  final Map<String, Holiday> holidayByKey;
+  final Map<String, ClassSlot> slotByUuid;
+  final Map<String, ExtraClass> extraByUuid;
+
+  final Map<SyncKind, List<SyncItem>> items = <SyncKind, List<SyncItem>>{};
+}
 
 class _Tally {
   int pushed = 0;
@@ -504,6 +892,13 @@ int? _int(Object? value) => switch (value) {
       String v => int.tryParse(v),
       _ => null,
     };
+
+/// A day key back to a date. Null stays null, so a semester end that has not
+/// been set travels as "not set" rather than as an epoch.
+DateTime? _date(Object? value) {
+  final int? key = _int(value);
+  return key == null ? null : Dates.fromKey(key);
+}
 
 double? _double(Object? value) => switch (value) {
       num v => v.toDouble(),

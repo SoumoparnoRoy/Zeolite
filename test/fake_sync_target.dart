@@ -51,7 +51,7 @@ class FakeSyncTarget implements SyncTarget {
   }
 
   @override
-  Future<SyncOutcome> archive(String remoteId) async {
+  Future<SyncOutcome> archive(SyncKind kind, String remoteId) async {
     calls.add('archive $remoteId');
     final SyncOutcome? failure = _takeFailure();
     if (failure != null) return failure;

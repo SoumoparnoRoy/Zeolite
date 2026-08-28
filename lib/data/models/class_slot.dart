@@ -14,6 +14,7 @@ import 'attendance_record.dart';
 class ClassSlot {
   const ClassSlot({
     this.id,
+    this.uuid,
     required this.subjectId,
     required this.weekday,
     required this.startMinutes,
@@ -25,6 +26,11 @@ class ClassSlot {
   });
 
   final int? id;
+
+  /// Stable across devices, unlike [id]. A slot has no natural key worth
+  /// trusting — weekday, times and dates are all editable — so it carries one.
+  final String? uuid;
+
   final int subjectId;
 
   /// 1 = Monday … 7 = Sunday, matching [DateTime.weekday].
@@ -69,6 +75,7 @@ class ClassSlot {
 
   ClassSlot copyWith({
     int? id,
+    String? uuid,
     int? subjectId,
     int? weekday,
     int? startMinutes,
@@ -81,6 +88,7 @@ class ClassSlot {
   }) {
     return ClassSlot(
       id: id ?? this.id,
+      uuid: uuid ?? this.uuid,
       subjectId: subjectId ?? this.subjectId,
       weekday: weekday ?? this.weekday,
       startMinutes: startMinutes ?? this.startMinutes,
@@ -94,6 +102,7 @@ class ClassSlot {
 
   Map<String, Object?> toMap() => <String, Object?>{
         if (id != null) 'id': id,
+        if (uuid != null) 'uuid': uuid,
         'subject_id': subjectId,
         'weekday': weekday,
         'start_minutes': startMinutes,
@@ -107,6 +116,7 @@ class ClassSlot {
   factory ClassSlot.fromMap(Map<String, Object?> map) {
     return ClassSlot(
       id: map['id'] as int?,
+      uuid: map['uuid'] as String?,
       subjectId: (map['subject_id'] as int?) ?? 0,
       weekday: (map['weekday'] as int?) ?? DateTime.monday,
       startMinutes: (map['start_minutes'] as int?) ?? 0,

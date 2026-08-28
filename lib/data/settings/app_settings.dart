@@ -54,6 +54,7 @@ class AppSettings {
     this.notifyAttendanceDanger = true,
     this.autoBackupEnabled = false,
     this.lastAutoBackupAt,
+    this.scheduleChangedAt,
     this.backupFolderUri,
     this.backupFolderName,
     this.onboarded = false,
@@ -120,6 +121,13 @@ class AppSettings {
   /// data, which is why it is kept out of the export — restoring it onto
   /// another phone would tell that phone a backup had already been taken.
   final DateTime? lastAutoBackupAt;
+
+  /// When a setting that shapes the timetable was last changed here.
+  ///
+  /// Exists only so two signed-in devices can settle a disagreement about the
+  /// semester dates by time rather than by whichever syncs last. Device
+  /// preferences do not move it, because they never travel.
+  final DateTime? scheduleChangedAt;
 
   /// A persisted SAF tree URI; null means the app's own folder. Out of the
   /// export like [lastAutoBackupAt], and for a sharper reason: a grant belongs
@@ -203,6 +211,7 @@ class AppSettings {
     bool? notifyAttendanceDanger,
     bool? autoBackupEnabled,
     DateTime? lastAutoBackupAt,
+    DateTime? scheduleChangedAt,
     String? backupFolderUri,
     String? backupFolderName,
     bool clearBackupFolder = false,
@@ -233,6 +242,7 @@ class AppSettings {
           notifyAttendanceDanger ?? this.notifyAttendanceDanger,
       autoBackupEnabled: autoBackupEnabled ?? this.autoBackupEnabled,
       lastAutoBackupAt: lastAutoBackupAt ?? this.lastAutoBackupAt,
+      scheduleChangedAt: scheduleChangedAt ?? this.scheduleChangedAt,
       // Choosing a folder and clearing one both have to be expressible, and
       // `?? this` cannot say "set this back to null".
       backupFolderUri:
@@ -312,6 +322,7 @@ class SettingsService {
   static const String _kBlockMinutes = 'ut.blockMinutes';
   static const String _kBreakAfterBlock = 'ut.breakAfterBlock';
   static const String _kBreakMinutes = 'ut.breakMinutes';
+  static const String _kScheduleChangedAt = 'ut.scheduleChangedAt';
   static const String _k24h = 'ut.use24HourTime';
   static const String _kThemeMode = 'ut.themeMode';
   static const String _kNotificationsEnabled = 'ut.notificationsEnabled';
@@ -361,6 +372,10 @@ class SettingsService {
         final int ms => DateTime.fromMillisecondsSinceEpoch(ms),
         null => null,
       },
+      scheduleChangedAt: switch (await prefs.getInt(_kScheduleChangedAt)) {
+        final int ms => DateTime.fromMillisecondsSinceEpoch(ms),
+        null => null,
+      },
       backupFolderUri: await prefs.getString(_kBackupFolderUri),
       backupFolderName: await prefs.getString(_kBackupFolderName),
       onboarded: await prefs.getBool(_kOnboarded) ?? false,
@@ -402,6 +417,14 @@ class SettingsService {
     await prefs.setInt(_kEveningMinutes, settings.eveningReminderMinutes);
     await prefs.setBool(_kNotifyDanger, settings.notifyAttendanceDanger);
     await prefs.setBool(_kAutoBackup, settings.autoBackupEnabled);
+    if (settings.scheduleChangedAt == null) {
+      await prefs.remove(_kScheduleChangedAt);
+    } else {
+      await prefs.setInt(
+        _kScheduleChangedAt,
+        settings.scheduleChangedAt!.millisecondsSinceEpoch,
+      );
+    }
     if (settings.lastAutoBackupAt == null) {
       await prefs.remove(_kLastAutoBackup);
     } else {

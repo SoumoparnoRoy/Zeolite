@@ -4,12 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
+import '../../domain/sync/sync_merge.dart';
 import '../../domain/sync/sync_status.dart';
 import '../../domain/sync/sync_target.dart';
 import '../../services/auth_service.dart';
 import '../../services/sync/sync_coordinator.dart';
 import '../../state/auth_providers.dart';
 import '../../state/sync_providers.dart';
+import 'sync_merge_screen.dart';
 import '../../widgets/common.dart';
 import '../../widgets/gradient_header.dart';
 
@@ -267,14 +269,46 @@ class _SyncSection extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
-        OutlinedButton(
-          onPressed: running
-              ? null
-              // Forced: a Retry that honours the backoff is not a Retry.
-              : () => ref.read(syncStatusProvider.notifier).run(force: true),
-          child: Text(status.failures > 0 ? 'Try again' : 'Sync now'),
-        ),
+        if (last?.outcome == SyncRunOutcome.reviewNeeded)
+          FilledButton(
+            onPressed: running ? null : () => _review(context, ref),
+            child: const Text('Review and merge'),
+          )
+        else
+          OutlinedButton(
+            onPressed: running
+                ? null
+                // Forced: a Retry that honours the backoff is not a Retry.
+                : () => ref.read(syncStatusProvider.notifier).run(force: true),
+            child: Text(status.failures > 0 ? 'Try again' : 'Sync now'),
+          ),
       ],
+    );
+  }
+
+  /// Read fresh rather than reusing what the run returned: the user may have
+  /// marked something since, and a merge screen built on a stale reading would
+  /// offer decisions about rows that have already moved on.
+  Future<void> _review(BuildContext context, WidgetRef ref) async {
+    final SyncCoordinator? coordinator = ref.read(syncCoordinatorProvider);
+    if (coordinator == null) return;
+
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    final NavigatorState navigator = Navigator.of(context);
+    final SyncMergePlan? plan = await coordinator.previewMerge();
+
+    if (plan == null) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Could not read your account. Try again in a moment.'),
+        ),
+      );
+      return;
+    }
+    await navigator.push(
+      MaterialPageRoute<void>(
+        builder: (BuildContext context) => SyncMergeScreen(plan: plan),
+      ),
     );
   }
 
@@ -306,10 +340,10 @@ String syncStatusLine(SyncStatus status, SyncRunResult? last) {
           : 'The last sync did not finish. Nothing on this device changed.';
     case SyncState.idle:
       if (last?.outcome == SyncRunOutcome.reviewNeeded) {
-        // The coordinator refuses to merge this case and there is no screen
-        // to resolve it yet, so say so rather than showing a bare "synced".
+        // Never a bare "synced": nothing was merged, and the difference is
+        // still sitting there waiting on an answer.
         return 'This device and your account both hold attendance. Nothing '
-            'was changed — choosing between them is not built yet.';
+            'has been changed yet.';
       }
       if (status.lastRunAt == null) return 'Not synced yet.';
       return 'Synced ${_ago(status.lastRunAt!)}.${_counts(last)}';

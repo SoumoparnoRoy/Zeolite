@@ -57,7 +57,7 @@ void main() {
   test('archiving leaves a tombstone a stale device can still see', () async {
     final SyncItem item = _mark();
     await target.create(item);
-    final SyncOutcome outcome = await target.archive(item.localKey);
+    final SyncOutcome outcome = await target.archive(SyncKind.attendance, item.localKey);
     expect(outcome.ok, isTrue);
 
     final List<RemoteState> states =
@@ -72,7 +72,7 @@ void main() {
   test('a re-push after a delete clears the tombstone', () async {
     final SyncItem item = _mark();
     await target.create(item);
-    await target.archive(item.localKey);
+    await target.archive(SyncKind.attendance, item.localKey);
     await target.update(item, item.localKey);
 
     final RemoteState state =

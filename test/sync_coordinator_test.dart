@@ -1,12 +1,18 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:zeolite/data/db/app_database.dart';
 import 'package:zeolite/data/db/zeolite_repository.dart';
 import 'package:zeolite/data/models/attendance_record.dart';
 import 'package:zeolite/data/models/attendance_status.dart';
+import 'package:zeolite/data/models/class_category.dart';
+import 'package:zeolite/data/models/class_slot.dart';
 import 'package:zeolite/data/models/subject.dart';
+import 'package:zeolite/data/settings/app_settings.dart';
+import 'package:zeolite/domain/sync/sync_merge.dart';
 import 'package:zeolite/domain/sync/sync_target.dart';
 import 'package:zeolite/services/sync/sync_coordinator.dart';
 
@@ -28,6 +34,8 @@ void main() {
   });
 
   setUp(() async {
+    SharedPreferencesAsyncPlatform.instance =
+        InMemorySharedPreferencesAsync.empty();
     dir = await Directory.systemTemp.createTemp('zeolite_sync');
     final AppDatabase appDb =
         AppDatabase.at('${dir.path}/sync.db', factory: databaseFactoryFfi);
@@ -41,8 +49,11 @@ void main() {
     await dir.delete(recursive: true);
   });
 
-  SyncCoordinator coordinator() =>
-      SyncCoordinator(repository: repo, target: target);
+  SyncCoordinator coordinator() => SyncCoordinator(
+        repository: repo,
+        settings: SettingsService(),
+        target: target,
+      );
 
   /// One subject with one mark, which is the smallest thing worth syncing.
   Future<Subject> seed({AttendanceStatus? status, DateTime? markedAt}) async {
@@ -111,13 +122,15 @@ void main() {
     );
   }
 
-  test('a first run pushes both kinds and a second one pushes nothing',
+  test('a first run pushes every kind and a second one pushes nothing',
       () async {
     await seed(status: AttendanceStatus.present);
 
     final SyncRunResult first = await coordinator().run();
     expect(first.outcome, SyncRunOutcome.synced);
-    expect(first.pushed, 2);
+    // The subject, its mark, the settings row, and the two categories the
+    // app seeds itself.
+    expect(first.pushed, 5);
 
     // The subject has to reach the target before the mark that is keyed on it.
     expect(target.calls.indexWhere((String c) => c.startsWith('create ')),
@@ -268,5 +281,177 @@ void main() {
     expect(result.failure, SyncFailure.offline);
     expect(sync.canRunNow(), isFalse);
     expect((await sync.run()).outcome, SyncRunOutcome.deferred);
+  });
+
+  test('a merge decision to keep the account overrides the local row',
+      () async {
+    final Subject subject = await seed(
+      status: AttendanceStatus.present,
+      markedAt: _late,
+    );
+    final String key = SyncItem.keyFor(subject.uuid!, _day, 540);
+    target.remote = <RemoteState>[
+      mark(subject.uuid!, status: 'absent', editedAt: _early),
+    ];
+
+    // Deliberately against the newer side, so only the decision can explain
+    // the result.
+    final SyncRunResult result = await coordinator().run(
+      merge: <String, SyncSide>{key: SyncSide.there},
+    );
+
+    expect(result.outcome, SyncRunOutcome.synced);
+    expect(
+      (await repo.getAttendanceAt(subject.id!, _day, 540))?.status,
+      AttendanceStatus.absent,
+    );
+  });
+
+  test('answering the merge stops it being asked again', () async {
+    final Subject subject = await seed(status: AttendanceStatus.present);
+    target.remote = <RemoteState>[
+      mark(subject.uuid!, status: 'absent', editedAt: _late),
+    ];
+
+    final SyncCoordinator sync = coordinator();
+    expect((await sync.run()).outcome, SyncRunOutcome.reviewNeeded);
+
+    final SyncRunResult merged = await sync.run(
+      force: true,
+      merge: <String, SyncSide>{
+        SyncItem.keyFor(subject.uuid!, _day, 540): SyncSide.here,
+      },
+    );
+
+    expect(merged.outcome, SyncRunOutcome.synced);
+    // A ledger now exists, so an ordinary run no longer sees a first run.
+    target.remote = <RemoteState>[];
+    expect((await sync.run(force: true)).outcome, SyncRunOutcome.synced);
+  });
+
+  test('a merge preview reads both sides and writes nothing', () async {
+    final Subject subject = await seed(status: AttendanceStatus.present);
+    target.remote = <RemoteState>[
+      mark(subject.uuid!, status: 'absent', editedAt: _late),
+    ];
+
+    final SyncMergePlan? plan = await coordinator().previewMerge();
+
+    expect(plan!.differing, hasLength(1));
+    expect(target.calls.where((String c) => c != 'fetch'), isEmpty);
+    expect(await repo.getRemoteLinks(target.id, SyncKind.attendance), isEmpty);
+  });
+
+  test('a preview against an unreadable account offers no merge', () async {
+    await seed(status: AttendanceStatus.present);
+    target.remote = null;
+
+    expect(await coordinator().previewMerge(), isNull);
+  });
+
+  test('a timetable reaches a second device with its classes intact', () async {
+    // What the account holds: one course, one weekly class naming it, one
+    // holiday and one class type. The device has none of it.
+    const String uuid = 'aaaaaaaabbbbccccddddeeeeeeeeeeee';
+    const String slotUuid = 'ccccccccddddeeeeffff000011112222';
+    target.remote = <RemoteState>[
+      subjectRow(uuid),
+      RemoteState(
+        kind: SyncKind.category,
+        localKey: 'Lecture',
+        remoteId: 'Lecture',
+        hash: 'c',
+        fields: const <String, Object?>{'defaultMinutes': 50},
+      ),
+      RemoteState(
+        kind: SyncKind.holiday,
+        localKey: '20260315',
+        remoteId: '20260315',
+        hash: 'h',
+        fields: const <String, Object?>{'name': 'Reading week'},
+      ),
+      RemoteState(
+        kind: SyncKind.slot,
+        localKey: slotUuid,
+        remoteId: slotUuid,
+        hash: 's',
+        fields: const <String, Object?>{
+          'subject': uuid,
+          'weekday': DateTime.tuesday,
+          'startMinutes': 540,
+          'endMinutes': 600,
+          'room': 'R101',
+          'weight': 1,
+          'startDate': 20260301,
+          'endDate': null,
+        },
+      ),
+    ];
+
+    final SyncRunResult result = await coordinator().run();
+    expect(result.outcome, SyncRunOutcome.synced);
+
+    // The slot is the point: without it the marks have no occurrences to
+    // attach to and the device shows a term of empty days.
+    final ClassSlot slot = (await repo.getSlots()).single;
+    final Subject subject = (await repo.getSubjects()).single;
+    expect(slot.subjectId, subject.id);
+    expect(slot.weekday, DateTime.tuesday);
+    expect(slot.startMinutes, 540);
+    expect(slot.uuid, slotUuid);
+
+    expect((await repo.getHolidays()).single.name, 'Reading week');
+  });
+
+  test('a course keeps the class type it was filed under', () async {
+    const String uuid = 'aaaaaaaabbbbccccddddeeeeeeeeeeee';
+    target.remote = <RemoteState>[
+      RemoteState(
+        kind: SyncKind.category,
+        localKey: 'Seminar',
+        remoteId: 'Seminar',
+        hash: 'c',
+        fields: const <String, Object?>{'defaultMinutes': 90},
+      ),
+      RemoteState(
+        kind: SyncKind.subject,
+        localKey: uuid,
+        remoteId: uuid,
+        hash: 'subject-hash',
+        fields: const <String, Object?>{
+          'name': 'Generic Course',
+          'color': 0xFF336699,
+          'category': 'Seminar',
+        },
+      ),
+    ];
+
+    await coordinator().run();
+
+    // Categories sync before subjects precisely so this lookup succeeds.
+    final Subject subject = (await repo.getSubjects()).single;
+    final ClassCategory category = (await repo.getCategories())
+        .firstWhere((ClassCategory c) => c.name == 'Seminar');
+    expect(subject.categoryId, category.id);
+  });
+
+  test('a field nobody uses does not make every row look changed', () async {
+    // The upgrade case: the payload gained `category` and `tag`, and a row
+    // that uses neither must still match what was pushed before they existed.
+    final SyncItem before = SyncItem(
+      kind: SyncKind.subject,
+      localKey: 'x',
+      fields: const <String, Object?>{'name': 'Generic Course'},
+    );
+    final SyncItem after = SyncItem(
+      kind: SyncKind.subject,
+      localKey: 'x',
+      fields: const <String, Object?>{
+        'name': 'Generic Course',
+        'category': null,
+      },
+    );
+
+    expect(after.hash, before.hash);
   });
 }

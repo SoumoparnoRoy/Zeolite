@@ -199,6 +199,15 @@ class ZeoliteRepository {
   Subject _withUuid(Subject subject) =>
       subject.uuid == null ? subject.copyWith(uuid: newId()) : subject;
 
+  /// Same guarantee for the two tables that also travel by uuid. Both are
+  /// built directly by the importers and by a restore, so the identity cannot
+  /// be left to the callers.
+  ClassSlot _slotWithUuid(ClassSlot slot) =>
+      slot.uuid == null ? slot.copyWith(uuid: newId()) : slot;
+
+  ExtraClass _extraWithUuid(ExtraClass extra) =>
+      extra.uuid == null ? extra.copyWith(uuid: newId()) : extra;
+
   Future<void> updateSubject(Subject subject) async {
     if (subject.id == null) return;
     final Database db = await _db;
@@ -256,14 +265,14 @@ class ZeoliteRepository {
     final Database db = await _db;
     final Batch batch = db.batch();
     for (final ClassSlot slot in slots) {
-      batch.insert('class_slots', slot.toMap());
+      batch.insert('class_slots', _slotWithUuid(slot).toMap());
     }
     await batch.commit(noResult: true);
   }
 
   Future<int> insertSlot(ClassSlot slot) async {
     final Database db = await _db;
-    return db.insert('class_slots', slot.toMap());
+    return db.insert('class_slots', _slotWithUuid(slot).toMap());
   }
 
   Future<void> updateSlot(ClassSlot slot) async {
@@ -305,7 +314,7 @@ class ZeoliteRepository {
 
   Future<int> insertExtraClass(ExtraClass extra) async {
     final Database db = await _db;
-    return db.insert('extra_classes', extra.toMap());
+    return db.insert('extra_classes', _extraWithUuid(extra).toMap());
   }
 
   Future<void> updateExtraClass(ExtraClass extra) async {

@@ -28,7 +28,7 @@ class AppDatabase {
   // install finds its data, so renaming it would strand every database in
   // place and read as a wipe. It is never shown to the user.
   static const String fileName = 'attend_it.db';
-  static const int schemaVersion = 8;
+  static const int schemaVersion = 9;
 
   Database? _db;
 
@@ -132,7 +132,34 @@ class AppDatabase {
             // so this is empty on every real install.
             await db.delete('remote_links');
           }
+          if (oldVersion < 9) {
+            // Only these two: see [ClassSlot.uuid] for why they cannot key on
+            // their own contents. Holidays, tags, rooms and categories go on
+            // keying by date and by name.
+            for (final String table in <String>[
+              'class_slots',
+              'extra_classes',
+            ]) {
+              await db.execute('ALTER TABLE $table ADD COLUMN uuid TEXT');
+              final List<Map<String, Object?>> rows =
+                  await db.query(table, columns: <String>['id']);
+              for (final Map<String, Object?> row in rows) {
+                await db.update(
+                  table,
+                  <String, Object?>{'uuid': newId()},
+                  where: 'id = ?',
+                  whereArgs: <Object?>[row['id']],
+                );
+              }
+            }
+            // The ledger deliberately survives. Keys are unchanged, and a null
+            // field hashes as absent, so a row that never had a category or a
+            // tag still matches what was pushed for it. Only rows that
+            // actually use one look changed, which is true.
+          }
           await db.execute(_subjectUuidIndex);
+          await db.execute(_slotUuidIndex);
+          await db.execute(_extraUuidIndex);
         },
       ),
     );
@@ -143,6 +170,13 @@ class AppDatabase {
   /// `ALTER TABLE ... ADD COLUMN` cannot carry `UNIQUE`.
   static const String _subjectUuidIndex =
       'CREATE UNIQUE INDEX IF NOT EXISTS idx_subjects_uuid ON subjects (uuid)';
+
+  static const String _slotUuidIndex =
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_slots_uuid ON class_slots (uuid)';
+
+  static const String _extraUuidIndex =
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_extras_uuid '
+      'ON extra_classes (uuid)';
 
   /// Kept as a constant so the create path and the v2 migration cannot drift.
   static const String _categoriesTable = '''
@@ -241,6 +275,7 @@ class AppDatabase {
     batch.execute('''
       CREATE TABLE class_slots (
         id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        uuid          TEXT,
         subject_id    INTEGER NOT NULL,
         weekday       INTEGER NOT NULL,
         start_minutes INTEGER NOT NULL,
@@ -257,6 +292,7 @@ class AppDatabase {
     batch.execute('''
       CREATE TABLE extra_classes (
         id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        uuid          TEXT,
         subject_id    INTEGER NOT NULL,
         date          INTEGER NOT NULL,
         start_minutes INTEGER NOT NULL,

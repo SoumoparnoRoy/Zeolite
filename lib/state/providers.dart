@@ -22,11 +22,14 @@ import '../domain/notion_import.dart';
 import '../domain/attendance_totals_ocr.dart';
 import '../domain/day_grid.dart';
 import '../domain/schedule_engine.dart';
+import '../domain/sync/sync_merge.dart';
+import '../domain/sync/sync_target.dart';
 import '../domain/tag_stats.dart';
 import '../domain/timetable_import.dart';
 import '../services/backup_folder.dart';
 import '../services/backup_service.dart';
 import '../services/notification_service.dart';
+import '../services/sync/sync_coordinator.dart';
 import 'undo.dart';
 
 // ---------------------------------------------------------------- singletons
@@ -71,9 +74,20 @@ class SettingsController extends AsyncNotifier<AppSettings> {
     return ref.watch(settingsServiceProvider).load();
   }
 
+  /// Every settings write goes through here, which is why the sync stamp is
+  /// applied here too — and only when something that shapes the timetable
+  /// actually moved. Stamping on every save would make a theme change look
+  /// like a newer schedule to the other device.
   Future<void> save(AppSettings settings) async {
-    state = AsyncValue<AppSettings>.data(settings);
-    await ref.read(settingsServiceProvider).save(settings);
+    final AppSettings next =
+        SyncItem.settings(settings).hash == SyncItem.settings(state.value ??
+                    const AppSettings())
+                .hash
+            ? settings
+            : settings.copyWith(scheduleChangedAt: DateTime.now());
+
+    state = AsyncValue<AppSettings>.data(next);
+    await ref.read(settingsServiceProvider).save(next);
   }
 
   Future<void> setSemester(DateTime start, DateTime end) async {
@@ -563,6 +577,7 @@ class TimetableActions {
     // Every mutation ends here, so this is the one place the pending undo has
     // to be dropped: restoring it would throw away whatever happened since.
     _undo.drop();
+    _mergeUndoToken = null;
     _ref.invalidate(timetableProvider);
     await _ref.read(timetableProvider.future);
     await _syncNotifications();
@@ -622,6 +637,34 @@ class TimetableActions {
     }
   }
 
+  /// Runs the first sync against an account that already had data, with the
+  /// merge screen's decisions.
+  ///
+  /// Lives here rather than on the screen so it lands under the same snapshot
+  /// every other import does: a merge can restate history, and one Undo has to
+  /// put all of it back — the rows brought down and the ones sent up alike.
+  Future<SyncRunResult> applySyncMerge(
+    SyncCoordinator coordinator,
+    Map<String, SyncSide> decisions,
+  ) async {
+    final DatabaseSnapshot before = await _repo.snapshot();
+    final SyncRunResult result =
+        await coordinator.run(force: true, merge: decisions);
+    await _refresh();
+    _mergeUndoToken = _undo.arm(before);
+    _mergeUndoTarget = coordinator.target.id;
+    return result;
+  }
+
+  /// Undoing a merge has to take the ledger with it. `remote_links` is outside
+  /// the snapshot by design, so a plain restore would put the local rows back
+  /// while leaving links that say the account holds them — and the next run
+  /// would read those rows as deleted here and archive the account's copies.
+  /// Forgetting the ledger instead returns the pair to "not yet reconciled",
+  /// which is the state the merge screen is for.
+  int? _mergeUndoToken;
+  String? _mergeUndoTarget;
+
   // undo ---------------------------------------------------------------------
 
   int? get pendingUndoToken => _undo.pendingToken;
@@ -633,6 +676,9 @@ class TimetableActions {
     final DatabaseSnapshot? snapshot = _undo.take(token);
     if (snapshot == null) return false;
     await _repo.restore(snapshot);
+    if (token == _mergeUndoToken && _mergeUndoTarget != null) {
+      await _repo.deleteRemoteLinksFor(_mergeUndoTarget!);
+    }
     await _refresh();
     return true;
   }

@@ -10,6 +10,7 @@ import '../../core/date_utils.dart';
 class ExtraClass {
   const ExtraClass({
     this.id,
+    this.uuid,
     required this.subjectId,
     required this.date,
     required this.startMinutes,
@@ -20,6 +21,11 @@ class ExtraClass {
   });
 
   final int? id;
+
+  /// See [ClassSlot.uuid] — a one-off class is editable in every field that
+  /// could otherwise identify it.
+  final String? uuid;
+
   final int subjectId;
   final DateTime date;
   final int startMinutes;
@@ -35,6 +41,7 @@ class ExtraClass {
 
   ExtraClass copyWith({
     int? id,
+    String? uuid,
     int? subjectId,
     DateTime? date,
     int? startMinutes,
@@ -45,6 +52,7 @@ class ExtraClass {
   }) {
     return ExtraClass(
       id: id ?? this.id,
+      uuid: uuid ?? this.uuid,
       subjectId: subjectId ?? this.subjectId,
       date: date ?? this.date,
       startMinutes: startMinutes ?? this.startMinutes,
@@ -57,6 +65,7 @@ class ExtraClass {
 
   Map<String, Object?> toMap() => <String, Object?>{
         if (id != null) 'id': id,
+        if (uuid != null) 'uuid': uuid,
         'subject_id': subjectId,
         'date': Dates.keyOf(date),
         'start_minutes': startMinutes,
@@ -69,6 +78,7 @@ class ExtraClass {
   factory ExtraClass.fromMap(Map<String, Object?> map) {
     return ExtraClass(
       id: map['id'] as int?,
+      uuid: map['uuid'] as String?,
       subjectId: (map['subject_id'] as int?) ?? 0,
       date: Dates.fromKey((map['date'] as int?) ?? 19700101),
       startMinutes: (map['start_minutes'] as int?) ?? 0,

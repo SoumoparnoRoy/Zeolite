@@ -214,6 +214,7 @@ class RemoteState {
     required this.localKey,
     required this.remoteId,
     required this.hash,
+    this.fields = const <String, Object?>{},
     this.editedAt,
     this.deleted = false,
   });
@@ -226,6 +227,13 @@ class RemoteState {
 
   final String remoteId;
   final String hash;
+
+  /// What the row holds, in the same shape [SyncItem.fields] uses. Carried on
+  /// the state rather than fetched again per row: knowing a row changed is no
+  /// use without knowing what it changed to, and a target that has just read
+  /// the collection already has this in hand. Empty on a tombstone.
+  final Map<String, Object?> fields;
+
   final DateTime? editedAt;
 
   /// A tombstone: the row was deleted on another device. Removing the document

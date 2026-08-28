@@ -104,6 +104,7 @@ class FirestoreSyncTarget implements SyncTarget {
       hash: deleted
           ? _deletedHash
           : SyncItem(kind: kind, localKey: id, fields: fields).hash,
+      fields: deleted ? const <String, Object?>{} : fields,
       editedAt: changedAt == null
           ? null
           : DateTime.fromMillisecondsSinceEpoch(changedAt),

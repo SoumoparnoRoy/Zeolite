@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 
+import '../../core/date_utils.dart';
 import '../../data/models/attendance_record.dart';
+import '../../data/models/subject.dart';
 
 /// What a synced row is.
 enum SyncKind {
@@ -43,21 +45,50 @@ class SyncItem {
     this.changedAt,
   });
 
+  /// The key a target files a mark under.
+  ///
+  /// Deliberately not [AttendanceRecord.key], which leads with `subjectId` —
+  /// an autoincrement that numbers the same course differently on every
+  /// install, so a second device would file the mark under the wrong subject.
+  static String keyFor(String subjectUuid, DateTime date, int startMinutes) =>
+      '$subjectUuid:${Dates.keyOf(date)}:$startMinutes';
+
   /// A mark, as a target would see it.
   ///
   /// `tagId` is left out on purpose: it points at a row in the local tag list,
   /// so it means nothing anywhere else, and including it would push rows on
   /// which nothing a target can show has changed.
-  factory SyncItem.attendance(AttendanceRecord record) {
+  factory SyncItem.attendance(AttendanceRecord record, String subjectUuid) {
     return SyncItem(
       kind: SyncKind.attendance,
-      localKey: record.key,
+      localKey: keyFor(subjectUuid, record.date, record.startMinutes),
       fields: <String, Object?>{
         'status': record.status.name,
         'weight': record.weight,
         'note': record.note,
       },
       changedAt: record.markedAt,
+    );
+  }
+
+  /// A subject travels too, or a second device receives marks keyed on a uuid
+  /// it cannot name. `id` and `categoryId` stay behind for the same reason the
+  /// mark's key does not use them.
+  factory SyncItem.subject(Subject subject) {
+    return SyncItem(
+      kind: SyncKind.subject,
+      localKey: subject.uuid ?? '',
+      fields: <String, Object?>{
+        'name': subject.name,
+        'code': subject.code,
+        'teacher': subject.teacher,
+        'color': subject.colorValue,
+        'targetPercent': subject.targetPercent,
+        'priorHeld': subject.priorHeld,
+        'priorAttended': subject.priorAttended,
+        'expectedTotal': subject.expectedTotal,
+      },
+      changedAt: subject.createdAt,
     );
   }
 

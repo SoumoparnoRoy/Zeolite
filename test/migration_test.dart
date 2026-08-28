@@ -166,7 +166,7 @@ void main() {
     return db;
   }
 
-  test('a v2 install climbs to v7 without losing anything', () async {
+  test('a v2 install climbs to current without losing anything', () async {
     final Database db = await openAt(await oldInstall());
 
     expect(await db.getVersion(), AppDatabase.schemaVersion);
@@ -183,6 +183,35 @@ void main() {
     // can move.
     expect(mark['weight'], 1);
     expect(mark['tag_id'], isNull);
+  });
+
+  test('every subject comes out of the climb with a uuid of its own', () async {
+    final Database db = await openAt(await oldInstall());
+    await db.insert('subjects', <String, Object?>{
+      'name': 'Second course',
+      'color': 0xFF000000,
+      'created_at': 1,
+      'uuid': 'ffffffffeeeeddddccccbbbbaaaaaaaa',
+    });
+
+    final List<Map<String, Object?>> subjects = await db.query('subjects');
+    final Set<Object?> ids =
+        subjects.map((Map<String, Object?> r) => r['uuid']).toSet();
+    // The row that predates v8 is the one that matters: the migration has to
+    // have issued it a uuid rather than leaving it null.
+    expect(ids, hasLength(subjects.length));
+    expect(ids.any((Object? v) => v == null || (v as String).isEmpty), isFalse);
+
+    // The index is what makes the uuid an identity rather than a hint.
+    await expectLater(
+      db.insert('subjects', <String, Object?>{
+        'name': 'Duplicate uuid',
+        'color': 0xFF000000,
+        'created_at': 1,
+        'uuid': subjects.first['uuid'],
+      }),
+      throwsA(isA<DatabaseException>()),
+    );
   });
 
   test('the ledger arrives empty and takes a link', () async {

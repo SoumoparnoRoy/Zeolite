@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
+import '../../core/ids.dart';
+
 /// Owns the SQLite connection and the schema.
 ///
 /// Everything is local to the device: no accounts, no network, works on a train
@@ -26,7 +28,7 @@ class AppDatabase {
   // install finds its data, so renaming it would strand every database in
   // place and read as a wipe. It is never shown to the user.
   static const String fileName = 'attend_it.db';
-  static const int schemaVersion = 7;
+  static const int schemaVersion = 8;
 
   Database? _db;
 
@@ -110,10 +112,37 @@ class AppDatabase {
             // table reads as "nothing has ever been synced", which is true.
             await db.execute(_remoteLinksTable);
           }
+          if (oldVersion < 8) {
+            // A key built on subjects.id means one thing only on the install
+            // that issued it, so two devices would file the same mark under
+            // different subjects. Added nullable, filled row by row, then made
+            // unique by index.
+            await db.execute('ALTER TABLE subjects ADD COLUMN uuid TEXT');
+            final List<Map<String, Object?>> rows =
+                await db.query('subjects', columns: <String>['id']);
+            for (final Map<String, Object?> row in rows) {
+              await db.update(
+                'subjects',
+                <String, Object?>{'uuid': newId()},
+                where: 'id = ?',
+                whereArgs: <Object?>[row['id']],
+              );
+            }
+            // Every stored key is in the old format. Sync has never shipped,
+            // so this is empty on every real install.
+            await db.delete('remote_links');
+          }
+          await db.execute(_subjectUuidIndex);
         },
       ),
     );
   }
+
+  /// Uniqueness lives in an index rather than a column constraint so the
+  /// create path and the v8 migration can run the exact same statement —
+  /// `ALTER TABLE ... ADD COLUMN` cannot carry `UNIQUE`.
+  static const String _subjectUuidIndex =
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_subjects_uuid ON subjects (uuid)';
 
   /// Kept as a constant so the create path and the v2 migration cannot drift.
   static const String _categoriesTable = '''
@@ -189,6 +218,10 @@ class AppDatabase {
     batch.execute('''
       CREATE TABLE subjects (
         id             INTEGER PRIMARY KEY AUTOINCREMENT,
+        -- Nullable because the v8 migration cannot add it otherwise, and both
+        -- paths must declare it identically. The repository is what guarantees
+        -- every row carries one.
+        uuid           TEXT,
         name           TEXT    NOT NULL,
         code           TEXT,
         teacher        TEXT,
@@ -202,6 +235,7 @@ class AppDatabase {
         FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE SET NULL
       )
     ''');
+    batch.execute(_subjectUuidIndex);
 
     // A recurring weekly rule. Dates are stored as yyyymmdd integers.
     batch.execute('''

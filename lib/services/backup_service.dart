@@ -349,6 +349,9 @@ class BackupService {
         final Subject subject = Subject.fromMap(map);
         final int newId = await _repo.insertSubject(
           Subject(
+            // Carried through, not reissued: a restore onto a second device
+            // has to land on the same uuid or the subject syncs as two.
+            uuid: subject.uuid,
             name: subject.name,
             code: subject.code,
             teacher: subject.teacher,

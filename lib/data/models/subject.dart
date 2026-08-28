@@ -10,6 +10,7 @@ import '../../core/app_theme.dart';
 class Subject {
   const Subject({
     this.id,
+    this.uuid,
     required this.name,
     this.code,
     this.teacher,
@@ -23,6 +24,11 @@ class Subject {
   });
 
   final int? id;
+
+  /// Stable across devices, unlike [id], which is a per-install autoincrement.
+  /// Written on insert and never changed; sync keys are built from it.
+  final String? uuid;
+
   final String name;
   final String? code;
   final String? teacher;
@@ -66,6 +72,7 @@ class Subject {
 
   Subject copyWith({
     int? id,
+    String? uuid,
     String? name,
     String? code,
     String? teacher,
@@ -82,6 +89,7 @@ class Subject {
   }) {
     return Subject(
       id: id ?? this.id,
+      uuid: uuid ?? this.uuid,
       name: name ?? this.name,
       code: code ?? this.code,
       teacher: teacher ?? this.teacher,
@@ -99,6 +107,7 @@ class Subject {
 
   Map<String, Object?> toMap() => <String, Object?>{
         if (id != null) 'id': id,
+        if (uuid != null) 'uuid': uuid,
         'name': name,
         'code': code,
         'teacher': teacher,
@@ -117,6 +126,7 @@ class Subject {
         math.max(0, (map['prior_attended'] as num?)?.toInt() ?? 0);
     return Subject(
       id: map['id'] as int?,
+      uuid: map['uuid'] as String?,
       name: (map['name'] as String?) ?? '',
       code: map['code'] as String?,
       teacher: map['teacher'] as String?,

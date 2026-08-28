@@ -13,6 +13,7 @@ import '../models/room.dart';
 import '../models/subject.dart';
 import '../models/tag.dart';
 import 'app_database.dart';
+import '../../core/ids.dart';
 
 /// One row per table, exactly as SQLite handed it over.
 typedef DatabaseSnapshot = Map<String, List<Map<String, Object?>>>;
@@ -190,8 +191,13 @@ class ZeoliteRepository {
 
   Future<int> insertSubject(Subject subject) async {
     final Database db = await _db;
-    return db.insert('subjects', subject.toMap());
+    return db.insert('subjects', _withUuid(subject).toMap());
   }
+
+  /// Every subject reaches the table with a uuid, whoever built it — the paste
+  /// and OCR importers and a backup restore all construct subjects directly.
+  Subject _withUuid(Subject subject) =>
+      subject.uuid == null ? subject.copyWith(uuid: newId()) : subject;
 
   Future<void> updateSubject(Subject subject) async {
     if (subject.id == null) return;
@@ -239,7 +245,7 @@ class ZeoliteRepository {
     final List<int> ids = <int>[];
     await db.transaction((Transaction txn) async {
       for (final Subject subject in subjects) {
-        ids.add(await txn.insert('subjects', subject.toMap()));
+        ids.add(await txn.insert('subjects', _withUuid(subject).toMap()));
       }
     });
     return ids;

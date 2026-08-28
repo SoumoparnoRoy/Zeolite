@@ -59,22 +59,24 @@ RemoteState _state(
   );
 }
 
+const String _subjectUuid = 'aaaaaaaabbbbccccddddeeeeeeeeeeee';
+
 void main() {
-  final SyncItem present = SyncItem.attendance(_mark());
+  final SyncItem present = SyncItem.attendance(_mark(), _subjectUuid);
   final SyncItem absent =
-      SyncItem.attendance(_mark(status: AttendanceStatus.absent));
+      SyncItem.attendance(_mark(status: AttendanceStatus.absent), _subjectUuid);
 
   group('the fingerprint', () {
     test('moves when a target could see the change', () {
       expect(present.hash, isNot(absent.hash));
       expect(
-        SyncItem.attendance(_mark(weight: 2)).hash,
+        SyncItem.attendance(_mark(weight: 2), _subjectUuid).hash,
         isNot(present.hash),
       );
     });
 
     test('holds still for a tag, which is a local label', () {
-      expect(SyncItem.attendance(_mark(tagId: 7)).hash, present.hash);
+      expect(SyncItem.attendance(_mark(tagId: 7), _subjectUuid).hash, present.hash);
     });
 
     test('does not depend on the order fields were built in', () {

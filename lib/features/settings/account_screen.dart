@@ -3,8 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
+import '../../core/date_utils.dart';
+import '../../domain/sync/sync_status.dart';
+import '../../domain/sync/sync_target.dart';
 import '../../services/auth_service.dart';
+import '../../services/sync/sync_coordinator.dart';
 import '../../state/auth_providers.dart';
+import '../../state/sync_providers.dart';
 import '../../widgets/common.dart';
 import '../../widgets/gradient_header.dart';
 
@@ -109,6 +114,9 @@ class _SignedIn extends ConsumerWidget {
           onPressed: () => ref.read(authServiceProvider).signOut(),
           child: const Text('Sign out'),
         ),
+        const SizedBox(height: AppSpacing.xl),
+        const SectionHeader('Sync'),
+        const _SyncSection(),
         const SizedBox(height: AppSpacing.xl),
         const SectionHeader('Deleting your account'),
         const _Hint(
@@ -217,6 +225,113 @@ class _SignInFormState extends ConsumerState<_SignInForm> {
       ],
     );
   }
+}
+
+/// The one place a run can be started by hand, and the only place a failed one
+/// is ever mentioned.
+class _SyncSection extends ConsumerWidget {
+  const _SyncSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final SyncStatus status = ref.watch(syncStatusProvider);
+    final SyncRunResult? last = ref.read(syncStatusProvider.notifier).lastResult;
+    final bool running = status.state == SyncState.running;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        SurfaceCard(
+          child: Row(
+            children: <Widget>[
+              SizedBox.square(
+                dimension: 20,
+                child: running
+                    ? const CircularProgressIndicator(strokeWidth: 2)
+                    : Icon(
+                        _iconFor(status, last),
+                        size: 20,
+                        color: status.state == SyncState.idle
+                            ? context.palette.textTertiary
+                            : Theme.of(context).colorScheme.error,
+                      ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  syncStatusLine(status, last),
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        OutlinedButton(
+          onPressed: running
+              ? null
+              // Forced: a Retry that honours the backoff is not a Retry.
+              : () => ref.read(syncStatusProvider.notifier).run(force: true),
+          child: Text(status.failures > 0 ? 'Try again' : 'Sync now'),
+        ),
+      ],
+    );
+  }
+
+  static IconData _iconFor(SyncStatus status, SyncRunResult? last) {
+    if (status.state == SyncState.offline) return Icons.cloud_off_outlined;
+    if (status.state == SyncState.failed) return Icons.error_outline;
+    if (last?.outcome == SyncRunOutcome.reviewNeeded) {
+      return Icons.help_outline;
+    }
+    return Icons.cloud_done_outlined;
+  }
+
+}
+
+
+/// The one line Settings shows for a target. Lifted out of the widget so the
+/// wording each state produces can be pinned down without a Firebase user.
+@visibleForTesting
+String syncStatusLine(SyncStatus status, SyncRunResult? last) {
+  switch (status.state) {
+    case SyncState.running:
+      return 'Syncing…';
+    case SyncState.offline:
+      return 'No connection. Your attendance is safe on this device.';
+    case SyncState.failed:
+      return status.failure == SyncFailure.auth
+          ? 'Your account would not accept the last sync. Sign out and back '
+              'in, then try again.'
+          : 'The last sync did not finish. Nothing on this device changed.';
+    case SyncState.idle:
+      if (last?.outcome == SyncRunOutcome.reviewNeeded) {
+        // The coordinator refuses to merge this case and there is no screen
+        // to resolve it yet, so say so rather than showing a bare "synced".
+        return 'This device and your account both hold attendance. Nothing '
+            'was changed — choosing between them is not built yet.';
+      }
+      if (status.lastRunAt == null) return 'Not synced yet.';
+      return 'Synced ${_ago(status.lastRunAt!)}.${_counts(last)}';
+  }
+}
+
+String _counts(SyncRunResult? last) {
+  if (last == null) return '';
+  final List<String> parts = <String>[
+    if (last.pushed > 0) '${last.pushed} sent',
+    if (last.pulled > 0) '${last.pulled} received',
+    if (last.overwritten > 0) '${last.overwritten} replaced there',
+  ];
+  return parts.isEmpty ? '' : ' ${parts.join(', ')}.';
+}
+
+String _ago(DateTime at) {
+  final Duration since = DateTime.now().difference(at);
+  if (since.inMinutes < 1) return 'just now';
+  if (since.inMinutes < 60) return '${since.inMinutes} min ago';
+  if (since.inHours < 24) return '${since.inHours} h ago';
+  return 'on ${Dates.formatDayMonth(at)}';
 }
 
 /// Firebase's codes say what went wrong to a developer, not to whoever is

@@ -2,13 +2,17 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-/// Settings promises "All your data stays on this device", and it is the
-/// manifest, not any Dart, that decides whether that is true.
+/// Settings now promises the data stays put *unless Notion is connected*. The
+/// manifest decides half of that; the absence of any other caller decides the rest.
 void main() {
   final File manifest =
       File('android/app/src/main/AndroidManifest.xml');
   final File settings =
       File('lib/features/settings/settings_screen.dart');
+
+  RegExp removed(String permission) => RegExp(
+        'android.permission.$permission"\\s*\\n\\s*tools:node="remove"',
+      );
 
   test('the manifest refuses both ways data leaves the device', () {
     final String xml = manifest.readAsStringSync();
@@ -27,18 +31,40 @@ void main() {
         hasLength(2));
   });
 
-  test('the release build asks for no network permission', () {
+  test('the release build asks for INTERNET and nothing more', () {
     final String xml = manifest.readAsStringSync();
-    for (final String permission in <String>['INTERNET', 'ACCESS_NETWORK_STATE']) {
-      final RegExp declared = RegExp(
-        'android.permission.$permission"\\s*\\n\\s*tools:node="remove"',
-      );
-      expect(declared.hasMatch(xml), isTrue,
-          reason: '$permission must be removed, not merely unused');
-    }
+
+    expect(xml,
+        contains('<uses-permission android:name="android.permission.INTERNET" />'));
+    expect(removed('INTERNET').hasMatch(xml), isFalse,
+        reason: 'Notion sync cannot reach the network without it');
+    expect(removed('ACCESS_NETWORK_STATE').hasMatch(xml), isTrue);
   });
 
   test('the promise in Settings is the one being kept', () {
-    expect(settings.readAsStringSync(), contains('stays on this device'));
+    expect(settings.readAsStringSync(),
+        contains('stays on this device unless you connect Notion'));
+  });
+
+  test('nothing outside the sync layer can open a socket', () {
+    // With the permission granted, "no network" is no longer a build property
+    // and has to be one of the code instead.
+    const List<String> allowed = <String>[
+      'lib/services/notion/',
+      'lib/services/sync/',
+    ];
+    final RegExp caller = RegExp(r'package:http/|\bHttpClient\b|\bSocket\b');
+
+    final Iterable<File> sources = Directory('lib')
+        .listSync(recursive: true)
+        .whereType<File>()
+        .where((File f) => f.path.endsWith('.dart'));
+
+    for (final File source in sources) {
+      final String path = source.path.replaceAll(r'\', '/');
+      if (allowed.any(path.contains)) continue;
+      expect(caller.hasMatch(source.readAsStringSync()), isFalse,
+          reason: '$path reaches the network outside the sync layer');
+    }
   });
 }

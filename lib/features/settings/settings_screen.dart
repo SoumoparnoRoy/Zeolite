@@ -521,7 +521,8 @@ class SettingsScreen extends ConsumerWidget {
               const SizedBox(height: AppSpacing.xl),
               Center(
                 child: Text(
-                  'Zeolite · 1.0.0\nAll your data stays on this device.',
+                  'Zeolite · 1.0.0\n'
+                  'Your data stays on this device unless you connect Notion.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12,

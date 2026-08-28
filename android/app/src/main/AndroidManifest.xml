@@ -8,12 +8,11 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.VIBRATE" />
 
-    <!-- ML Kit's telemetry transport declares these so it can upload usage
-         metrics to Google. Text recognition itself runs entirely on-device, so
-         the app asks for neither: no network calls is the product, and a
-         permission on the listing is what google_fonts was turned down for. -->
-    <uses-permission android:name="android.permission.INTERNET"
-        tools:node="remove" />
+    <!-- Notion sync needs this. Restoring it also re-opens ML Kit's telemetry
+         transport, which declares the same permission and exposes no opt-out. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Nothing reads connectivity: an offline sync result comes from a request
+         that failed. One less permission on the listing. -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"
         tools:node="remove" />
 

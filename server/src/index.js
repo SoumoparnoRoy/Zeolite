@@ -31,6 +31,14 @@ export function createApp({ fetchImpl = globalThis.fetch, now = Date.now } = {})
 
   app.set("trust proxy", config.trustProxy);
   app.use(express.json());
+
+  // Called when the connect screen opens, so a host that has spun the service
+  // down is awake before anyone taps Connect. Unmetered on purpose: throttling
+  // a wake-up call defeats it. It reports nothing worth reconnoitring.
+  app.get("/health", (_request, response) => {
+    response.status(200).type("text/plain").send("ok");
+  });
+
   app.use("/notion", createNotionRouter({ config, sessions, limit, fetchImpl }));
   return app;
 }

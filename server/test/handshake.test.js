@@ -208,3 +208,21 @@ test("claim rate limit returns 429", async () => {
   }
   assert.equal(response.status, 429);
 });
+
+test("health answers without touching the handshake", async () => {
+  const response = await fetch(`${baseUrl}/health`);
+  assert.equal(response.status, 200);
+  assert.equal(await response.text(), "ok");
+});
+
+test("health stays answerable when a route's rate limit is spent", async () => {
+  for (let attempt = 0; attempt < 25; attempt += 1) {
+    await fetch(`${baseUrl}/notion/claim`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session: "nonexistent", verifier }),
+    });
+  }
+  const response = await fetch(`${baseUrl}/health`);
+  assert.equal(response.status, 200);
+});

@@ -11,6 +11,7 @@ This standalone service completes the secret-bearing steps of Zeolite's Notion O
 | `GET /notion/callback` | Exchanges Notion's authorization code and returns to the app. |
 | `POST /notion/claim` | Releases the token payload after verifier proof. |
 | `POST /notion/refresh` | Exchanges a refresh token for a fresh token payload. |
+| `GET /health` | Returns `ok`. The app calls it when the connect screen opens, so a host that has spun the service down is awake before anyone taps Connect. |
 
 ## Environment variables
 

@@ -44,6 +44,10 @@ dependencies:
   firebase_auth: ^6.6.1
   cloud_firestore: ^6.9.0
   google_sign_in: ^7.2.0
+  # Not imported from Dart: the Android SDK auto-collects opens, sessions and
+  # engagement on its own, which is the whole reason it is here. The ad-ID half
+  # is switched off in the manifest, so this reports usage without an
+  # advertising identifier.
   firebase_analytics: ^12.5.0
 
 dev_dependencies:

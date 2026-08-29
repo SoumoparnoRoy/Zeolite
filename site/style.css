@@ -1,0 +1,149 @@
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --surface: #f5f5f7;
+  --text: #1c1c1e;
+  --muted: #5c5c66;
+  --rule: #e3e3e8;
+  --accent: #5b4bd6;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121216;
+    --surface: #1c1c22;
+    --text: #ececf1;
+    --muted: #a0a0ad;
+    --rule: #2c2c35;
+    --accent: #a394ff;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0 auto;
+  padding: 2.5rem 1.25rem 5rem;
+  max-width: 44rem;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+header {
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: 2rem;
+  padding-bottom: 1.25rem;
+}
+
+header a {
+  color: var(--muted);
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+
+h1 {
+  font-size: 1.9rem;
+  line-height: 1.2;
+  margin: 0.4rem 0 0.25rem;
+}
+
+h2 {
+  font-size: 1.15rem;
+  margin: 2.25rem 0 0.6rem;
+}
+
+h3 {
+  font-size: 1rem;
+  margin: 1.5rem 0 0.4rem;
+}
+
+.updated {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.lead {
+  font-size: 1.05rem;
+}
+
+a {
+  color: var(--accent);
+}
+
+code {
+  background: var(--surface);
+  border-radius: 4px;
+  font-size: 0.9em;
+  padding: 0.1em 0.35em;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+/* Two columns fit a phone; a wider table would need its own scroller rather
+   than display:block, which squeezes columns instead of overflowing them. */
+th:first-child,
+td:first-child {
+  width: 40%;
+}
+
+dl {
+  margin: 1.25rem 0;
+}
+
+dt {
+  font-weight: 600;
+  margin-top: 1.1rem;
+}
+
+dd {
+  color: var(--muted);
+  margin: 0.15rem 0 0;
+}
+
+th,
+td {
+  border-bottom: 1px solid var(--rule);
+  padding: 0.6rem 0.9rem 0.6rem 0;
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+footer {
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin-top: 3.5rem;
+  padding-top: 1.25rem;
+}
+
+footer a {
+  color: var(--muted);
+}
+
+.card {
+  background: var(--surface);
+  border-radius: 12px;
+  margin: 1.5rem 0;
+  padding: 1.1rem 1.25rem;
+}
+
+.card p:last-child {
+  margin-bottom: 0;
+}
+
+.card p:first-child {
+  margin-top: 0;
+}

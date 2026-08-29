@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Policy — Zeolite</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header>
+  <a href="/">Zeolite</a>
+  <h1>Privacy Policy</h1>
+  <p class="updated">Last updated 30 August 2026</p>
+</header>
+
+<p class="lead">Zeolite is an attendance tracker for students, published by
+<strong>Zeolite</strong>. This policy describes what the app does with your
+information, who else can see it, how long it is kept and how to have it
+deleted.</p>
+
+<p>Zeolite works without an account, and in that state nothing you enter leaves
+your device. Signing in is optional, and it is what changes the answer — so
+this policy is written in two halves, with the measurement that applies to both
+set out between them.</p>
+
+<h2>If you do not sign in</h2>
+
+<p>Everything you create — subjects, teachers, rooms, your timetable,
+attendance marks, tags, notes and holidays — is written to a database inside
+the app's own private storage on your device. It is not uploaded, and the
+developer cannot see it.</p>
+
+<p>Two things still leave the device even without an account, and neither
+carries anything you entered: the usage measurement described below, and the
+ML Kit diagnostics described further down. Nothing else does.</p>
+
+<h2>If you sign in</h2>
+
+<p>Signing in creates a Zeolite account so your attendance survives a lost
+phone and stays the same on a second device. It is optional, off until you
+choose it, and it never gates recording attendance.</p>
+
+<h3>What is collected</h3>
+
+<dl>
+  <dt>Your email address</dt>
+  <dd>To identify your account and let you sign back in. Held in Firebase
+      Authentication, operated by Google.</dd>
+
+  <dt>Your subjects, timetable, attendance marks, categories, rooms, tags,
+      holidays, and the app settings that shape your term</dt>
+  <dd>To back them up and keep two devices in step. Held in Cloud Firestore,
+      operated by Google, under a record keyed to your account.</dd>
+</dl>
+
+<p>If you sign in with Google, Google tells Zeolite your email address and
+basic profile information so the account can be created. Zeolite never sees
+your Google password.</p>
+
+<h3>Usage measurement, whether or not you sign in</h3>
+
+<p>Zeolite uses Firebase Analytics, from Google, to count how the app is used
+so its developer can tell whether it works for people. This is collected on
+every install, account or not, and it is the one thing the app reports without
+being asked.</p>
+
+<p>What it records is how the app is used, not what you put into it: when the
+app is opened, how long sessions last, the app version, and coarse device and
+country information derived from your connection. <strong>It never includes
+your timetable, your attendance, your subjects, your notes, or the contents of
+any image you read.</strong></p>
+
+<p>The advertising identifier is switched off. Zeolite sets
+<code>google_analytics_adid_collection_enabled</code> to false and strips the
+advertising permissions from the app, so this measurement is not tied to an
+advertising ID and cannot be used to target you.</p>
+
+<h3>What is not collected</h3>
+
+<p>There is no advertising, no crash reporting, and no tracking of you across
+other apps or websites. Nothing is sold, and nothing is shared with anyone for
+marketing.</p>
+
+<h3>Who can access it</h3>
+
+<p>Your records are stored under your own account and the security rules
+permit only that account to read or write them. Google processes and stores
+the data as the infrastructure provider under its own terms. The developer can
+technically reach the stored records through the project's administrative
+console, and does so only where necessary to operate or repair the service.</p>
+
+<h2>Reading a timetable from an image</h2>
+
+<p>If you use “Read from an image”, the picture is processed
+<strong>on your device</strong> by Google's ML Kit text recognition, using a
+model bundled inside the app. The image is not uploaded, not kept after the
+read, and not shared.</p>
+
+<p>One side effect is worth stating plainly. ML Kit ships a component that
+reports usage and performance metrics about the ML Kit APIs to Google, and it
+provides no setting to switch this off. It carries diagnostic information about
+the app and the device — not your timetable, your attendance, or the images you
+read.</p>
+
+<h2>Connecting Notion</h2>
+
+<p>Notion sync is optional and off by default. If you turn it on:</p>
+
+<ul>
+  <li>You authorise Zeolite from Notion's own sign-in page and choose which
+      pages or databases it may reach. Zeolite never sees your Notion
+      password.</li>
+  <li>Your attendance is written to the Notion database you picked, inside your
+      own workspace. What happens to it there is governed by Notion's privacy
+      policy, not this one.</li>
+  <li>The sign-in exchange passes through a small service the developer runs,
+      which exists only because Notion requires a secret that cannot safely be
+      shipped inside an app. It completes the token exchange, holds the
+      exchange in memory for at most five minutes, and keeps no copy of your
+      attendance.</li>
+  <li>Disconnecting stops any further sync and leaves everything in the app
+      intact.</li>
+</ul>
+
+<h2>Backups on your device</h2>
+
+<ul>
+  <li><strong>Manual export</strong> writes a backup file where you choose.
+      What you then do with that file is your own action.</li>
+  <li><strong>Automatic backup</strong> writes to a folder you pick, or to the
+      app's own folder, on the same device.</li>
+  <li><strong>Android cloud backup is switched off.</strong> Zeolite sets
+      <code>allowBackup="false"</code> and excludes itself from device-to-device
+      transfer, so the operating system does not copy your data to Google Drive
+      or to a new phone.</li>
+</ul>
+
+<h2>Permissions</h2>
+
+<table>
+  <tr><th>Permission</th><th>Why</th></tr>
+  <tr><td><code>POST_NOTIFICATIONS</code></td><td>Class reminders you asked for.</td></tr>
+  <tr><td><code>SCHEDULE_EXACT_ALARM</code></td><td>So a reminder arrives at the minute you chose. Optional — decline it and reminders still work, less precisely.</td></tr>
+  <tr><td><code>RECEIVE_BOOT_COMPLETED</code></td><td>To restore scheduled reminders after a restart.</td></tr>
+  <tr><td><code>VIBRATE</code></td><td>To vibrate for a reminder.</td></tr>
+  <tr><td><code>INTERNET</code></td><td>To sync to your account or to Notion, and for the ML Kit side effect described above.</td></tr>
+  <tr><td><code>ACCESS_NETWORK_STATE</code></td><td>So syncing can tell it is offline and wait, rather than failing repeatedly.</td></tr>
+</table>
+
+<h2>Who your data reaches</h2>
+
+<dl>
+  <dt>Google — Firebase Authentication and Cloud Firestore</dt>
+  <dd>Only if you sign in. Stores your email address and the records you chose
+      to back up, as the infrastructure provider.</dd>
+
+  <dt>Google — Firebase Analytics</dt>
+  <dd>Always. Receives the usage measurement described above, and nothing you
+      entered.</dd>
+
+  <dt>Google — ML Kit</dt>
+  <dd>Only if you read from an image. The recognition happens on your device;
+      only diagnostics about the API reach Google.</dd>
+
+  <dt>Notion</dt>
+  <dd>Only if you connect it. Receives the attendance you chose to sync, into
+      your own workspace.</dd>
+</dl>
+
+<p>No one else. Your data is not sold, rented, or shared for advertising.</p>
+
+<h2>How long it is kept</h2>
+
+<p>Data on your device stays until you delete it or uninstall the app. Data in
+your account stays until you delete it. There is no separate archive: deleting
+removes the records rather than hiding them.</p>
+
+<h2>How to delete it</h2>
+
+<ul>
+  <li><strong>On the device</strong> — Settings → Reset everything clears all
+      subjects and history. Uninstalling removes the database with it.</li>
+  <li><strong>Your account</strong> — Settings → Backup and sync → Delete my
+      account removes the account and everything stored under it.</li>
+  <li><strong>Without the app installed</strong> — see
+      <a href="/delete-account">deleting your account</a>.</li>
+  <li><strong>Notion</strong> — disconnecting stops further sync. Records
+      already written to your workspace are yours to delete in Notion.</li>
+</ul>
+
+<h2>Your rights</h2>
+
+<p>You may ask for a copy of the personal data held about you, ask for it to be
+corrected, ask for it to be deleted, or withdraw your consent to it being
+stored by deleting your account. Most of this you can do yourself in the app;
+for anything you cannot, write to the address below and it will be actioned.</p>
+
+<p>If you are in India and believe your data has been mishandled, you may raise
+a grievance at the address below and, if unsatisfied, complain to the Data
+Protection Board of India.</p>
+
+<h2>Children</h2>
+
+<p>Zeolite is a general-purpose study tool. It is not directed at children under
+13 and does not knowingly collect information from them.</p>
+
+<h2>Security</h2>
+
+<p>Traffic between the app and your account is encrypted in transit. Stored
+records are held in Google's infrastructure and are restricted by rules that
+permit only your own account to read or write them. No system is perfect, and
+this policy does not promise one.</p>
+
+<h2>Changes</h2>
+
+<p>If this policy changes, the date at the top changes with it and the updated
+version is published at this address.</p>
+
+<h2>Contact</h2>
+
+<p>Questions, requests and grievances:
+<a href="mailto:zeolite.help@gmail.com">zeolite.help@gmail.com</a></p>
+
+<footer>
+  <a href="/">Zeolite</a> · <a href="/terms">Terms of Use</a> ·
+  <a href="/delete-account">Delete your account</a>
+</footer>
+</body>
+</html>

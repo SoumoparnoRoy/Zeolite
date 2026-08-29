@@ -24,6 +24,47 @@ class FirestoreSyncTarget implements SyncTarget {
   @override
   bool get trustsPulls => true;
 
+  /// Every collection a signed-in device writes under `users/{uid}`.
+  static Iterable<String> get collectionNames => _collections.values;
+
+  /// Removes everything written for [uid], the user document included, and
+  /// returns how many documents went.
+  ///
+  /// Lives here rather than with the account it belongs to because it has to
+  /// clear exactly [_collections], and a second hand-written list is how the
+  /// two fell out of step before: deletion knew about `subjects` and
+  /// `attendance` and left the other seven behind. Firestore does not remove a
+  /// document's subcollections with it, so each is emptied first.
+  ///
+  /// The count is returned because it is the only honest way to test this:
+  /// `fake_cloud_firestore` does not reproduce that retention rule once
+  /// batched deletes and a parent delete are combined, so reading its store
+  /// afterwards reports success either way.
+  static Future<int> deleteEverythingFor({
+    required FirebaseFirestore firestore,
+    required String uid,
+  }) async {
+    int removed = 0;
+    final DocumentReference<Map<String, Object?>> root =
+        firestore.collection('users').doc(uid);
+    for (final String name in _collections.values) {
+      QuerySnapshot<Map<String, Object?>> page =
+          await root.collection(name).limit(400).get();
+      while (page.docs.isNotEmpty) {
+        final WriteBatch batch = firestore.batch();
+        for (final QueryDocumentSnapshot<Map<String, Object?>> doc
+            in page.docs) {
+          batch.delete(doc.reference);
+        }
+        removed += page.docs.length;
+        await batch.commit();
+        page = await root.collection(name).limit(400).get();
+      }
+    }
+    await root.delete();
+    return removed;
+  }
+
   static const Map<SyncKind, String> _collections = <SyncKind, String>{
     SyncKind.attendance: 'attendance',
     SyncKind.subject: 'subjects',

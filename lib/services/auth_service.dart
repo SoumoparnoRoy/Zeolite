@@ -3,6 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
+import 'firebase/firestore_sync_target.dart';
+
 /// Why a sign-in did not go through, in terms the screen can phrase.
 enum AuthFailure {
   network,
@@ -99,29 +101,13 @@ class AuthService {
     if (current == null) return const AuthResult.failed(AuthFailure.noSuchUser);
 
     return _guard(() async {
-      await _deleteSubtree(_firestore.collection('users').doc(current.uid));
+      await FirestoreSyncTarget.deleteEverythingFor(
+        firestore: _firestore,
+        uid: current.uid,
+      );
       await current.delete();
       await GoogleSignIn.instance.signOut();
     });
-  }
-
-  /// Firestore does not delete a document's subcollections with it, and the
-  /// names are known here rather than discoverable from the client.
-  Future<void> _deleteSubtree(DocumentReference<Map<String, Object?>> root) async {
-    for (final String name in const <String>['subjects', 'attendance']) {
-      QuerySnapshot<Map<String, Object?>> page =
-          await root.collection(name).limit(400).get();
-      while (page.docs.isNotEmpty) {
-        final WriteBatch batch = _firestore.batch();
-        for (final QueryDocumentSnapshot<Map<String, Object?>> doc
-            in page.docs) {
-          batch.delete(doc.reference);
-        }
-        await batch.commit();
-        page = await root.collection(name).limit(400).get();
-      }
-    }
-    await root.delete();
   }
 
   Future<AuthResult> _guard(Future<void> Function() run) async {

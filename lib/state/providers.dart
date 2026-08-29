@@ -1264,8 +1264,11 @@ class TimetableActions {
     _undo.arm(before);
   }
 
+  /// Awaited for the same reason as [reloadAfterSync], and it matters more
+  /// here: a restore can move the semester dates the reminders hang off.
   Future<void> reloadAfterImport() async {
     _ref.invalidate(settingsProvider);
+    await _ref.read(settingsProvider.future);
     await _refresh();
   }
 }

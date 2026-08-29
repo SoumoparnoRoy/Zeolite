@@ -208,12 +208,15 @@ class ZeoliteRepository {
   ExtraClass _extraWithUuid(ExtraClass extra) =>
       extra.uuid == null ? extra.copyWith(uuid: newId()) : extra;
 
-  Future<void> updateSubject(Subject subject) async {
+  /// [touch] is false only when applying a pull, which keeps the far side's
+  /// timestamp. Stamping `now` there would leave the row claiming an edit this
+  /// device never made, and it would win a later conflict it should have lost.
+  Future<void> updateSubject(Subject subject, {bool touch = true}) async {
     if (subject.id == null) return;
     final Database db = await _db;
     await db.update(
       'subjects',
-      subject.toMap(),
+      (touch ? subject.copyWith(updatedAt: DateTime.now()) : subject).toMap(),
       where: 'id = ?',
       whereArgs: <Object?>[subject.id],
     );

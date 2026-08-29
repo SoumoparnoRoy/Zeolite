@@ -28,7 +28,7 @@ class AppDatabase {
   // install finds its data, so renaming it would strand every database in
   // place and read as a wipe. It is never shown to the user.
   static const String fileName = 'attend_it.db';
-  static const int schemaVersion = 9;
+  static const int schemaVersion = 10;
 
   Database? _db;
 
@@ -157,6 +157,13 @@ class AppDatabase {
             // tag still matches what was pushed for it. Only rows that
             // actually use one look changed, which is true.
           }
+          if (oldVersion < 10) {
+            // Renaming a subject had no date on it, so two devices could not
+            // settle which name was newer. Left null rather than backfilled,
+            // and the ledger survives: `changedAt` is outside the hash, so no
+            // row looks changed by this.
+            await db.execute('ALTER TABLE subjects ADD COLUMN updated_at INTEGER');
+          }
           await db.execute(_subjectUuidIndex);
           await db.execute(_slotUuidIndex);
           await db.execute(_extraUuidIndex);
@@ -263,6 +270,8 @@ class AppDatabase {
         target_percent REAL,
         category_id    INTEGER,
         created_at     INTEGER NOT NULL,
+        -- Null until the subject is first edited: see [Subject.updatedAt].
+        updated_at     INTEGER,
         prior_held     INTEGER NOT NULL DEFAULT 0,
         prior_attended INTEGER NOT NULL DEFAULT 0,
         expected_total INTEGER,

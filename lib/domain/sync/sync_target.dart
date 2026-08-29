@@ -115,7 +115,7 @@ class SyncItem {
         'expectedTotal': subject.expectedTotal,
         'category': categoryName,
       },
-      changedAt: subject.createdAt,
+      changedAt: subject.updatedAt ?? subject.createdAt,
     );
   }
 

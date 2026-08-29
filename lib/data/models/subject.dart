@@ -18,6 +18,7 @@ class Subject {
     this.targetPercent,
     this.categoryId,
     this.createdAt,
+    this.updatedAt,
     this.priorHeld = 0,
     this.priorAttended = 0,
     this.expectedTotal,
@@ -42,6 +43,12 @@ class Subject {
   final int? categoryId;
 
   final DateTime? createdAt;
+
+  /// When the synced fields last moved, which is what lets two devices settle
+  /// a rename by time. Null on a row that predates v10 or has never been
+  /// edited, where [createdAt] is the honest answer. Stamped by the repository,
+  /// for the same reason the uuid is.
+  final DateTime? updatedAt;
 
   /// Classes held before this app started counting, and how many were
   /// attended. Carried rather than invented as records: they have no dates.
@@ -82,6 +89,7 @@ class Subject {
     int? categoryId,
     bool clearCategory = false,
     DateTime? createdAt,
+    DateTime? updatedAt,
     int? priorHeld,
     int? priorAttended,
     int? expectedTotal,
@@ -98,6 +106,7 @@ class Subject {
           clearTargetPercent ? null : (targetPercent ?? this.targetPercent),
       categoryId: clearCategory ? null : (categoryId ?? this.categoryId),
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
       priorHeld: priorHeld ?? this.priorHeld,
       priorAttended: priorAttended ?? this.priorAttended,
       expectedTotal:
@@ -115,6 +124,8 @@ class Subject {
         'target_percent': targetPercent,
         'category_id': categoryId,
         'created_at': (createdAt ?? DateTime.now()).millisecondsSinceEpoch,
+        if (updatedAt != null)
+          'updated_at': updatedAt!.millisecondsSinceEpoch,
         'prior_held': priorHeld,
         'prior_attended': priorAttended,
         'expected_total': expectedTotal,
@@ -136,6 +147,9 @@ class Subject {
       createdAt: map['created_at'] == null
           ? null
           : DateTime.fromMillisecondsSinceEpoch(map['created_at']! as int),
+      updatedAt: map['updated_at'] == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(map['updated_at']! as int),
       priorHeld: held,
       // A hand-edited backup must not attend more classes than it held.
       priorAttended: math.min(attended, held),

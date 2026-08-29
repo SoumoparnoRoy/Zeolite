@@ -34,7 +34,8 @@ class _Recording extends ZeoliteRepository {
   }
 
   @override
-  Future<void> updateSubject(Subject subject) async => updated.add(subject);
+  Future<void> updateSubject(Subject subject, {bool touch = true}) async =>
+      updated.add(subject);
 
   @override
   Future<int> clearAttendanceBetween(int id, DateTime from, DateTime to) async {

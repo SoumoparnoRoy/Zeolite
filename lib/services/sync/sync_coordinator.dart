@@ -648,7 +648,10 @@ class SyncCoordinator {
       // side never had it.
       categoryId:
           categoryName == null ? null : local.categoryByName[categoryName]?.id,
-      createdAt: state.editedAt ?? existing?.createdAt,
+      // The row's own creation date survives a sync — only a subject arriving
+      // for the first time has none of its own to keep.
+      createdAt: existing?.createdAt ?? state.editedAt,
+      updatedAt: state.editedAt,
       priorHeld: _int(f['priorHeld']) ?? 0,
       priorAttended: _int(f['priorAttended']) ?? 0,
       expectedTotal: _int(f['expectedTotal']),
@@ -658,7 +661,7 @@ class SyncCoordinator {
       final int id = await _repository.insertSubject(subject);
       local.subjectByUuid[state.localKey] = subject.copyWith(id: id);
     } else {
-      await _repository.updateSubject(subject);
+      await _repository.updateSubject(subject, touch: false);
       local.subjectByUuid[state.localKey] = subject;
     }
     return SyncItem.subject(subject, categoryName: categoryName);

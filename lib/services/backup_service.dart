@@ -361,6 +361,7 @@ class BackupService {
                 ? null
                 : categoryIdMap[subject.categoryId],
             createdAt: subject.createdAt,
+            updatedAt: subject.updatedAt,
             priorHeld: subject.priorHeld,
             priorAttended: subject.priorAttended,
             expectedTotal: subject.expectedTotal,

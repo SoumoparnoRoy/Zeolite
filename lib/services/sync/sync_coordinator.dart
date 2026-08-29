@@ -207,6 +207,8 @@ class SyncCoordinator {
       );
     }
 
+    final bool joining = _joiningAnAccount(local, links, remote);
+
     final _Tally tally = _Tally();
     for (final SyncKind kind in _order) {
       final SyncFailure? stop = await _runKind(
@@ -217,6 +219,7 @@ class SyncCoordinator {
         local: read,
         merge: merge,
         tally: tally,
+        joining: joining,
       );
       if (stop != null) {
         _status = _status.failed(stop, message: tally.message);
@@ -347,6 +350,7 @@ class SyncCoordinator {
     required _Local local,
     required Map<String, SyncSide>? merge,
     required _Tally tally,
+    bool joining = false,
   }) async {
     final SyncPlan plan =
         SyncPlan.from(local: items, links: links, remote: remote);
@@ -379,7 +383,13 @@ class SyncCoordinator {
       // push would send the local row the user just chose against.
       final bool chosenAway =
           merge?[push.item.localKey] == SyncSide.there && state != null;
+      // Outside [_content], a joining device is holding defaults, not answers.
+      final bool defaultsHere = joining &&
+          push.kind == SyncPushKind.adopt &&
+          !_content.contains(kind) &&
+          state != null;
       if (chosenAway ||
+          defaultsHere ||
           (push.kind == SyncPushKind.conflict &&
               _remoteWins(push.item, state))) {
         final RemoteLink? link = await _applyPull(
@@ -824,10 +834,27 @@ class SyncCoordinator {
     if (linked) return _Merge.proceed;
 
     final bool hasLocal = _content.any((SyncKind k) => local[k]!.isNotEmpty);
-    final bool hasRemote = _content.every((SyncKind k) => remote[k] != null) &&
-        _content.any((SyncKind k) => remote[k]!.isNotEmpty);
-    return hasLocal && hasRemote ? _Merge.review : _Merge.proceed;
+    return hasLocal && _remoteHasContent(remote) ? _Merge.review : _Merge.proceed;
   }
+
+  /// A device signing in to an account that already holds a term, carrying no
+  /// history and no ledger of its own. Its settings row and seeded categories
+  /// are whatever onboarding defaulted to rather than anything chosen, and
+  /// `changedAt` cannot arbitrate: onboarding stamps the schedule as it sets
+  /// the dates, so this side always looks newer.
+  bool _joiningAnAccount(
+    Map<SyncKind, List<SyncItem>> local,
+    Map<SyncKind, List<RemoteLink>> links,
+    Map<SyncKind, List<RemoteState>?> remote,
+  ) {
+    if (_order.any((SyncKind k) => links[k]!.isNotEmpty)) return false;
+    if (_content.any((SyncKind k) => local[k]!.isNotEmpty)) return false;
+    return _remoteHasContent(remote);
+  }
+
+  bool _remoteHasContent(Map<SyncKind, List<RemoteState>?> remote) =>
+      _content.every((SyncKind k) => remote[k] != null) &&
+      _content.any((SyncKind k) => remote[k]!.isNotEmpty);
 }
 
 enum _Merge { proceed, review }

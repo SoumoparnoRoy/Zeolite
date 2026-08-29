@@ -105,6 +105,14 @@ class SettingsController extends AsyncNotifier<AppSettings> {
     );
   }
 
+  /// Whether marks outside the semester count towards the figures — a view of
+  /// the same marks, reversible at any time.
+  Future<void> setCountOutsideTerm(bool value) async {
+    final AppSettings? current = state.value;
+    if (current == null) return;
+    await save(current.copyWith(countOutsideTerm: value));
+  }
+
   Future<void> setBackupFolder(String uri, String name) async {
     final AppSettings? current = state.value;
     if (current == null) return;
@@ -321,8 +329,9 @@ final statsProvider = Provider<OverallStats>((ref) {
 
   // Count marks straight from the records — cheaper and more accurate than
   // re-expanding the whole semester, since a mark survives rule edits. Only
-  // this term's: the header above these figures says so, and an install keeps
-  // marks from before the dates were last moved.
+  // this term's unless the user has said otherwise: the header above these
+  // figures says so, and an install keeps marks from before the dates were
+  // last moved.
   final AppSettings term = settings ?? const AppSettings();
   final Map<int, Map<AttendanceStatus, int>> counts =
       <int, Map<AttendanceStatus, int>>{};
@@ -330,7 +339,7 @@ final statsProvider = Provider<OverallStats>((ref) {
   // headlines need in order to say "periods" instead.
   final Set<int> weighted = <int>{};
   for (final AttendanceRecord record in data.records) {
-    if (!term.countsInTerm(record.date)) continue;
+    if (!term.countsTowardsPercentage(record.date)) continue;
     if (record.weight != 1) weighted.add(record.subjectId);
     counts.putIfAbsent(record.subjectId, () => <AttendanceStatus, int>{});
     counts[record.subjectId]![record.status] =
@@ -405,10 +414,20 @@ final tagBreakdownsProvider = Provider<List<TagBreakdown>>((ref) {
   return buildTagBreakdowns(
     tags: data.tags,
     records: data.records
-        .where((AttendanceRecord r) => term.countsInTerm(r.date))
+        .where((AttendanceRecord r) => term.countsTowardsPercentage(r.date))
         .toList(),
     subjects: data.subjects,
   );
+});
+
+/// Marks dated outside the semester, so the stats screen can say so instead of
+/// quietly leaving them out of every figure on it.
+final outOfTermMarksProvider = Provider<OutOfTermMarks>((ref) {
+  final TimetableData? data = ref.watch(timetableProvider).value;
+  if (data == null) return const OutOfTermMarks(count: 0);
+  final AppSettings term =
+      ref.watch(settingsProvider).value ?? const AppSettings();
+  return OutOfTermMarks.from(data.records, term);
 });
 
 /// Whether anything is tagged at all. The stats screen hides its tag section

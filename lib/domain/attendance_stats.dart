@@ -1,9 +1,14 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
+
+import '../core/date_utils.dart';
 import '../core/words.dart';
+import '../data/models/attendance_record.dart';
 import '../data/models/attendance_status.dart';
 import '../data/models/class_session.dart';
 import '../data/models/subject.dart';
+import '../data/settings/app_settings.dart';
 
 /// How a subject is doing against its attendance requirement.
 enum AttendanceHealth {
@@ -308,5 +313,56 @@ class OverallStats {
     withData
         .sort((SubjectStats a, SubjectStats b) => a.ratio.compareTo(b.ratio));
     return withData.first;
+  }
+}
+
+/// The marks sitting outside the semester dates, which the figures above them
+/// otherwise say nothing about.
+///
+/// Reported whether or not they are being counted, because the point is that
+/// their absence from a percentage should never be silent — that silence cost
+/// a full debugging round once already.
+@immutable
+class OutOfTermMarks {
+  const OutOfTermMarks({required this.count, this.earliest, this.latest});
+
+  final int count;
+
+  /// The span they cover, which is what an offer to widen the term onto them
+  /// needs. Null when there are none.
+  final DateTime? earliest;
+  final DateTime? latest;
+
+  bool get isEmpty => count == 0;
+
+  static OutOfTermMarks from(
+    Iterable<AttendanceRecord> records,
+    AppSettings term,
+  ) {
+    int count = 0;
+    DateTime? earliest;
+    DateTime? latest;
+    for (final AttendanceRecord record in records) {
+      // Deliberately not [AppSettings.countsTowardsPercentage]: these stay
+      // worth naming even once the user has said to count them.
+      if (term.countsInTerm(record.date)) continue;
+      count++;
+      final DateTime day = Dates.dayOf(record.date);
+      if (earliest == null || day.isBefore(earliest)) earliest = day;
+      if (latest == null || day.isAfter(latest)) latest = day;
+    }
+    return OutOfTermMarks(count: count, earliest: earliest, latest: latest);
+  }
+
+  /// The dates a term would need in order to take these marks in. Only the end
+  /// that has strays beyond it moves, so widening never shrinks the term.
+  (DateTime, DateTime)? widenedTerm(AppSettings term) {
+    final DateTime? start = term.semesterStart;
+    final DateTime? end = term.semesterEnd;
+    if (start == null || end == null || isEmpty) return null;
+    return (
+      earliest!.isBefore(start) ? earliest! : start,
+      latest!.isAfter(end) ? latest! : end,
+    );
   }
 }

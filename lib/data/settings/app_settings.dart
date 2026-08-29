@@ -36,6 +36,7 @@ class AppSettings {
   const AppSettings({
     this.semesterStart,
     this.semesterEnd,
+    this.countOutsideTerm = false,
     this.targetPercent = 75,
     this.defaultClassDurationMinutes = 60,
     this.dayStartMinutes = 9 * 60,
@@ -174,6 +175,11 @@ class AppSettings {
 
   bool get hasSemester => semesterStart != null && semesterEnd != null;
 
+  /// Whether marks dated outside the term still count towards the percentage.
+  /// Kept off the synced settings row deliberately: it changes how this device
+  /// reads the same marks, not which occurrences exist.
+  final bool countOutsideTerm;
+
   /// Whether a mark on [date] counts towards this term. Inclusive at both
   /// ends, and with no dates set there is no window, so everything counts.
   bool countsInTerm(DateTime date) {
@@ -182,6 +188,10 @@ class AppSettings {
     return !day.isBefore(Dates.dayOf(semesterStart!)) &&
         !day.isAfter(Dates.dayOf(semesterEnd!));
   }
+
+  /// The window, unless the user has asked for the strays counted too.
+  bool countsTowardsPercentage(DateTime date) =>
+      countOutsideTerm || countsInTerm(date);
 
   /// How far through the term you are, 0..1.
   double get semesterProgress {
@@ -199,6 +209,7 @@ class AppSettings {
   }
 
   AppSettings copyWith({
+    bool? countOutsideTerm,
     DateTime? semesterStart,
     DateTime? semesterEnd,
     double? targetPercent,
@@ -229,6 +240,7 @@ class AppSettings {
     return AppSettings(
       semesterStart: semesterStart ?? this.semesterStart,
       semesterEnd: semesterEnd ?? this.semesterEnd,
+      countOutsideTerm: countOutsideTerm ?? this.countOutsideTerm,
       targetPercent: targetPercent ?? this.targetPercent,
       defaultClassDurationMinutes:
           defaultClassDurationMinutes ?? this.defaultClassDurationMinutes,
@@ -267,6 +279,7 @@ class AppSettings {
         'semesterStart':
             semesterStart == null ? null : Dates.keyOf(semesterStart!),
         'semesterEnd': semesterEnd == null ? null : Dates.keyOf(semesterEnd!),
+        'countOutsideTerm': countOutsideTerm,
         'targetPercent': targetPercent,
         'defaultClassDurationMinutes': defaultClassDurationMinutes,
         'dayStartMinutes': dayStartMinutes,
@@ -292,6 +305,7 @@ class AppSettings {
     return AppSettings(
       semesterStart: start == null ? null : Dates.fromKey(start),
       semesterEnd: end == null ? null : Dates.fromKey(end),
+      countOutsideTerm: json['countOutsideTerm'] as bool? ?? false,
       targetPercent: (json['targetPercent'] as num?)?.toDouble() ?? 75,
       defaultClassDurationMinutes:
           (json['defaultClassDurationMinutes'] as num?)?.toInt() ?? 60,
@@ -343,6 +357,7 @@ class SettingsService {
   static const String _kEveningMinutes = 'ut.eveningReminderMinutes';
   static const String _kNotifyDanger = 'ut.notifyAttendanceDanger';
   static const String _kAutoBackup = 'ut.autoBackup';
+  static const String _kCountOutsideTerm = 'ut.countOutsideTerm';
   static const String _kLastAutoBackup = 'ut.lastAutoBackup';
   static const String _kLastSync = 'ut.lastSync';
   static const String _kBackupFolderUri = 'ut.backupFolderUri';
@@ -379,6 +394,7 @@ class SettingsService {
       eveningReminderMinutes: await prefs.getInt(_kEveningMinutes) ?? 20 * 60,
       notifyAttendanceDanger: await prefs.getBool(_kNotifyDanger) ?? true,
       autoBackupEnabled: await prefs.getBool(_kAutoBackup) ?? false,
+      countOutsideTerm: await prefs.getBool(_kCountOutsideTerm) ?? false,
       lastAutoBackupAt: switch (await prefs.getInt(_kLastAutoBackup)) {
         final int ms => DateTime.fromMillisecondsSinceEpoch(ms),
         null => null,
@@ -432,6 +448,7 @@ class SettingsService {
     await prefs.setInt(_kEveningMinutes, settings.eveningReminderMinutes);
     await prefs.setBool(_kNotifyDanger, settings.notifyAttendanceDanger);
     await prefs.setBool(_kAutoBackup, settings.autoBackupEnabled);
+    await prefs.setBool(_kCountOutsideTerm, settings.countOutsideTerm);
     if (settings.scheduleChangedAt == null) {
       await prefs.remove(_kScheduleChangedAt);
     } else {

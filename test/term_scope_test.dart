@@ -121,4 +121,26 @@ void main() {
       expect(half.countsInTerm(DateTime(1999, 1, 1)), isTrue);
     });
   });
+
+  group('counting the marks outside it', () {
+    final AppSettings counting = AppSettings(
+      semesterStart: _start,
+      semesterEnd: _end,
+      countOutsideTerm: true,
+    );
+
+    test('a mark from before the term counts once asked for', () async {
+      final SubjectStats stats = await _statsFor(
+        <AttendanceRecord>[_present(DateTime(2026, 8, 4))],
+        settings: counting,
+      );
+      expect(stats.held, 1);
+    });
+
+    test('the window itself is unchanged, so the strays stay nameable', () {
+      final DateTime stray = DateTime(2026, 8, 4);
+      expect(counting.countsInTerm(stray), isFalse);
+      expect(counting.countsTowardsPercentage(stray), isTrue);
+    });
+  });
 }

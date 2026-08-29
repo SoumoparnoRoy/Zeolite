@@ -12,6 +12,7 @@ import '../../data/models/room.dart';
 import '../../data/models/subject.dart';
 import '../../data/models/tag.dart';
 import '../../data/settings/app_settings.dart';
+import '../../domain/restore_identity.dart';
 import '../../domain/sync/sync_merge.dart';
 import '../../domain/sync/sync_plan.dart';
 import '../../domain/sync/sync_status.dart';
@@ -183,9 +184,6 @@ class SyncCoordinator {
     _status = _status.running();
     _attemptedAt = _now();
 
-    final _Local read = await _readLocal();
-    final Map<SyncKind, List<SyncItem>> local = read.items;
-
     final Map<SyncKind, List<RemoteLink>> links = <SyncKind, List<RemoteLink>>{
       for (final SyncKind kind in _order)
         kind: await _repository.getRemoteLinks(target.id, kind),
@@ -194,6 +192,13 @@ class SyncCoordinator {
         <SyncKind, List<RemoteState>?>{
       for (final SyncKind kind in _order) kind: await target.fetch(kind),
     };
+
+    // Ahead of the local read and of the check below, which would otherwise
+    // call two reconcilable sides disjoint.
+    await _adoptAccountIdentities(links, remote);
+
+    final _Local read = await _readLocal();
+    final Map<SyncKind, List<SyncItem>> local = read.items;
 
     if (merge == null && _firstRunMerge(local, links, remote) == _Merge.review) {
       _status = _status.succeeded(_now());
@@ -822,6 +827,156 @@ class SyncCoordinator {
       failure == SyncFailure.offline ||
       failure == SyncFailure.auth ||
       failure == SyncFailure.rateLimited;
+
+  /// Hands a local subject the identity the account files its code under.
+  ///
+  /// A restore from a pre-v8 backup issues every subject a fresh uuid, so
+  /// signing in afterwards offers the account a second copy of a term it
+  /// already holds, marks and slots included. The code is the only evidence
+  /// the two rows are one course — and only on a first run, since once a
+  /// ledger exists an unknown uuid means a subject genuinely added here.
+  Future<void> _adoptAccountIdentities(
+    Map<SyncKind, List<RemoteLink>> links,
+    Map<SyncKind, List<RemoteState>?> remote,
+  ) async {
+    if (_order.any((SyncKind k) => links[k]!.isNotEmpty)) return;
+
+    await _adoptSubjects(remote[SyncKind.subject]);
+
+    // Re-read between the two: a class is recognised by its subject, so the
+    // subjects have to have settled before anything under them is matched.
+    final Map<int, String> subjectUuid = <int, String>{
+      for (final Subject s in await _repository.getSubjects())
+        if (s.id != null && s.uuid != null) s.id!: s.uuid!,
+    };
+    await _adoptClasses(remote[SyncKind.slot], remote[SyncKind.extraClass],
+        subjectUuid);
+  }
+
+  Future<void> _adoptSubjects(List<RemoteState>? theirs) async {
+    if (theirs == null || theirs.isEmpty) return;
+
+    final List<Subject> rows = await _repository.getSubjects();
+    final Set<String> held = _uuids(rows.map((Subject s) => s.uuid));
+    final Set<String> known = _uuids(theirs.map((RemoteState r) => r.localKey));
+
+    final List<Subject> unknown = <Subject>[
+      for (final Subject s in rows)
+        if (s.uuid == null || !known.contains(s.uuid)) s,
+    ];
+    if (unknown.isEmpty) return;
+
+    final Map<int, String> adopted = matchByKey(
+      unknown: <RowIdentity>[
+        for (final Subject s in unknown) RowIdentity(key: subjectKey(s.code)),
+      ],
+      known: _adoptable(theirs, held,
+          (RemoteState r) => subjectKey(r.fields['code'] as String?)),
+    );
+
+    for (final MapEntry<int, String> entry in adopted.entries) {
+      // Not an edit, so it must not be stamped as one: an `updatedAt` of now
+      // would have this side win a conflict it should lose.
+      await _repository.updateSubject(
+        unknown[entry.key].copyWith(uuid: entry.value),
+        touch: false,
+      );
+    }
+  }
+
+  Future<void> _adoptClasses(
+    List<RemoteState>? theirSlots,
+    List<RemoteState>? theirExtras,
+    Map<int, String> subjectUuid,
+  ) async {
+    if (theirSlots != null && theirSlots.isNotEmpty) {
+      final List<ClassSlot> rows = await _repository.getSlots();
+      final Set<String> held = _uuids(rows.map((ClassSlot s) => s.uuid));
+      final Set<String> known =
+          _uuids(theirSlots.map((RemoteState r) => r.localKey));
+      final List<ClassSlot> unknown = <ClassSlot>[
+        for (final ClassSlot s in rows)
+          if (s.uuid == null || !known.contains(s.uuid)) s,
+      ];
+
+      final Map<int, String> adopted = matchByKey(
+        unknown: <RowIdentity>[
+          for (final ClassSlot s in unknown)
+            RowIdentity(
+              key: slotKey(subjectUuid[s.subjectId], s.weekday, s.startMinutes),
+            ),
+        ],
+        known: _adoptable(
+          theirSlots,
+          held,
+          (RemoteState r) => slotKey(
+            r.fields['subject'] as String?,
+            (r.fields['weekday'] as num?)?.toInt() ?? -1,
+            (r.fields['startMinutes'] as num?)?.toInt() ?? -1,
+          ),
+        ),
+      );
+
+      for (final MapEntry<int, String> entry in adopted.entries) {
+        await _repository
+            .updateSlot(unknown[entry.key].copyWith(uuid: entry.value));
+      }
+    }
+
+    if (theirExtras == null || theirExtras.isEmpty) return;
+
+    final List<ExtraClass> rows = await _repository.getExtraClasses();
+    final Set<String> held = _uuids(rows.map((ExtraClass e) => e.uuid));
+    final Set<String> known =
+        _uuids(theirExtras.map((RemoteState r) => r.localKey));
+    final List<ExtraClass> unknown = <ExtraClass>[
+      for (final ExtraClass e in rows)
+        if (e.uuid == null || !known.contains(e.uuid)) e,
+    ];
+
+    final Map<int, String> adopted = matchByKey(
+      unknown: <RowIdentity>[
+        for (final ExtraClass e in unknown)
+          RowIdentity(
+            key: extraKey(
+                subjectUuid[e.subjectId], Dates.keyOf(e.date), e.startMinutes),
+          ),
+      ],
+      known: _adoptable(
+        theirExtras,
+        held,
+        (RemoteState r) => extraKey(
+          r.fields['subject'] as String?,
+          (r.fields['date'] as num?)?.toInt() ?? -1,
+          (r.fields['startMinutes'] as num?)?.toInt() ?? -1,
+        ),
+      ),
+    );
+
+    for (final MapEntry<int, String> entry in adopted.entries) {
+      await _repository
+          .updateExtraClass(unknown[entry.key].copyWith(uuid: entry.value));
+    }
+  }
+
+  /// The account rows an identity can be taken from. A tombstone is none, and
+  /// neither is a uuid this device already holds — that one belongs to another
+  /// of its rows, and taking it would leave two on one identity.
+  List<RowIdentity> _adoptable(
+    List<RemoteState> theirs,
+    Set<String> held,
+    String? Function(RemoteState) key,
+  ) =>
+      <RowIdentity>[
+        for (final RemoteState state in theirs)
+          if (!state.deleted && !held.contains(state.localKey))
+            RowIdentity(key: key(state), uuid: state.localKey),
+      ];
+
+  Set<String> _uuids(Iterable<String?> values) => <String>{
+        for (final String? value in values)
+          if (value != null) value,
+      };
 
   /// The first run against a target — no ledger at all — is the only time two
   /// populated sides cannot be told apart: with nothing recorded, every local

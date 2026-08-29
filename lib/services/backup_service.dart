@@ -15,6 +15,7 @@ import '../data/models/room.dart';
 import '../data/models/subject.dart';
 import '../data/models/tag.dart';
 import '../data/settings/app_settings.dart';
+import '../domain/restore_identity.dart';
 import 'backup_folder.dart';
 
 /// Result of an import attempt.
@@ -298,6 +299,18 @@ class BackupService {
     }
 
     try {
+      // Read before the wipe. A backup written before schema v8 carries no
+      // subject uuid and one before v9 no slot uuid, and the identities
+      // already on this device are the only place left to recover one from
+      // once the tables are empty.
+      final List<Subject> existing = await _repo.getSubjects();
+      final List<ClassSlot> existingSlots = await _repo.getSlots();
+      final List<ExtraClass> existingExtras = await _repo.getExtraClasses();
+      final Map<int, String> existingSubjectUuid = <int, String>{
+        for (final Subject s in existing)
+          if (s.id != null && s.uuid != null) s.id!: s.uuid!,
+      };
+
       await _repo.clearAll();
 
       // Old id -> newly assigned id, for categories, subjects and tags.
@@ -341,17 +354,38 @@ class BackupService {
         if (oldId != null) tagIdMap[oldId] = newId;
       }
 
+      final List<int?> subjectOldIds = <int?>[];
+      final List<Subject> restored = <Subject>[];
       for (final Object? raw in (data['subjects'] as List<Object?>?) ??
           const <Object?>[]) {
         if (raw is! Map) continue;
         final Map<String, Object?> map = Map<String, Object?>.from(raw);
-        final int? oldId = (map['id'] as num?)?.toInt();
-        final Subject subject = Subject.fromMap(map);
+        subjectOldIds.add((map['id'] as num?)?.toInt());
+        restored.add(Subject.fromMap(map));
+      }
+
+      final Map<int, String> adopted = matchByKey(
+        unknown: <RowIdentity>[
+          for (final Subject s in restored)
+            // A file that already carries uuids needs no matching, and must
+            // not be re-pointed at whatever this device filed the code under.
+            RowIdentity(key: s.uuid == null ? subjectKey(s.code) : null),
+        ],
+        known: <RowIdentity>[
+          for (final Subject s in existing)
+            RowIdentity(key: subjectKey(s.code), uuid: s.uuid),
+        ],
+      );
+
+      for (int i = 0; i < restored.length; i++) {
+        final Subject subject = restored[i];
+        final int? oldId = subjectOldIds[i];
         final int newId = await _repo.insertSubject(
           Subject(
             // Carried through, not reissued: a restore onto a second device
-            // has to land on the same uuid or the subject syncs as two.
-            uuid: subject.uuid,
+            // has to land on the same uuid or the subject syncs as two. An
+            // older file has none, so it takes the one held for its code.
+            uuid: subject.uuid ?? adopted[i],
             name: subject.name,
             code: subject.code,
             teacher: subject.teacher,
@@ -370,17 +404,52 @@ class BackupService {
         if (oldId != null) subjectIdMap[oldId] = newId;
       }
 
+      // Read back so a slot is keyed on the uuid its subject ended up with,
+      // whether that was adopted just now or issued on insert.
+      final Map<int, String> subjectUuidById = <int, String>{
+        for (final Subject s in await _repo.getSubjects())
+          if (s.id != null && s.uuid != null) s.id!: s.uuid!,
+      };
+
+      final List<ClassSlot> restoredSlots = <ClassSlot>[];
       for (final Object? raw in (data['slots'] as List<Object?>?) ??
           const <Object?>[]) {
         if (raw is! Map) continue;
-        final Map<String, Object?> map = Map<String, Object?>.from(raw);
-        final ClassSlot slot = ClassSlot.fromMap(map);
-        final int? subjectId = subjectIdMap[slot.subjectId];
-        if (subjectId == null) continue;
-        // Rebuilt without an id so SQLite assigns a fresh primary key.
+        final ClassSlot slot =
+            ClassSlot.fromMap(Map<String, Object?>.from(raw));
+        if (subjectIdMap[slot.subjectId] == null) continue;
+        restoredSlots.add(slot);
+      }
+
+      final Map<int, String> adoptedSlots = matchByKey(
+        unknown: <RowIdentity>[
+          for (final ClassSlot s in restoredSlots)
+            RowIdentity(
+              key: s.uuid != null
+                  ? null
+                  : slotKey(subjectUuidById[subjectIdMap[s.subjectId]],
+                      s.weekday, s.startMinutes),
+            ),
+        ],
+        known: <RowIdentity>[
+          for (final ClassSlot s in existingSlots)
+            RowIdentity(
+              key: slotKey(
+                  existingSubjectUuid[s.subjectId], s.weekday, s.startMinutes),
+              uuid: s.uuid,
+            ),
+        ],
+      );
+
+      for (int i = 0; i < restoredSlots.length; i++) {
+        final ClassSlot slot = restoredSlots[i];
+        // Rebuilt without an id so SQLite assigns a fresh primary key. The
+        // uuid is not an id in that sense and has to survive, or the rule
+        // comes back as a second class beside the one the account holds.
         await _repo.insertSlot(
           ClassSlot(
-            subjectId: subjectId,
+            uuid: slot.uuid ?? adoptedSlots[i],
+            subjectId: subjectIdMap[slot.subjectId]!,
             weekday: slot.weekday,
             startMinutes: slot.startMinutes,
             endMinutes: slot.endMinutes,
@@ -392,16 +461,42 @@ class BackupService {
         );
       }
 
+      final List<ExtraClass> restoredExtras = <ExtraClass>[];
       for (final Object? raw in (data['extraClasses'] as List<Object?>?) ??
           const <Object?>[]) {
         if (raw is! Map) continue;
-        final Map<String, Object?> map = Map<String, Object?>.from(raw);
-        final ExtraClass extra = ExtraClass.fromMap(map);
-        final int? subjectId = subjectIdMap[extra.subjectId];
-        if (subjectId == null) continue;
+        final ExtraClass extra =
+            ExtraClass.fromMap(Map<String, Object?>.from(raw));
+        if (subjectIdMap[extra.subjectId] == null) continue;
+        restoredExtras.add(extra);
+      }
+
+      final Map<int, String> adoptedExtras = matchByKey(
+        unknown: <RowIdentity>[
+          for (final ExtraClass e in restoredExtras)
+            RowIdentity(
+              key: e.uuid != null
+                  ? null
+                  : extraKey(subjectUuidById[subjectIdMap[e.subjectId]],
+                      Dates.keyOf(e.date), e.startMinutes),
+            ),
+        ],
+        known: <RowIdentity>[
+          for (final ExtraClass e in existingExtras)
+            RowIdentity(
+              key: extraKey(existingSubjectUuid[e.subjectId],
+                  Dates.keyOf(e.date), e.startMinutes),
+              uuid: e.uuid,
+            ),
+        ],
+      );
+
+      for (int i = 0; i < restoredExtras.length; i++) {
+        final ExtraClass extra = restoredExtras[i];
         await _repo.insertExtraClass(
           ExtraClass(
-            subjectId: subjectId,
+            uuid: extra.uuid ?? adoptedExtras[i],
+            subjectId: subjectIdMap[extra.subjectId]!,
             date: extra.date,
             startMinutes: extra.startMinutes,
             endMinutes: extra.endMinutes,

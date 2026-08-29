@@ -577,16 +577,29 @@ class TimetableActions {
   final UndoStore _undo = UndoStore();
 
   Future<void> _refresh() async {
+    await _reload();
+    _ref.read(syncSchedulerProvider)?.onLocalChange();
+  }
+
+  /// Split out of [_refresh] because a pull needs all of this without
+  /// announcing a local change, which would schedule the rows it just brought
+  /// down straight back up.
+  Future<void> _reload() async {
     // Every mutation ends here, so this is the one place the pending undo has
     // to be dropped: restoring it would throw away whatever happened since.
     _undo.drop();
     _mergeUndoToken = null;
-    // Also the one place a local change can be announced without every future
-    // write path having to remember to.
-    _ref.read(syncSchedulerProvider)?.onLocalChange();
     _ref.invalidate(timetableProvider);
     await _ref.read(timetableProvider.future);
     await _syncNotifications();
+  }
+
+  /// A run writes straight through the repository and the settings service, so
+  /// without this nothing reading either provider knows the database moved.
+  Future<void> reloadAfterSync() async {
+    _ref.invalidate(settingsProvider);
+    await _ref.read(settingsProvider.future);
+    await _reload();
   }
 
   /// Alarms already in the system keep the mode they were scheduled with, so
@@ -656,7 +669,7 @@ class TimetableActions {
     final DatabaseSnapshot before = await _repo.snapshot();
     final SyncRunResult result =
         await coordinator.run(force: true, merge: decisions);
-    await _refresh();
+    await reloadAfterSync();
     _mergeUndoToken = _undo.arm(before);
     _mergeUndoTarget = coordinator.target.id;
     return result;

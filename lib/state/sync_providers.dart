@@ -92,6 +92,7 @@ class SyncController extends Notifier<SyncStatus> {
         .applySyncMerge(coordinator, decisions);
     _last = result;
     state = coordinator.status;
+    // `applySyncMerge` has already reloaded, so only the stamp is left.
     if (result.ok) await _stampLastSync(coordinator.status.lastRunAt);
     return result;
   }
@@ -112,7 +113,14 @@ class SyncController extends Notifier<SyncStatus> {
     final SyncRunResult result = await coordinator.run(force: force);
     _last = result;
     state = coordinator.status;
-    if (result.ok) await _stampLastSync(coordinator.status.lastRunAt);
+    if (result.ok) {
+      // Reload before stamping, not after: a pulled settings row is written
+      // through the service, so `settingsProvider` still holds the pre-run
+      // value and stamping from it would push the pulled settings straight
+      // back out.
+      if (result.pulled > 0) await ref.read(actionsProvider).reloadAfterSync();
+      await _stampLastSync(coordinator.status.lastRunAt);
+    }
     return result;
   }
 

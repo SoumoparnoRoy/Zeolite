@@ -63,6 +63,9 @@ _to_delete/
 # Flutter project.
 .github/modernize/
 
+# Firebase CLI deploy cache — regenerated on every `firebase deploy`.
+.firebase/
+
 # --------------------------------------------------------------- OS noise
 .DS_Store
 Thumbs.db

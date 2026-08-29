@@ -30,6 +30,7 @@ import '../services/backup_folder.dart';
 import '../services/backup_service.dart';
 import '../services/notification_service.dart';
 import '../services/sync/sync_coordinator.dart';
+import 'sync_providers.dart';
 import 'undo.dart';
 
 // ---------------------------------------------------------------- singletons
@@ -79,15 +80,17 @@ class SettingsController extends AsyncNotifier<AppSettings> {
   /// actually moved. Stamping on every save would make a theme change look
   /// like a newer schedule to the other device.
   Future<void> save(AppSettings settings) async {
-    final AppSettings next =
-        SyncItem.settings(settings).hash == SyncItem.settings(state.value ??
-                    const AppSettings())
-                .hash
-            ? settings
-            : settings.copyWith(scheduleChangedAt: DateTime.now());
+    final bool scheduleMoved = SyncItem.settings(settings).hash !=
+        SyncItem.settings(state.value ?? const AppSettings()).hash;
+    final AppSettings next = scheduleMoved
+        ? settings.copyWith(scheduleChangedAt: DateTime.now())
+        : settings;
 
     state = AsyncValue<AppSettings>.data(next);
     await ref.read(settingsServiceProvider).save(next);
+    // Settings do not go through `_refresh`, so the one row with no table
+    // would otherwise wait for a resume to travel.
+    if (scheduleMoved) ref.read(syncSchedulerProvider)?.onLocalChange();
   }
 
   Future<void> setSemester(DateTime start, DateTime end) async {
@@ -578,6 +581,9 @@ class TimetableActions {
     // to be dropped: restoring it would throw away whatever happened since.
     _undo.drop();
     _mergeUndoToken = null;
+    // Also the one place a local change can be announced without every future
+    // write path having to remember to.
+    _ref.read(syncSchedulerProvider)?.onLocalChange();
     _ref.invalidate(timetableProvider);
     await _ref.read(timetableProvider.future);
     await _syncNotifications();

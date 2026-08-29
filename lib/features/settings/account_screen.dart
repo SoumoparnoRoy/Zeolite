@@ -10,6 +10,7 @@ import '../../domain/sync/sync_target.dart';
 import '../../services/auth_service.dart';
 import '../../services/sync/sync_coordinator.dart';
 import '../../state/auth_providers.dart';
+import '../../state/providers.dart';
 import '../../state/sync_providers.dart';
 import 'sync_merge_screen.dart';
 import '../../widgets/common.dart';
@@ -261,7 +262,12 @@ class _SyncSection extends ConsumerWidget {
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Text(
-                  syncStatusLine(status, last),
+                  syncStatusLine(
+                    status,
+                    last,
+                    storedLastSyncAt:
+                        ref.watch(settingsProvider).value?.lastSyncAt,
+                  ),
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
               ),
@@ -327,7 +333,11 @@ class _SyncSection extends ConsumerWidget {
 /// The one line Settings shows for a target. Lifted out of the widget so the
 /// wording each state produces can be pinned down without a Firebase user.
 @visibleForTesting
-String syncStatusLine(SyncStatus status, SyncRunResult? last) {
+String syncStatusLine(
+  SyncStatus status,
+  SyncRunResult? last, {
+  DateTime? storedLastSyncAt,
+}) {
   switch (status.state) {
     case SyncState.running:
       return 'Syncing…';
@@ -345,8 +355,10 @@ String syncStatusLine(SyncStatus status, SyncRunResult? last) {
         return 'This device and your account both hold attendance. Nothing '
             'has been changed yet.';
       }
-      if (status.lastRunAt == null) return 'Not synced yet.';
-      return 'Synced ${_ago(status.lastRunAt!)}.${_counts(last)}';
+      // Rebuilt with the process, so the stored stamp outlives it.
+      final DateTime? at = status.lastRunAt ?? storedLastSyncAt;
+      if (at == null) return 'Not synced yet.';
+      return 'Synced ${_ago(at)}.${_counts(last)}';
   }
 }
 

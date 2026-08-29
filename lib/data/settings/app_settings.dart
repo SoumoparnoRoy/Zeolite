@@ -54,6 +54,7 @@ class AppSettings {
     this.notifyAttendanceDanger = true,
     this.autoBackupEnabled = false,
     this.lastAutoBackupAt,
+    this.lastSyncAt,
     this.scheduleChangedAt,
     this.backupFolderUri,
     this.backupFolderName,
@@ -121,6 +122,13 @@ class AppSettings {
   /// data, which is why it is kept out of the export — restoring it onto
   /// another phone would tell that phone a backup had already been taken.
   final DateTime? lastAutoBackupAt;
+
+  /// When a sync run last succeeded. Persisted rather than left on the
+  /// coordinator so that "resume when the last run is stale" survives the
+  /// process being killed — in memory it would be null at every cold launch,
+  /// which is the most common resume there is, and every launch would sync.
+  /// Out of the export for the same reason as [lastAutoBackupAt].
+  final DateTime? lastSyncAt;
 
   /// When a setting that shapes the timetable was last changed here.
   ///
@@ -211,6 +219,7 @@ class AppSettings {
     bool? notifyAttendanceDanger,
     bool? autoBackupEnabled,
     DateTime? lastAutoBackupAt,
+    DateTime? lastSyncAt,
     DateTime? scheduleChangedAt,
     String? backupFolderUri,
     String? backupFolderName,
@@ -242,6 +251,7 @@ class AppSettings {
           notifyAttendanceDanger ?? this.notifyAttendanceDanger,
       autoBackupEnabled: autoBackupEnabled ?? this.autoBackupEnabled,
       lastAutoBackupAt: lastAutoBackupAt ?? this.lastAutoBackupAt,
+      lastSyncAt: lastSyncAt ?? this.lastSyncAt,
       scheduleChangedAt: scheduleChangedAt ?? this.scheduleChangedAt,
       // Choosing a folder and clearing one both have to be expressible, and
       // `?? this` cannot say "set this back to null".
@@ -334,6 +344,7 @@ class SettingsService {
   static const String _kNotifyDanger = 'ut.notifyAttendanceDanger';
   static const String _kAutoBackup = 'ut.autoBackup';
   static const String _kLastAutoBackup = 'ut.lastAutoBackup';
+  static const String _kLastSync = 'ut.lastSync';
   static const String _kBackupFolderUri = 'ut.backupFolderUri';
   static const String _kBackupFolderName = 'ut.backupFolderName';
   static const String _kOnboarded = 'ut.onboarded';
@@ -369,6 +380,10 @@ class SettingsService {
       notifyAttendanceDanger: await prefs.getBool(_kNotifyDanger) ?? true,
       autoBackupEnabled: await prefs.getBool(_kAutoBackup) ?? false,
       lastAutoBackupAt: switch (await prefs.getInt(_kLastAutoBackup)) {
+        final int ms => DateTime.fromMillisecondsSinceEpoch(ms),
+        null => null,
+      },
+      lastSyncAt: switch (await prefs.getInt(_kLastSync)) {
         final int ms => DateTime.fromMillisecondsSinceEpoch(ms),
         null => null,
       },
@@ -431,6 +446,14 @@ class SettingsService {
       await prefs.setInt(
         _kLastAutoBackup,
         settings.lastAutoBackupAt!.millisecondsSinceEpoch,
+      );
+    }
+    if (settings.lastSyncAt == null) {
+      await prefs.remove(_kLastSync);
+    } else {
+      await prefs.setInt(
+        _kLastSync,
+        settings.lastSyncAt!.millisecondsSinceEpoch,
       );
     }
     if (settings.backupFolderUri == null) {

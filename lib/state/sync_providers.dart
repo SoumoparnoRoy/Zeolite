@@ -1,11 +1,13 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/settings/app_settings.dart';
 import '../domain/sync/sync_merge.dart';
 import '../domain/sync/sync_status.dart';
 import '../domain/sync/sync_target.dart';
 import '../services/firebase/firestore_sync_target.dart';
 import '../services/sync/sync_coordinator.dart';
+import '../services/sync/sync_scheduler.dart';
 import 'auth_providers.dart';
 import 'providers.dart';
 
@@ -31,6 +33,33 @@ final syncCoordinatorProvider = Provider<SyncCoordinator?>((ref) {
 final syncStatusProvider = NotifierProvider<SyncController, SyncStatus>(
   SyncController.new,
 );
+
+/// The two automatic triggers, alive only while signed in. Rebuilding on the
+/// target means signing out disposes the lifecycle listener and cancels any
+/// pending run, so a debounce armed by the last edit before signing out
+/// cannot fire against an account nobody is in.
+///
+/// Watched by the root widget purely to keep it alive: a provider nobody reads
+/// is never constructed, and a scheduler nobody constructs never schedules.
+final syncSchedulerProvider = Provider<SyncScheduler?>((ref) {
+  if (ref.watch(syncTargetProvider) == null) return null;
+  // Built only once settings have loaded, because the cold-start staleness
+  // check reads `lastSyncAt` the moment the scheduler starts. Watching
+  // whether there is a value rather than the value itself keeps a settings
+  // write from tearing the scheduler down and cancelling a pending run.
+  if (!ref.watch(settingsProvider.select((AsyncValue<AppSettings> s) =>
+      s.hasValue))) {
+    return null;
+  }
+
+  final SyncScheduler scheduler = SyncScheduler(
+    run: () => ref.read(syncStatusProvider.notifier).run(),
+    lastSyncAt: () => ref.read(settingsProvider).value?.lastSyncAt,
+  );
+  ref.onDispose(scheduler.dispose);
+  scheduler.start();
+  return scheduler;
+});
 
 /// What Settings reads and what the Retry button calls.
 ///
@@ -63,6 +92,7 @@ class SyncController extends Notifier<SyncStatus> {
         .applySyncMerge(coordinator, decisions);
     _last = result;
     state = coordinator.status;
+    if (result.ok) await _stampLastSync(coordinator.status.lastRunAt);
     return result;
   }
 
@@ -72,11 +102,28 @@ class SyncController extends Notifier<SyncStatus> {
     final SyncCoordinator? coordinator = ref.read(syncCoordinatorProvider);
     if (coordinator == null) return null;
     if (state.state == SyncState.running) return null;
+    // An unanswered merge question is not fixed by asking again, and every
+    // automatic retry of it is a fetch of all nine kinds for an outcome that
+    // is already known. The button still gets through, because pressing it is
+    // how the user reaches the screen that answers it.
+    if (!force && _last?.outcome == SyncRunOutcome.reviewNeeded) return null;
 
     state = coordinator.status.running();
     final SyncRunResult result = await coordinator.run(force: force);
     _last = result;
     state = coordinator.status;
+    if (result.ok) await _stampLastSync(coordinator.status.lastRunAt);
     return result;
+  }
+
+  /// Kept in settings rather than only on the coordinator so the scheduler can
+  /// still tell how old the last run is after the process has been killed.
+  Future<void> _stampLastSync(DateTime? at) async {
+    if (at == null) return;
+    final AppSettings? current = ref.read(settingsProvider).value;
+    if (current == null) return;
+    await ref
+        .read(settingsProvider.notifier)
+        .save(current.copyWith(lastSyncAt: at));
   }
 }

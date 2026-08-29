@@ -9,6 +9,7 @@ import 'features/stats/stats_screen.dart';
 import 'features/timetable/timetable_screen.dart';
 import 'features/today/today_screen.dart';
 import 'state/providers.dart';
+import 'state/sync_providers.dart';
 
 class ZeoliteApp extends ConsumerWidget {
   const ZeoliteApp({super.key});
@@ -19,6 +20,9 @@ class ZeoliteApp extends ConsumerWidget {
     // app opens dark rather than flashing a light frame first.
     final AppThemeMode mode =
         ref.watch(settingsProvider).value?.themeMode ?? AppThemeMode.dark;
+
+    // Watched for its lifetime rather than its value; see the provider.
+    ref.watch(syncSchedulerProvider);
 
     return MaterialApp(
       title: 'Zeolite',

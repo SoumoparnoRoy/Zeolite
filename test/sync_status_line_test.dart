@@ -61,4 +61,24 @@ void main() {
 
     expect(line, contains('safe on this device'));
   });
+
+  test('a restart reports the stored run rather than denying it happened', () {
+    final String line = syncStatusLine(
+      const SyncStatus(),
+      null,
+      storedLastSyncAt: justNow.subtract(const Duration(minutes: 12)),
+    );
+
+    expect(line, 'Synced 12 min ago.');
+  });
+
+  test('a live run outranks the stored stamp', () {
+    final String line = syncStatusLine(
+      SyncStatus(state: SyncState.idle, lastRunAt: justNow),
+      null,
+      storedLastSyncAt: justNow.subtract(const Duration(hours: 5)),
+    );
+
+    expect(line, 'Synced just now.');
+  });
 }

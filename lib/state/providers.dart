@@ -30,6 +30,7 @@ import '../services/backup_folder.dart';
 import '../services/backup_service.dart';
 import '../services/notification_service.dart';
 import '../services/sync/sync_coordinator.dart';
+import 'notion_sync_providers.dart';
 import 'sync_providers.dart';
 import 'undo.dart';
 
@@ -90,7 +91,10 @@ class SettingsController extends AsyncNotifier<AppSettings> {
     await ref.read(settingsServiceProvider).save(next);
     // Settings do not go through `_refresh`, so the one row with no table
     // would otherwise wait for a resume to travel.
-    if (scheduleMoved) ref.read(syncSchedulerProvider)?.onLocalChange();
+    if (scheduleMoved) {
+      ref.read(syncSchedulerProvider)?.onLocalChange();
+      ref.read(notionSchedulerProvider)?.onLocalChange();
+    }
   }
 
   Future<void> setSemester(DateTime start, DateTime end) async {
@@ -597,7 +601,10 @@ class TimetableActions {
 
   Future<void> _refresh() async {
     await _reload();
+    // Every scheduler, or a change would reach one target and quietly never
+    // reach the other.
     _ref.read(syncSchedulerProvider)?.onLocalChange();
+    _ref.read(notionSchedulerProvider)?.onLocalChange();
   }
 
   /// Split out of [_refresh] because a pull needs all of this without

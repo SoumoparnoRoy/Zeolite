@@ -56,6 +56,8 @@ class AppSettings {
     this.autoBackupEnabled = false,
     this.lastAutoBackupAt,
     this.lastSyncAt,
+    this.lastNotionSyncAt,
+    this.notionAutoSync = true,
     this.scheduleChangedAt,
     this.backupFolderUri,
     this.backupFolderName,
@@ -130,6 +132,19 @@ class AppSettings {
   /// which is the most common resume there is, and every launch would sync.
   /// Out of the export for the same reason as [lastAutoBackupAt].
   final DateTime? lastSyncAt;
+
+  /// Notion's own stamp. Sharing [lastSyncAt] would let a run against the
+  /// account make Notion look freshly synced, and neither would ever be
+  /// resumed on staleness again.
+  final DateTime? lastNotionSyncAt;
+
+  /// Whether marking also writes to Notion without being asked.
+  ///
+  /// On by default, and a switch rather than an assumption because unlike the
+  /// account this writes into a workspace the person also edits by hand.
+  /// Device-local, like the connection it belongs to, so it stays out of the
+  /// synced settings row.
+  final bool notionAutoSync;
 
   /// When a setting that shapes the timetable was last changed here.
   ///
@@ -231,6 +246,8 @@ class AppSettings {
     bool? autoBackupEnabled,
     DateTime? lastAutoBackupAt,
     DateTime? lastSyncAt,
+    DateTime? lastNotionSyncAt,
+    bool? notionAutoSync,
     DateTime? scheduleChangedAt,
     String? backupFolderUri,
     String? backupFolderName,
@@ -264,6 +281,8 @@ class AppSettings {
       autoBackupEnabled: autoBackupEnabled ?? this.autoBackupEnabled,
       lastAutoBackupAt: lastAutoBackupAt ?? this.lastAutoBackupAt,
       lastSyncAt: lastSyncAt ?? this.lastSyncAt,
+      lastNotionSyncAt: lastNotionSyncAt ?? this.lastNotionSyncAt,
+      notionAutoSync: notionAutoSync ?? this.notionAutoSync,
       scheduleChangedAt: scheduleChangedAt ?? this.scheduleChangedAt,
       // Choosing a folder and clearing one both have to be expressible, and
       // `?? this` cannot say "set this back to null".
@@ -360,6 +379,8 @@ class SettingsService {
   static const String _kCountOutsideTerm = 'ut.countOutsideTerm';
   static const String _kLastAutoBackup = 'ut.lastAutoBackup';
   static const String _kLastSync = 'ut.lastSync';
+  static const String _kLastNotionSync = 'ut.lastNotionSync';
+  static const String _kNotionAutoSync = 'ut.notionAutoSync';
   static const String _kBackupFolderUri = 'ut.backupFolderUri';
   static const String _kBackupFolderName = 'ut.backupFolderName';
   static const String _kOnboarded = 'ut.onboarded';
@@ -403,6 +424,11 @@ class SettingsService {
         final int ms => DateTime.fromMillisecondsSinceEpoch(ms),
         null => null,
       },
+      lastNotionSyncAt: switch (await prefs.getInt(_kLastNotionSync)) {
+        final int ms => DateTime.fromMillisecondsSinceEpoch(ms),
+        null => null,
+      },
+      notionAutoSync: await prefs.getBool(_kNotionAutoSync) ?? true,
       scheduleChangedAt: switch (await prefs.getInt(_kScheduleChangedAt)) {
         final int ms => DateTime.fromMillisecondsSinceEpoch(ms),
         null => null,
@@ -473,6 +499,15 @@ class SettingsService {
         settings.lastSyncAt!.millisecondsSinceEpoch,
       );
     }
+    if (settings.lastNotionSyncAt == null) {
+      await prefs.remove(_kLastNotionSync);
+    } else {
+      await prefs.setInt(
+        _kLastNotionSync,
+        settings.lastNotionSyncAt!.millisecondsSinceEpoch,
+      );
+    }
+    await prefs.setBool(_kNotionAutoSync, settings.notionAutoSync);
     if (settings.backupFolderUri == null) {
       await prefs.remove(_kBackupFolderUri);
       await prefs.remove(_kBackupFolderName);

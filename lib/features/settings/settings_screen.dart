@@ -26,6 +26,10 @@ import '../../widgets/undo_snack.dart';
 import '../subjects/class_editor_sheets.dart';
 import '../subjects/notion_import_screen.dart';
 import 'account_screen.dart';
+import '../../domain/sync/sync_status.dart';
+import '../../services/sync/sync_coordinator.dart';
+import '../../state/notion_sync_providers.dart';
+import 'sync_status_line.dart';
 import 'notion_connect_screen.dart';
 import 'notion_mapping_screen.dart';
 import '../timetable/import_screen.dart';
@@ -517,9 +521,26 @@ class SettingsScreen extends ConsumerWidget {
                           ),
                         ),
                       ),
+                    if (ref.watch(notionSyncTargetProvider) != null)
+                      _Row(
+                        icon: Icons.schedule_rounded,
+                        title: 'Sync automatically',
+                        value: 'About 15 seconds after you mark a class',
+                        trailing: Switch(
+                          value: settings.notionAutoSync,
+                          onChanged: (bool on) => ref
+                              .read(settingsProvider.notifier)
+                              .save(settings.copyWith(notionAutoSync: on)),
+                        ),
+                      ),
                   ],
                 ),
               ),
+              // A failing sync has to be visible, or the app reads as working.
+              if (ref.watch(notionSyncTargetProvider) != null) ...<Widget>[
+                const SizedBox(height: AppSpacing.sm),
+                const _NotionSyncCard(),
+              ],
               const SizedBox(height: AppSpacing.xl),
               const SectionHeader('Your data'),
               SurfaceCard(
@@ -1296,6 +1317,46 @@ class _Hint extends StatelessWidget {
         fontSize: 10.5,
         height: 1.4,
         color: context.palette.textTertiary,
+      ),
+    );
+  }
+}
+
+/// A card rather than a row: a failure needs a sentence and a button.
+class _NotionSyncCard extends ConsumerWidget {
+  const _NotionSyncCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final SyncStatus status = ref.watch(notionSyncStatusProvider);
+    final SyncRunResult? last =
+        ref.read(notionSyncStatusProvider.notifier).lastResult;
+    final bool running = status.state == SyncState.running;
+
+    return SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Text(
+            syncStatusLine(
+              status,
+              last,
+              storedLastSyncAt:
+                  ref.watch(settingsProvider).value?.lastNotionSyncAt,
+              authAdvice: 'Disconnect Notion and connect it again.',
+            ),
+            style: TextStyle(color: context.palette.textSecondary),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          OutlinedButton(
+            onPressed: running
+                ? null
+                : () => ref
+                    .read(notionSyncStatusProvider.notifier)
+                    .run(force: true),
+            child: Text(status.failures > 0 ? 'Try again' : 'Sync now'),
+          ),
+        ],
       ),
     );
   }

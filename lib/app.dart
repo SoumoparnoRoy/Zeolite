@@ -9,6 +9,7 @@ import 'features/stats/stats_screen.dart';
 import 'features/timetable/timetable_screen.dart';
 import 'features/today/today_screen.dart';
 import 'state/providers.dart';
+import 'state/notion_sync_providers.dart';
 import 'state/sync_providers.dart';
 
 class ZeoliteApp extends ConsumerWidget {
@@ -21,8 +22,9 @@ class ZeoliteApp extends ConsumerWidget {
     final AppThemeMode mode =
         ref.watch(settingsProvider).value?.themeMode ?? AppThemeMode.dark;
 
-    // Watched for its lifetime rather than its value; see the provider.
+    // Watched for their lifetime rather than their value; see the providers.
     ref.watch(syncSchedulerProvider);
+    ref.watch(notionSchedulerProvider);
 
     return MaterialApp(
       title: 'Zeolite',

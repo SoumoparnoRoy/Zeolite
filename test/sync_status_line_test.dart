@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zeolite/domain/sync/sync_status.dart';
 import 'package:zeolite/domain/sync/sync_target.dart';
-import 'package:zeolite/features/settings/account_screen.dart';
+import 'package:zeolite/features/settings/sync_status_line.dart';
 import 'package:zeolite/services/sync/sync_coordinator.dart';
 
 /// A run that reports "synced" when it merged nothing is the failure mode

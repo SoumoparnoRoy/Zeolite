@@ -54,7 +54,12 @@ dependencies:
   # is switched off in the manifest, so this reports usage without an
   # advertising identifier.
   firebase_analytics: ^12.5.0
-  flutter_secure_storage: ^11.0.0
+  # Held below 11, which requires compileSdk 37 while AGP 9.0.1 tops out at a
+  # recommended 36. The Keystore defaults are identical either way, so the only
+  # thing 11 would buy is a toolchain bump for one dependency.
+  flutter_secure_storage: ^10.3.1
+  app_links: ^7.2.1
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:

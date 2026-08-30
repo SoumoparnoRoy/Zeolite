@@ -57,6 +57,10 @@ void main() {
       'android.permission.ACCESS_ADSERVICES_AD_ID',
       'com.google.android.gms.permission.AD_ID',
       'com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE',
+      // Arrived with the secure store, and caught in the merged manifest —
+      // this file cannot see what a dependency contributes.
+      'android.permission.USE_BIOMETRIC',
+      'android.permission.USE_FINGERPRINT',
     ]) {
       expect(removed(unwanted).hasMatch(xml), isTrue, reason: unwanted);
     }
@@ -67,9 +71,18 @@ void main() {
     );
   });
 
-  test('the promise in Settings is the one being kept', () {
-    expect(settings.readAsStringSync(),
-        contains('stays on this device unless you connect Notion'));
+  test('the promise in Settings names both ways data leaves', () {
+    final String source = settings.readAsStringSync();
+
+    // In the two pieces the source wraps into: this reads the file, not the
+    // rendered string.
+    expect(source, contains('unless you sign in '));
+    expect(source, contains('or connect Notion.'));
+    // Naming only Notion was false for every signed-in user once Firestore
+    // sync landed.
+    expect(source,
+        isNot(contains('stays on this device unless you connect Notion')));
+    expect(source, isNot(contains('everything stays on this device')));
   });
 
   test('nothing outside the sync layer can open a socket', () {

@@ -17,6 +17,7 @@ import '../../domain/notion_export.dart';
 import '../../services/backup_folder.dart';
 import '../../services/backup_service.dart';
 import '../../services/notification_service.dart';
+import '../../state/notion_providers.dart';
 import '../../state/providers.dart';
 import '../../state/auth_providers.dart';
 import '../../widgets/common.dart';
@@ -25,6 +26,7 @@ import '../../widgets/undo_snack.dart';
 import '../subjects/class_editor_sheets.dart';
 import '../subjects/notion_import_screen.dart';
 import 'account_screen.dart';
+import 'notion_connect_screen.dart';
 import '../timetable/import_screen.dart';
 import '../subjects/subjects_screen.dart';
 import 'timetable_layout_section.dart';
@@ -471,10 +473,30 @@ class SettingsScreen extends ConsumerWidget {
                   icon: Icons.cloud_outlined,
                   title: 'Backup and sync',
                   value: ref.watch(signedInUserProvider).value?.email ??
-                      'Not signed in — everything stays on this device',
+                      'Not signed in — nothing is backed up',
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
                       builder: (BuildContext context) => const AccountScreen(),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xl),
+              const SectionHeader('Notion'),
+              SurfaceCard(
+                padding: EdgeInsets.zero,
+                child: _Row(
+                  icon: Icons.sync_alt_rounded,
+                  title: 'Notion sync',
+                  value: ref
+                          .watch(notionConnectionProvider)
+                          .value
+                          ?.workspaceName ??
+                      'Not connected',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (BuildContext context) =>
+                          const NotionConnectScreen(),
                     ),
                   ),
                 ),
@@ -540,7 +562,8 @@ class SettingsScreen extends ConsumerWidget {
               Center(
                 child: Text(
                   'Zeolite · 1.0.0\n'
-                  'Your data stays on this device unless you connect Notion.',
+                  'Your data stays on this device unless you sign in '
+                  'or connect Notion.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12,

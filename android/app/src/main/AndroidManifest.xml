@@ -27,6 +27,15 @@
     <uses-permission android:name="com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE"
         tools:node="remove" />
 
+    <!-- flutter_secure_storage supports gating a value behind a fingerprint.
+         Nothing here does that — the Notion token is protected by the Keystore,
+         not by a prompt — and an attendance app asking for fingerprint access
+         is a question on the store listing with no good answer. -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC"
+        tools:node="remove" />
+    <uses-permission android:name="android.permission.USE_FINGERPRINT"
+        tools:node="remove" />
+
     <application
         android:label="Zeolite"
         android:name="${applicationName}"
@@ -55,6 +64,18 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+            <!-- Where the Notion callback page sends the browser back to.
+                 Any app may claim this scheme, so the redirect is treated as
+                 public: it carries a session id that is worthless without the
+                 PKCE verifier, which never leaves the device. singleTop above
+                 is what makes the return arrive as onNewIntent rather than a
+                 second copy of the app. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="zeolite" android:host="notion"/>
             </intent-filter>
         </activity>
 
@@ -85,6 +106,13 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- Android 11+ hides other packages unless they are declared here, and
+             without this the connect screen cannot find a browser to open
+             Notion's authorize page in. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
         </intent>
     </queries>
 </manifest>

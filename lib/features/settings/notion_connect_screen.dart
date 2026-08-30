@@ -184,14 +184,6 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
               style: TextStyle(color: context.palette.textSecondary),
             ),
             const SizedBox(height: AppSpacing.md),
-            // Signing in during this step is what breaks it — the Notion app
-            // intercepts the login redirect and the flow never returns.
-            Text(
-              'Sign in to Notion in your browser first. If you sign in while '
-              'connecting, the Notion app can interrupt it.',
-              style: TextStyle(color: context.palette.textSecondary),
-            ),
-            const SizedBox(height: AppSpacing.md),
             Text(
               'The first connection can take up to a minute while the service '
               'wakes up.',
@@ -238,6 +230,30 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
           style: TextStyle(
             fontSize: 12,
             color: context.palette.textTertiary,
+          ),
+        ),
+      ],
+      // An attempt still outstanding while this screen is visible *is* the
+      // failure signature — a redirect that worked would have popped it. The
+      // cause is Notion's app swallowing the Google sign-in redirect.
+      if (_verifier != null && !busy) ...<Widget>[
+        const SizedBox(height: AppSpacing.lg),
+        SurfaceCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              const Text(
+                "Didn't get back from Notion?",
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                "If Notion's own app opened instead of the sign-in page, sign "
+                'in to Notion in your browser using Email, then tap Open '
+                'Notion again.',
+                style: TextStyle(color: context.palette.textSecondary),
+              ),
+            ],
           ),
         ),
       ],

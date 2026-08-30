@@ -89,6 +89,10 @@ void main() {
         find.widgetWithText(OutlinedButton, 'Finish connecting');
     expect(tester.widget<OutlinedButton>(finish).onPressed, isNotNull);
     expect(find.textContaining('tap Connect Notion first'), findsNothing);
+
+    // Back here with the attempt outstanding is the hijack's signature.
+    expect(find.textContaining("Didn't get back from Notion?"), findsOneWidget);
+    expect(find.textContaining('using Email'), findsOneWidget);
   });
 
   testWidgets('a claim that is refused says so and keeps nothing',
@@ -105,6 +109,7 @@ void main() {
     expect(tester.widget<OutlinedButton>(finish).onPressed, isNull);
     // Disabled is not enough on its own — the screen has to say why.
     expect(find.textContaining('tap Connect Notion first'), findsOneWidget);
+    expect(find.textContaining("Didn't get back from Notion?"), findsNothing);
     expect(stored, isEmpty);
   });
 }

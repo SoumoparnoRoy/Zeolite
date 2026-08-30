@@ -40,6 +40,11 @@ dependencies:
   # A Notion export arrives as a zip holding another zip, which no phone file
   # manager opens comfortably. Pure Dart, MIT.
   archive: ^4.2.0
+  # Both already arrive under Firebase. Named here because the Notion connect
+  # flow imports them directly, and a dependency nobody declared is one a
+  # Firebase bump can drop without warning.
+  http: ^1.6.0
+  crypto: ^3.0.7
   firebase_core: ^4.14.0
   firebase_auth: ^6.6.1
   cloud_firestore: ^6.9.0

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -283,6 +284,86 @@ void main() {
     expect((await sync.run()).outcome, SyncRunOutcome.deferred);
   });
 
+  test('two runs at once file the mark one time, not twice', () async {
+    await seed(status: AttendanceStatus.present);
+    final SyncCoordinator sync = coordinator();
+    final Completer<void> gate = Completer<void>();
+    target.hold = gate.future;
+
+    final Future<SyncRunResult> first = sync.run();
+    final Future<SyncRunResult> second = sync.run();
+    gate.complete();
+    await Future.wait<SyncRunResult>(<Future<SyncRunResult>>[first, second]);
+
+    // A second run reaching `create` before the first wrote its link is a
+    // duplicate page nothing would clean up.
+    expect(
+      target.calls.where((String c) => c.startsWith('create ')).length,
+      5,
+    );
+  });
+
+  test('a mark made during a run is picked up by the run that follows',
+      () async {
+    final Subject subject = await seed(status: AttendanceStatus.present);
+    final SyncCoordinator sync = coordinator();
+    final Completer<void> gate = Completer<void>();
+    target.holdCreate = gate.future;
+
+    final Future<SyncRunResult> running = sync.run();
+    // Past the local read, so what follows is invisible to this run.
+    await target.reachedCreate.future;
+    await repo.setAttendance(
+      AttendanceRecord(
+        subjectId: subject.id!,
+        date: _day,
+        startMinutes: 600,
+        status: AttendanceStatus.absent,
+        markedAt: _late,
+      ),
+    );
+    final Future<SyncRunResult> joined = sync.run();
+    target.holdCreate = null;
+    gate.complete();
+    await running;
+
+    // A shared result cannot hold the later mark; the owed re-run does.
+    expect((await joined).pushed, (await running).pushed);
+    await _settle(() async =>
+        (await repo.getRemoteLinks(target.id, SyncKind.attendance)).length ==
+        2);
+    expect(
+      await repo.getRemoteLinks(target.id, SyncKind.attendance),
+      hasLength(2),
+    );
+  });
+
+  test('a merge answer waits for its own run rather than joining one',
+      () async {
+    final Subject subject = await seed(status: AttendanceStatus.present);
+    target.remote = <RemoteState>[
+      mark(subject.uuid!, status: 'absent', editedAt: _late),
+    ];
+    final SyncCoordinator sync = coordinator();
+    final Completer<void> gate = Completer<void>();
+    target.hold = gate.future;
+
+    final Future<SyncRunResult> asking = sync.run();
+    final Future<SyncRunResult> answering = sync.run(
+      force: true,
+      merge: <String, SyncSide>{
+        SyncItem.keyFor(subject.uuid!, _day, 540): SyncSide.here,
+      },
+    );
+    target.hold = null;
+    gate.complete();
+
+    expect((await asking).outcome, SyncRunOutcome.reviewNeeded);
+    // Folding this into the run above would have dropped the decision and
+    // asked the user the same question again.
+    expect((await answering).outcome, SyncRunOutcome.synced);
+  });
+
   test('a merge decision to keep the account overrides the local row',
       () async {
     final Subject subject = await seed(
@@ -454,4 +535,12 @@ void main() {
 
     expect(after.hash, before.hash);
   });
+}
+
+/// The owed re-run hands back no future, so it is waited for by its effect.
+Future<void> _settle(Future<bool> Function() done) async {
+  for (int i = 0; i < 50; i++) {
+    if (await done()) return;
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
 }

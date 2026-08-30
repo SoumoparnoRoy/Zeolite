@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:zeolite/domain/sync/sync_target.dart';
 
 /// A target that keeps its pages in a map, so everything above [SyncTarget]
@@ -21,10 +23,21 @@ class FakeSyncTarget implements SyncTarget {
 
   final List<String> calls = <String>[];
 
+  /// Blocks the start of every run, so two can be put in flight at once.
+  Future<void>? hold;
+
+  /// Blocks at the first write instead — past the local read, which is the
+  /// only point a change can be made that the running one cannot see.
+  Future<void>? holdCreate;
+
+  /// So a test can act at that moment rather than guess at a delay.
+  final Completer<void> reachedCreate = Completer<void>();
+
   int _nextId = 1;
 
   @override
   Future<List<RemoteState>?> fetch(SyncKind kind) async {
+    if (hold != null) await hold;
     calls.add('fetch');
     return remote
         ?.where((RemoteState state) => state.kind == kind)
@@ -33,6 +46,8 @@ class FakeSyncTarget implements SyncTarget {
 
   @override
   Future<SyncOutcome> create(SyncItem item) async {
+    if (!reachedCreate.isCompleted) reachedCreate.complete();
+    if (holdCreate != null) await holdCreate;
     calls.add('create ${item.localKey}');
     final SyncOutcome? failure = _takeFailure();
     if (failure != null) return failure;

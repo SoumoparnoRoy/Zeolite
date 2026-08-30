@@ -97,6 +97,11 @@ class SyncCoordinator {
   /// anything back until a run had succeeded at least once.
   DateTime? _attemptedAt;
 
+  Future<SyncRunResult>? _inFlight;
+
+  /// One re-run covers any number of collapsed requests.
+  bool _rerunWanted = false;
+
   /// Parents before children, because every reference travels as the far
   /// side's key and a row that arrives first would point at nothing: a mark is
   /// keyed on its subject, a slot names its subject, a subject names its
@@ -172,9 +177,52 @@ class SyncCoordinator {
   }
 
   /// [merge] holds one decision per differing key. Its presence is also what
-  /// says the first-run question has been answered, so the guard below stands
+  /// says the first-run question has been answered, so the check below stands
   /// down rather than asking again and looping.
+  ///
+  /// One run at a time, because a target that creates by call rather than by
+  /// key files a second page for every row two overlapping runs both see as
+  /// unlinked.
   Future<SyncRunResult> run({
+    bool force = false,
+    Map<String, SyncSide>? merge,
+  }) {
+    final Future<SyncRunResult>? inFlight = _inFlight;
+    if (inFlight == null) return _start(force: force, merge: merge);
+
+    // Only a run started with the answer can apply it.
+    if (merge != null) return _queueAfter(inFlight, force: force, merge: merge);
+
+    // Local rows may have moved since the running one read them.
+    _rerunWanted = true;
+    return inFlight;
+  }
+
+  Future<SyncRunResult> _start({
+    required bool force,
+    required Map<String, SyncSide>? merge,
+  }) {
+    final Future<SyncRunResult> attempt = _run(force: force, merge: merge);
+    _inFlight = attempt;
+    return attempt.whenComplete(() {
+      _inFlight = null;
+      if (!_rerunWanted) return;
+      _rerunWanted = false;
+      // Nobody awaits this one, so a failure would go unhandled.
+      _start(force: false, merge: null).then<void>((_) {}, onError: (_, __) {});
+    });
+  }
+
+  Future<SyncRunResult> _queueAfter(
+    Future<SyncRunResult> previous, {
+    required bool force,
+    required Map<String, SyncSide>? merge,
+  }) async {
+    await previous.then<void>((_) {}, onError: (_, __) {});
+    return run(force: force, merge: merge);
+  }
+
+  Future<SyncRunResult> _run({
     bool force = false,
     Map<String, SyncSide>? merge,
   }) async {

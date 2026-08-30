@@ -284,6 +284,22 @@ void main() {
     expect((await sync.run()).outcome, SyncRunOutcome.deferred);
   });
 
+  test('a target is never asked to file a kind it does not keep', () async {
+    await seed(status: AttendanceStatus.present);
+    target.kinds = <SyncKind>{SyncKind.attendance};
+
+    final SyncRunResult result = await coordinator().run();
+
+    // Notion holds rows of classes and nothing else, so a room offered to it
+    // has to be skipped outright rather than reported as filed.
+    expect(result.outcome, SyncRunOutcome.synced);
+    expect(target.calls.where((String c) => c.startsWith('create ')).length, 1);
+    expect(
+      await repo.getRemoteLinks(target.id, SyncKind.category),
+      isEmpty,
+    );
+  });
+
   test('two runs at once file the mark one time, not twice', () async {
     await seed(status: AttendanceStatus.present);
     final SyncCoordinator sync = coordinator();

@@ -104,6 +104,7 @@ class NotionClient {
     String dataSourceId, {
     String? cursor,
     Map<String, Object?>? filter,
+    int? pageSize,
   }) =>
       _send(
         'POST',
@@ -111,6 +112,7 @@ class NotionClient {
         body: <String, Object?>{
           if (filter != null) 'filter': filter,
           if (cursor != null) 'start_cursor': cursor,
+          if (pageSize != null) 'page_size': pageSize,
         },
       );
 

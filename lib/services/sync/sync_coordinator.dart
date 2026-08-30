@@ -106,6 +106,11 @@ class SyncCoordinator {
   /// side's key and a row that arrives first would point at nothing: a mark is
   /// keyed on its subject, a slot names its subject, a subject names its
   /// category and a mark names its tag.
+  /// [_order] filtered to what the target keeps, which is every kind for an
+  /// account and attendance alone for Notion.
+  List<SyncKind> get _kinds =>
+      _order.where(target.kinds.contains).toList(growable: false);
+
   static const List<SyncKind> _order = <SyncKind>[
     SyncKind.settings,
     SyncKind.category,
@@ -157,7 +162,7 @@ class SyncCoordinator {
     final List<SyncMergeRow> differing = <SyncMergeRow>[];
     final List<SyncMergeRow> agreed = <SyncMergeRow>[];
 
-    for (final SyncKind kind in _order) {
+    for (final SyncKind kind in _kinds) {
       final List<RemoteState>? remote = await target.fetch(kind);
       if (remote == null) return null;
       final SyncMergePlan part =
@@ -233,12 +238,12 @@ class SyncCoordinator {
     _attemptedAt = _now();
 
     final Map<SyncKind, List<RemoteLink>> links = <SyncKind, List<RemoteLink>>{
-      for (final SyncKind kind in _order)
+      for (final SyncKind kind in _kinds)
         kind: await _repository.getRemoteLinks(target.id, kind),
     };
     final Map<SyncKind, List<RemoteState>?> remote =
         <SyncKind, List<RemoteState>?>{
-      for (final SyncKind kind in _order) kind: await target.fetch(kind),
+      for (final SyncKind kind in _kinds) kind: await target.fetch(kind),
     };
 
     // Ahead of the local read and of the check below, which would otherwise
@@ -253,7 +258,7 @@ class SyncCoordinator {
       return SyncRunResult(
         outcome: SyncRunOutcome.reviewNeeded,
         review: <SyncPull>[
-          for (final SyncKind kind in _order)
+          for (final SyncKind kind in _kinds)
             for (final RemoteState state in remote[kind]!)
               SyncPull(remote: state),
         ],
@@ -263,7 +268,7 @@ class SyncCoordinator {
     final bool joining = _joiningAnAccount(local, links, remote);
 
     final _Tally tally = _Tally();
-    for (final SyncKind kind in _order) {
+    for (final SyncKind kind in _kinds) {
       final SyncFailure? stop = await _runKind(
         kind: kind,
         items: local[kind]!,
@@ -887,7 +892,7 @@ class SyncCoordinator {
     Map<SyncKind, List<RemoteLink>> links,
     Map<SyncKind, List<RemoteState>?> remote,
   ) async {
-    if (_order.any((SyncKind k) => links[k]!.isNotEmpty)) return;
+    if (_kinds.any((SyncKind k) => links[k]!.isNotEmpty)) return;
 
     await _adoptSubjects(remote[SyncKind.subject]);
 
@@ -1036,7 +1041,7 @@ class SyncCoordinator {
     Map<SyncKind, List<RemoteLink>> links,
     Map<SyncKind, List<RemoteState>?> remote,
   ) {
-    final bool linked = _order.any((SyncKind k) => links[k]!.isNotEmpty);
+    final bool linked = _kinds.any((SyncKind k) => links[k]!.isNotEmpty);
     if (linked) return _Merge.proceed;
 
     final bool hasLocal = _content.any((SyncKind k) => local[k]!.isNotEmpty);
@@ -1053,7 +1058,7 @@ class SyncCoordinator {
     Map<SyncKind, List<RemoteLink>> links,
     Map<SyncKind, List<RemoteState>?> remote,
   ) {
-    if (_order.any((SyncKind k) => links[k]!.isNotEmpty)) return false;
+    if (_kinds.any((SyncKind k) => links[k]!.isNotEmpty)) return false;
     if (_content.any((SyncKind k) => local[k]!.isNotEmpty)) return false;
     return _remoteHasContent(remote);
   }

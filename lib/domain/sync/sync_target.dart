@@ -404,6 +404,11 @@ abstract class SyncTarget {
   /// has to go through the preview first.
   bool get trustsPulls;
 
+  /// What this target keeps. Notion holds attendance and nothing else, and a
+  /// target that answered "fine" to a room or a settings row would leave a
+  /// ledger entry pointing at a page nobody ever made.
+  Set<SyncKind> get kinds => SyncKind.values.toSet();
+
   /// What the target holds now, or null when it could not be read this run —
   /// the planner then pushes without claiming to know the far side.
   Future<List<RemoteState>?> fetch(SyncKind kind);

@@ -80,7 +80,13 @@ enum NotionField {
   component(label: 'Component', types: <String>{'title', 'rich_text'}),
   kind(label: 'Type', types: <String>{'select'}),
   held(label: 'Held', types: <String>{'number'}),
-  credit(label: 'Attendance Credit', types: <String>{'number'});
+  credit(label: 'Attendance Credit', types: <String>{'number'}),
+
+  /// Holds `SyncItem.localKey` verbatim. Without it a page cannot be
+  /// recognised again — Notion has no start time and no subject id, so two
+  /// classes of the same course on one day are the same row — and syncing
+  /// falls back to pushing without ever reading the far side.
+  key(label: 'Zeolite ID', types: <String>{'rich_text'});
 
   const NotionField({
     required this.label,
@@ -114,6 +120,7 @@ enum NotionField {
       // is one real workspace rather than the shape this app authors.
       NotionField.held => n == 'held' || n.startsWith('held'),
       NotionField.credit => n.contains('credit'),
+      NotionField.key => n == 'zeolite id' || n == 'zeolite key',
     };
   }
 }

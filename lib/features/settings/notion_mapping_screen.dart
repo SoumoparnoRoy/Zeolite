@@ -153,12 +153,17 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
       _stage = _Stage.fields;
       _dataSourceId = dataSourceId;
       _properties = properties;
-      // Reopening keeps what the user already answered; a fresh database has
-      // nothing to keep and takes the guess.
-      if (!keepChoices) {
-        _fields = Map<NotionField, NotionProperty>.from(guess.fields);
-        _statusValues = Map<String, String>.from(guess.statusValues);
-      }
+      // Reopening keeps every answer already given and lets the guess fill
+      // only the gaps, so a column added since — to the database or to the
+      // app — is offered instead of staying invisible behind an old mapping.
+      _fields = <NotionField, NotionProperty>{
+        ...guess.fields,
+        if (keepChoices) ..._fields,
+      };
+      _statusValues = <String, String>{
+        ...guess.statusValues,
+        if (keepChoices) ..._statusValues,
+      };
     });
   }
 

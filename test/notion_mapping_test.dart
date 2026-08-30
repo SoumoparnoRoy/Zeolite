@@ -30,6 +30,7 @@ Map<String, Object?> _template() => <String, Object?>{
       },
       'Held': <String, Object?>{'id': 'p5', 'type': 'number'},
       'Attendance Credit': <String, Object?>{'id': 'p6', 'type': 'number'},
+      'Zeolite ID': <String, Object?>{'id': 'p7', 'type': 'rich_text'},
     };
 
 List<NotionProperty> _properties(Map<String, Object?> schema) => <NotionProperty>[
@@ -55,6 +56,8 @@ void main() {
     // The column the CSV reader would refuse, because it wants a `/` in the
     // name to tell a counter from a yes/no flag.
     expect(mapping.fields[NotionField.held]!.id, 'p5');
+    // Without this one a page cannot be recognised on the way back.
+    expect(mapping.fields[NotionField.key]!.id, 'p7');
   });
 
   test('status words pair with options spelled the same way', () {

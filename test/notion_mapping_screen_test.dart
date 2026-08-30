@@ -11,6 +11,7 @@ import 'package:http/http.dart' as http;
 import 'package:zeolite/core/app_theme.dart';
 import 'package:zeolite/domain/notion/notion_mapping.dart';
 import 'package:zeolite/features/settings/notion_mapping_screen.dart';
+import 'package:zeolite/services/notion/notion_auth_client.dart';
 import 'package:zeolite/services/notion/notion_client.dart';
 import 'package:zeolite/services/notion/notion_connection_store.dart';
 import 'package:zeolite/state/notion_providers.dart';
@@ -164,6 +165,49 @@ void main() {
       find.textContaining('needed before anything can be synced'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('a column added since is offered without losing corrections',
+      (WidgetTester tester) async {
+    final NotionConnectionStore store =
+        NotionConnectionStore(storage: const FlutterSecureStorage());
+    // The mapping is only read for a live connection, so there has to be one.
+    await store.write(const NotionTokens(accessToken: 'a-token'));
+
+    // A mapping saved before the column existed, with a deliberate correction
+    // in it that must survive.
+    await store.writeMapping(NotionMapping(
+      databaseId: 'db-1',
+      dataSourceId: 'ds-1',
+      title: 'Zeolite Attendance',
+      fields: const <NotionField, NotionProperty>{
+        NotionField.course: NotionProperty(
+          id: 'title',
+          name: 'Name',
+          type: 'title',
+        ),
+      },
+    ));
+
+    await tester.pumpWidget(_app(_notion(schema: <String, Object?>{
+      ..._schema(),
+      'Zeolite ID': <String, Object?>{'id': 'p7', 'type': 'rich_text'},
+    })));
+    await tester.pumpAndSettle();
+
+    final Finder save = find.widgetWithText(FilledButton, 'Save');
+    await tester.ensureVisible(save);
+    await tester.pumpAndSettle();
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+
+    final NotionMapping? saved =
+        await NotionConnectionStore(storage: const FlutterSecureStorage())
+            .readMapping();
+
+    // The new column is picked up; the hand-made choice is not overwritten.
+    expect(saved!.fields[NotionField.key]!.id, 'p7');
+    expect(saved.fields[NotionField.course]!.id, 'title');
   });
 
   testWidgets('every shared table is offered, not just the first',

@@ -24,6 +24,11 @@ class FirestoreSyncTarget implements SyncTarget {
   @override
   bool get trustsPulls => true;
 
+  /// Everything, which is what makes the account the device's whole picture
+  /// rather than a copy of one table.
+  @override
+  Set<SyncKind> get kinds => SyncKind.values.toSet();
+
   /// Every collection a signed-in device writes under `users/{uid}`.
   static Iterable<String> get collectionNames => _collections.values;
 

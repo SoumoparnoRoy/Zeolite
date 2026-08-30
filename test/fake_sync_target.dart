@@ -13,6 +13,11 @@ class FakeSyncTarget implements SyncTarget {
   @override
   bool trustsPulls = false;
 
+  /// Mutable so a test can shrink it to the one kind a Notion-shaped target
+  /// keeps.
+  @override
+  Set<SyncKind> kinds = SyncKind.values.toSet();
+
   /// Page id to the hash the target would report for it.
   Map<String, String> pages;
 

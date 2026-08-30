@@ -32,7 +32,13 @@ developer cannot see it.</p>
 
 <p>Two things still leave the device even without an account, and neither
 carries anything you entered: the usage measurement described below, and the
-ML Kit diagnostics described further down. Nothing else does.</p>
+ML Kit diagnostics described further down.</p>
+
+<p>One more thing can leave, but only if you ask for it. Connecting Notion does
+not require an account either, and once you connect it your attendance is
+written to your own Notion workspace. Nothing is sent there unless you connect
+it, and disconnecting stops it. That is described under
+<a href="#notion">Connecting Notion</a> below.</p>
 
 <h2>If you sign in</h2>
 
@@ -102,9 +108,10 @@ provides no setting to switch this off. It carries diagnostic information about
 the app and the device — not your timetable, your attendance, or the images you
 read.</p>
 
-<h2>Connecting Notion</h2>
+<h2 id="notion">Connecting Notion</h2>
 
-<p>Notion sync is optional and off by default. If you turn it on:</p>
+<p>Notion sync is optional and off by default, and it does not require a
+Zeolite account. If you turn it on:</p>
 
 <ul>
   <li>You authorise Zeolite from Notion's own sign-in page and choose which
@@ -118,6 +125,9 @@ read.</p>
       shipped inside an app. It completes the token exchange, holds the
       exchange in memory for at most five minutes, and keeps no copy of your
       attendance.</li>
+  <li>The connection is stored encrypted on your device and is never uploaded.
+      Signing out of a Zeolite account does not disconnect Notion, because the
+      two are unrelated.</li>
   <li>Disconnecting stops any further sync and leaves everything in the app
       intact.</li>
 </ul>

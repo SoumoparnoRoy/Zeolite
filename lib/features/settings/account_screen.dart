@@ -16,9 +16,11 @@ import 'sync_merge_screen.dart';
 import '../../widgets/common.dart';
 import '../../widgets/gradient_header.dart';
 
-/// Signing in is optional and buys backup, sync across devices, and Notion.
-/// Everything else works signed out and always has, so this screen never
-/// stands between anyone and their attendance.
+/// Signing in is optional and buys backup and sync across devices. Notion is
+/// deliberately not on that list — it holds its own token on the device and
+/// never touches the account, so gating it here would be friction with nothing
+/// behind it. Everything else works signed out and always has, so this screen
+/// never stands between anyone and their attendance.
 class AccountScreen extends ConsumerWidget {
   const AccountScreen({super.key});
 

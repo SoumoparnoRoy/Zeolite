@@ -54,6 +54,7 @@ dependencies:
   # is switched off in the manifest, so this reports usage without an
   # advertising identifier.
   firebase_analytics: ^12.5.0
+  flutter_secure_storage: ^11.0.0
 
 dev_dependencies:
   flutter_test:
@@ -69,6 +70,9 @@ dev_dependencies:
   # in-memory store, since SettingsService uses the async prefs API.
   shared_preferences_platform_interface: ^2.4.1
   fake_cloud_firestore: ^4.2.0
+  # Transitive under flutter_secure_storage; declared so the connection store
+  # test can swap in the in-memory platform the package ships.
+  flutter_secure_storage_platform_interface: ^2.0.3
   # Also already transitive; declared so the sync scheduler's debounce can be
   # tested by moving the clock rather than by sleeping for fifteen seconds.
   fake_async: ^1.3.3

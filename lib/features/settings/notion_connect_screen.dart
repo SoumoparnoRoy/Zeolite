@@ -34,9 +34,9 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
   final AppLinks _links = AppLinks();
   StreamSubscription<Uri>? _sub;
 
-  /// In memory only, so leaving this screen or being evicted while the browser
-  /// is in front ends the attempt.
-  PkcePair? _pair;
+  /// Read back from the store on open, so an attempt survives leaving this
+  /// screen while the browser is in front.
+  String? _verifier;
   _Stage _stage = _Stage.idle;
   String? _error;
 
@@ -47,6 +47,7 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
     // Nothing waits on it and a failure changes nothing.
     unawaited(ref.read(notionAuthClientProvider).health());
     _sub = _links.uriLinkStream.listen(_onLink);
+    unawaited(_resume());
   }
 
   @override
@@ -54,6 +55,18 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
     _sub?.cancel();
     _code.dispose();
     super.dispose();
+  }
+
+  /// Picks up an attempt already in the browser. Anything older than the
+  /// service keeps its session for reads back as nothing.
+  Future<void> _resume() async {
+    final String? pending =
+        await ref.read(notionConnectionStoreProvider).readPending();
+    if (!mounted || pending == null) return;
+    setState(() {
+      _verifier = pending;
+      _stage = _Stage.waiting;
+    });
   }
 
   void _onLink(Uri uri) {
@@ -70,17 +83,23 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
     // state and shows its own login screen. RFC 8252 says the same thing.
     final bool opened =
         await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+    // Written before the browser can come back, not after.
+    if (opened) {
+      await ref
+          .read(notionConnectionStoreProvider)
+          .writePending(pair.verifier);
+    }
     if (!mounted) return;
     setState(() {
-      _pair = opened ? pair : null;
+      _verifier = opened ? pair.verifier : null;
       _stage = opened ? _Stage.waiting : _Stage.idle;
       _error = opened ? null : 'No browser could be opened to sign in with.';
     });
   }
 
   Future<void> _claim({String? session, String? pairingCode}) async {
-    final PkcePair? pair = _pair;
-    if (pair == null || _stage == _Stage.claiming) return;
+    final String? verifier = _verifier;
+    if (verifier == null || _stage == _Stage.claiming) return;
 
     setState(() {
       _stage = _Stage.claiming;
@@ -92,11 +111,12 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
         .claim(
           session: session,
           pairingCode: pairingCode,
-          verifier: pair.verifier,
+          verifier: verifier,
         );
 
     if (!mounted) return;
     if (result.ok) {
+      await ref.read(notionConnectionStoreProvider).clearPending();
       await ref
           .read(notionConnectionProvider.notifier)
           .connect(result.tokens!);
@@ -198,18 +218,29 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
       const SizedBox(height: AppSpacing.sm),
       TextField(
         controller: _code,
-        enabled: !busy && _pair != null,
+        enabled: !busy && _verifier != null,
         textCapitalization: TextCapitalization.characters,
         decoration: const InputDecoration(hintText: 'Eight characters'),
         onSubmitted: (String value) => _claim(pairingCode: value),
       ),
       const SizedBox(height: AppSpacing.sm),
       OutlinedButton(
-        onPressed: busy || _pair == null
+        onPressed: busy || _verifier == null
             ? null
             : () => _claim(pairingCode: _code.text),
         child: const Text('Finish connecting'),
       ),
+      if (_verifier == null) ...<Widget>[
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          'The code only works with a connection you have started, so tap '
+          'Connect Notion first.',
+          style: TextStyle(
+            fontSize: 12,
+            color: context.palette.textTertiary,
+          ),
+        ),
+      ],
       if (busy) ...<Widget>[
         const SizedBox(height: AppSpacing.lg),
         const Center(child: CircularProgressIndicator()),

@@ -73,6 +73,24 @@ void main() {
     expect(stored, isEmpty);
   });
 
+  testWidgets('an attempt left in the browser is picked back up',
+      (WidgetTester tester) async {
+    stored['notion_pending'] =
+        '{"verifier":"a-verifier","startedAt":${DateTime.now().millisecondsSinceEpoch}}';
+
+    await tester.pumpWidget(
+      _app(MockClient((_) async => http.Response('ok', 200))),
+    );
+    await tester.pumpAndSettle();
+
+    // Pressing back out of this screen used to end the attempt silently and
+    // strand the user with a pairing code that could no longer be claimed.
+    final Finder finish =
+        find.widgetWithText(OutlinedButton, 'Finish connecting');
+    expect(tester.widget<OutlinedButton>(finish).onPressed, isNotNull);
+    expect(find.textContaining('tap Connect Notion first'), findsNothing);
+  });
+
   testWidgets('a claim that is refused says so and keeps nothing',
       (WidgetTester tester) async {
     await tester.pumpWidget(
@@ -82,8 +100,11 @@ void main() {
 
     // Nothing can be claimed until the browser has been opened, because the
     // verifier is generated at that moment and there is nothing to prove.
-    final Finder finish = find.widgetWithText(OutlinedButton, 'Finish connecting');
+    final Finder finish =
+        find.widgetWithText(OutlinedButton, 'Finish connecting');
     expect(tester.widget<OutlinedButton>(finish).onPressed, isNull);
+    // Disabled is not enough on its own — the screen has to say why.
+    expect(find.textContaining('tap Connect Notion first'), findsOneWidget);
     expect(stored, isEmpty);
   });
 }

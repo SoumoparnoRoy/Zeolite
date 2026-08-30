@@ -51,4 +51,51 @@ class NotionConnectionStore {
 
   /// Deletes the key rather than blanking it, so nothing is left behind.
   Future<void> clear() => _storage.delete(key: _key);
+
+  /// Keeps the verifier of an attempt that is still in the browser.
+  ///
+  /// It has to outlive the screen: leaving it, or Android evicting the app
+  /// while the browser is in front, would otherwise end the attempt silently
+  /// and invalidate a pairing code the user is already holding.
+  Future<void> writePending(String verifier, {DateTime? startedAt}) =>
+      _storage.write(
+        key: _pendingKey,
+        value: jsonEncode(<String, Object?>{
+          'verifier': verifier,
+          'startedAt':
+              (startedAt ?? DateTime.now()).millisecondsSinceEpoch,
+        }),
+      );
+
+  /// Null once the attempt is older than the service will keep its session
+  /// for, since the verifier is then unusable and is only a secret at rest.
+  Future<String?> readPending({DateTime? now}) async {
+    final String? raw = await _storage.read(key: _pendingKey);
+    if (raw == null || raw.isEmpty) return null;
+    Object? decoded;
+    try {
+      decoded = jsonDecode(raw);
+    } on FormatException {
+      return null;
+    }
+    if (decoded is! Map<String, Object?>) return null;
+
+    final String? verifier = decoded['verifier'] as String?;
+    final int? startedAt = decoded['startedAt'] as int?;
+    if (verifier == null || verifier.isEmpty || startedAt == null) return null;
+
+    final DateTime began = DateTime.fromMillisecondsSinceEpoch(startedAt);
+    if ((now ?? DateTime.now()).difference(began) >= pendingLifetime) {
+      return null;
+    }
+    return verifier;
+  }
+
+  Future<void> clearPending() => _storage.delete(key: _pendingKey);
+
+  /// Mirrors `SESSION_TTL_MS` in `server/src/sessions.js`. Past it the service
+  /// has dropped the session, so holding the verifier buys nothing.
+  static const Duration pendingLifetime = Duration(minutes: 5);
+
+  static const String _pendingKey = 'notion_pending';
 }

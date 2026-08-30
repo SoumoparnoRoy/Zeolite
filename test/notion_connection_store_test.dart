@@ -47,6 +47,35 @@ void main() {
     expect(stored, isEmpty);
   });
 
+  test('an attempt in the browser outlives the screen', () async {
+    await store.writePending('a-verifier');
+
+    expect(await store.readPending(), 'a-verifier');
+
+    await store.clearPending();
+    expect(await store.readPending(), isNull);
+  });
+
+  test('an attempt the service has already dropped reads as nothing', () async {
+    final DateTime began = DateTime(2026, 8, 30, 12);
+    await store.writePending('a-verifier', startedAt: began);
+
+    // One second inside the service's session window, and one second past it.
+    expect(
+      await store.readPending(
+        now: began.add(NotionConnectionStore.pendingLifetime -
+            const Duration(seconds: 1)),
+      ),
+      'a-verifier',
+    );
+    expect(
+      await store.readPending(
+        now: began.add(NotionConnectionStore.pendingLifetime),
+      ),
+      isNull,
+    );
+  });
+
   test('a value that is no longer readable reads as disconnected', () async {
     // The platform resets rather than throws on a key it cannot unwrap, so
     // what reaches this code is a surviving but meaningless value. Throwing

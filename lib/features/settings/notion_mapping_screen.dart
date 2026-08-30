@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
+import '../../data/models/class_category.dart';
+import '../../state/providers.dart';
 import '../../domain/notion/notion_mapping.dart';
 import '../../domain/sync/sync_target.dart';
 import '../../services/notion/notion_client.dart';
@@ -40,6 +42,10 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
   List<NotionProperty> _properties = const <NotionProperty>[];
   Map<NotionField, NotionProperty> _fields = <NotionField, NotionProperty>{};
   Map<String, String> _statusValues = <String, String>{};
+  Map<String, String> _kindValues = <String, String>{};
+
+  List<ClassCategory> get _categories =>
+      ref.read(timetableProvider).value?.categories ?? const <ClassCategory>[];
 
   @override
   void initState() {
@@ -146,6 +152,7 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
       dataSourceId: dataSourceId,
       title: _databaseTitle,
       properties: properties,
+      categoryNames: _categories.map((ClassCategory c) => c.name).toList(),
     );
 
     setState(() {
@@ -164,6 +171,10 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
         ...guess.statusValues,
         if (keepChoices) ..._statusValues,
       };
+      _kindValues = <String, String>{
+        ...guess.kindValues,
+        if (keepChoices) ..._kindValues,
+      };
     });
   }
 
@@ -177,6 +188,7 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
             title: _databaseTitle,
             fields: _fields,
             statusValues: _statusValues,
+            kindValues: _kindValues,
           ),
         );
     if (mounted) navigator.pop();
@@ -281,6 +293,7 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
 
   List<Widget> _fieldForm(BuildContext context) {
     final NotionProperty? status = _fields[NotionField.status];
+    final NotionProperty? kind = _fields[NotionField.kind];
     return <Widget>[
       Text(
         'Zeolite filled these in from the column names. Change anything it '
@@ -302,9 +315,31 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
             // The words belong to the column, so a different Status column
             // leaves the old workspace's spellings behind.
             if (field == NotionField.status) _statusValues = <String, String>{};
+            if (field == NotionField.kind) _kindValues = <String, String>{};
           }),
         ),
         const SizedBox(height: AppSpacing.sm),
+      ],
+      if (kind != null && kind.options.isNotEmpty && _categories.isNotEmpty)
+        ...<Widget>[
+        const SizedBox(height: AppSpacing.lg),
+        const SectionHeader('What each class type is called'),
+        for (final ClassCategory category in _categories) ...<Widget>[
+          _ValuePicker(
+            word: category.name.toLowerCase(),
+            label: category.name,
+            options: kind.options,
+            chosen: _kindValues[category.name.toLowerCase()],
+            onChanged: (String? option) => setState(() {
+              if (option == null) {
+                _kindValues.remove(category.name.toLowerCase());
+              } else {
+                _kindValues[category.name.toLowerCase()] = option;
+              }
+            }),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+        ],
       ],
       if (status != null && status.options.isNotEmpty) ...<Widget>[
         const SizedBox(height: AppSpacing.lg),
@@ -425,9 +460,13 @@ class _ValuePicker extends StatelessWidget {
     required this.options,
     required this.chosen,
     required this.onChanged,
+    this.label,
   });
 
   final String word;
+
+  /// What to show, when it is not just [word] with a capital.
+  final String? label;
   final List<String> options;
   final String? chosen;
   final ValueChanged<String?> onChanged;
@@ -439,7 +478,7 @@ class _ValuePicker extends StatelessWidget {
         children: <Widget>[
           Expanded(
             child: Text(
-              '${word[0].toUpperCase()}${word.substring(1)}',
+              label ?? '${word[0].toUpperCase()}${word.substring(1)}',
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
           ),

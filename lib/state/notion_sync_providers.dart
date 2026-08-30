@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/models/class_category.dart';
 import '../data/models/subject.dart';
 import '../data/settings/app_settings.dart';
 import '../domain/notion/notion_mapping.dart';
@@ -25,16 +26,27 @@ final notionSyncTargetProvider = Provider<SyncTarget?>((ref) {
     mapping: mapping,
     // Read per call rather than captured, so renaming a course reaches the
     // next run instead of the next restart.
-    courseName: (String uuid) {
-      for (final Subject subject
-          in ref.read(timetableProvider).value?.subjects ??
-              const <Subject>[]) {
-        if (subject.uuid == uuid) return subject.name;
+    courseName: (String uuid) => _subjectFor(ref, uuid)?.name,
+    categoryName: (String uuid) {
+      final int? id = _subjectFor(ref, uuid)?.categoryId;
+      if (id == null) return null;
+      for (final ClassCategory category
+          in ref.read(timetableProvider).value?.categories ??
+              const <ClassCategory>[]) {
+        if (category.id == id) return category.name;
       }
       return null;
     },
   );
 });
+
+Subject? _subjectFor(Ref ref, String uuid) {
+  for (final Subject subject
+      in ref.read(timetableProvider).value?.subjects ?? const <Subject>[]) {
+    if (subject.uuid == uuid) return subject;
+  }
+  return null;
+}
 
 /// Deliberately a second coordinator rather than a second target on the first
 /// one: backoff, status and the last result are per-target, and a workspace
@@ -96,6 +108,21 @@ class NotionSyncController extends Notifier<SyncStatus> {
     state = coordinator.status;
     if (result.ok) await _stamp(coordinator.status.lastRunAt);
     return result;
+  }
+
+  /// Forgets what was pushed and runs again.
+  ///
+  /// Every page is recognised by its `Zeolite ID` and adopted rather than
+  /// created a second time, so this rewrites the workspace's rows instead of
+  /// duplicating them. It exists because a change to what the app writes — a
+  /// column it did not fill before — leaves rows that are correct by their own
+  /// hash and so would never be pushed again.
+  Future<SyncRunResult?> resyncEverything() async {
+    if (ref.read(notionCoordinatorProvider) == null) return null;
+    await ref
+        .read(repositoryProvider)
+        .deleteRemoteLinksFor(NotionSyncTarget.targetId);
+    return run(force: true);
   }
 
   /// Its own stamp, so staleness is judged per target — see

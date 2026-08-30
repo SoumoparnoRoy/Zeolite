@@ -12,9 +12,11 @@ class NotionSyncTarget implements SyncTarget {
     required NotionClient client,
     required NotionMapping mapping,
     required String? Function(String subjectUuid) courseName,
+    String? Function(String subjectUuid)? categoryName,
   })  : _client = client,
         _mapping = mapping,
         _courseName = courseName,
+        _categoryName = categoryName,
         _properties = NotionProperties(mapping);
 
   final NotionClient _client;
@@ -24,8 +26,14 @@ class NotionSyncTarget implements SyncTarget {
   /// A mark names its subject by uuid, which means nothing in a workspace.
   final String? Function(String subjectUuid) _courseName;
 
+  /// What kind of session the subject holds, for Notion's `Type`.
+  final String? Function(String subjectUuid)? _categoryName;
+
+  /// Stored in `remote_links.target`, so it has to stay stable once shipped.
+  static const String targetId = 'notion';
+
   @override
-  String get id => 'notion';
+  String get id => targetId;
 
   /// A person edits these rows by hand, so a pull is somebody's typing and
   /// goes through the import preview rather than straight into the database.
@@ -121,10 +129,14 @@ class NotionSyncTarget implements SyncTarget {
     return _failure(result);
   }
 
-  Map<String, Object?> _encode(SyncItem item) => _properties.encode(
-        item,
-        courseName: _courseName(_subjectOf(item.localKey)),
-      );
+  Map<String, Object?> _encode(SyncItem item) {
+    final String subject = _subjectOf(item.localKey);
+    return _properties.encode(
+      item,
+      courseName: _courseName(subject),
+      categoryName: _categoryName?.call(subject),
+    );
+  }
 
   /// `uuid:20260304:540`.
   static String _subjectOf(String localKey) => localKey.split(':').first;

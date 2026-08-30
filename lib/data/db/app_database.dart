@@ -230,8 +230,8 @@ class AppDatabase {
       )
     ''';
 
-  /// Two categories most timetables need on day one. They are ordinary rows —
-  /// the user can rename, retime or delete them like any other.
+  /// The three categories most timetables need on day one. They are ordinary
+  /// rows — the user can rename, retime or delete them like any other.
   static Future<void> _seedCategories(Database db) async {
     final int now = DateTime.now().millisecondsSinceEpoch;
     final Batch batch = db.batch();
@@ -243,6 +243,11 @@ class AppDatabase {
     batch.insert('categories', <String, Object?>{
       'name': 'Lab',
       'default_minutes': 120,
+      'created_at': now,
+    });
+    batch.insert('categories', <String, Object?>{
+      'name': 'Tutorial',
+      'default_minutes': 60,
       'created_at': now,
     });
     await batch.commit(noResult: true);

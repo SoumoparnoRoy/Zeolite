@@ -129,9 +129,9 @@ void main() {
 
     final SyncRunResult first = await coordinator().run();
     expect(first.outcome, SyncRunOutcome.synced);
-    // The subject, its mark, the settings row, and the two categories the
+    // The subject, its mark, the settings row, and the three categories the
     // app seeds itself.
-    expect(first.pushed, 5);
+    expect(first.pushed, 6);
 
     // The subject has to reach the target before the mark that is keyed on it.
     expect(target.calls.indexWhere((String c) => c.startsWith('create ')),
@@ -315,7 +315,7 @@ void main() {
     // duplicate page nothing would clean up.
     expect(
       target.calls.where((String c) => c.startsWith('create ')).length,
-      5,
+      6,
     );
   });
 

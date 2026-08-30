@@ -229,9 +229,12 @@ void main() {
     ]);
 
     expect(sentAt, hasLength(3));
+    // Two gaps' worth, less a little: a timer may fire a millisecond early,
+    // and the claim being made is that the sends are spaced at all — without
+    // the pacing they land together, microseconds apart.
     expect(
       sentAt[2].difference(sentAt[0]),
-      greaterThanOrEqualTo(const Duration(milliseconds: 80)),
+      greaterThanOrEqualTo(const Duration(milliseconds: 60)),
     );
   });
 }

@@ -25,6 +25,8 @@ NotionMapping _mapping({bool withKey = true}) => NotionMapping(
         NotionField.date: _p('p2', 'Date', 'date'),
         NotionField.status: _p('p3', 'Status', 'select',
             <String>['Present', 'Absent', 'Cancelled', 'Proxy']),
+        NotionField.kind: _p('p4', 'Type', 'select',
+            <String>['Lecture', 'Tutorial', 'Practical']),
         NotionField.held: _p('p5', 'Held', 'number'),
         NotionField.credit: _p('p6', 'Attendance Credit', 'number'),
         if (withKey) NotionField.key: _p('p7', 'Zeolite ID', 'rich_text'),
@@ -35,6 +37,7 @@ NotionMapping _mapping({bool withKey = true}) => NotionMapping(
         'cancelled': 'Cancelled',
         'proxy': 'Proxy',
       },
+      kindValues: const <String, String>{'lab': 'Practical'},
     );
 
 SyncItem _mark({
@@ -53,7 +56,11 @@ SyncItem _mark({
       },
     );
 
-NotionSyncTarget _target(MockClient mock, {bool withKey = true}) =>
+NotionSyncTarget _target(
+  MockClient mock, {
+  bool withKey = true,
+  String? category = 'Lab',
+}) =>
     NotionSyncTarget(
       client: NotionClient(
         accessToken: () async => 'a-token',
@@ -64,6 +71,7 @@ NotionSyncTarget _target(MockClient mock, {bool withKey = true}) =>
       ),
       mapping: _mapping(withKey: withKey),
       courseName: (String uuid) => uuid == _uuid ? 'Generic Course' : null,
+      categoryName: (String uuid) => category,
     );
 
 /// One page as Notion reports it back, in the shape the reader expects.
@@ -171,6 +179,43 @@ void main() {
     expect(props['p3'], <String, Object?>{
       'select': <String, Object?>{'name': 'Proxy'},
     });
+  });
+
+  test('a class type is written as the workspace spells it', () async {
+    late http.Request sent;
+    final NotionSyncTarget target = _target(MockClient((http.Request r) async {
+      sent = r;
+      return http.Response('{"id":"page-1"}', 200);
+    }));
+
+    await target.create(_mark());
+
+    final Map<String, Object?> props =
+        (jsonDecode(sent.body) as Map<String, Object?>)['properties']!
+            as Map<String, Object?>;
+    // The category is `Lab` here and the option is `Practical`; the category
+    // name itself is not a value this Type column offers.
+    expect(props['p4'], <String, Object?>{
+      'select': <String, Object?>{'name': 'Practical'},
+    });
+  });
+
+  test('a category nobody has paired leaves the type alone', () async {
+    late http.Request sent;
+    final NotionSyncTarget target = _target(
+      MockClient((http.Request r) async {
+        sent = r;
+        return http.Response('{"id":"page-1"}', 200);
+      }),
+      category: 'Seminar',
+    );
+
+    await target.create(_mark());
+
+    final Map<String, Object?> props =
+        (jsonDecode(sent.body) as Map<String, Object?>)['properties']!
+            as Map<String, Object?>;
+    expect(props.containsKey('p4'), isFalse);
   });
 
   test('an absence credits nothing, so the column cannot read as agreement',

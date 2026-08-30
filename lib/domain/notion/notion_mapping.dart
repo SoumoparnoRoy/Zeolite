@@ -145,6 +145,7 @@ class NotionMapping {
     required this.title,
     required this.fields,
     this.statusValues = const <String, String>{},
+    this.kindValues = const <String, String>{},
   });
 
   final String databaseId;
@@ -164,6 +165,14 @@ class NotionMapping {
   /// text, so `Present` here can be `Attended` there.
   final Map<String, String> statusValues;
 
+  /// A class category here to a `Type` option there, keyed by the lowercased
+  /// category name — `lab` to `Practical`.
+  ///
+  /// A category says what kind of session a subject holds, which is the only
+  /// local thing `Type` describes; a tag says how one class went, and belongs
+  /// in [statusValues] instead.
+  final Map<String, String> kindValues;
+
   bool get isComplete => NotionField.values
       .where((NotionField f) => f.isRequired)
       .every(fields.containsKey);
@@ -173,6 +182,7 @@ class NotionMapping {
     String? title,
     Map<NotionField, NotionProperty>? fields,
     Map<String, String>? statusValues,
+    Map<String, String>? kindValues,
   }) {
     return NotionMapping(
       databaseId: databaseId,
@@ -180,6 +190,7 @@ class NotionMapping {
       title: title ?? this.title,
       fields: fields ?? this.fields,
       statusValues: statusValues ?? this.statusValues,
+      kindValues: kindValues ?? this.kindValues,
     );
   }
 
@@ -192,6 +203,7 @@ class NotionMapping {
     required String dataSourceId,
     required String title,
     required List<NotionProperty> properties,
+    List<String> categoryNames = const <String>[],
   }) {
     final Map<NotionField, NotionProperty> fields =
         <NotionField, NotionProperty>{};
@@ -213,19 +225,29 @@ class NotionMapping {
       dataSourceId: dataSourceId,
       title: title,
       fields: fields,
-      statusValues: _matchStatuses(fields[NotionField.status]),
+      statusValues: _pairByName(
+        fields[NotionField.status],
+        kNotionStatusValues,
+      ),
+      kindValues: _pairByName(fields[NotionField.kind], categoryNames),
     );
   }
 
-  /// Pairs each word with an option spelled the same way. Anything else is
-  /// left for the user, since a workspace calling it `Attended` is not
-  /// something a guess should invent.
-  static Map<String, String> _matchStatuses(NotionProperty? status) {
-    if (status == null) return const <String, String>{};
+  /// Pairs each of [words] with an option spelled the same way.
+  ///
+  /// Nothing else is paired: a workspace calling it `Attended`, or a `Lab`
+  /// category against a `Practical` option, is a judgement only the user can
+  /// make, and guessing it would file attendance under the wrong word.
+  static Map<String, String> _pairByName(
+    NotionProperty? property,
+    List<String> words,
+  ) {
+    if (property == null) return const <String, String>{};
     return <String, String>{
-      for (final String word in kNotionStatusValues)
-        for (final String option in status.options)
-          if (option.trim().toLowerCase() == word) word: option,
+      for (final String word in words)
+        for (final String option in property.options)
+          if (option.trim().toLowerCase() == word.trim().toLowerCase())
+            word.trim().toLowerCase(): option,
     };
   }
 
@@ -238,6 +260,7 @@ class NotionMapping {
             e.key.name: e.value.toJson(),
         },
         'statusValues': statusValues,
+        'kindValues': kindValues,
       };
 
   /// Null when what is stored no longer parses. Remapping is the recovery,
@@ -258,19 +281,21 @@ class NotionMapping {
       }
     }
 
-    final Object? statuses = json['statusValues'];
     return NotionMapping(
       databaseId: (json['databaseId'] as String?) ?? '',
       dataSourceId: dataSourceId,
       title: (json['title'] as String?) ?? '',
       fields: fields,
-      statusValues: <String, String>{
-        if (statuses is Map<String, Object?>)
-          for (final MapEntry<String, Object?> e in statuses.entries)
-            if (e.value is String) e.key: e.value! as String,
-      },
+      statusValues: _stringMap(json['statusValues']),
+      kindValues: _stringMap(json['kindValues']),
     );
   }
+
+  static Map<String, String> _stringMap(Object? raw) => <String, String>{
+        if (raw is Map<String, Object?>)
+          for (final MapEntry<String, Object?> e in raw.entries)
+            if (e.value is String) e.key: e.value! as String,
+      };
 
   static NotionField? _fieldNamed(String value) {
     for (final NotionField field in NotionField.values) {

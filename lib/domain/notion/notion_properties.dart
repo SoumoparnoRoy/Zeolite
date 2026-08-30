@@ -17,7 +17,11 @@ class NotionProperties {
   /// [courseName] comes from the caller because a mark carries its subject as
   /// a uuid — meaningless in a workspace — and adding the name to the item
   /// itself would change the hash of every mark and re-push all of Firestore.
-  Map<String, Object?> encode(SyncItem item, {required String? courseName}) {
+  Map<String, Object?> encode(
+    SyncItem item, {
+    required String? courseName,
+    String? categoryName,
+  }) {
     final String status = (item.fields['status'] as String?) ?? 'present';
     final String? tag = item.fields['tag'] as String?;
     final int weight = (item.fields['weight'] as int?) ?? 1;
@@ -39,6 +43,18 @@ class NotionProperties {
         : _text(courseName ?? ''));
     put(NotionField.course, (NotionProperty p) => _named(p, courseName));
     put(NotionField.status, (NotionProperty p) => _named(p, _word(status, tag)));
+    // Only a category the user has paired with an option. Sending the category
+    // name itself would have Notion invent a new option beside the ones the
+    // workspace already uses.
+    put(
+      NotionField.kind,
+      (NotionProperty p) => _named(
+        p,
+        categoryName == null
+            ? null
+            : mapping.kindValues[categoryName.trim().toLowerCase()],
+      ),
+    );
     put(NotionField.held, (_) => <String, Object?>{'number': weight});
     // The credit is what decides whether a class counted, and the reader
     // trusts it over the word beside it — so an absence has to say zero

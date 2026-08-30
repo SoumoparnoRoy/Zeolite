@@ -26,7 +26,12 @@ Map<String, Object?> _template() => <String, Object?>{
       'Type': <String, Object?>{
         'id': 'p4',
         'type': 'select',
-        'select': <String, Object?>{'options': <Object?>[]},
+        'select': <String, Object?>{
+          'options': <Object?>[
+            <String, Object?>{'name': 'Lecture'},
+            <String, Object?>{'name': 'Practical'},
+          ],
+        },
       },
       'Held': <String, Object?>{'id': 'p5', 'type': 'number'},
       'Attendance Credit': <String, Object?>{'id': 'p6', 'type': 'number'},
@@ -127,6 +132,20 @@ void main() {
     expect(_match(schema).isComplete, isTrue);
   });
 
+  test('a category pairs with a type option spelled the same way', () {
+    final NotionMapping mapping = NotionMapping.match(
+      databaseId: 'db-1',
+      dataSourceId: 'ds-1',
+      title: 'Attendance',
+      properties: _properties(_template()),
+      categoryNames: const <String>['Practical', 'Seminar'],
+    );
+
+    // `Seminar` is not an option here, and inventing one for it would file
+    // classes under a type the workspace does not use.
+    expect(mapping.kindValues, <String, String>{'practical': 'Practical'});
+  });
+
   test('a stored mapping comes back the same, ids included', () {
     final NotionMapping mapping = _match(_template());
 
@@ -136,6 +155,7 @@ void main() {
     expect(back!.dataSourceId, 'ds-1');
     expect(back.title, 'Zeolite Attendance');
     expect(back.statusValues, mapping.statusValues);
+    expect(back.kindValues, mapping.kindValues);
     expect(
       <NotionField, String>{
         for (final MapEntry<NotionField, NotionProperty> e

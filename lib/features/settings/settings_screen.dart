@@ -1356,6 +1356,17 @@ class _NotionSyncCard extends ConsumerWidget {
                     .run(force: true),
             child: Text(status.failures > 0 ? 'Try again' : 'Sync now'),
           ),
+          const SizedBox(height: AppSpacing.sm),
+          // For when what the app writes has changed rather than what the
+          // marks say — see `resyncEverything`.
+          TextButton(
+            onPressed: running
+                ? null
+                : () => ref
+                    .read(notionSyncStatusProvider.notifier)
+                    .resyncEverything(),
+            child: const Text('Rewrite every row'),
+          ),
         ],
       ),
     );

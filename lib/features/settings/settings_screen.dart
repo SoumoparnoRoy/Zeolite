@@ -27,6 +27,7 @@ import '../subjects/class_editor_sheets.dart';
 import '../subjects/notion_import_screen.dart';
 import 'account_screen.dart';
 import 'notion_connect_screen.dart';
+import 'notion_mapping_screen.dart';
 import '../timetable/import_screen.dart';
 import '../subjects/subjects_screen.dart';
 import 'timetable_layout_section.dart';
@@ -485,20 +486,38 @@ class SettingsScreen extends ConsumerWidget {
               const SectionHeader('Notion'),
               SurfaceCard(
                 padding: EdgeInsets.zero,
-                child: _Row(
-                  icon: Icons.sync_alt_rounded,
-                  title: 'Notion sync',
-                  value: ref
-                          .watch(notionConnectionProvider)
-                          .value
-                          ?.workspaceName ??
-                      'Not connected',
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (BuildContext context) =>
-                          const NotionConnectScreen(),
+                child: Column(
+                  children: <Widget>[
+                    _Row(
+                      icon: Icons.sync_alt_rounded,
+                      title: 'Notion sync',
+                      value: ref
+                              .watch(notionConnectionProvider)
+                              .value
+                              ?.workspaceName ??
+                          'Not connected',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (BuildContext context) =>
+                              const NotionConnectScreen(),
+                        ),
+                      ),
                     ),
-                  ),
+                    // A mapping the app chose itself has to be visible.
+                    if (ref.watch(notionConnectionProvider).value != null)
+                      _Row(
+                        icon: Icons.table_chart_outlined,
+                        title: 'Database',
+                        value: ref.watch(notionMappingProvider).value?.title ??
+                            'Not set up',
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (BuildContext context) =>
+                                const NotionMappingScreen(),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
               const SizedBox(height: AppSpacing.xl),

@@ -12,6 +12,7 @@ import '../../services/notion/pkce.dart';
 import '../../state/notion_providers.dart';
 import '../../widgets/common.dart';
 import '../../widgets/gradient_header.dart';
+import 'notion_mapping_screen.dart';
 
 /// Authorising Notion, both ways it can come back.
 ///
@@ -121,13 +122,41 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
           .read(notionConnectionProvider.notifier)
           .connect(result.tokens!);
       if (!mounted) return;
-      Navigator.of(context).pop();
+      await _settleMapping(result.tokens!);
       return;
     }
     setState(() {
       _stage = _Stage.waiting;
       _error = _messageFor(result.failure);
     });
+  }
+
+  /// The template is the schema this app authored, so mapping it is a fact
+  /// rather than a guess. Anyone else's database is never mapped unseen.
+  Future<void> _settleMapping(NotionTokens tokens) async {
+    final NavigatorState navigator = Navigator.of(context);
+    final String? template = tokens.duplicatedTemplateId;
+
+    if (template != null && template.isNotEmpty) {
+      final bool mapped = await ref
+          .read(notionMappingProvider.notifier)
+          .adoptTemplate(template);
+      if (!mounted) return;
+      if (mapped) {
+        navigator.pop();
+        return;
+      }
+    }
+
+    // Replaced, so coming back lands in Settings and not on a connect screen
+    // for a connection already made.
+    unawaited(
+      navigator.pushReplacement(
+        MaterialPageRoute<void>(
+          builder: (BuildContext context) => const NotionMappingScreen(),
+        ),
+      ),
+    );
   }
 
   String _messageFor(SyncFailure? failure) {

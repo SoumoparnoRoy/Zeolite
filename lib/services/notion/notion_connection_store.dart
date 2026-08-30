@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../../domain/notion/notion_mapping.dart';
 import 'notion_auth_client.dart';
 
 /// Where a Notion connection lives between launches. Keystore-backed rather
@@ -46,11 +47,37 @@ class NotionConnectionStore {
           'workspace_id': tokens.workspaceId,
           'workspace_name': tokens.workspaceName,
           'workspace_icon': tokens.workspaceIcon,
+          'duplicated_template_id': tokens.duplicatedTemplateId,
         }),
       );
 
-  /// Deletes the key rather than blanking it, so nothing is left behind.
-  Future<void> clear() => _storage.delete(key: _key);
+  /// Deletes the keys rather than blanking them, so nothing is left behind.
+  ///
+  /// The mapping goes with the token deliberately: it names a data source in
+  /// one workspace, so outliving the connection could only ever leave it
+  /// pointing somewhere the user no longer is.
+  Future<void> clear() async {
+    await _storage.delete(key: _key);
+    await _storage.delete(key: _mappingKey);
+  }
+
+  /// Which data source attendance is filed in, and which column holds what.
+  /// Null until the user has been through the mapping screen.
+  Future<NotionMapping?> readMapping() async {
+    final String? raw = await _storage.read(key: _mappingKey);
+    if (raw == null || raw.isEmpty) return null;
+    Object? decoded;
+    try {
+      decoded = jsonDecode(raw);
+    } on FormatException {
+      return null;
+    }
+    if (decoded is! Map<String, Object?>) return null;
+    return NotionMapping.fromJson(decoded);
+  }
+
+  Future<void> writeMapping(NotionMapping mapping) =>
+      _storage.write(key: _mappingKey, value: jsonEncode(mapping.toJson()));
 
   /// Keeps the verifier of an attempt that is still in the browser.
   ///
@@ -98,4 +125,6 @@ class NotionConnectionStore {
   static const Duration pendingLifetime = Duration(minutes: 5);
 
   static const String _pendingKey = 'notion_pending';
+
+  static const String _mappingKey = 'notion_mapping';
 }

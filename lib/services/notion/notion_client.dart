@@ -74,14 +74,18 @@ class NotionClient {
 
   static const Duration _timeout = Duration(seconds: 30);
 
-  /// The databases the connection can see. Paged: the caller hands
-  /// `next_cursor` back and this never loops, since a workspace can hold far
-  /// more than a picker should pull in one go.
-  Future<NotionResult> searchDatabases({String? cursor}) => _send(
+  /// The tables the connection can see. `database` is not a value search
+  /// takes any more, and asking for one is a validation error rather than an
+  /// empty list. Paged, and this never loops — the caller hands the cursor
+  /// back.
+  Future<NotionResult> searchDataSources({String? cursor}) => _send(
         'POST',
         '/v1/search',
         body: <String, Object?>{
-          'filter': <String, String>{'value': 'database', 'property': 'object'},
+          'filter': <String, String>{
+            'value': 'data_source',
+            'property': 'object',
+          },
           if (cursor != null) 'start_cursor': cursor,
         },
       );

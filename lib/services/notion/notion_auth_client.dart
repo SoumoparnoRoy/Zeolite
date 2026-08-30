@@ -18,6 +18,7 @@ class NotionTokens {
     this.workspaceId,
     this.workspaceName,
     this.workspaceIcon,
+    this.duplicatedTemplateId,
   });
 
   /// [refreshToken] is documented as always present and read as nullable
@@ -29,6 +30,7 @@ class NotionTokens {
         workspaceId: json['workspace_id'] as String?,
         workspaceName: json['workspace_name'] as String?,
         workspaceIcon: json['workspace_icon'] as String?,
+        duplicatedTemplateId: json['duplicated_template_id'] as String?,
       );
 
   final String accessToken;
@@ -40,6 +42,12 @@ class NotionTokens {
   final String? workspaceId;
   final String? workspaceName;
   final String? workspaceIcon;
+
+  /// The database Notion copied in when the user took the template during
+  /// consent, or null when they shared their own pages instead. Its presence
+  /// is what says the schema on the far side is the one this app authored, so
+  /// a mapping against it is known rather than guessed.
+  final String? duplicatedTemplateId;
 
   bool get isUsable => accessToken.isNotEmpty;
 }

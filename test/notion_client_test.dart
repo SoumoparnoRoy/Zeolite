@@ -183,7 +183,7 @@ void main() {
       ),
     );
 
-    final NotionResult result = await client.searchDatabases();
+    final NotionResult result = await client.searchDataSources();
 
     expect(result.failure, SyncFailure.rateLimited);
   });
@@ -199,10 +199,13 @@ void main() {
       );
     }));
 
-    final NotionResult result = await client.searchDatabases(cursor: 'cur-1');
+    final NotionResult result = await client.searchDataSources(cursor: 'cur-1');
 
     expect(jsonDecode(sent.body), <String, Object?>{
-      'filter': <String, String>{'value': 'database', 'property': 'object'},
+      'filter': <String, String>{
+        'value': 'data_source',
+        'property': 'object',
+      },
       'start_cursor': 'cur-1',
     });
     expect(result.body!['next_cursor'], 'cur-2');

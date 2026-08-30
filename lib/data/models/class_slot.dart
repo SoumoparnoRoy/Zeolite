@@ -122,7 +122,7 @@ class ClassSlot {
       startMinutes: (map['start_minutes'] as int?) ?? 0,
       endMinutes: (map['end_minutes'] as int?) ?? 0,
       room: map['room'] as String?,
-      weight: math.max(1, (map['weight'] as num?)?.toInt() ?? 1),
+      weight: math.max(0, (map['weight'] as num?)?.toInt() ?? 1),
       startDate: Dates.fromKey((map['start_date'] as int?) ?? 19700101),
       endDate: map['end_date'] == null
           ? null

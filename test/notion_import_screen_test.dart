@@ -28,6 +28,15 @@ class _StaticSettings extends SettingsController {
       );
 }
 
+/// The screen opens on a grouping the categories imply, so every other test
+/// has to say which rule it is under.
+const ClassCategory _weightedLab = ClassCategory(
+  id: 1,
+  name: 'Lab',
+  defaultDurationMinutes: 120,
+  weight: 2,
+);
+
 final DateTime _day = Dates.addDays(Dates.today(), -7);
 
 String _dayCell(DateTime date) =>
@@ -40,8 +49,9 @@ const List<String> _months = <String>[
 
 /// The lab is stored and already marked; the course it belongs to is not
 /// stored at all. So nothing conflicts until the courses are split apart.
-TimetableData _fixture() => TimetableData(
-      categories: const <ClassCategory>[],
+TimetableData _fixture({bool weighted = true}) => TimetableData(
+      categories:
+          weighted ? const <ClassCategory>[_weightedLab] : const <ClassCategory>[],
       subjects: const <Subject>[
         Subject(id: 1, name: 'Thermodynamics Lab', colorValue: 0xFF7C6BFF),
       ],
@@ -68,9 +78,10 @@ NotionExport _export() {
   return NotionExport.read(Uint8List.fromList(utf8.encode(csv)));
 }
 
-Widget _app() => ProviderScope(
+Widget _app({bool weighted = true}) => ProviderScope(
       overrides: [
-        timetableProvider.overrideWith((Ref ref) async => _fixture()),
+        timetableProvider
+            .overrideWith((Ref ref) async => _fixture(weighted: weighted)),
         settingsProvider.overrideWith(_StaticSettings.new),
       ],
       child: MaterialApp(
@@ -88,6 +99,24 @@ void main() {
     expect(find.text('Thermodynamics'), findsOneWidget);
     expect(find.text('NEW'), findsOneWidget);
     expect(find.text('Bring in 2'), findsOneWidget);
+  });
+
+  // The categories already answer this, so the screen does not re-ask it.
+  testWidgets('with no category weighted, the lab opens kept apart',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(_app(weighted: false));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Thermodynamics Lab'), findsOneWidget);
+  });
+
+  testWidgets('a weighted category opens with the lab inside its course',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(_app());
+    await tester.pumpAndSettle();
+
+    expect(find.text('Thermodynamics Lab'), findsNothing);
+    expect(find.text('Thermodynamics'), findsOneWidget);
   });
 
   testWidgets('a conflict that only exists once the courses are split '

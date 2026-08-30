@@ -8,11 +8,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
+import '../../core/words.dart';
 import '../../core/time_picker.dart';
 import '../../data/models/class_category.dart';
 import '../../data/models/holiday.dart';
 import '../../data/models/subject.dart';
 import '../../data/settings/app_settings.dart';
+import '../../domain/class_weight.dart';
 import '../../domain/holiday_runs.dart';
 import '../../domain/notion/notion_mapping.dart';
 import '../../domain/notion_export.dart';
@@ -181,8 +183,9 @@ class SettingsScreen extends ConsumerWidget {
               if (categories.isEmpty)
                 const SurfaceCard(
                   child: _Hint(
-                    'No categories yet. Create one — Lab, Theory, Tutorial — and '
-                    'give it a default length, then put your subjects in it.',
+                    'No categories yet. Create one — Lab, Theory, Tutorial — '
+                    'give it a default length and say what one of its classes '
+                    'counts as, then put your subjects in it.',
                   ),
                 )
               else
@@ -195,8 +198,7 @@ class SettingsScreen extends ConsumerWidget {
                         _Row(
                           icon: Icons.category_outlined,
                           title: categories[i].name,
-                          value: 'Classes default to '
-                              '${categories[i].durationLabel}',
+                          value: _categoryLine(categories[i]),
                           onTap: () => showCategoryEditor(
                             context,
                             ref,
@@ -213,6 +215,26 @@ class SettingsScreen extends ConsumerWidget {
                     ],
                   ),
                 ),
+              if (categories.isNotEmpty) ...<Widget>[
+                const SizedBox(height: AppSpacing.sm),
+                SurfaceCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      OutlinedButton(
+                        onPressed: () => _applyWeights(context, ref),
+                        child: const Text('Apply to every class'),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      const _Hint(
+                        'Classes and marks keep whatever they were worth when '
+                        'you made them. This rewrites them all from the '
+                        'categories above, and can be undone.',
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: AppSpacing.md),
               SurfaceCard(
                 child: Column(
@@ -762,6 +784,53 @@ class SettingsScreen extends ConsumerWidget {
 
     if (confirmed != true) return;
     await ref.read(actionsProvider).deleteCategory(id);
+  }
+
+  /// The one action that restates history, so it asks first.
+  Future<void> _applyWeights(BuildContext context, WidgetRef ref) async {
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        backgroundColor: context.palette.surfaceHigh,
+        title: const Text('Apply to every class?'),
+        content: const Text(
+          'Every class and every mark already recorded is set to what its '
+          'category now says it is worth. A weight you set on one class by '
+          'hand is replaced. You can undo this.',
+          style: TextStyle(height: 1.4),
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Apply'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    final TimetableActions actions = ref.read(actionsProvider);
+    final int changed = await actions.applyClassWeights();
+    showUndoSnack(
+      messenger,
+      actions,
+      changed == 0
+          ? 'Everything already matched'
+          : 'Re-weighted ${Words.plural(changed, 'mark', 'marks')}',
+    );
+  }
+
+  /// Named only where it is not the ordinary one.
+  static String _categoryLine(ClassCategory category) {
+    final String length = 'Classes default to ${category.durationLabel}';
+    if (category.weight == 1) return length;
+    return '$length · counts as '
+        '${classWeightLabel(category.weight).toLowerCase()}';
   }
 
   /// The unavailable case is not silent: a backup still happens, and this row

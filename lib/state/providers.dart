@@ -15,6 +15,7 @@ import '../data/models/room.dart';
 import '../data/models/subject.dart';
 import '../data/models/tag.dart';
 import '../data/settings/app_settings.dart';
+import '../domain/class_weight.dart';
 import '../domain/attendance_log.dart';
 import '../domain/attendance_stats.dart';
 import '../domain/attendance_totals_import.dart';
@@ -562,6 +563,15 @@ final defaultDurationProvider =
   return category?.defaultDurationMinutes ?? fallback;
 });
 
+/// [weightFor] against the subject's own category. Shaped like
+/// [defaultDurationProvider] because it answers the same kind of question off
+/// the same category.
+final defaultWeightProvider = Provider.family<int, int?>((ref, int? subjectId) {
+  final TimetableData? data = ref.watch(timetableProvider).value;
+  if (data == null || subjectId == null) return 1;
+  return weightFor(data.categoryFor(data.subjectById(subjectId)));
+});
+
 /// Says *why* a class came out the length it did — "Lab · 2 blocks · 1h 40m",
 /// or "no category · 1h" when the global fallback was used.
 ///
@@ -866,6 +876,53 @@ class TimetableActions {
 
     await _refresh();
     _undo.arm(before);
+  }
+
+  /// Brings every class and every mark into line with what its subject's
+  /// category now says a class is worth.
+  ///
+  /// The only place the rule is applied backwards — everywhere else it merely
+  /// seeds, because a mark carries what it was worth when it was made. So the
+  /// user asks for this, under one snapshot, and one Undo puts a term back.
+  ///
+  /// A weight set by hand on one class is replaced: the category is now the
+  /// authority. Returns how many marks actually moved.
+  Future<int> applyClassWeights() async {
+    final TimetableData? data = _ref.read(timetableProvider).value;
+    if (data == null) return 0;
+
+    final DatabaseSnapshot before = await _repo.snapshot();
+
+    int weightOf(int subjectId) =>
+        weightFor(data.categoryFor(data.subjectById(subjectId)));
+
+    for (final ClassSlot slot in data.slots) {
+      final int weight = weightOf(slot.subjectId);
+      if (slot.weight != weight) {
+        await _repo.updateSlot(slot.copyWith(weight: weight));
+      }
+    }
+    for (final ExtraClass extra in data.extras) {
+      final int weight = weightOf(extra.subjectId);
+      if (extra.weight != weight) {
+        await _repo.updateExtraClass(extra.copyWith(weight: weight));
+      }
+    }
+
+    // Read fresh rather than off [TimetableData]: a mark outside the term
+    // window is still a mark, and leaving it on the old rule would make the
+    // figures disagree the moment the window moved.
+    final List<AttendanceRecord> stored = await _repo.getAttendance();
+    final List<AttendanceRecord> changed = <AttendanceRecord>[
+      for (final AttendanceRecord record in stored)
+        if (record.weight != weightOf(record.subjectId))
+          record.copyWith(weight: weightOf(record.subjectId)),
+    ];
+    await _repo.setManyAttendance(changed);
+
+    await _refresh();
+    _undo.arm(before);
+    return changed.length;
   }
 
   /// Writes a portal's per-subject figures onto the subjects they name.

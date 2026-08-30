@@ -15,6 +15,7 @@ import '../../data/models/extra_class.dart';
 import '../../data/models/room.dart';
 import '../../data/models/subject.dart';
 import '../../domain/class_clash.dart';
+import '../../domain/class_weight.dart';
 import '../../domain/day_grid.dart';
 import '../../state/providers.dart';
 import '../../widgets/common.dart';
@@ -645,6 +646,7 @@ class _CategoryForm extends ConsumerStatefulWidget {
 class _CategoryFormState extends ConsumerState<_CategoryForm> {
   late final TextEditingController _name;
   late int _minutes;
+  late int _weight;
   String? _error;
   bool _saving = false;
 
@@ -656,6 +658,7 @@ class _CategoryFormState extends ConsumerState<_CategoryForm> {
     super.initState();
     _name = TextEditingController(text: widget.category?.name ?? '');
     _minutes = widget.category?.defaultDurationMinutes ?? 60;
+    _weight = widget.category?.weight ?? 1;
   }
 
   @override
@@ -690,7 +693,11 @@ class _CategoryFormState extends ConsumerState<_CategoryForm> {
     int? id = widget.category?.id;
     if (id == null) {
       id = await actions.addCategory(
-        ClassCategory(name: name, defaultDurationMinutes: _minutes),
+        ClassCategory(
+          name: name,
+          defaultDurationMinutes: _minutes,
+          weight: _weight,
+        ),
       );
     } else {
       await actions.updateCategory(
@@ -698,6 +705,7 @@ class _CategoryFormState extends ConsumerState<_CategoryForm> {
           id: id,
           name: name,
           defaultDurationMinutes: _minutes,
+          weight: _weight,
           createdAt: widget.category?.createdAt,
         ),
       );
@@ -797,6 +805,11 @@ class _CategoryFormState extends ConsumerState<_CategoryForm> {
             height: 1.4,
             color: context.palette.textTertiary,
           ),
+        ),
+        const SizedBox(height: AppSpacing.xl),
+        _WeightPicker(
+          value: _weight,
+          onChanged: (int n) => setState(() => _weight = n),
         ),
         if (_error != null) ...<Widget>[
           const SizedBox(height: AppSpacing.md),
@@ -908,9 +921,9 @@ class _WeightPicker extends StatelessWidget {
           spacing: AppSpacing.sm,
           runSpacing: AppSpacing.sm,
           children: <Widget>[
-            for (int n = 1; n <= 3; n++)
+            for (final int n in kClassWeights)
               _OptionChip(
-                label: n == 1 ? '1 class' : '$n classes',
+                label: classWeightLabel(n),
                 selected: value == n,
                 onTap: () => onChanged(n),
               ),
@@ -918,12 +931,16 @@ class _WeightPicker extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.sm),
         Text(
-          value == 1
-              ? 'Leave this alone unless your institution counts a longer '
-                  'class more than once towards attendance.'
-              : 'Attending one of these is worth $value, and missing one '
-                  'costs $value. Marks already made keep what they were worth '
-                  'when you made them.',
+          switch (value) {
+            0 => 'Held but not assessed: attending or missing one of these '
+                'changes nothing. Marks already made keep what they were '
+                'worth when you made them.',
+            1 => 'Leave this alone unless your institution counts a longer '
+                'class more than once towards attendance.',
+            _ => 'Attending one of these is worth $value, and missing one '
+                'costs $value. Marks already made keep what they were worth '
+                'when you made them.',
+          },
           style: TextStyle(
             fontSize: 12,
             height: 1.4,
@@ -1010,6 +1027,10 @@ class _SlotFormState extends ConsumerState<_SlotForm> {
   /// what the class *is*, and a subject's lab meetings are all labs.
   int _weight = 1;
 
+  /// Set once the weight has been chosen by hand, or when an existing class
+  /// was opened, after which changing the subject stops re-weighting it.
+  bool _weightTouched = false;
+
   /// Set once an *end* time has been chosen by hand, after which changing the
   /// subject no longer re-lengths the rows. Picking a start time deliberately
   /// does not count: that chooses when the class sits, not how long it runs,
@@ -1021,6 +1042,8 @@ class _SlotFormState extends ConsumerState<_SlotForm> {
   /// The class length implied by the chosen subject's category, falling back
   /// to the global setting.
   int get _defaultDuration => ref.read(defaultDurationProvider(_subjectId));
+
+  int get _defaultWeight => ref.read(defaultWeightProvider(_subjectId));
 
   /// Re-lengths every row from the current default. Call inside setState.
   void _applyDefaultDurationToAll() {
@@ -1077,7 +1100,10 @@ class _SlotFormState extends ConsumerState<_SlotForm> {
 
     _startDate = slot?.startDate ?? seed;
     _endDate = slot?.endDate;
-    _weight = slot?.weight ?? 1;
+    // An existing slot already carries what its owner meant, so opening the
+    // form must not re-weight it from the category.
+    _weight = slot?.weight ?? _defaultWeight;
+    _weightTouched = slot != null;
   }
 
   @override
@@ -1359,6 +1385,7 @@ class _SlotFormState extends ConsumerState<_SlotForm> {
             // Adopt the new category's length, unless the user set an end
             // time by hand.
             if (!_durationTouched) _applyDefaultDurationToAll();
+            if (!_weightTouched) _weight = _defaultWeight;
           }),
         ),
         const SizedBox(height: AppSpacing.xl),
@@ -1407,7 +1434,10 @@ class _SlotFormState extends ConsumerState<_SlotForm> {
         const SizedBox(height: AppSpacing.xl),
         _WeightPicker(
           value: _weight,
-          onChanged: (int n) => setState(() => _weight = n),
+          onChanged: (int n) => setState(() {
+            _weight = n;
+            _weightTouched = true;
+          }),
         ),
         const SizedBox(height: AppSpacing.xl),
         const SectionHeader('Runs from'),
@@ -1824,9 +1854,13 @@ class _ExtraClassFormState extends ConsumerState<_ExtraClassForm> {
   /// See the weekly form: only a hand-set end time pins the length.
   bool _durationTouched = false;
 
+  bool _weightTouched = false;
+
   bool get _isEditing => widget.extra != null;
 
   int get _defaultDuration => ref.read(defaultDurationProvider(_subjectId));
+
+  int get _defaultWeight => ref.read(defaultWeightProvider(_subjectId));
 
   @override
   void initState() {
@@ -1842,6 +1876,9 @@ class _ExtraClassFormState extends ConsumerState<_ExtraClassForm> {
       // An existing class already has the length its owner meant, so opening
       // the form must not re-length it from the category.
       _durationTouched = true;
+      _weightTouched = true;
+    } else {
+      _weight = _defaultWeight;
     }
   }
 
@@ -1956,6 +1993,7 @@ class _ExtraClassFormState extends ConsumerState<_ExtraClassForm> {
             if (!_durationTouched) {
               _end = Clock.endFromStart(_start, _defaultDuration);
             }
+            if (!_weightTouched) _weight = _defaultWeight;
           }),
         ),
         const SizedBox(height: AppSpacing.xl),
@@ -1994,7 +2032,10 @@ class _ExtraClassFormState extends ConsumerState<_ExtraClassForm> {
         const SizedBox(height: AppSpacing.xl),
         _WeightPicker(
           value: _weight,
-          onChanged: (int n) => setState(() => _weight = n),
+          onChanged: (int n) => setState(() {
+            _weight = n;
+            _weightTouched = true;
+          }),
         ),
         if (_error != null) ...<Widget>[
           const SizedBox(height: AppSpacing.md),
@@ -2062,6 +2103,7 @@ class _BlockClassFormState extends ConsumerState<_BlockClassForm> {
   /// See [_SlotFormState._weight]. Offered here too because filling the grid
   /// is how a timetable usually gets built.
   int _weight = 1;
+  bool _weightTouched = false;
 
   String? _error;
   bool _saving = false;
@@ -2196,6 +2238,9 @@ class _BlockClassFormState extends ConsumerState<_BlockClassForm> {
           onChanged: (int? id) => setState(() {
             _subjectId = id;
             _error = null;
+            if (!_weightTouched) {
+              _weight = ref.read(defaultWeightProvider(id));
+            }
           }),
         ),
         const SizedBox(height: AppSpacing.xl),
@@ -2292,7 +2337,10 @@ class _BlockClassFormState extends ConsumerState<_BlockClassForm> {
         const SizedBox(height: AppSpacing.xl),
         _WeightPicker(
           value: _weight,
-          onChanged: (int n) => setState(() => _weight = n),
+          onChanged: (int n) => setState(() {
+            _weight = n;
+            _weightTouched = true;
+          }),
         ),
         if (_error != null) ...<Widget>[
           const SizedBox(height: AppSpacing.md),

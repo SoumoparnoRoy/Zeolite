@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zeolite/core/date_utils.dart';
 import 'package:zeolite/data/models/attendance_record.dart';
 import 'package:zeolite/data/models/attendance_status.dart';
+import 'package:zeolite/data/models/class_category.dart';
 import 'package:zeolite/data/models/class_session.dart';
 import 'package:zeolite/data/models/class_slot.dart';
 import 'package:zeolite/data/models/extra_class.dart';
@@ -9,6 +10,7 @@ import 'package:zeolite/data/models/holiday.dart';
 import 'package:zeolite/data/models/subject.dart';
 import 'package:zeolite/domain/attendance_log.dart';
 import 'package:zeolite/domain/attendance_stats.dart';
+import 'package:zeolite/domain/class_weight.dart';
 import 'package:zeolite/domain/schedule_engine.dart';
 
 const Subject maths = Subject(id: 1, name: 'Maths', colorValue: 0xFF7C6BFF);
@@ -140,7 +142,6 @@ void main() {
         }).weight,
         1,
       );
-      // And a hand-edited file cannot make an occurrence worth nothing.
       expect(
         AttendanceRecord.fromMap(<String, Object?>{
           'subject_id': 1,
@@ -149,8 +150,78 @@ void main() {
           'status': 'present',
           'weight': 0,
         }).weight,
-        1,
+        0,
       );
+      expect(
+        AttendanceRecord.fromMap(<String, Object?>{
+          'subject_id': 1,
+          'date': 20260824,
+          'start_minutes': 600,
+          'status': 'present',
+          'weight': -3,
+        }).weight,
+        0,
+      );
+    });
+  });
+
+  group('which weight a new class gets', () {
+    test('a category answers for its own subjects', () {
+      const ClassCategory lab = ClassCategory(
+        id: 1,
+        name: 'Lab',
+        defaultDurationMinutes: 120,
+        weight: 3,
+      );
+      expect(weightFor(lab), 3);
+    });
+
+    // A subject in no category has to behave as it did before any of this.
+    test('a subject in no category is worth one', () {
+      expect(weightFor(null), 1);
+    });
+
+    test('a category worth nothing is honoured, not read as unset', () {
+      const ClassCategory unassessed = ClassCategory(
+        id: 2,
+        name: 'Seminar',
+        defaultDurationMinutes: 60,
+        weight: 0,
+      );
+      expect(weightFor(unassessed), 0);
+    });
+  });
+
+  group('a class worth nothing', () {
+    final DateTime monday = Dates.addDays(Dates.today(), -7);
+
+    test('counts towards neither side of the percentage', () {
+      final SubjectStats stats = SubjectStats.fromSessions(
+        subject: maths,
+        sessions: <ClassSession>[
+          sessionAt(monday, 540, status: AttendanceStatus.present),
+          sessionAt(monday, 600, status: AttendanceStatus.absent, weight: 0),
+        ],
+        target: 0.75,
+        plannedFromSlots: 0,
+      );
+
+      expect(stats.held, 1);
+      expect(stats.attended, 1);
+      expect(stats.percent, 100);
+    });
+
+    test('does not make the subject read in periods', () {
+      final SubjectStats stats = SubjectStats.fromSessions(
+        subject: maths,
+        sessions: <ClassSession>[
+          sessionAt(monday, 540, status: AttendanceStatus.present, weight: 0),
+        ],
+        target: 0.75,
+        plannedFromSlots: 0,
+      );
+
+      expect(stats.weighted, isFalse);
     });
   });
 

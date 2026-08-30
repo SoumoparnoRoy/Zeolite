@@ -84,7 +84,7 @@ class ExtraClass {
       startMinutes: (map['start_minutes'] as int?) ?? 0,
       endMinutes: (map['end_minutes'] as int?) ?? 0,
       room: map['room'] as String?,
-      weight: math.max(1, (map['weight'] as num?)?.toInt() ?? 1),
+      weight: math.max(0, (map['weight'] as num?)?.toInt() ?? 1),
       note: map['note'] as String?,
     );
   }

@@ -5,6 +5,7 @@ import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../core/words.dart';
 import '../../data/models/attendance_record.dart';
+import '../../data/models/class_category.dart';
 import '../../data/models/class_slot.dart';
 import '../../data/models/subject.dart';
 import '../../data/settings/app_settings.dart';
@@ -31,7 +32,16 @@ class NotionImportScreen extends ConsumerStatefulWidget {
 }
 
 class _NotionImportScreenState extends ConsumerState<NotionImportScreen> {
-  NotionGrouping _grouping = NotionGrouping.grouped;
+  /// Counting a longer class twice is the same choice as keeping the lab
+  /// inside its course, so the categories answer it rather than the user.
+  NotionGrouping? _chosen;
+
+  NotionGrouping _groupingFrom(List<ClassCategory> categories) =>
+      _chosen ??
+      (categories.any((ClassCategory c) => c.weight > 1)
+          ? NotionGrouping.grouped
+          : NotionGrouping.separate);
+
   final Set<String> _excluded = <String>{};
   final Set<String> _seeded = <String>{};
   bool _saving = false;
@@ -82,9 +92,11 @@ class _NotionImportScreenState extends ConsumerState<NotionImportScreen> {
     final AppSettings settings =
         ref.watch(settingsProvider).value ?? const AppSettings();
 
+    final NotionGrouping grouping =
+        _groupingFrom(data?.categories ?? const <ClassCategory>[]);
     final NotionPlan plan = NotionPlan.from(
       export: widget.export,
-      grouping: _grouping,
+      grouping: grouping,
       subjects: data?.subjects ?? const <Subject>[],
       slots: data?.slots ?? const <ClassSlot>[],
       records: data?.records ?? const <AttendanceRecord>[],
@@ -120,9 +132,8 @@ class _NotionImportScreenState extends ConsumerState<NotionImportScreen> {
               _OutsideTermWarning(export: widget.export, settings: settings),
               const SectionHeader('How the courses split'),
               _GroupingChoice(
-                value: _grouping,
-                onChanged: (NotionGrouping g) =>
-                    setState(() => _grouping = g),
+                value: grouping,
+                onChanged: (NotionGrouping g) => setState(() => _chosen = g),
               ),
               const SizedBox(height: AppSpacing.xl),
               SectionHeader(

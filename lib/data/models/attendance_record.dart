@@ -96,8 +96,9 @@ class AttendanceRecord {
       startMinutes: (map['start_minutes'] as int?) ?? 0,
       status: AttendanceStatus.fromName(map['status'] as String?) ??
           AttendanceStatus.present,
-      // A hand-edited backup must not make an occurrence worth nothing.
-      weight: math.max(1, (map['weight'] as num?)?.toInt() ?? 1),
+      // Zero is a real weight — a class held but not assessed. Negative is
+      // not, and a hand-edited backup is where one would come from.
+      weight: math.max(0, (map['weight'] as num?)?.toInt() ?? 1),
       tagId: map['tag_id'] as int?,
       note: map['note'] as String?,
       markedAt: map['marked_at'] == null

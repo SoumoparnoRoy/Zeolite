@@ -181,7 +181,9 @@ class SubjectStats {
       // The mark's own weight, not the rule's: editing a slot must not restate
       // what a past class was worth.
       final int weight = session.record?.weight ?? session.weight;
-      if (weight != 1) weighted = true;
+      // Above one only: a class worth nothing does not make a subject read
+      // in periods.
+      if (weight > 1) weighted = true;
       if (status == AttendanceStatus.present) {
         present += weight;
       } else if (status == AttendanceStatus.absent) {

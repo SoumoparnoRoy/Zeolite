@@ -28,7 +28,7 @@ class AppDatabase {
   // install finds its data, so renaming it would strand every database in
   // place and read as a wipe. It is never shown to the user.
   static const String fileName = 'attend_it.db';
-  static const int schemaVersion = 10;
+  static const int schemaVersion = 11;
 
   Database? _db;
 
@@ -164,6 +164,11 @@ class AppDatabase {
             // row looks changed by this.
             await db.execute('ALTER TABLE subjects ADD COLUMN updated_at INTEGER');
           }
+          if (oldVersion < 11) {
+            // v11 lets a category say what its classes are worth. Existing
+            // slots and marks keep theirs, so nothing moves until asked.
+            await db.execute(_categoryWeightColumn);
+          }
           await db.execute(_subjectUuidIndex);
           await db.execute(_slotUuidIndex);
           await db.execute(_extraUuidIndex);
@@ -185,7 +190,7 @@ class AppDatabase {
       'CREATE UNIQUE INDEX IF NOT EXISTS idx_extras_uuid '
       'ON extra_classes (uuid)';
 
-  /// Kept as a constant so the create path and the v2 migration cannot drift.
+  /// Frozen at the shape v2 created, which the v2 migration has to reproduce.
   static const String _categoriesTable = '''
       CREATE TABLE categories (
         id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -194,6 +199,11 @@ class AppDatabase {
         created_at      INTEGER NOT NULL
       )
     ''';
+
+  /// Shared by the create path and v11: inside [_categoriesTable] the v2
+  /// migration would add it early and v11 would fail on a duplicate.
+  static const String _categoryWeightColumn =
+      'ALTER TABLE categories ADD COLUMN weight INTEGER NOT NULL DEFAULT 1';
 
   /// Same reasoning as [_categoriesTable]: shared by the create path and the
   /// v3 migration so the two cannot drift.
@@ -257,6 +267,7 @@ class AppDatabase {
     final Batch batch = db.batch();
 
     batch.execute(_categoriesTable);
+    batch.execute(_categoryWeightColumn);
     batch.execute(_roomsTable);
     batch.execute(_tagsTable);
     batch.execute(_remoteLinksTable);

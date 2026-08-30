@@ -185,6 +185,23 @@ void main() {
     expect(mark['tag_id'], isNull);
   });
 
+  test('a category that predates the weight column is worth one', () async {
+    final Database db = await openAt(await oldInstall());
+    await db.insert('categories', <String, Object?>{
+      'name': 'Theory',
+      'default_minutes': 60,
+      'created_at': 1,
+    });
+
+    // Old or new, every category reads as an ordinary class, so no
+    // percentage moves until the user says otherwise.
+    final List<Map<String, Object?>> categories = await db.query('categories');
+    expect(categories, isNotEmpty);
+    for (final Map<String, Object?> row in categories) {
+      expect(row['weight'], 1, reason: '${row['name']} came out weighted');
+    }
+  });
+
   test('every subject comes out of the climb with a uuid of its own', () async {
     final Database db = await openAt(await oldInstall());
     await db.insert('subjects', <String, Object?>{

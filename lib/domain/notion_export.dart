@@ -44,6 +44,42 @@ class NotionRow {
     this.creditDisagrees = false,
   });
 
+  /// One row off a status word and the two counters, wherever they were read
+  /// from — a CSV cell or a page property.
+  ///
+  /// The judgement lives here rather than in each reader: which of the three
+  /// statuses a row lands on is the only thing an export cannot say plainly,
+  /// and two copies of that rule would drift apart.
+  factory NotionRow.read({
+    required String component,
+    required String course,
+    required NotionKind kind,
+    required DateTime date,
+    required String status,
+    required int held,
+    int? credit,
+  }) {
+    final String raw = status.trim().toLowerCase();
+    return NotionRow(
+      component: component,
+      course: course,
+      kind: kind,
+      date: date,
+      status: NotionExport._statusOf(raw, held, credit),
+      weight: math.max(1, held),
+      tagName: switch (raw) {
+        'proxy' => 'Proxy',
+        'cancelled' || 'canceled' => 'Cancelled',
+        _ => null,
+      },
+      creditDisagrees: NotionExport._creditDisagrees(raw, credit),
+    );
+  }
+
+  /// Whether a reader has anywhere to put this word.
+  static bool knowsStatus(String status) =>
+      NotionExport._known.contains(status.trim().toLowerCase());
+
   /// The per-component code the export uses as a page title, e.g. `ABC101P`.
   final String component;
 
@@ -212,7 +248,7 @@ class NotionExport {
       }
 
       final String raw = at(columns.status).toLowerCase();
-      if (!_known.contains(raw)) {
+      if (!NotionRow.knowsStatus(raw)) {
         problems.add('Row ${i + 1} ($label): "${at(columns.status)}" is not a '
             'status this can read.');
         continue;
@@ -222,19 +258,14 @@ class NotionExport {
       final int? credit = int.tryParse(at(columns.credit));
 
       rows.add(
-        NotionRow(
+        NotionRow.read(
           component: component,
           course: course,
           kind: NotionKind.fromLabel(at(columns.kind)) ?? NotionKind.lecture,
           date: date,
-          status: _statusOf(raw, held, credit),
-          weight: math.max(1, held),
-          tagName: switch (raw) {
-            'proxy' => 'Proxy',
-            'cancelled' || 'canceled' => 'Cancelled',
-            _ => null,
-          },
-          creditDisagrees: _creditDisagrees(raw, credit),
+          status: raw,
+          held: held,
+          credit: credit,
         ),
       );
     }

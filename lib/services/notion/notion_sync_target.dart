@@ -43,13 +43,6 @@ class NotionSyncTarget implements SyncTarget {
   @override
   Set<SyncKind> get kinds => const <SyncKind>{SyncKind.attendance};
 
-  /// How many pages one query returns before the cursor is followed again.
-  static const int _pageSize = 100;
-
-  /// A run stops walking after this many pages rather than pulling a whole
-  /// workspace into memory on a database somebody else fills too.
-  static const int _maxPages = 20;
-
   /// What the table holds now, or null when it cannot be read.
   ///
   /// Null is also the honest answer for a database with no key column: the
@@ -61,31 +54,16 @@ class NotionSyncTarget implements SyncTarget {
     if (kind != SyncKind.attendance) return null;
     if (!_mapping.fields.containsKey(NotionField.key)) return null;
 
+    final NotionRows rows = await _client.queryAllPages(_mapping.dataSourceId);
+    if (!rows.ok) return null;
+
     final List<RemoteState> found = <RemoteState>[];
-    String? cursor;
-    for (int page = 0; page < _maxPages; page++) {
-      final NotionResult result = await _client.queryDataSource(
-        _mapping.dataSourceId,
-        cursor: cursor,
-        pageSize: _pageSize,
-      );
-      if (!result.ok) return null;
-
-      final Object? rows = result.body?['results'];
-      if (rows is List<Object?>) {
-        for (final Object? row in rows) {
-          if (row is! Map<String, Object?>) continue;
-          // Null is a row somebody made by hand, which belongs to the import
-          // screen; adopting it here would file it against a class it may
-          // have nothing to do with.
-          final RemoteState? state = _properties.decode(row);
-          if (state != null) found.add(state);
-        }
-      }
-
-      if (result.body?['has_more'] != true) break;
-      cursor = result.body?['next_cursor'] as String?;
-      if (cursor == null) break;
+    for (final Map<String, Object?> page in rows.pages) {
+      // Null is a row somebody made by hand, which belongs to the import
+      // screen; adopting it here would file it against a class it may have
+      // nothing to do with.
+      final RemoteState? state = _properties.decode(page);
+      if (state != null) found.add(state);
     }
     return found;
   }

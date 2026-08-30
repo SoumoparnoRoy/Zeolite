@@ -28,6 +28,27 @@ class NotionResult {
   bool get ok => failure == null;
 }
 
+/// Every row of a data source, or the reason the walk stopped.
+///
+/// Separate from [NotionResult] because a partial answer is not a shorter
+/// answer: a table read half way and reported whole reads as rows somebody
+/// deleted.
+@immutable
+class NotionRows {
+  const NotionRows.done(this.pages)
+      : failure = null,
+        message = null;
+
+  const NotionRows.failed(this.failure, {this.message})
+      : pages = const <Map<String, Object?>>[];
+
+  final List<Map<String, Object?>> pages;
+  final SyncFailure? failure;
+  final String? message;
+
+  bool get ok => failure == null;
+}
+
 /// The device's calls to Notion.
 ///
 /// Speaks pages and data sources only — nothing here knows what a mark is, and
@@ -74,6 +95,11 @@ class NotionClient {
 
   static const Duration _timeout = Duration(seconds: 30);
 
+  /// How many rows one query asks for before the cursor is followed again.
+  static const int queryPageSize = 100;
+
+  static const int maxPages = 20;
+
   /// The tables the connection can see. `database` is not a value search
   /// takes any more, and asking for one is a validation error rather than an
   /// empty list. Paged, and this never loops — the caller hands the cursor
@@ -115,6 +141,44 @@ class NotionClient {
           if (pageSize != null) 'page_size': pageSize,
         },
       );
+
+  /// One page, for the far side of a relation — a relation cell holds ids and
+  /// no names, so the course it points at has to be read to be named.
+  Future<NotionResult> page(String pageId) =>
+      _send('GET', '/v1/pages/$pageId');
+
+  /// Walks the cursor to the end of a data source.
+  ///
+  /// [maxPages] stops a run pulling a whole workspace into memory on a
+  /// database somebody else fills too, and a walk that ends there is still
+  /// reported as done: the alternative is refusing to read a large table at
+  /// all.
+  Future<NotionRows> queryAllPages(String dataSourceId) async {
+    final List<Map<String, Object?>> pages = <Map<String, Object?>>[];
+    String? cursor;
+    for (int walked = 0; walked < maxPages; walked++) {
+      final NotionResult result = await queryDataSource(
+        dataSourceId,
+        cursor: cursor,
+        pageSize: queryPageSize,
+      );
+      if (!result.ok) {
+        return NotionRows.failed(result.failure, message: result.message);
+      }
+
+      final Object? rows = result.body?['results'];
+      if (rows is List<Object?>) {
+        for (final Object? row in rows) {
+          if (row is Map<String, Object?>) pages.add(row);
+        }
+      }
+
+      if (result.body?['has_more'] != true) break;
+      cursor = result.body?['next_cursor'] as String?;
+      if (cursor == null) break;
+    }
+    return NotionRows.done(pages);
+  }
 
   Future<NotionResult> createPage({
     required String dataSourceId,

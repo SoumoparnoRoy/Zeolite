@@ -81,7 +81,7 @@ class NotionProperties {
     final String status = (item.fields['status'] as String?) ?? 'present';
     final String? tag = item.fields['tag'] as String?;
     return <String, Object?>{
-      'status': _statusFor(_word(status, tag)),
+      'status': wordFor(_word(status, tag)) ?? 'present',
       'weight': (item.fields['weight'] as int?) ?? 1,
     };
   }
@@ -110,19 +110,19 @@ class NotionProperties {
 
     final Map<String, Object?> properties =
         (page['properties'] as Map<String, Object?>?) ?? <String, Object?>{};
-    final String? localKey = _plain(_valueOf(properties, keyProperty));
+    final String? localKey = plainTextOf(valueOf(properties, keyProperty));
     if (localKey == null || localKey.isEmpty) return null;
 
-    final String? word = _selected(
-      _valueOf(properties, mapping.fields[NotionField.status]),
+    final String? word = optionNameOf(
+      valueOf(properties, mapping.fields[NotionField.status]),
     );
-    final Object? held = _valueOf(properties, mapping.fields[NotionField.held]);
+    final Object? held = valueOf(properties, mapping.fields[NotionField.held]);
 
     // Only what Notion actually holds. The hash is compared against its own
     // stored value rather than the local one, so it has to be stable, not
     // identical to what the device would produce.
     final Map<String, Object?> fields = <String, Object?>{
-      'status': _statusFor(word),
+      'status': wordFor(word) ?? 'present',
       'weight': (held is Map<String, Object?> ? held['number'] : null) ?? 1,
     };
 
@@ -143,8 +143,11 @@ class NotionProperties {
 
   /// The workspace's word back to one of ours, so a renamed option does not
   /// read as a different mark every run.
-  String _statusFor(String? option) {
-    if (option == null) return 'present';
+  ///
+  /// Null only for a column that is empty, which a pull reads as agreement
+  /// and an import has to report rather than guess at.
+  String? wordFor(String? option) {
+    if (option == null) return null;
     for (final MapEntry<String, String> entry in mapping.statusValues.entries) {
       if (entry.value == option) return entry.key;
     }
@@ -187,7 +190,11 @@ class NotionProperties {
 
   /// Notion keys a page's properties by name, not by id, so the column is
   /// found by its id among the values.
-  static Object? _valueOf(
+  ///
+  /// Public because the import reader reads the same envelopes off pages this
+  /// app never wrote; knowing their shape twice is how one of the two ends up
+  /// wrong.
+  static Object? valueOf(
     Map<String, Object?> properties,
     NotionProperty? property,
   ) {
@@ -200,7 +207,7 @@ class NotionProperties {
     return properties[property.name];
   }
 
-  static String? _plain(Object? value) {
+  static String? plainTextOf(Object? value) {
     if (value is! Map<String, Object?>) return null;
     final Object? parts = value['rich_text'] ?? value['title'];
     if (parts is! List<Object?>) return null;
@@ -212,10 +219,44 @@ class NotionProperties {
     return joined.isEmpty ? null : joined;
   }
 
-  static String? _selected(Object? value) {
+  static String? optionNameOf(Object? value) {
     if (value is! Map<String, Object?>) return null;
     final Object? holder = value['select'] ?? value['status'];
     return holder is Map<String, Object?> ? holder['name'] as String? : null;
+  }
+
+  /// The first option of a multi-select, which is the only one a single course
+  /// or status can mean.
+  static String? firstOptionOf(Object? value) {
+    if (value is! Map<String, Object?>) return null;
+    final Object? options = value['multi_select'];
+    if (options is! List<Object?> || options.isEmpty) return null;
+    final Object? first = options.first;
+    return first is Map<String, Object?> ? first['name'] as String? : null;
+  }
+
+  /// The pages a relation cell points at. Ids only — Notion sends no titles
+  /// with them, so naming one costs a separate read.
+  static List<String> relationIdsOf(Object? value) {
+    if (value is! Map<String, Object?>) return const <String>[];
+    final Object? related = value['relation'];
+    if (related is! List<Object?>) return const <String>[];
+    return <String>[
+      for (final Object? entry in related)
+        if (entry is Map<String, Object?> && entry['id'] is String)
+          entry['id']! as String,
+    ];
+  }
+
+  static num? numberOf(Object? value) =>
+      value is Map<String, Object?> ? value['number'] as num? : null;
+
+  /// A range's start, which is the day a class was on. An end is ignored: a
+  /// mark belongs to one day, and a row spanning two is one class either way.
+  static String? dateStartOf(Object? value) {
+    if (value is! Map<String, Object?>) return null;
+    final Object? date = value['date'];
+    return date is Map<String, Object?> ? date['start'] as String? : null;
   }
 
   /// `uuid:20260304:540` — the day is the middle part, and the key is the only

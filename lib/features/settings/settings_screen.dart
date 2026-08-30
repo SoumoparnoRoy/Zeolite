@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:file_picker/file_picker.dart';
@@ -13,10 +14,12 @@ import '../../data/models/holiday.dart';
 import '../../data/models/subject.dart';
 import '../../data/settings/app_settings.dart';
 import '../../domain/holiday_runs.dart';
+import '../../domain/notion/notion_mapping.dart';
 import '../../domain/notion_export.dart';
 import '../../services/backup_folder.dart';
 import '../../services/backup_service.dart';
 import '../../services/notification_service.dart';
+import '../../services/notion/notion_database_reader.dart';
 import '../../state/notion_providers.dart';
 import '../../state/providers.dart';
 import '../../state/auth_providers.dart';
@@ -27,6 +30,7 @@ import '../subjects/class_editor_sheets.dart';
 import '../subjects/notion_import_screen.dart';
 import 'account_screen.dart';
 import '../../domain/sync/sync_status.dart';
+import '../../domain/sync/sync_target.dart';
 import '../../services/sync/sync_coordinator.dart';
 import '../../state/notion_sync_providers.dart';
 import 'sync_status_line.dart';
@@ -523,6 +527,14 @@ class SettingsScreen extends ConsumerWidget {
                           ),
                         ),
                       ),
+                    // Sync's own pull drops these rows, so this is the way in.
+                    if (ref.watch(notionMappingProvider).value != null)
+                      _Row(
+                        icon: Icons.download_for_offline_outlined,
+                        title: 'Import from your database',
+                        value: 'Bring in classes already recorded in Notion',
+                        onTap: () => _importFromNotion(context, ref),
+                      ),
                     if (ref.watch(notionSyncTargetProvider) != null)
                       _Row(
                         icon: Icons.schedule_rounded,
@@ -973,6 +985,108 @@ class SettingsScreen extends ConsumerWidget {
       ),
     );
   }
+
+  /// Reads the mapped database into the same preview the CSV goes through.
+  Future<void> _importFromNotion(BuildContext context, WidgetRef ref) async {
+    final NotionMapping? mapping = ref.read(notionMappingProvider).value;
+    if (mapping == null) return;
+
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    final NavigatorState navigator = Navigator.of(context);
+
+    unawaited(showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) => const AlertDialog(
+        content: SizedBox(
+          height: 64,
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ),
+    ));
+
+    final NotionReadResult result = await NotionDatabaseReader(
+      client: ref.read(notionClientProvider),
+      mapping: mapping,
+    ).read();
+    navigator.pop();
+
+    final NotionSource? source = result.source;
+    if (source == null) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(_notionReadFailure(result.failure)),
+          duration: const Duration(seconds: 6),
+        ),
+      );
+      return;
+    }
+
+    // Only worth asking where there is something of ours to leave out.
+    bool skipKeyed = false;
+    if (source.hasKeyedRows) {
+      if (!context.mounted) return;
+      final bool? answer = await _askWhichRows(context);
+      if (answer == null) return;
+      skipKeyed = answer;
+    }
+
+    final NotionExport export = source.read(skipKeyed: skipKeyed);
+    if (export.isEmpty) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(export.problems.isEmpty
+              ? 'Nothing in that database could be read as a class.'
+              : export.problems.first),
+          duration: const Duration(seconds: 6),
+        ),
+      );
+      return;
+    }
+
+    await navigator.push(
+      MaterialPageRoute<void>(
+        builder: (BuildContext context) => NotionImportScreen(export: export),
+      ),
+    );
+  }
+
+  /// True to skip the app's own rows; null is a cancel.
+  static Future<bool?> _askWhichRows(BuildContext context) => showDialog<bool>(
+        context: context,
+        builder: (BuildContext context) => AlertDialog(
+          backgroundColor: context.palette.surfaceHigh,
+          title: const Text('Which rows?'),
+          content: const Text(
+            'Some rows in that database were written by this app. Bring them '
+            'in too if you are setting this device up again, or leave them out '
+            'if you only want what you typed into Notion yourself.',
+            style: TextStyle(height: 1.4),
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Only mine'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Everything'),
+            ),
+          ],
+        ),
+      );
+
+  static String _notionReadFailure(SyncFailure? failure) => switch (failure) {
+        SyncFailure.auth =>
+          'Zeolite is not allowed to read your workspace any more. Disconnect '
+              'Notion and connect it again.',
+        SyncFailure.offline =>
+          'Could not reach Notion. Check your network and try again.',
+        SyncFailure.rateLimited => 'Notion is busy. Wait a moment and try '
+            'again.',
+        _ => 'Notion refused that request. Check the database is still shared '
+            'with Zeolite.',
+      };
 
   /// Confirms before restoring, because the file dialog made this two taps from
   /// the Settings list and it replaces everything. Reads bytes rather than a

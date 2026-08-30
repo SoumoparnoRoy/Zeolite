@@ -380,6 +380,105 @@ void main() {
     expect((await answering).outcome, SyncRunOutcome.synced);
   });
 
+  test('a hand edit is offered for review, never applied on its own', () async {
+    final Subject subject = await seed(status: AttendanceStatus.present);
+    target.trustsPulls = false;
+    final SyncCoordinator sync = coordinator();
+    await sync.run(force: true);
+
+    // Edited on the far side, untouched here.
+    target.remote = <RemoteState>[
+      mark(subject.uuid!, status: 'absent', editedAt: _late),
+    ];
+    final SyncRunResult result = await sync.run(force: true);
+
+    expect(result.review, hasLength(1));
+    expect(result.pulled, 0);
+    // The difference is a claim to look at, not a newer truth.
+    expect(
+      (await repo.getAttendanceAt(subject.id!, _day, 540))?.status,
+      AttendanceStatus.present,
+    );
+  });
+
+  test('taking the Notion row writes it here and settles the difference',
+      () async {
+    final Subject subject = await seed(status: AttendanceStatus.present);
+    target.trustsPulls = false;
+    final SyncCoordinator sync = coordinator();
+    await sync.run(force: true);
+
+    target.remote = <RemoteState>[
+      mark(subject.uuid!, status: 'absent', editedAt: _late),
+    ];
+    final SyncRunResult result = await sync.run(force: true);
+
+    await sync.applyReview(result.review, <String, SyncSide>{
+      SyncItem.keyFor(subject.uuid!, _day, 540): SyncSide.there,
+    });
+
+    expect(
+      (await repo.getAttendanceAt(subject.id!, _day, 540))?.status,
+      AttendanceStatus.absent,
+    );
+    // Answered once: the same edit must not be raised again.
+    expect((await sync.run(force: true)).review, isEmpty);
+  });
+
+  test('keeping the local row leaves it alone and pushes it back', () async {
+    final Subject subject = await seed(status: AttendanceStatus.present);
+    target.trustsPulls = false;
+    final SyncCoordinator sync = coordinator();
+    await sync.run(force: true);
+
+    target.remote = <RemoteState>[
+      mark(subject.uuid!, status: 'absent', editedAt: _late),
+    ];
+    final SyncRunResult result = await sync.run(force: true);
+
+    await sync.applyReview(result.review, <String, SyncSide>{
+      SyncItem.keyFor(subject.uuid!, _day, 540): SyncSide.here,
+    });
+
+    expect(
+      (await repo.getAttendanceAt(subject.id!, _day, 540))?.status,
+      AttendanceStatus.present,
+    );
+    // Keeping mine is a decision to correct Notion, not to ignore it.
+    final SyncRunResult after = await sync.run(force: true);
+    expect(after.pushed, 1);
+    expect(after.review, isEmpty);
+  });
+
+  test('the run after an answer does not join one that predates it', () async {
+    final Subject subject = await seed(status: AttendanceStatus.present);
+    target.trustsPulls = false;
+    final SyncCoordinator sync = coordinator();
+    await sync.run(force: true);
+
+    target.remote = <RemoteState>[
+      mark(subject.uuid!, status: 'absent', editedAt: _late),
+    ];
+    final SyncRunResult found = await sync.run(force: true);
+
+    // A run is already going when the answer lands. Joining it would report a
+    // plan made before the ledger was written, and leave the kept row waiting.
+    final Completer<void> gate = Completer<void>();
+    target.hold = gate.future;
+    final Future<SyncRunResult> stale = sync.run(force: true);
+
+    await sync.applyReview(found.review, <String, SyncSide>{
+      SyncItem.keyFor(subject.uuid!, _day, 540): SyncSide.here,
+    });
+    target.hold = null;
+    gate.complete();
+    final SyncRunResult after = await sync.runAfterReview();
+    await stale;
+
+    expect(after.pushed, 1);
+    expect(after.review, isEmpty);
+  });
+
   test('a merge decision to keep the account overrides the local row',
       () async {
     final Subject subject = await seed(

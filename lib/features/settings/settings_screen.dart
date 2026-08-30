@@ -31,6 +31,8 @@ import '../../services/sync/sync_coordinator.dart';
 import '../../state/notion_sync_providers.dart';
 import 'sync_status_line.dart';
 import 'notion_connect_screen.dart';
+import '../../domain/sync/sync_plan.dart';
+import 'notion_review_screen.dart';
 import 'notion_mapping_screen.dart';
 import '../timetable/import_screen.dart';
 import '../subjects/subjects_screen.dart';
@@ -1332,6 +1334,8 @@ class _NotionSyncCard extends ConsumerWidget {
     final SyncRunResult? last =
         ref.read(notionSyncStatusProvider.notifier).lastResult;
     final bool running = status.state == SyncState.running;
+    final List<SyncPull> review =
+        ref.read(notionSyncStatusProvider.notifier).review;
 
     return SurfaceCard(
       child: Column(
@@ -1347,6 +1351,23 @@ class _NotionSyncCard extends ConsumerWidget {
             ),
             style: TextStyle(color: context.palette.textSecondary),
           ),
+          // Saying only "synced" would let the two sides drift unremarked.
+          if (review.isNotEmpty) ...<Widget>[
+            const SizedBox(height: AppSpacing.sm),
+            FilledButton(
+              onPressed: running
+                  ? null
+                  : () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (BuildContext context) =>
+                              const NotionReviewScreen(),
+                        ),
+                      ),
+              child: Text(
+                'Review ${review.length} changed in Notion',
+              ),
+            ),
+          ],
           const SizedBox(height: AppSpacing.sm),
           OutlinedButton(
             onPressed: running

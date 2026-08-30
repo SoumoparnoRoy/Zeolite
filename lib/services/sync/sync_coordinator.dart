@@ -514,6 +514,65 @@ class SyncCoordinator {
     return null;
   }
 
+  /// Settles rows a person answered on, for a target whose pulls are never
+  /// applied on their own.
+  ///
+  /// [SyncSide.here] clears the link's local hash, which is how this design
+  /// says "needs pushing". Either way the remote hash is brought up to date,
+  /// so an answered difference is not raised again.
+  Future<int> applyReview(
+    List<SyncPull> pulls,
+    Map<String, SyncSide> decisions,
+  ) async {
+    if (pulls.isEmpty) return 0;
+    final _Local read = await _readLocal();
+    final List<RemoteLink> write = <RemoteLink>[];
+    final List<String> forget = <String>[];
+    int settled = 0;
+
+    for (final SyncPull pull in pulls) {
+      final SyncSide? side = decisions[pull.remote.localKey];
+      if (side == null) continue;
+      settled++;
+
+      if (side == SyncSide.there) {
+        final RemoteLink? link =
+            await _applyPull(pull, SyncKind.attendance, read);
+        if (link == null) {
+          forget.add(pull.remote.localKey);
+        } else {
+          write.add(link);
+        }
+        continue;
+      }
+
+      // With no link there is nothing to mark: the page was never adopted
+      // here, so leaving it be is the whole answer.
+      final RemoteLink? link = pull.link;
+      if (link == null) continue;
+      write.add(
+        link.copyWith(
+          localHash: '',
+          remoteHash: pull.remote.hash,
+          syncedAt: _now(),
+        ),
+      );
+    }
+
+    await _commit(SyncKind.attendance, write, forget);
+    return settled;
+  }
+
+  /// The run that follows an answer, queued rather than joined: one already
+  /// in flight planned against the ledger as it stood before the answers
+  /// landed, and would leave a kept row waiting.
+  Future<SyncRunResult> runAfterReview() {
+    final Future<SyncRunResult>? inFlight = _inFlight;
+    return inFlight == null
+        ? _start(force: true, merge: null)
+        : _queueAfter(inFlight, force: true, merge: null);
+  }
+
   Future<void> _commit(
     SyncKind kind,
     List<RemoteLink> write,

@@ -4,6 +4,8 @@ import '../data/models/class_category.dart';
 import '../data/models/subject.dart';
 import '../data/settings/app_settings.dart';
 import '../domain/notion/notion_mapping.dart';
+import '../domain/sync/sync_merge.dart';
+import '../domain/sync/sync_plan.dart';
 import '../domain/sync/sync_status.dart';
 import '../domain/sync/sync_target.dart';
 import '../services/notion/notion_sync_target.dart';
@@ -104,6 +106,28 @@ class NotionSyncController extends Notifier<SyncStatus> {
 
     state = coordinator.status.running();
     final SyncRunResult result = await coordinator.run(force: force);
+    _last = result;
+    state = coordinator.status;
+    if (result.ok) await _stamp(coordinator.status.lastRunAt);
+    return result;
+  }
+
+  /// What a person still has to answer: rows edited in Notion since the app
+  /// last saw them. Empty for a run that found none.
+  List<SyncPull> get review => _last?.review ?? const <SyncPull>[];
+
+  /// Settles the answers, then runs so a kept local row goes over the top.
+  Future<SyncRunResult?> applyReview(Map<String, SyncSide> decisions) async {
+    final SyncCoordinator? coordinator = ref.read(notionCoordinatorProvider);
+    if (coordinator == null) return null;
+
+    await coordinator.applyReview(review, decisions);
+    // The rows that were taken have been written here, so the screens holding
+    // them are stale until this lands.
+    await ref.read(actionsProvider).reloadAfterSync();
+
+    state = coordinator.status.running();
+    final SyncRunResult result = await coordinator.runAfterReview();
     _last = result;
     state = coordinator.status;
     if (result.ok) await _stamp(coordinator.status.lastRunAt);

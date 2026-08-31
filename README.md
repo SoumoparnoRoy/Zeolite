@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" alt="" width="120">
+
 # Zeolite
 
 **Know exactly how many classes you can afford to miss.**
@@ -19,8 +21,11 @@ before you skip a lecture.
 
 ---
 
-Everything is stored locally on the device. No accounts, no server, no network
-calls. It works on a train with no signal.
+Your timetable and attendance live on the device, in SQLite. Everything works
+with no signal. Signing in or connecting Notion are both optional, and both are
+off until you turn them on. Usage is counted on every install — screens visited
+and features used, never anything you entered; [`site/privacy.html`](site/privacy.html)
+is the full text.
 
 ## Features
 
@@ -42,11 +47,23 @@ calls. It works on a train with no signal.
   class takes up a whole number of blocks, so a double lab is two of them.
 - **Saved rooms** - keep your room numbers once and pick them with a tap.
 - **Holidays** - skipped everywhere and never counted against you.
-- **Light and dark themes** - pick one or follow the device.
+- **Tags** - "Proxy", "Online", "Makeup": how a class went, recorded next to
+  Present or Absent.
+- **What a class counts as** - a category can say its classes are worth two
+  ordinary ones, or none at all, and every new class in it starts there.
+- **Light and dark, in five accents** - Violet, Indigo, Teal, Magenta or Slate.
+  Green, amber and red are not offered: they already mean present, tight and
+  absent.
 - **Notifications** - pre-class reminders, an evening nudge to mark what you
   forgot, and alerts when a subject nears its limit. A master switch silences
   all three.
 - **JSON backup** - export to clipboard and file, import to restore.
+- **Backup and sync to your account** - optional. Sign in with Google and the
+  term follows you to another device, first run asking what to keep when both
+  sides already hold something.
+- **Notion sync** - optional and two-way. Marks go to a Notion database as you
+  make them, rows you edited by hand come back through a review, and a database
+  you already keep can be imported.
 - **Undo** - deleting a subject or a class, importing a timetable and marking a
   whole day all offer Undo until you change something else.
 - **Import your timetable** - paste it a line at a time, or read it straight
@@ -96,8 +113,8 @@ at 9" is one trip through the form.
 the skip allowance, the recovery count, and whether the target is reachable.
 
 **Settings** - semester dates, attendance target, subjects, the shape of the
-teaching day, saved rooms, class categories, theme, notifications, holidays, and
-JSON export/import.
+teaching day, saved rooms, tags, class categories, theme and accent, account
+backup, Notion, notifications, holidays, and JSON export/import.
 
 ### Removing a class
 
@@ -138,24 +155,24 @@ lib/
 │   ├── models/         Subject, ClassSlot, AttendanceRecord, Holiday, ...
 │   ├── db/             SQLite schema and the repository
 │   └── settings/       AppSettings + SharedPreferencesAsync
-├── domain/             schedule engine, stats, attendance log
-├── services/           notifications, JSON backup
+├── domain/             schedule engine, stats, attendance log, sync planning
+├── services/           notifications, backup, account and Notion sync
 ├── state/              Riverpod providers and every mutation
 ├── features/           one folder per screen
 └── widgets/            shared UI primitives
 ```
 
 The UI never touches SQL and the domain layer never imports Flutter, so the
-interesting logic is unit-testable without a device. `flutter test` runs 206
+interesting logic is unit-testable without a device. `flutter test` runs 675
 tests covering the schedule engine, the stats formulas, the attendance log, the
-notification gating rules and the light palette's contrast ratios.
+sync planner, the notification gating rules and the light palette's contrast
+ratios.
 
 ## Roadmap
 
 - [ ] Home-screen widget showing today's classes
 - [ ] Per-class notes and assignment deadlines
 - [ ] Calendar heatmap of attendance over the term
-- [ ] Optional cloud sync
 
 ## License
 

@@ -72,8 +72,15 @@ final notionSyncStatusProvider =
 /// user has left them on.
 final notionSchedulerProvider = Provider<SyncScheduler?>((ref) {
   if (ref.watch(notionSyncTargetProvider) == null) return null;
-  final AppSettings? settings = ref.watch(settingsProvider).value;
-  if (settings == null || !settings.notionAutoSync) return null;
+  // The one field, not the whole value: watching the value tore the scheduler
+  // down on every settings write — its own stamp included — and cancelled the
+  // run it had pending. Null while settings are still loading.
+  if (ref.watch(settingsProvider.select(
+        (AsyncValue<AppSettings> s) => s.value?.notionAutoSync,
+      )) !=
+      true) {
+    return null;
+  }
 
   final SyncScheduler scheduler = SyncScheduler(
     run: () => ref.read(notionSyncStatusProvider.notifier).run(),
@@ -108,7 +115,17 @@ class NotionSyncController extends Notifier<SyncStatus> {
     final SyncRunResult result = await coordinator.run(force: force);
     _last = result;
     state = coordinator.status;
-    if (result.ok) await _stamp(coordinator.status.lastRunAt);
+    if (result.ok) {
+      // A run writes through the repository, so without this a row edited in
+      // Notion sits in the database unseen until something else reloads.
+      if (result.pulled > 0) {
+        await ref.read(actionsProvider).reloadAfterSync(
+              target: coordinator.target.id,
+              pulled: result.pulledKeys,
+            );
+      }
+      await _stamp(coordinator.status.lastRunAt);
+    }
     return result;
   }
 

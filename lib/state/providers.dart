@@ -610,6 +610,9 @@ class TimetableActions {
   final UndoStore _undo = UndoStore();
 
   Future<void> _refresh() async {
+    // Every mutation comes through here, so this is where the pending undo is
+    // dropped: restoring it would throw away whatever the user did since.
+    _dropUndo();
     await _reload();
     // Every scheduler, or a change would reach one target and quietly never
     // reach the other.
@@ -621,10 +624,6 @@ class TimetableActions {
   /// announcing a local change, which would schedule the rows it just brought
   /// down straight back up.
   Future<void> _reload() async {
-    // Every mutation ends here, so this is the one place the pending undo has
-    // to be dropped: restoring it would throw away whatever happened since.
-    _undo.drop();
-    _mergeUndoToken = null;
     _ref.invalidate(timetableProvider);
     await _ref.read(timetableProvider.future);
     await _syncNotifications();
@@ -632,7 +631,20 @@ class TimetableActions {
 
   /// A run writes straight through the repository and the settings service, so
   /// without this nothing reading either provider knows the database moved.
-  Future<void> reloadAfterSync() async {
+  ///
+  /// A caller that can name what it pulled leaves a standing Undo offer alone;
+  /// one that cannot passes no [target] and the offer goes, since a restore
+  /// would then delete rows nothing knows how to bring back.
+  Future<void> reloadAfterSync({
+    String? target,
+    Map<SyncKind, List<String>> pulled =
+        const <SyncKind, List<String>>{},
+  }) async {
+    if (target == null) {
+      _dropUndo();
+    } else {
+      _recordPull(target, pulled);
+    }
     _ref.invalidate(settingsProvider);
     await _ref.read(settingsProvider.future);
     await _reload();
@@ -724,6 +736,32 @@ class TimetableActions {
 
   int? get pendingUndoToken => _undo.pendingToken;
 
+  /// Rows a sync brought down while the pending snapshot was standing, by
+  /// target and kind.
+  ///
+  /// A background run is not the user, so it must not kill an offer raised
+  /// seconds earlier by a tap. Keeping the offer is only safe if a restore can
+  /// account for what arrived meanwhile: it deletes those rows again, so their
+  /// ledger entries go with them and the next run pulls them back, rather than
+  /// reading them as deleted here and archiving the far side's copies.
+  final Map<String, Map<SyncKind, List<String>>> _pulledSinceUndo =
+      <String, Map<SyncKind, List<String>>>{};
+
+  void _dropUndo() {
+    _undo.drop();
+    _mergeUndoToken = null;
+    _pulledSinceUndo.clear();
+  }
+
+  void _recordPull(String target, Map<SyncKind, List<String>> pulled) {
+    if (_undo.pendingToken == null) return;
+    final Map<SyncKind, List<String>> forTarget = _pulledSinceUndo
+        .putIfAbsent(target, () => <SyncKind, List<String>>{});
+    pulled.forEach((SyncKind kind, List<String> keys) {
+      forTarget.putIfAbsent(kind, () => <String>[]).addAll(keys);
+    });
+  }
+
   /// Puts the database back as it stood before the action [token] belongs to.
   /// False once that offer has been overtaken, which is what stops a snackbar
   /// still on screen from undoing something it did not name.
@@ -733,6 +771,13 @@ class TimetableActions {
     await _repo.restore(snapshot);
     if (token == _mergeUndoToken && _mergeUndoTarget != null) {
       await _repo.deleteRemoteLinksFor(_mergeUndoTarget!);
+    }
+    for (final MapEntry<String, Map<SyncKind, List<String>>> target
+        in _pulledSinceUndo.entries) {
+      for (final MapEntry<SyncKind, List<String>> kind
+          in target.value.entries) {
+        await _repo.deleteRemoteLinks(target.key, kind.key, kind.value);
+      }
     }
     await _refresh();
     return true;

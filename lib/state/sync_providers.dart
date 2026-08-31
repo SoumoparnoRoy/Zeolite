@@ -118,7 +118,12 @@ class SyncController extends Notifier<SyncStatus> {
       // through the service, so `settingsProvider` still holds the pre-run
       // value and stamping from it would push the pulled settings straight
       // back out.
-      if (result.pulled > 0) await ref.read(actionsProvider).reloadAfterSync();
+      if (result.pulled > 0) {
+        await ref.read(actionsProvider).reloadAfterSync(
+              target: coordinator.target.id,
+              pulled: result.pulledKeys,
+            );
+      }
       await _stampLastSync(coordinator.status.lastRunAt);
     }
     return result;

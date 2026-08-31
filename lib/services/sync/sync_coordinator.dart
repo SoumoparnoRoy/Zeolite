@@ -38,6 +38,7 @@ class SyncRunResult {
     required this.outcome,
     this.pushed = 0,
     this.pulled = 0,
+    this.pulledKeys = const <SyncKind, List<String>>{},
     this.archived = 0,
     this.overwritten = 0,
     this.review = const <SyncPull>[],
@@ -48,6 +49,11 @@ class SyncRunResult {
   final SyncRunOutcome outcome;
   final int pushed;
   final int pulled;
+
+  /// Which rows [pulled] counted, by kind. Undo needs them by name — see
+  /// `TimetableActions._pulledSinceUndo`.
+  final Map<SyncKind, List<String>> pulledKeys;
+
   final int archived;
 
   /// Rows changed in both places where this device's copy won. Counted
@@ -299,6 +305,7 @@ class SyncCoordinator {
       outcome: SyncRunOutcome.synced,
       pushed: tally.pushed,
       pulled: tally.pulled,
+      pulledKeys: tally.pulledKeys,
       archived: tally.archived,
       overwritten: tally.overwritten,
       review: tally.review,
@@ -431,7 +438,7 @@ class SyncCoordinator {
       } else {
         write.add(link);
       }
-      tally.pulled++;
+      tally.pull(kind, pull.remote.localKey);
     }
 
     for (final SyncPush push in plan.pushes) {
@@ -460,7 +467,7 @@ class SyncCoordinator {
         } else {
           write.add(link);
         }
-        tally.pulled++;
+        tally.pull(kind, state.localKey);
         continue;
       }
       if (push.kind == SyncPushKind.conflict) tally.overwritten++;
@@ -1162,6 +1169,13 @@ class _Tally {
   int overwritten = 0;
   String? message;
   final List<SyncPull> review = <SyncPull>[];
+
+  final Map<SyncKind, List<String>> pulledKeys = <SyncKind, List<String>>{};
+
+  void pull(SyncKind kind, String localKey) {
+    pulled++;
+    pulledKeys.putIfAbsent(kind, () => <String>[]).add(localKey);
+  }
 }
 
 /// The three parts of an attendance sync key, back out of the string.

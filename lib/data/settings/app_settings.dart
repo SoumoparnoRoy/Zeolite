@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../domain/day_grid.dart';
 
@@ -58,6 +59,7 @@ class AppSettings {
     this.lastSyncAt,
     this.lastNotionSyncAt,
     this.syncedAccountId,
+    this.accentColour = AccentColour.violet,
     this.notionAutoSync = true,
     this.scheduleChangedAt,
     this.backupFolderUri,
@@ -149,6 +151,10 @@ class AppSettings {
   /// account this writes into a workspace the person also edits by hand.
   /// Device-local, like the connection it belongs to, so it stays out of the
   /// synced settings row.
+  /// Device-local like [themeMode], and out of the sync hash for the same
+  /// reason: a phone and a tablet can be tinted differently.
+  final AccentColour accentColour;
+
   final bool notionAutoSync;
 
   /// When a setting that shapes the timetable was last changed here.
@@ -253,6 +259,7 @@ class AppSettings {
     DateTime? lastSyncAt,
     DateTime? lastNotionSyncAt,
     String? syncedAccountId,
+    AccentColour? accentColour,
     bool? notionAutoSync,
     DateTime? scheduleChangedAt,
     String? backupFolderUri,
@@ -289,6 +296,7 @@ class AppSettings {
       lastSyncAt: lastSyncAt ?? this.lastSyncAt,
       lastNotionSyncAt: lastNotionSyncAt ?? this.lastNotionSyncAt,
       syncedAccountId: syncedAccountId ?? this.syncedAccountId,
+      accentColour: accentColour ?? this.accentColour,
       notionAutoSync: notionAutoSync ?? this.notionAutoSync,
       scheduleChangedAt: scheduleChangedAt ?? this.scheduleChangedAt,
       // Choosing a folder and clearing one both have to be expressible, and
@@ -388,6 +396,7 @@ class SettingsService {
   static const String _kLastSync = 'ut.lastSync';
   static const String _kLastNotionSync = 'ut.lastNotionSync';
   static const String _kSyncedAccount = 'ut.syncedAccount';
+  static const String _kAccentColour = 'ut.accentColour';
   static const String _kNotionAutoSync = 'ut.notionAutoSync';
   static const String _kBackupFolderUri = 'ut.backupFolderUri';
   static const String _kBackupFolderName = 'ut.backupFolderName';
@@ -437,6 +446,8 @@ class SettingsService {
         null => null,
       },
       syncedAccountId: await prefs.getString(_kSyncedAccount),
+      accentColour:
+          AccentColour.fromName(await prefs.getString(_kAccentColour)),
       notionAutoSync: await prefs.getBool(_kNotionAutoSync) ?? true,
       scheduleChangedAt: switch (await prefs.getInt(_kScheduleChangedAt)) {
         final int ms => DateTime.fromMillisecondsSinceEpoch(ms),
@@ -521,6 +532,7 @@ class SettingsService {
     } else {
       await prefs.setString(_kSyncedAccount, settings.syncedAccountId!);
     }
+    await prefs.setString(_kAccentColour, settings.accentColour.name);
     await prefs.setBool(_kNotionAutoSync, settings.notionAutoSync);
     if (settings.backupFolderUri == null) {
       await prefs.remove(_kBackupFolderUri);

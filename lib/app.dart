@@ -20,8 +20,9 @@ class ZeoliteApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Until settings have loaded there is no stored choice to honour, so the
     // app opens dark rather than flashing a light frame first.
-    final AppThemeMode mode =
-        ref.watch(settingsProvider).value?.themeMode ?? AppThemeMode.dark;
+    final AppSettings? settings = ref.watch(settingsProvider).value;
+    final AppThemeMode mode = settings?.themeMode ?? AppThemeMode.dark;
+    final AccentColour accent = settings?.accentColour ?? AccentColour.violet;
 
     // Watched for their lifetime rather than their value; see the providers.
     ref.watch(syncSchedulerProvider);
@@ -39,8 +40,8 @@ class ZeoliteApp extends ConsumerWidget {
       navigatorObservers: <NavigatorObserver>[
         if (observer != null) observer,
       ],
-      theme: AppTheme.light(),
-      darkTheme: AppTheme.dark(),
+      theme: AppTheme.light(accent),
+      darkTheme: AppTheme.dark(accent),
       themeMode: switch (mode) {
         AppThemeMode.system => ThemeMode.system,
         AppThemeMode.light => ThemeMode.light,

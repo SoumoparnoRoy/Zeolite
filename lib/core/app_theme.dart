@@ -1,7 +1,57 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
+/// The colours the app can be tinted with.
+///
+/// Deliberately none of green, amber or red: those three mean present, tight
+/// and absent everywhere else in the app, and an accent wearing one of them
+/// reads as carrying a meaning it does not.
+enum AccentColour {
+  violet('Violet'),
+  indigo('Indigo'),
+  teal('Teal'),
+  magenta('Magenta'),
+  slate('Slate');
+
+  const AccentColour(this.label);
+
+  final String label;
+
+  static AccentColour fromName(String? value) {
+    for (final AccentColour accent in AccentColour.values) {
+      if (accent.name == value) return accent;
+    }
+    return AccentColour.violet;
+  }
+}
+
+/// One accent in one brightness: the five colours that carry the app's
+/// identity, plus the tint the light theme's card shadow takes.
+///
+/// Hand-picked per pair rather than rotated from a single hue. The two base
+/// palettes are not inversions of each other — light darkens every accent
+/// until it holds against a white card — and a rotation throws that away.
+@immutable
+class _AccentSet {
+  const _AccentSet({
+    required this.accent,
+    required this.soft,
+    required this.top,
+    required this.mid,
+    required this.bottom,
+    this.shadow = const Color(0x00000000),
+  });
+
+  final Color accent;
+  final Color soft;
+  final Color top;
+  final Color mid;
+  final Color bottom;
+  final Color shadow;
+}
 
 /// The colours that change between themes.
 ///
@@ -179,6 +229,126 @@ class AppPalette extends ThemeExtension<AppPalette> {
     // instead of lightening it.
     warning: Color(0xFFB57516),
   );
+
+  /// Violet repeats what [dark] and [light] already hold, so the default
+  /// tint is the one the app shipped with and nothing moves for anybody who
+  /// never opens the picker.
+  static const Map<AccentColour, _AccentSet> _darkAccents =
+      <AccentColour, _AccentSet>{
+    AccentColour.violet: _AccentSet(
+      accent: Color(0xFFA28FFF),
+      soft: Color(0xFF2A2542),
+      top: Color(0xFF5B45E8),
+      mid: Color(0xFF3F27B8),
+      bottom: Color(0xFF241463),
+    ),
+    AccentColour.indigo: _AccentSet(
+      accent: Color(0xFF8FB0FF),
+      soft: Color(0xFF1E2740),
+      top: Color(0xFF3D5BE8),
+      mid: Color(0xFF2540B8),
+      bottom: Color(0xFF142463),
+    ),
+    AccentColour.teal: _AccentSet(
+      accent: Color(0xFF5FD8D2),
+      soft: Color(0xFF14302F),
+      top: Color(0xFF1B8F8B),
+      mid: Color(0xFF12706E),
+      bottom: Color(0xFF084543),
+    ),
+    AccentColour.magenta: _AccentSet(
+      accent: Color(0xFFFF93D6),
+      soft: Color(0xFF3A1E33),
+      top: Color(0xFFD63C9E),
+      mid: Color(0xFFA82778),
+      bottom: Color(0xFF63144A),
+    ),
+    AccentColour.slate: _AccentSet(
+      accent: Color(0xFFA9B6CC),
+      soft: Color(0xFF232933),
+      top: Color(0xFF4A5772),
+      mid: Color(0xFF333D52),
+      bottom: Color(0xFF1C2230),
+    ),
+  };
+
+  static const Map<AccentColour, _AccentSet> _lightAccents =
+      <AccentColour, _AccentSet>{
+    AccentColour.violet: _AccentSet(
+      accent: Color(0xFF6C4CF0),
+      soft: Color(0xFFEDE8FE),
+      top: Color(0xFF7B5CFF),
+      mid: Color(0xFF5B3BE8),
+      bottom: Color(0xFF4B2FD6),
+      shadow: Color(0x124C4696),
+    ),
+    AccentColour.indigo: _AccentSet(
+      accent: Color(0xFF2F55E0),
+      soft: Color(0xFFE4EBFE),
+      top: Color(0xFF5C86FF),
+      mid: Color(0xFF3B5BE8),
+      bottom: Color(0xFF2F49D6),
+      shadow: Color(0x12324C96),
+    ),
+    AccentColour.teal: _AccentSet(
+      accent: Color(0xFF0E8F8A),
+      soft: Color(0xFFDFF4F3),
+      top: Color(0xFF17B2AC),
+      mid: Color(0xFF0E8F8A),
+      bottom: Color(0xFF0A736F),
+      shadow: Color(0x12147E7A),
+    ),
+    AccentColour.magenta: _AccentSet(
+      accent: Color(0xFFC4267F),
+      soft: Color(0xFFFDE6F3),
+      top: Color(0xFFE8579F),
+      mid: Color(0xFFC43B85),
+      bottom: Color(0xFFA82A72),
+      shadow: Color(0x12961B6B),
+    ),
+    AccentColour.slate: _AccentSet(
+      accent: Color(0xFF4B5A72),
+      soft: Color(0xFFE8ECF3),
+      top: Color(0xFF6E7F9C),
+      mid: Color(0xFF4F5E78),
+      bottom: Color(0xFF3D4A60),
+      shadow: Color(0x123E4A63),
+    ),
+  };
+
+  /// A value class in every other respect, so equality is by value too. It
+  /// also keeps `AppTheme.dark()` equal to [dark]: tinting rebuilds the
+  /// palette, and without this an untinted theme stopped comparing equal to
+  /// the constant it was built from.
+  List<Object?> get _values => <Object?>[
+        brightness, canvas, surface, surfaceHigh, surfaceHigher, navSurface,
+        outline, outlineSoft, hairline, accent, accentSoft, cyan, gradientTop,
+        gradientMid, gradientBottom, cardShadow, textPrimary, textSecondary,
+        textTertiary, textFaint, present, absent, cancelled, warning,
+      ];
+
+  @override
+  bool operator ==(Object other) =>
+      other is AppPalette && listEquals(other._values, _values);
+
+  @override
+  int get hashCode => Object.hashAll(_values);
+
+  /// The base palette tinted. Only the five identity colours move — surfaces,
+  /// text and the status colours are the same whichever accent is chosen.
+  AppPalette withAccent(AccentColour accent) {
+    final _AccentSet set = (brightness == Brightness.dark
+        ? _darkAccents
+        : _lightAccents)[accent]!;
+    return copyWith(
+      accent: set.accent,
+      accentSoft: set.soft,
+      gradientTop: set.top,
+      gradientMid: set.mid,
+      gradientBottom: set.bottom,
+      cardShadow: set.shadow,
+    );
+  }
 
   @override
   AppPalette copyWith({
@@ -455,9 +625,11 @@ class AppTheme {
     );
   }
 
-  static ThemeData dark() => _build(AppPalette.dark);
+  static ThemeData dark([AccentColour accent = AccentColour.violet]) =>
+      _build(AppPalette.dark.withAccent(accent));
 
-  static ThemeData light() => _build(AppPalette.light);
+  static ThemeData light([AccentColour accent = AccentColour.violet]) =>
+      _build(AppPalette.light.withAccent(accent));
 
   /// One builder for both themes. Everything below reads from [p], so a colour
   /// can never be right in one theme and hard-coded wrong in the other.

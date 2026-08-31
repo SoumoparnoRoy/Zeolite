@@ -320,6 +320,32 @@ class SettingsScreen extends ConsumerWidget {
                     : 'Always ${settings.themeMode.label.toLowerCase()}, whatever '
                         'your device is set to.',
               ),
+              const SizedBox(height: AppSpacing.md),
+              SurfaceCard(
+                child: Row(
+                  children: <Widget>[
+                    for (final AccentColour accent in AccentColour.values)
+                      Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.only(
+                            right: accent == AccentColour.values.last
+                                ? 0
+                                : AppSpacing.sm,
+                          ),
+                          child: _AccentOption(
+                            accent: accent,
+                            selected: settings.accentColour == accent,
+                            onTap: () => controller
+                                .save(settings.copyWith(accentColour: accent)),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              _Hint('${settings.accentColour.label} tints the headers, the '
+                  'buttons and every highlight. It stays on this device.'),
               const SizedBox(height: AppSpacing.xl),
               const SectionHeader('Notifications'),
               SurfaceCard(
@@ -1355,6 +1381,65 @@ class _Row extends StatelessWidget {
 }
 
 /// One of the three theme choices, shown as a tappable tile.
+class _AccentOption extends StatelessWidget {
+  const _AccentOption({
+    required this.accent,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final AccentColour accent;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final AppPalette p = context.palette;
+    // The swatch has to show the accent being offered, not the one in force,
+    // so it is drawn from that accent's own palette at the current brightness.
+    final AppPalette sample = (p.brightness == Brightness.dark
+            ? AppPalette.dark
+            : AppPalette.light)
+        .withAccent(accent);
+
+    return Semantics(
+      label: accent.label,
+      selected: selected,
+      button: true,
+      child: Material(
+        color: selected ? p.accentSoft : p.surfaceHigh,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+            child: Center(
+              child: Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: sample.accentGradient,
+                  // Slate on a dark card is barely a shape without the ring.
+                  border: Border.all(
+                    color: selected ? sample.accent : p.outline,
+                    width: 2,
+                  ),
+                ),
+                child: selected
+                    ? const Icon(Icons.check_rounded,
+                        size: 16, color: Colors.white)
+                    : null,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ThemeOption extends StatelessWidget {
   const _ThemeOption({
     required this.mode,

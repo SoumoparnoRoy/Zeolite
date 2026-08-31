@@ -88,7 +88,9 @@ flutter_launcher_icons:
   android: true
   ios: false
   image_path: assets/icon/zeolite_icon.png
-  adaptive_icon_background: "#F3F1FF"
+  # The artwork's own dark field, so the parallax shift never reveals a
+  # colour behind it.
+  adaptive_icon_background: "#000A11"
   adaptive_icon_foreground: assets/icon/zeolite_icon_foreground.png
   # Below 26 there is no adaptive icon, so the legacy bitmap still gets built.
   min_sdk_android: 24

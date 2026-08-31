@@ -35,6 +35,11 @@ class NotionSyncTarget implements SyncTarget {
   @override
   String get id => targetId;
 
+  // A page that has gone was removed by hand, and putting it back would
+  // override that.
+  @override
+  bool get recreatesMissingRows => false;
+
   /// A person edits these rows by hand, so a pull is somebody's typing and
   /// goes through the import preview rather than straight into the database.
   @override

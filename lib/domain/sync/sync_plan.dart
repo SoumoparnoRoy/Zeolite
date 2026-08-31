@@ -116,10 +116,12 @@ class SyncPlan {
 
   /// [remote] null means the far side was not read this run — every link is
   /// then taken at its stored hash, which turns the run into a push-only one.
+  /// [recreateMissing] is the target's `recreatesMissingRows`.
   static SyncPlan from({
     required List<SyncItem> local,
     required List<RemoteLink> links,
     List<RemoteState>? remote,
+    bool recreateMissing = false,
   }) {
     final Map<String, RemoteLink> linkByKey = <String, RemoteLink>{
       for (final RemoteLink link in links) link.localKey: link,
@@ -145,6 +147,15 @@ class SyncPlan {
             remote: orphan,
           ),
         );
+        continue;
+      }
+
+      // Pushed without the link: the far side decides the id, and on a store
+      // that keys documents on the sync key this lands back in the same place.
+      if (recreateMissing &&
+          remote != null &&
+          !remoteByKey.containsKey(item.localKey)) {
+        pushes.add(SyncPush(item: item, kind: SyncPushKind.create));
         continue;
       }
 
@@ -204,8 +215,8 @@ class SyncPlan {
   ) {
     if (remote == null) return false;
     final RemoteState? state = remoteByKey[link.localKey];
-    // A linked page that has stopped existing is not a change to pull; the
-    // next push recreates it.
+    // Not a change to pull. Whether it is a change to push is the caller's
+    // `recreateMissing`, decided before this runs.
     if (state == null) return false;
     return state.hash != link.remoteHash;
   }

@@ -13,6 +13,10 @@ class FakeSyncTarget implements SyncTarget {
   @override
   bool trustsPulls = false;
 
+  /// Mutable so a test can model either kind of far side.
+  @override
+  bool recreatesMissingRows = false;
+
   /// Mutable so a test can shrink it to the one kind a Notion-shaped target
   /// keeps.
   @override

@@ -404,6 +404,11 @@ abstract class SyncTarget {
   /// has to go through the preview first.
   bool get trustsPulls;
 
+  /// Whether a linked row the far side no longer holds should be pushed again.
+  /// True for a store this app owns, where the row going missing is damage to
+  /// repair. False where a person works by hand and deleted it on purpose.
+  bool get recreatesMissingRows => false;
+
   /// What this target keeps. Notion holds attendance and nothing else, and a
   /// target that answered "fine" to a room or a settings row would leave a
   /// ledger entry pointing at a page nobody ever made.

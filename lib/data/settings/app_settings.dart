@@ -57,6 +57,7 @@ class AppSettings {
     this.lastAutoBackupAt,
     this.lastSyncAt,
     this.lastNotionSyncAt,
+    this.syncedAccountId,
     this.notionAutoSync = true,
     this.scheduleChangedAt,
     this.backupFolderUri,
@@ -137,6 +138,10 @@ class AppSettings {
   /// account make Notion look freshly synced, and neither would ever be
   /// resumed on staleness again.
   final DateTime? lastNotionSyncAt;
+
+  /// Which account the `firebase` ledger was built against. Without it a new
+  /// account inherits links saying its rows are already pushed.
+  final String? syncedAccountId;
 
   /// Whether marking also writes to Notion without being asked.
   ///
@@ -247,6 +252,7 @@ class AppSettings {
     DateTime? lastAutoBackupAt,
     DateTime? lastSyncAt,
     DateTime? lastNotionSyncAt,
+    String? syncedAccountId,
     bool? notionAutoSync,
     DateTime? scheduleChangedAt,
     String? backupFolderUri,
@@ -282,6 +288,7 @@ class AppSettings {
       lastAutoBackupAt: lastAutoBackupAt ?? this.lastAutoBackupAt,
       lastSyncAt: lastSyncAt ?? this.lastSyncAt,
       lastNotionSyncAt: lastNotionSyncAt ?? this.lastNotionSyncAt,
+      syncedAccountId: syncedAccountId ?? this.syncedAccountId,
       notionAutoSync: notionAutoSync ?? this.notionAutoSync,
       scheduleChangedAt: scheduleChangedAt ?? this.scheduleChangedAt,
       // Choosing a folder and clearing one both have to be expressible, and
@@ -380,6 +387,7 @@ class SettingsService {
   static const String _kLastAutoBackup = 'ut.lastAutoBackup';
   static const String _kLastSync = 'ut.lastSync';
   static const String _kLastNotionSync = 'ut.lastNotionSync';
+  static const String _kSyncedAccount = 'ut.syncedAccount';
   static const String _kNotionAutoSync = 'ut.notionAutoSync';
   static const String _kBackupFolderUri = 'ut.backupFolderUri';
   static const String _kBackupFolderName = 'ut.backupFolderName';
@@ -428,6 +436,7 @@ class SettingsService {
         final int ms => DateTime.fromMillisecondsSinceEpoch(ms),
         null => null,
       },
+      syncedAccountId: await prefs.getString(_kSyncedAccount),
       notionAutoSync: await prefs.getBool(_kNotionAutoSync) ?? true,
       scheduleChangedAt: switch (await prefs.getInt(_kScheduleChangedAt)) {
         final int ms => DateTime.fromMillisecondsSinceEpoch(ms),
@@ -506,6 +515,11 @@ class SettingsService {
         _kLastNotionSync,
         settings.lastNotionSyncAt!.millisecondsSinceEpoch,
       );
+    }
+    if (settings.syncedAccountId == null) {
+      await prefs.remove(_kSyncedAccount);
+    } else {
+      await prefs.setString(_kSyncedAccount, settings.syncedAccountId!);
     }
     await prefs.setBool(_kNotionAutoSync, settings.notionAutoSync);
     if (settings.backupFolderUri == null) {

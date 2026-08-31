@@ -109,6 +109,8 @@ class SyncController extends Notifier<SyncStatus> {
     // how the user reaches the screen that answers it.
     if (!force && _last?.outcome == SyncRunOutcome.reviewNeeded) return null;
 
+    await _forgetLedgerIfAccountChanged(coordinator.target.id);
+
     state = coordinator.status.running();
     final SyncRunResult result = await coordinator.run(force: force);
     _last = result;
@@ -127,6 +129,29 @@ class SyncController extends Notifier<SyncStatus> {
       await _stampLastSync(coordinator.status.lastRunAt);
     }
     return result;
+  }
+
+  /// The ledger keys on the target, and the target's id is the same string for
+  /// every account, so nothing about signing out or deleting an account
+  /// invalidates it on its own. Left alone, the next account inherits links
+  /// saying its rows are already pushed, and a term's worth of history sits on
+  /// a device the account has never been told about.
+  ///
+  /// A device that has never recorded which account it synced with keeps its
+  /// ledger: the planner's `recreatesMissingRows` repairs it on the next run,
+  /// and wiping here would put a device whose ledger is fine through a merge.
+  Future<void> _forgetLedgerIfAccountChanged(String target) async {
+    final User? user = ref.read(signedInUserProvider).value;
+    final AppSettings? settings = ref.read(settingsProvider).value;
+    if (user == null || settings == null) return;
+    if (settings.syncedAccountId == user.uid) return;
+
+    if (settings.syncedAccountId != null) {
+      await ref.read(repositoryProvider).deleteRemoteLinksFor(target);
+    }
+    await ref
+        .read(settingsProvider.notifier)
+        .save(settings.copyWith(syncedAccountId: user.uid));
   }
 
   /// Kept in settings rather than only on the coordinator so the scheduler can

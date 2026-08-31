@@ -197,12 +197,17 @@ class SyncCoordinator {
   Future<SyncRunResult> run({
     bool force = false,
     Map<String, SyncSide>? merge,
+    bool rewrite = false,
   }) {
     final Future<SyncRunResult>? inFlight = _inFlight;
-    if (inFlight == null) return _start(force: force, merge: merge);
+    if (inFlight == null) {
+      return _start(force: force, merge: merge, rewrite: rewrite);
+    }
 
     // Only a run started with the answer can apply it.
-    if (merge != null) return _queueAfter(inFlight, force: force, merge: merge);
+    if (merge != null || rewrite) {
+      return _queueAfter(inFlight, force: force, merge: merge, rewrite: rewrite);
+    }
 
     // Local rows may have moved since the running one read them.
     _rerunWanted = true;
@@ -212,8 +217,10 @@ class SyncCoordinator {
   Future<SyncRunResult> _start({
     required bool force,
     required Map<String, SyncSide>? merge,
+    bool rewrite = false,
   }) {
-    final Future<SyncRunResult> attempt = _run(force: force, merge: merge);
+    final Future<SyncRunResult> attempt =
+        _run(force: force, merge: merge, rewrite: rewrite);
     _inFlight = attempt;
     return attempt.whenComplete(() {
       _inFlight = null;
@@ -228,14 +235,16 @@ class SyncCoordinator {
     Future<SyncRunResult> previous, {
     required bool force,
     required Map<String, SyncSide>? merge,
+    bool rewrite = false,
   }) async {
     await previous.then<void>((_) {}, onError: (_, __) {});
-    return run(force: force, merge: merge);
+    return run(force: force, merge: merge, rewrite: rewrite);
   }
 
   Future<SyncRunResult> _run({
     bool force = false,
     Map<String, SyncSide>? merge,
+    bool rewrite = false,
   }) async {
     if (!force && !canRunNow()) {
       return const SyncRunResult(outcome: SyncRunOutcome.deferred);
@@ -259,7 +268,13 @@ class SyncCoordinator {
     final _Local read = await _readLocal();
     final Map<SyncKind, List<SyncItem>> local = read.items;
 
-    if (merge == null && _firstRunMerge(local, links, remote) == _Merge.review) {
+    // [rewrite] is the user having already answered this: they asked for the
+    // far side to be written over. Without it, forgetting the ledger to force
+    // a rewrite looks exactly like a first run with data on both sides, and
+    // the rewrite turns into the question it was meant to settle.
+    if (merge == null &&
+        !rewrite &&
+        _firstRunMerge(local, links, remote) == _Merge.review) {
       _status = _status.succeeded(_now());
       return SyncRunResult(
         outcome: SyncRunOutcome.reviewNeeded,
@@ -417,8 +432,12 @@ class SyncCoordinator {
     required _Tally tally,
     bool joining = false,
   }) async {
-    final SyncPlan plan =
-        SyncPlan.from(local: items, links: links, remote: remote);
+    final SyncPlan plan = SyncPlan.from(
+      local: items,
+      links: links,
+      remote: remote,
+      recreateMissing: target.recreatesMissingRows,
+    );
     final Map<String, RemoteState> remoteByKey = <String, RemoteState>{
       for (final RemoteState state in remote ?? const <RemoteState>[])
         state.localKey: state,

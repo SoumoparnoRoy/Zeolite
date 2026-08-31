@@ -106,13 +106,14 @@ class NotionSyncController extends Notifier<SyncStatus> {
 
   /// Never awaited by a write path — marking has already succeeded locally by
   /// the time this runs, and a failure is a line in Settings, not a modal.
-  Future<SyncRunResult?> run({bool force = false}) async {
+  Future<SyncRunResult?> run({bool force = false, bool rewrite = false}) async {
     final SyncCoordinator? coordinator = ref.read(notionCoordinatorProvider);
     if (coordinator == null) return null;
     if (state.state == SyncState.running) return null;
 
     state = coordinator.status.running();
-    final SyncRunResult result = await coordinator.run(force: force);
+    final SyncRunResult result =
+        await coordinator.run(force: force, rewrite: rewrite);
     _last = result;
     state = coordinator.status;
     if (result.ok) {
@@ -163,7 +164,7 @@ class NotionSyncController extends Notifier<SyncStatus> {
     await ref
         .read(repositoryProvider)
         .deleteRemoteLinksFor(NotionSyncTarget.targetId);
-    return run(force: true);
+    return run(force: true, rewrite: true);
   }
 
   /// Its own stamp, so staleness is judged per target — see

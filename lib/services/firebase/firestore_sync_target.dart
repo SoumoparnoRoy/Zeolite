@@ -18,6 +18,11 @@ class FirestoreSyncTarget implements SyncTarget {
   @override
   String get id => 'firebase';
 
+  // A document that is simply absent means the account's data is gone: a row
+  // deleted properly leaves a tombstone, which `fetch` returns like any other.
+  @override
+  bool get recreatesMissingRows => true;
+
   /// Only ever holds what this app wrote, so a pull is the user's own second
   /// device rather than someone's hand edit, and asking them to review their
   /// own marks would make a fresh install unusable.

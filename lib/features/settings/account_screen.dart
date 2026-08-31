@@ -314,6 +314,7 @@ class _SyncSection extends ConsumerWidget {
     }
     await navigator.push(
       MaterialPageRoute<void>(
+        settings: const RouteSettings(name: 'sync_merge'),
         builder: (BuildContext context) => SyncMergeScreen(plan: plan),
       ),
     );

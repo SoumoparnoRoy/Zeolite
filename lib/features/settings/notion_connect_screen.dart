@@ -153,6 +153,7 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
     unawaited(
       navigator.pushReplacement(
         MaterialPageRoute<void>(
+          settings: const RouteSettings(name: 'notion_mapping'),
           builder: (BuildContext context) => const NotionMappingScreen(),
         ),
       ),

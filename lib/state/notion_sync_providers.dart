@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/models/class_category.dart';
@@ -116,6 +118,10 @@ class NotionSyncController extends Notifier<SyncStatus> {
         await coordinator.run(force: force, rewrite: rewrite);
     _last = result;
     state = coordinator.status;
+    unawaited(ref.read(analyticsProvider).syncRan(
+          target: 'notion',
+          outcome: result.outcome.name,
+        ));
     if (result.ok) {
       // A run writes through the repository, so without this a row edited in
       // Notion sits in the database unseen until something else reloads.

@@ -130,6 +130,7 @@ class SettingsScreen extends ConsumerWidget {
                           '$classCount ${classCount == 1 ? 'class' : 'classes'}',
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
+                      settings: const RouteSettings(name: 'subjects'),
                       builder: (BuildContext context) => const SubjectsScreen(),
                     ),
                   ),
@@ -144,6 +145,7 @@ class SettingsScreen extends ConsumerWidget {
                   value: 'Paste the whole week at once',
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
+                      settings: const RouteSettings(name: 'import_timetable'),
                       builder: (BuildContext context) =>
                           const ImportTimetableScreen(),
                     ),
@@ -509,6 +511,7 @@ class SettingsScreen extends ConsumerWidget {
                       'Not signed in — nothing is backed up',
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
+                      settings: const RouteSettings(name: 'account'),
                       builder: (BuildContext context) => const AccountScreen(),
                     ),
                   ),
@@ -530,6 +533,7 @@ class SettingsScreen extends ConsumerWidget {
                           'Not connected',
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute<void>(
+                          settings: const RouteSettings(name: 'notion_connect'),
                           builder: (BuildContext context) =>
                               const NotionConnectScreen(),
                         ),
@@ -544,6 +548,7 @@ class SettingsScreen extends ConsumerWidget {
                             'Not set up',
                         onTap: () => Navigator.of(context).push(
                           MaterialPageRoute<void>(
+                            settings: const RouteSettings(name: 'notion_mapping'),
                             builder: (BuildContext context) =>
                                 const NotionMappingScreen(),
                           ),
@@ -638,8 +643,9 @@ class SettingsScreen extends ConsumerWidget {
               Center(
                 child: Text(
                   'Zeolite · 1.0.0\n'
-                  'Your data stays on this device unless you sign in '
-                  'or connect Notion.',
+                  'Your timetable and attendance stay on this device unless '
+                  'you sign in or connect Notion. Zeolite counts how the app '
+                  'is used either way.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12,
@@ -1008,6 +1014,7 @@ class SettingsScreen extends ConsumerWidget {
         );
         return;
       }
+      unawaited(ref.read(analyticsProvider).backupExported());
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Backup saved.')),
       );
@@ -1050,6 +1057,7 @@ class SettingsScreen extends ConsumerWidget {
 
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
+        settings: const RouteSettings(name: 'notion_import'),
         builder: (BuildContext context) => NotionImportScreen(export: export),
       ),
     );
@@ -1115,6 +1123,7 @@ class SettingsScreen extends ConsumerWidget {
 
     await navigator.push(
       MaterialPageRoute<void>(
+        settings: const RouteSettings(name: 'notion_import'),
         builder: (BuildContext context) => NotionImportScreen(export: export),
       ),
     );
@@ -1542,6 +1551,7 @@ class _NotionSyncCard extends ConsumerWidget {
                   ? null
                   : () => Navigator.of(context).push(
                         MaterialPageRoute<void>(
+                          settings: const RouteSettings(name: 'notion_review'),
                           builder: (BuildContext context) =>
                               const NotionReviewScreen(),
                         ),

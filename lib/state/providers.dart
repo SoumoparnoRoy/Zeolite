@@ -1,4 +1,8 @@
-import 'package:flutter/foundation.dart';
+import 'dart:async';
+
+import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/app_theme.dart';
@@ -28,6 +32,7 @@ import '../domain/sync/sync_target.dart';
 import '../domain/tag_stats.dart';
 import '../domain/timetable_import.dart';
 import '../services/backup_folder.dart';
+import '../services/analytics_service.dart';
 import '../services/backup_service.dart';
 import '../services/notification_service.dart';
 import '../services/sync/sync_coordinator.dart';
@@ -43,6 +48,30 @@ final repositoryProvider = Provider<ZeoliteRepository>(
 
 final settingsServiceProvider = Provider<SettingsService>(
   (ref) => SettingsService(),
+);
+
+/// Null where Firebase did not come up, which is also every widget test —
+/// `MaterialApp` takes an empty observer list rather than a broken one.
+final analyticsObserverProvider = Provider<FirebaseAnalyticsObserver?>(
+  (ref) => Firebase.apps.isEmpty
+      ? null
+      : FirebaseAnalyticsObserver(
+          analytics: FirebaseAnalytics.instance,
+          // The shell sits at '/', which [RootShell] already reports as
+          // whichever tab is showing. Without this every launch files a screen
+          // called '/' alongside the real one.
+          nameExtractor: (RouteSettings route) =>
+              route.name == '/' ? null : route.name,
+        ),
+);
+
+/// [NoAnalytics] where Firebase did not come up. `main` lets that failure pass
+/// so the app still runs offline, and a measurement is not the thing to break
+/// it — tests get the same, with no Firebase to initialise.
+final analyticsProvider = Provider<Analytics>(
+  (ref) => Firebase.apps.isEmpty
+      ? const NoAnalytics()
+      : FirebaseAnalyticsService(FirebaseAnalytics.instance),
 );
 
 /// Whether the chosen backup folder can still be written to. Asked when
@@ -607,6 +636,8 @@ class TimetableActions {
 
   ZeoliteRepository get _repo => _ref.read(repositoryProvider);
 
+  Analytics get _analytics => _ref.read(analyticsProvider);
+
   final UndoStore _undo = UndoStore();
 
   Future<void> _refresh() async {
@@ -780,6 +811,7 @@ class TimetableActions {
       }
     }
     await _refresh();
+    unawaited(_analytics.undoUsed());
     return true;
   }
 
@@ -921,6 +953,7 @@ class TimetableActions {
 
     await _refresh();
     _undo.arm(before);
+    unawaited(_analytics.timetableImported('paste'));
   }
 
   /// Brings every class and every mark into line with what its subject's
@@ -1030,6 +1063,7 @@ class TimetableActions {
 
     await _refresh();
     _undo.arm(before);
+    unawaited(_analytics.timetableImported('totals'));
     return decisions.length;
   }
 
@@ -1105,6 +1139,7 @@ class TimetableActions {
     await _repo.setManyAttendance(records);
     await _refresh();
     _undo.arm(before);
+    unawaited(_analytics.timetableImported('notion'));
     return records.length;
   }
 
@@ -1270,6 +1305,9 @@ class TimetableActions {
       ),
     );
     await _refresh();
+    // Both screens that mark come through here, so this is the one place it
+    // has to be counted.
+    unawaited(_analytics.attendanceMarked());
   }
 
   /// Attaches or removes the tag on a marked occurrence, leaving the status
@@ -1398,6 +1436,7 @@ class TimetableActions {
     _ref.invalidate(settingsProvider);
     await _ref.read(settingsProvider.future);
     await _refresh();
+    unawaited(_analytics.backupRestored());
   }
 }
 

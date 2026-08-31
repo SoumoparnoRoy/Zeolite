@@ -98,6 +98,7 @@ class _ImportTimetableScreenState
         }
         await Navigator.of(context).push(
           MaterialPageRoute<void>(
+            settings: const RouteSettings(name: 'totals_import'),
             builder: (_) => TotalsImportScreen(totals: totals),
           ),
         );

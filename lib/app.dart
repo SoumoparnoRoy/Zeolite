@@ -1,3 +1,4 @@
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -26,9 +27,18 @@ class ZeoliteApp extends ConsumerWidget {
     ref.watch(syncSchedulerProvider);
     ref.watch(notionSchedulerProvider);
 
+    final FirebaseAnalyticsObserver? observer =
+        ref.watch(analyticsObserverProvider);
+
     return MaterialApp(
       title: 'Zeolite',
       debugShowCheckedModeBanner: false,
+      // Reaches the pushed screens only, and only because they carry a
+      // `RouteSettings` name — the tabs are an [IndexedStack], so [RootShell]
+      // reports those itself.
+      navigatorObservers: <NavigatorObserver>[
+        if (observer != null) observer,
+      ],
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
       themeMode: switch (mode) {
@@ -91,14 +101,14 @@ class _Bootstrap extends ConsumerWidget {
 ///
 /// An [IndexedStack] keeps each tab's scroll position and state alive, so
 /// switching tabs feels instant rather than rebuilding from scratch.
-class RootShell extends StatefulWidget {
+class RootShell extends ConsumerStatefulWidget {
   const RootShell({super.key});
 
   @override
-  State<RootShell> createState() => _RootShellState();
+  ConsumerState<RootShell> createState() => _RootShellState();
 }
 
-class _RootShellState extends State<RootShell> {
+class _RootShellState extends ConsumerState<RootShell> {
   int _index = 0;
 
   static const List<Widget> _screens = <Widget>[
@@ -107,6 +117,22 @@ class _RootShellState extends State<RootShell> {
     StatsScreen(),
     SettingsScreen(),
   ];
+
+  /// Same order as [_screens], so a tab added to one and not the other shows.
+  static const List<String> _tabNames = <String>[
+    'today',
+    'timetable',
+    'stats',
+    'settings',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _report());
+  }
+
+  void _report() => ref.read(analyticsProvider).screen(_tabNames[_index]);
 
   @override
   Widget build(BuildContext context) {
@@ -130,7 +156,10 @@ class _RootShellState extends State<RootShell> {
         ),
         child: NavigationBar(
           selectedIndex: _index,
-          onDestinationSelected: (int value) => setState(() => _index = value),
+          onDestinationSelected: (int value) {
+            setState(() => _index = value);
+            _report();
+          },
           destinations: const <NavigationDestination>[
             NavigationDestination(
               icon: Icon(Icons.today_outlined),

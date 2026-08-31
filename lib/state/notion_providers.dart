@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/notion/notion_mapping.dart';
@@ -5,6 +7,7 @@ import '../domain/sync/sync_target.dart';
 import '../services/notion/notion_auth_client.dart';
 import '../services/notion/notion_client.dart';
 import '../services/notion/notion_connection_store.dart';
+import 'providers.dart';
 
 final notionAuthClientProvider =
     Provider<NotionAuthClient>((ref) => NotionAuthClient());
@@ -51,6 +54,7 @@ class NotionConnectionController extends AsyncNotifier<NotionTokens?> {
 
   Future<void> connect(NotionTokens tokens) async {
     await ref.read(notionConnectionStoreProvider).write(tokens);
+    unawaited(ref.read(analyticsProvider).notionConnected());
     state = AsyncData<NotionTokens?>(tokens);
   }
 

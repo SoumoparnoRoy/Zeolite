@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -115,6 +117,10 @@ class SyncController extends Notifier<SyncStatus> {
     final SyncRunResult result = await coordinator.run(force: force);
     _last = result;
     state = coordinator.status;
+    unawaited(ref.read(analyticsProvider).syncRan(
+          target: 'account',
+          outcome: result.outcome.name,
+        ));
     if (result.ok) {
       // Reload before stamping, not after: a pulled settings row is written
       // through the service, so `settingsProvider` still holds the pre-run

@@ -74,14 +74,17 @@ void main() {
   test('the promise in Settings names both ways data leaves', () {
     final String source = settings.readAsStringSync();
 
-    // In the two pieces the source wraps into: this reads the file, not the
+    // In the pieces the source wraps into: this reads the file, not the
     // rendered string.
-    expect(source, contains('unless you sign in '));
-    expect(source, contains('or connect Notion.'));
+    expect(source, contains('stay on this device unless '));
+    expect(source, contains('you sign in or connect Notion.'));
     // Naming only Notion was false for every signed-in user once Firestore
-    // sync landed.
+    // sync landed, and naming only those two was false for everybody once
+    // Analytics did: it reports on every install, account or not.
+    expect(source, contains('counts how the app '));
     expect(source,
         isNot(contains('stays on this device unless you connect Notion')));
+    expect(source, isNot(contains('Your data stays on this device unless')));
     expect(source, isNot(contains('everything stays on this device')));
   });
 

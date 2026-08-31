@@ -520,6 +520,7 @@ class _SubjectDetail extends ConsumerWidget {
             // this sheet would unmount the context being navigated from.
             await Navigator.of(context).push(
               MaterialPageRoute<void>(
+                settings: const RouteSettings(name: 'attendance_log'),
                 builder: (BuildContext context) =>
                     AttendanceLogScreen(subject: subject),
               ),

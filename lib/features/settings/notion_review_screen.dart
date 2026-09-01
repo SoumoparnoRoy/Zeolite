@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
+import '../../data/models/attendance_record.dart';
 import '../../data/models/attendance_status.dart';
 import '../../data/models/subject.dart';
 import '../../domain/sync/sync_merge.dart';
@@ -47,8 +48,10 @@ class _NotionReviewScreenState extends ConsumerState<NotionReviewScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final List<Subject> subjects =
-        ref.watch(timetableProvider).value?.subjects ?? const <Subject>[];
+    final TimetableData? data = ref.watch(timetableProvider).value;
+    final List<Subject> subjects = data?.subjects ?? const <Subject>[];
+    final List<AttendanceRecord> records =
+        data?.records ?? const <AttendanceRecord>[];
     final int taking = _choices.values
         .where((SyncSide side) => side == SyncSide.there)
         .length;
@@ -83,6 +86,7 @@ class _NotionReviewScreenState extends ConsumerState<NotionReviewScreen> {
                     _Row(
                       pull: pull,
                       subjects: subjects,
+                      records: records,
                       side: _choices[pull.remote.localKey] ?? SyncSide.here,
                       onChanged: (SyncSide side) => setState(
                         () => _choices[pull.remote.localKey] = side,
@@ -127,12 +131,14 @@ class _Row extends StatelessWidget {
   const _Row({
     required this.pull,
     required this.subjects,
+    required this.records,
     required this.side,
     required this.onChanged,
   });
 
   final SyncPull pull;
   final List<Subject> subjects;
+  final List<AttendanceRecord> records;
   final SyncSide side;
   final ValueChanged<SyncSide> onChanged;
 
@@ -150,6 +156,15 @@ class _Row extends StatelessWidget {
           Text(
             'Notion says ${_describe(pull.remote.fields)}',
             style: TextStyle(color: context.palette.textSecondary),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            _here(),
+            style: TextStyle(
+              color: _mark() == null
+                  ? context.palette.warning
+                  : context.palette.textSecondary,
+            ),
           ),
           const SizedBox(height: AppSpacing.sm),
           Row(
@@ -192,6 +207,41 @@ class _Row extends StatelessWidget {
     if (key == null) return name;
     final DateTime date = Dates.fromKey(key);
     return '$name · ${Dates.formatDayMonth(date)}';
+  }
+
+  /// The mark this key names, or null when there is none.
+  ///
+  /// A row with nothing here is the case worth seeing: it cannot be answered
+  /// by keeping a local mark that does not exist, and choosing to keep this
+  /// side retires the page instead.
+  AttendanceRecord? _mark() {
+    final List<String> parts = pull.remote.localKey.split(':');
+    if (parts.length < 3) return null;
+    final int? key = int.tryParse(parts[1]);
+    final int? start = int.tryParse(parts[2]);
+    if (key == null || start == null) return null;
+
+    final int? subjectId = subjects
+        .where((Subject s) => s.uuid == parts.first)
+        .firstOrNull
+        ?.id;
+    if (subjectId == null) return null;
+
+    return records
+        .where((AttendanceRecord r) =>
+            r.subjectId == subjectId &&
+            r.startMinutes == start &&
+            Dates.keyOf(r.date) == key)
+        .firstOrNull;
+  }
+
+  String _here() {
+    final AttendanceRecord? mark = _mark();
+    if (mark == null) return 'Not marked on this device';
+    return 'Here it is ${_describe(<String, Object?>{
+          'status': mark.status.name,
+          'weight': mark.weight,
+        })}';
   }
 
   static String _describe(Map<String, Object?> fields) {

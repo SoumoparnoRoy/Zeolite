@@ -9,6 +9,7 @@ import 'features/settings/settings_screen.dart';
 import 'features/stats/stats_screen.dart';
 import 'features/timetable/timetable_screen.dart';
 import 'features/today/today_screen.dart';
+import 'services/notification_service.dart';
 import 'state/providers.dart';
 import 'state/notion_sync_providers.dart';
 import 'state/sync_providers.dart';
@@ -105,13 +106,34 @@ class _Bootstrap extends ConsumerWidget {
 class RootShell extends ConsumerStatefulWidget {
   const RootShell({super.key});
 
+  /// Same order as the shell's screens, so a tab added to one and not the
+  /// other shows. Public so [tabForPayload] and the tests resolve through it
+  /// rather than through a second copy of the ordering.
+  static const List<String> tabNames = <String>[
+    'today',
+    'timetable',
+    'stats',
+    'settings',
+  ];
+
+  /// Where a tapped notification lands. The warning is about percentages, so
+  /// it opens Stats; both reminders are about a class you are meant to mark,
+  /// which is Today. Resolved through [tabNames] so reordering the tabs cannot
+  /// leave this pointing at the wrong screen.
+  static int? tabForPayload(String? payload) {
+    if (payload == null) return null;
+    if (payload == 'danger') return tabNames.indexOf('stats');
+    if (payload == 'evening' || payload.startsWith('class:')) {
+      return tabNames.indexOf('today');
+    }
+    return null;
+  }
+
   @override
   ConsumerState<RootShell> createState() => _RootShellState();
 }
 
 class _RootShellState extends ConsumerState<RootShell> {
-  int _index = 0;
-
   static const List<Widget> _screens = <Widget>[
     TodayScreen(),
     TimetableScreen(),
@@ -119,26 +141,47 @@ class _RootShellState extends ConsumerState<RootShell> {
     SettingsScreen(),
   ];
 
-  /// Same order as [_screens], so a tab added to one and not the other shows.
-  static const List<String> _tabNames = <String>[
-    'today',
-    'timetable',
-    'stats',
-    'settings',
-  ];
+  ValueNotifier<String?> get _tapped =>
+      NotificationService.instance.tappedPayload;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _report());
+    _tapped.addListener(_openTappedNotification);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _report();
+      // A tap that launched the app was recorded before this shell existed.
+      _openTappedNotification();
+    });
   }
 
-  void _report() => ref.read(analyticsProvider).screen(_tabNames[_index]);
+  @override
+  void dispose() {
+    _tapped.removeListener(_openTappedNotification);
+    super.dispose();
+  }
+
+  void _openTappedNotification() {
+    final int? tab = RootShell.tabForPayload(_tapped.value);
+    if (_tapped.value != null) _tapped.value = null;
+    if (tab == null || !mounted) return;
+    _select(tab);
+  }
+
+  void _select(int index) {
+    ref.read(selectedTabProvider.notifier).select(index);
+    _report(index);
+  }
+
+  void _report([int? index]) => ref
+      .read(analyticsProvider)
+      .screen(RootShell.tabNames[index ?? ref.read(selectedTabProvider)]);
 
   @override
   Widget build(BuildContext context) {
+    final int index = ref.watch(selectedTabProvider);
     return Scaffold(
-      body: IndexedStack(index: _index, children: _screens),
+      body: IndexedStack(index: index, children: _screens),
       // A shadow rather than a rule: the tab row is the one piece of chrome
       // that has to stay above the sheet, and a hairline read as one more
       // divider among the day rules above it.
@@ -156,11 +199,8 @@ class _RootShellState extends ConsumerState<RootShell> {
           ],
         ),
         child: NavigationBar(
-          selectedIndex: _index,
-          onDestinationSelected: (int value) {
-            setState(() => _index = value);
-            _report();
-          },
+          selectedIndex: index,
+          onDestinationSelected: _select,
           destinations: const <NavigationDestination>[
             NavigationDestination(
               icon: Icon(Icons.today_outlined),

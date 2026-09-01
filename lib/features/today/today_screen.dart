@@ -526,7 +526,8 @@ class _GridHeader extends StatelessWidget {
 }
 
 /// The in-app stand-in for an attendance notification. Deliberately reuses
-/// [NotificationService.dangerMessage] so the wording matches the tray exactly.
+/// [NotificationService.dangerTitle] and [NotificationService.dangerMessage]
+/// so the wording matches the tray exactly.
 class _InAppAlertDialog extends StatelessWidget {
   const _InAppAlertDialog({required this.alerts});
 
@@ -543,11 +544,7 @@ class _InAppAlertDialog extends StatelessWidget {
         color: p.warning,
         size: 28,
       ),
-      title: Text(
-        alerts.length == 1
-            ? 'Worth a look'
-            : '${alerts.length} subjects worth a look',
-      ),
+      title: Text(NotificationService.dangerTitle(alerts.length)),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,

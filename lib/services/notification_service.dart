@@ -25,10 +25,22 @@ class NotificationService {
 
   bool _ready = false;
 
+  /// The payload of the notification the user last tapped, or null once the
+  /// app has acted on it. A value rather than a stream because the tap that
+  /// launches the app arrives during [init], before anything is listening.
+  final ValueNotifier<String?> tappedPayload = ValueNotifier<String?>(null);
+
   /// Notification id ranges, kept apart so one feature never cancels another.
   static const int _classReminderBase = 100000;
   static const int _eveningReminderId = 10;
-  static const int _dangerAlertBase = 2000;
+  static const int _dangerAlertId = 2000;
+
+  /// Ids 2000-2004 belonged to the one-alert-per-subject version, so an
+  /// upgrade has to clear them too.
+  static const int _retiredDangerAlerts = 5;
+
+  /// Stacks leftover reminders under one heading when classes run back to back.
+  static const String _classGroupKey = 'zeolite.class_reminders';
 
   /// Android caps pending alarms (500 on most OEM builds). A week of classes
   /// is well inside that, and we refresh on every data change anyway.
@@ -81,7 +93,21 @@ class NotificationService {
         InitializationSettings(android: android);
 
     try {
-      await _plugin.initialize(settings: settings);
+      await _plugin.initialize(
+        settings: settings,
+        onDidReceiveNotificationResponse: (NotificationResponse response) {
+          tappedPayload.value = response.payload;
+        },
+      );
+
+      // A tap that launched the app from cold does not reach the callback
+      // above, so it has to be collected separately.
+      final NotificationAppLaunchDetails? launch =
+          await _plugin.getNotificationAppLaunchDetails();
+      if (launch?.didNotificationLaunchApp ?? false) {
+        tappedPayload.value = launch!.notificationResponse?.payload;
+      }
+
       final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
           _plugin.resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>();
@@ -180,7 +206,7 @@ class NotificationService {
 
     await _cancelRange(_classReminderBase, _maxClassReminders);
     await _plugin.cancel(id: _eveningReminderId);
-    await _cancelRange(_dangerAlertBase, 50);
+    await _cancelRange(_dangerAlertId, _retiredDangerAlerts);
 
     // The master switch short-circuits everything. The cancellations above have
     // already run, so flipping it off clears the tray rather than leaving
@@ -285,6 +311,7 @@ class NotificationService {
           importance: Importance.high,
           priority: Priority.high,
           category: AndroidNotificationCategory.reminder,
+          groupKey: _classGroupKey,
           styleInformation: BigTextStyleInformation(body),
         ),
       );
@@ -352,14 +379,37 @@ class NotificationService {
 
   /// The wording used for one subject's warning, shared by the system
   /// notification and the in-app alert so both always say the same thing.
+  ///
+  /// One shape either side of the target — the on-target case used to get a
+  /// sentence of its own — and rounded like every percentage elsewhere.
   static String dangerMessage(SubjectStats subjectStats) =>
-      subjectStats.meetsTarget
-          ? 'At ${subjectStats.percent.toStringAsFixed(1)}% — one more absence would take you below target.'
-          : '${subjectStats.percent.toStringAsFixed(1)}% · ${subjectStats.headline}';
+      '${subjectStats.percent.toStringAsFixed(0)}% · ${subjectStats.headline}';
 
-  /// Fires immediately for any subject that has dropped below its target or is
-  /// sitting on the edge. Shown at most once per app data change.
+  /// Shared with the in-app dialog, so the two cannot word it differently.
+  static String dangerTitle(int count) =>
+      count == 1 ? 'Worth a look' : '$count subjects worth a look';
+
+  /// For the tray, which has no typography to set the name off from the rest.
+  static String dangerLine(SubjectStats subjectStats) =>
+      '${subjectStats.subject.name} · ${dangerMessage(subjectStats)}';
+
+  /// Fires immediately for any subject below its target or sitting on the
+  /// edge — all of them in one notification, because four arriving at once
+  /// otherwise read as four unrelated problems. Android truncates the inbox
+  /// lines, so the name and the percentage lead.
   Future<void> _showDangerAlerts(OverallStats stats) async {
+    final List<SubjectStats> danger = subjectsInDanger(stats);
+    if (danger.isEmpty) return;
+
+    final List<String> lines = danger.map(dangerLine).toList();
+    final String title = dangerTitle(danger.length);
+
+    // Collapsed, one warning fits whole; several can only name their subjects.
+    final bool single = danger.length == 1;
+    final String body = single
+        ? lines.first
+        : danger.map((SubjectStats s) => s.subject.name).join(' · ');
+
     final NotificationDetails details = NotificationDetails(
       android: AndroidNotificationDetails(
         _alertChannel.id,
@@ -367,27 +417,22 @@ class NotificationService {
         channelDescription: _alertChannel.description,
         importance: Importance.high,
         priority: Priority.high,
+        styleInformation: single
+            ? BigTextStyleInformation(lines.first)
+            : InboxStyleInformation(lines, contentTitle: title),
       ),
     );
 
-    final List<SubjectStats> danger = subjectsInDanger(stats);
-    if (danger.isEmpty) return;
-
-    int index = 0;
-    for (final SubjectStats subjectStats in danger.take(5)) {
-      final String body = dangerMessage(subjectStats);
-      try {
-        await _plugin.show(
-          id: _dangerAlertBase + index,
-          title: '${subjectStats.subject.name} attendance',
-          body: body,
-          notificationDetails: details,
-          payload: 'danger:${subjectStats.subject.id}',
-        );
-      } catch (error) {
-        debugPrint('Zeolite: could not show danger alert: $error');
-      }
-      index++;
+    try {
+      await _plugin.show(
+        id: _dangerAlertId,
+        title: title,
+        body: body,
+        notificationDetails: details,
+        payload: 'danger',
+      );
+    } catch (error) {
+      debugPrint('Zeolite: could not show attendance alert: $error');
     }
   }
 

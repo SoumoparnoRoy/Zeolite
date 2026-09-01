@@ -518,6 +518,22 @@ final attendanceLogProvider =
   );
 });
 
+// ------------------------------------------------------------ navigation
+
+/// The selected bottom-navigation tab.
+///
+/// Held here rather than in the shell's own state because a tapped
+/// notification has to be able to change it from outside the widget tree.
+class SelectedTabController extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void select(int index) => state = index;
+}
+
+final selectedTabProvider =
+    NotifierProvider<SelectedTabController, int>(SelectedTabController.new);
+
 // ------------------------------------------------------------ in-app alerts
 
 /// Subjects the app has to warn about itself, because their system

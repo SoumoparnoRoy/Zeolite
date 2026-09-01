@@ -10,9 +10,11 @@ import 'package:flutter/services.dart';
 /// and absent everywhere else in the app, and an accent wearing one of them
 /// reads as carrying a meaning it does not.
 enum AccentColour {
-  violet('Violet'),
-  indigo('Indigo'),
   teal('Teal'),
+  sky('Sky'),
+  indigo('Indigo'),
+  violet('Violet'),
+  plum('Plum'),
   magenta('Magenta'),
   slate('Slate');
 
@@ -28,8 +30,8 @@ enum AccentColour {
   }
 }
 
-/// One accent in one brightness: the five colours that carry the app's
-/// identity, plus the tint the light theme's card shadow takes.
+/// One accent in one brightness: the colours that carry the app's identity,
+/// plus the tint the light theme's card shadow takes.
 ///
 /// Hand-picked per pair rather than rotated from a single hue. The two base
 /// palettes are not inversions of each other — light darkens every accent
@@ -256,6 +258,20 @@ class AppPalette extends ThemeExtension<AppPalette> {
       mid: Color(0xFF12706E),
       bottom: Color(0xFF084543),
     ),
+    AccentColour.sky: _AccentSet(
+      accent: Color(0xFF80CAEF),
+      soft: Color(0xFF1A272E),
+      top: Color(0xFF2191CA),
+      mid: Color(0xFF14709F),
+      bottom: Color(0xFF0B4765),
+    ),
+    AccentColour.plum: _AccentSet(
+      accent: Color(0xFFD980EF),
+      soft: Color(0xFF2A1A2E),
+      top: Color(0xFFA821CA),
+      mid: Color(0xFF83149F),
+      bottom: Color(0xFF530B65),
+    ),
     AccentColour.magenta: _AccentSet(
       accent: Color(0xFFFF93D6),
       soft: Color(0xFF3A1E33),
@@ -297,6 +313,22 @@ class AppPalette extends ThemeExtension<AppPalette> {
       mid: Color(0xFF0E8F8A),
       bottom: Color(0xFF0A736F),
       shadow: Color(0x12147E7A),
+    ),
+    AccentColour.sky: _AccentSet(
+      accent: Color(0xFF0F76A9),
+      soft: Color(0xFFDEEFF7),
+      top: Color(0xFF1FA0E0),
+      mid: Color(0xFF117BB0),
+      bottom: Color(0xFF0C628D),
+      shadow: Color(0x12186891),
+    ),
+    AccentColour.plum: _AccentSet(
+      accent: Color(0xFF8A0FA9),
+      soft: Color(0xFFF2DEF7),
+      top: Color(0xFFBA1FE0),
+      mid: Color(0xFF9111B0),
+      bottom: Color(0xFF730C8D),
+      shadow: Color(0x12791891),
     ),
     AccentColour.magenta: _AccentSet(
       accent: Color(0xFFC4267F),

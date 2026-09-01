@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
@@ -40,6 +41,33 @@ void main() {
         expect(tinted.present, base.present);
         expect(tinted.absent, base.absent);
         expect(tinted.textPrimary, base.textPrimary);
+      }
+    }
+  });
+
+  test('no two accents are the same colour', () {
+    // The tables are hand-written per accent, so a copied entry is the likely
+    // mistake and every other test here would pass with one.
+    for (final AppPalette base in <AppPalette>[
+      AppPalette.dark,
+      AppPalette.light,
+    ]) {
+      final Map<int, String> seen = <int, String>{};
+      for (final AccentColour accent in AccentColour.values) {
+        final AppPalette tinted = base.withAccent(accent);
+        for (final MapEntry<String, Color> role in <String, Color>{
+          'accent': tinted.accent,
+          'gradientTop': tinted.gradientTop,
+          'accentSoft': tinted.accentSoft,
+        }.entries) {
+          final int key = Object.hash(role.key, role.value.toARGB32());
+          expect(
+            seen.containsKey(key),
+            isFalse,
+            reason: '${accent.name} shares its ${role.key} with ${seen[key]}',
+          );
+          seen[key] = accent.name;
+        }
       }
     }
   });

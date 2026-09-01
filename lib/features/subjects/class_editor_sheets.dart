@@ -260,7 +260,7 @@ class _SubjectFormState extends ConsumerState<_SubjectForm> {
           textCapitalization: TextCapitalization.words,
           decoration: const InputDecoration(
             labelText: 'Subject name',
-            hintText: 'e.g. Data Structures',
+            hintText: 'e.g. Thermodynamics',
           ),
         ),
         const SizedBox(height: AppSpacing.md),

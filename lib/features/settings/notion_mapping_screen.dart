@@ -49,6 +49,9 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
   Map<String, String> _kindValues = <String, String>{};
   NotionCourses? _courses;
 
+  /// Saved from, not rebuilt, so a field this screen does not edit survives.
+  NotionMapping? _loaded;
+
   List<ClassCategory> get _categories =>
       ref.read(timetableProvider).value?.categories ?? const <ClassCategory>[];
 
@@ -76,6 +79,7 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
     _kindValues = Map<String, String>.from(existing.kindValues);
     // Carried, not rebuilt: saving without it would drop the dashboard.
     _courses = existing.courses;
+    _loaded = existing;
     await _loadSchema(existing.dataSourceId, keepChoices: true);
   }
 
@@ -164,7 +168,10 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
     setState(() {
       _databaseId = choice.databaseId;
       _databaseTitle = choice.title;
-      if (moved) _courses = null;
+      if (moved) {
+        _courses = null;
+        _loaded = null;
+      }
     });
     await _loadSchema(choice.id);
   }
@@ -221,9 +228,17 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
   Future<void> _save() async {
     setState(() => _busy = true);
     final NavigatorState navigator = Navigator.of(context);
-    await ref.read(notionMappingProvider.notifier).save(
-          NotionMapping(
+    final NotionMapping base = _loaded?.databaseId == _databaseId
+        ? _loaded!
+        : NotionMapping(
             databaseId: _databaseId,
+            dataSourceId: _dataSourceId,
+            title: _databaseTitle,
+            fields: const <NotionField, NotionProperty>{},
+          );
+
+    await ref.read(notionMappingProvider.notifier).save(
+          base.copyWith(
             dataSourceId: _dataSourceId,
             title: _databaseTitle,
             fields: _fields,

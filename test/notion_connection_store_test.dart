@@ -85,4 +85,34 @@ void main() {
 
     expect(await store.read(), isNull);
   });
+
+  test('the database a migration left behind outlives the moment it was made',
+      () async {
+    // "Leave it for now" used to be final: there was no way back to the offer.
+    await store.writeRetired('db-old', 'Zeolite Attendance (old)');
+
+    final RetiredNotionDatabase? kept = await store.readRetired();
+    expect(kept?.id, 'db-old');
+    expect(kept?.title, 'Zeolite Attendance (old)');
+
+    await store.clearRetired();
+    expect(await store.readRetired(), isNull);
+  });
+
+  test('it goes with the connection, like the mapping does', () async {
+    // It names a database in one workspace, so outliving the connection could
+    // only leave it pointing somewhere the user no longer is.
+    await store.write(const NotionTokens(accessToken: 'a-token'));
+    await store.writeRetired('db-old', 'Zeolite Attendance (old)');
+
+    await store.clear();
+
+    expect(await store.readRetired(), isNull);
+  });
+
+  test('a retired entry that no longer parses reads as nothing to offer',
+      () async {
+    stored['notion_retired_database'] = 'not json';
+    expect(await store.readRetired(), isNull);
+  });
 }

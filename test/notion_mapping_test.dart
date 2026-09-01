@@ -36,6 +36,7 @@ Map<String, Object?> _template() => <String, Object?>{
       'Held': <String, Object?>{'id': 'p5', 'type': 'number'},
       'Attendance Credit': <String, Object?>{'id': 'p6', 'type': 'number'},
       'Zeolite ID': <String, Object?>{'id': 'p7', 'type': 'rich_text'},
+      'Time': <String, Object?>{'id': 'p8', 'type': 'rich_text'},
     };
 
 List<NotionProperty> _properties(Map<String, Object?> schema) => <NotionProperty>[
@@ -63,6 +64,9 @@ void main() {
     expect(mapping.fields[NotionField.held]!.id, 'p5');
     // Without this one a page cannot be recognised on the way back.
     expect(mapping.fields[NotionField.key]!.id, 'p7');
+    // `Time` must not be mistaken for the title, which `Name` holds.
+    expect(mapping.fields[NotionField.time]!.id, 'p8');
+    expect(mapping.fields[NotionField.component]!.id, 'title');
   });
 
   test('status words pair with options spelled the same way', () {

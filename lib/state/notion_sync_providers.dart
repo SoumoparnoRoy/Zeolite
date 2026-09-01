@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/models/class_category.dart';
 import '../data/models/subject.dart';
 import '../data/settings/app_settings.dart';
+import '../domain/notion/notion_course.dart';
 import '../domain/notion/notion_mapping.dart';
 import '../domain/sync/sync_merge.dart';
 import '../domain/sync/sync_plan.dart';
@@ -30,7 +31,16 @@ final notionSyncTargetProvider = Provider<SyncTarget?>((ref) {
     mapping: mapping,
     // Read per call rather than captured, so renaming a course reaches the
     // next run instead of the next restart.
-    courseName: (String uuid) => _subjectFor(ref, uuid)?.name,
+    course: (String uuid) {
+      final Subject? subject = _subjectFor(ref, uuid);
+      if (subject == null) return null;
+      return NotionCourse(
+        uuid: uuid,
+        name: subject.name,
+        priorHeld: subject.priorHeld,
+        priorAttended: subject.priorAttended,
+      );
+    },
     categoryName: (String uuid) {
       final int? id = _subjectFor(ref, uuid)?.categoryId;
       if (id == null) return null;

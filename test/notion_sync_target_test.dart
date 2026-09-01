@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:zeolite/domain/notion/notion_course.dart';
 import 'package:zeolite/domain/notion/notion_mapping.dart';
 import 'package:zeolite/domain/sync/sync_target.dart';
 import 'package:zeolite/services/notion/notion_client.dart';
@@ -30,6 +31,7 @@ NotionMapping _mapping({bool withKey = true}) => NotionMapping(
         NotionField.held: _p('p5', 'Held', 'number'),
         NotionField.credit: _p('p6', 'Attendance Credit', 'number'),
         if (withKey) NotionField.key: _p('p7', 'Zeolite ID', 'rich_text'),
+        NotionField.time: _p('p8', 'Time', 'rich_text'),
       },
       statusValues: const <String, String>{
         'present': 'Present',
@@ -70,7 +72,9 @@ NotionSyncTarget _target(
         minimumGap: Duration.zero,
       ),
       mapping: _mapping(withKey: withKey),
-      courseName: (String uuid) => uuid == _uuid ? 'Generic Course' : null,
+      course: (String uuid) => uuid == _uuid
+          ? const NotionCourse(uuid: _uuid, name: 'Generic Course')
+          : null,
       categoryName: (String uuid) => category,
     );
 
@@ -304,5 +308,49 @@ void main() {
 
     expect(target.kinds, <SyncKind>{SyncKind.attendance});
     expect(target.trustsPulls, isFalse);
+  });
+
+  test('the start time is written as a plain 24-hour clock', () async {
+    late http.Request sent;
+    final NotionSyncTarget target = _target(MockClient((http.Request r) async {
+      sent = r;
+      return http.Response('{"id":"page-1"}', 200);
+    }));
+
+    await target.create(_mark());
+
+    final Map<String, Object?> props =
+        (jsonDecode(sent.body) as Map<String, Object?>)['properties']!
+            as Map<String, Object?>;
+    // 540 is the third part of the key. Written in its own column and never
+    // onto the date, which Notion would treat as an instant and shift.
+    expect(
+      ((props['p8']! as Map<String, Object?>)['rich_text']! as List<Object?>)
+          .single,
+      <String, Object?>{
+        'text': <String, Object?>{'content': '09:00'},
+      },
+    );
+    expect(props['p2'], <String, Object?>{
+      'date': <String, Object?>{'start': '2026-03-04'},
+    });
+  });
+
+  test('a cancelled class is held zero times, not once', () async {
+    late http.Request sent;
+    final NotionSyncTarget target = _target(MockClient((http.Request r) async {
+      sent = r;
+      return http.Response('{"id":"page-1"}', 200);
+    }));
+
+    await target.create(_mark(status: 'cancelled', weight: 2));
+
+    final Map<String, Object?> props =
+        (jsonDecode(sent.body) as Map<String, Object?>)['properties']!
+            as Map<String, Object?>;
+    // The reader already treats held 0 as cancelled, and the dashboard sums
+    // this column: held 2 would read as two classes you missed.
+    expect(props['p5'], <String, Object?>{'number': 0});
+    expect(props['p6'], <String, Object?>{'number': 0});
   });
 }

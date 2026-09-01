@@ -21,7 +21,13 @@ import 'notion_mapping_screen.dart';
 /// return is dropped by enough browsers that an escape hatch which only
 /// appears once something has already gone wrong is the wrong shape.
 class NotionConnectScreen extends ConsumerStatefulWidget {
-  const NotionConnectScreen({super.key});
+  const NotionConnectScreen({super.key, this.retakeTemplate = false});
+
+  /// Runs consent again on a workspace already connected, which is the only
+  /// way Notion hands over a copy of a newer template. Without it this screen
+  /// offers nothing but Disconnect, and taking a new template would mean
+  /// tearing down a working connection first.
+  final bool retakeTemplate;
 
   @override
   ConsumerState<NotionConnectScreen> createState() =>
@@ -199,7 +205,9 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
 
   List<Widget> _body(BuildContext context) {
     final NotionTokens? connected = ref.watch(notionConnectionProvider).value;
-    if (connected != null) return _connected(context, connected);
+    if (connected != null && !widget.retakeTemplate) {
+      return _connected(context, connected);
+    }
 
     final bool busy = _stage == _Stage.claiming;
     return <Widget>[
@@ -208,9 +216,13 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Text(
-              'You will sign in to Notion in your browser and choose which '
-              'pages Zeolite may write to. Your attendance stays on this '
-              'device as well.',
+              widget.retakeTemplate
+                  ? 'You will go back to Notion and take a fresh copy of the '
+                      'template. Your current database is left exactly as it '
+                      'is until the new one is filled.'
+                  : 'You will sign in to Notion in your browser and choose '
+                      'which pages Zeolite may write to. Your attendance '
+                      'stays on this device as well.',
               style: TextStyle(color: context.palette.textSecondary),
             ),
             const SizedBox(height: AppSpacing.md),
@@ -229,7 +241,11 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
       FilledButton(
         onPressed: busy ? null : _start,
         child: Text(
-          _stage == _Stage.idle ? 'Connect Notion' : 'Open Notion again',
+          switch ((_stage, widget.retakeTemplate)) {
+            (_Stage.idle, true) => 'Take the template',
+            (_Stage.idle, false) => 'Connect Notion',
+            _ => 'Open Notion again',
+          },
         ),
       ),
       const SizedBox(height: AppSpacing.xl),
@@ -255,8 +271,9 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
       if (_verifier == null) ...<Widget>[
         const SizedBox(height: AppSpacing.sm),
         Text(
-          'The code only works with a connection you have started, so tap '
-          'Connect Notion first.',
+          'The code only works with an attempt you have started, so tap '
+          '${widget.retakeTemplate ? 'Take the template' : 'Connect Notion'} '
+          'first.',
           style: TextStyle(
             fontSize: 12,
             color: context.palette.textTertiary,

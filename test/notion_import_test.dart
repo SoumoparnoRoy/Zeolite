@@ -189,6 +189,60 @@ void main() {
       );
     });
 
+    test('a row that brought its own time keeps it', () {
+      final NotionPlan plan = _plan(
+        NotionExport(
+          rows: <NotionRow>[
+            NotionRow.read(
+              component: 'ABC101L',
+              course: 'Thermodynamics',
+              kind: NotionKind.lecture,
+              date: _monday,
+              status: 'present',
+              held: 1,
+              startMinutes: 14 * 60 + 20,
+            ),
+          ],
+          problems: const <String>[],
+        ),
+        subjects: <Subject>[stored],
+        slots: <ClassSlot>[slotAt(DateTime.monday, 11 * 60)],
+      );
+      final NotionPlacement placed = plan.subjects.single.placements.single;
+      // 11:00 is the only slot, and inference would have taken it.
+      expect(placed.startMinutes, 14 * 60 + 20);
+      expect(placed.scheduled, isFalse);
+    });
+
+    test('a row without a time cannot take the slot a told row is using', () {
+      final NotionPlan plan = _plan(
+        NotionExport(
+          rows: <NotionRow>[
+            for (final int? at in <int?>[null, 9 * 60])
+              NotionRow.read(
+                component: at == null ? 'ABC101L' : 'ABC101P',
+                course: 'Thermodynamics',
+                kind: NotionKind.lecture,
+                date: _monday,
+                status: 'present',
+                held: 1,
+                startMinutes: at,
+              ),
+          ],
+          problems: const <String>[],
+        ),
+        subjects: <Subject>[stored],
+        slots: <ClassSlot>[slotAt(DateTime.monday, 9 * 60)],
+      );
+      final List<NotionPlacement> placed = plan.subjects.single.placements;
+      // Sharing 9:00 would collapse the two into one mark and lose a class.
+      expect(
+        placed.map((NotionPlacement p) => p.startMinutes).toSet(),
+        hasLength(2),
+      );
+      expect(placed.map((NotionPlacement p) => p.startMinutes), contains(540));
+    });
+
     test('a subject that does not exist yet has nothing to place against', () {
       final NotionPlan plan = _plan(
         _read(<String>['ABC101L,1,Thermodynamics,Aug 3,1,Yes,Lecture,Present']),

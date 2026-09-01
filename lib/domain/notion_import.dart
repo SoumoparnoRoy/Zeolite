@@ -224,9 +224,11 @@ class NotionPlan {
   /// Gives every row a start time.
   ///
   /// Marks are keyed by `(subject, date, start)`, so two rows landing on the
-  /// same minute would collapse into one and quietly lose a class. Each day's
-  /// rows take that day's scheduled start times in order; anything left over
-  /// falls back to an hour the day has not used yet.
+  /// same minute would collapse into one and quietly lose a class. A row that
+  /// brought its own time keeps it and is placed first, so the rows that did
+  /// not cannot take a slot one of them already occupies. The rest take that
+  /// day's scheduled start times in order, and anything left over falls back
+  /// to an hour the day has not used yet.
   static List<NotionPlacement> _place(
     List<NotionRow> rows,
     List<ClassSlot> slots,
@@ -246,7 +248,29 @@ class NotionPlan {
         ..sort();
       final Set<int> taken = <int>{};
 
+      // Told beats inferred, and claiming those minutes up front is what stops
+      // the inference below from handing the same slot to a second row.
+      final List<NotionRow> told = <NotionRow>[
+        for (final NotionRow r in day)
+          if (r.startMinutes != null) r,
+      ];
+      for (final NotionRow row in told) {
+        int start = row.startMinutes!;
+        while (!taken.add(start)) {
+          start = start + 1;
+        }
+        out.add(
+          NotionPlacement(
+            row: row,
+            startMinutes: start,
+            scheduled: free.contains(row.startMinutes),
+            weight: grouping == NotionGrouping.grouped ? row.weight : 1,
+          ),
+        );
+      }
+
       for (final NotionRow row in day) {
+        if (row.startMinutes != null) continue;
         int? start;
         for (final int candidate in free) {
           if (taken.add(candidate)) {

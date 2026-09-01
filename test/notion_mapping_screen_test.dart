@@ -210,6 +210,57 @@ void main() {
     expect(saved.fields[NotionField.course]!.id, 'title');
   });
 
+  testWidgets('reopening keeps the pairings and the Courses table',
+      (WidgetTester tester) async {
+    final NotionConnectionStore store =
+        NotionConnectionStore(storage: const FlutterSecureStorage());
+    await store.write(const NotionTokens(accessToken: 'a-token'));
+
+    await store.writeMapping(NotionMapping(
+      databaseId: 'db-1',
+      dataSourceId: 'ds-1',
+      title: 'Zeolite Attendance',
+      fields: const <NotionField, NotionProperty>{
+        NotionField.kind:
+            NotionProperty(id: 'p6', name: 'Type', type: 'select'),
+      },
+      // A pairing no guess would make: the words are nothing alike.
+      kindValues: const <String, String>{'theory': 'Lecture'},
+      courses: const NotionCourses(
+        databaseId: 'db-2',
+        dataSourceId: 'ds-2',
+        fields: <NotionCourseField, NotionProperty>{
+          NotionCourseField.name:
+              NotionProperty(id: 'c0', name: 'Name', type: 'title'),
+          NotionCourseField.key:
+              NotionProperty(id: 'c1', name: 'Zeolite ID', type: 'rich_text'),
+        },
+      ),
+    ));
+
+    await tester.pumpWidget(_app(_notion(schema: <String, Object?>{
+      ..._schema(),
+      'Type': _select('p6', <String>['Lecture', 'Practical']),
+    })));
+    await tester.pumpAndSettle();
+
+    final Finder save = find.widgetWithText(FilledButton, 'Save');
+    await tester.ensureVisible(save);
+    await tester.pumpAndSettle();
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+
+    final NotionMapping? saved =
+        await NotionConnectionStore(storage: const FlutterSecureStorage())
+            .readMapping();
+
+    // The screen rebuilds the mapping from its own state, so anything it does
+    // not read back is dropped on save — the pairing read as "Not used", and
+    // the Courses table went silently.
+    expect(saved!.kindValues, <String, String>{'theory': 'Lecture'});
+    expect(saved.courses?.dataSourceId, 'ds-2');
+  });
+
   testWidgets('every shared table is offered, not just the first',
       (WidgetTester tester) async {
     await tester.pumpWidget(_app(_notion(tables: 2)));

@@ -86,6 +86,7 @@ class NotionPageRows {
           status: word,
           held: _numberOf(NotionField.held, cells)?.round() ?? 1,
           credit: _numberOf(NotionField.credit, cells)?.round(),
+          startMinutes: _timeOf(cells),
         ),
       );
     }
@@ -155,6 +156,26 @@ class NotionPageRows {
     if (start == null || start.length < 10) return null;
     final DateTime? day = DateTime.tryParse(start.substring(0, 10));
     return day == null ? null : DateTime(day.year, day.month, day.day);
+  }
+
+  /// `HH:mm` off the optional Time column, or null when there is none this
+  /// can read. A column full of prose is not an error: the importer places the
+  /// row itself in that case, exactly as it did before the column existed.
+  int? _timeOf(Map<String, Object?> cells) {
+    final Object? value = NotionProperties.valueOf(
+      cells,
+      mapping.fields[NotionField.time],
+    );
+    final String? text = NotionProperties.optionNameOf(value) ??
+        NotionProperties.plainTextOf(value);
+    if (text == null) return null;
+    final Match? match =
+        RegExp(r'^\s*(\d{1,2}):(\d{2})').firstMatch(text);
+    if (match == null) return null;
+    final int hour = int.parse(match.group(1)!);
+    final int minute = int.parse(match.group(2)!);
+    if (hour > 23 || minute > 59) return null;
+    return hour * 60 + minute;
   }
 
   num? _numberOf(NotionField field, Map<String, Object?> cells) =>

@@ -15,6 +15,7 @@ NotionMapping _mapping({
   Map<String, String>? statusValues,
   Map<String, String> kindValues = const <String, String>{},
   bool withKey = true,
+  bool withTime = false,
 }) =>
     NotionMapping(
       databaseId: 'db-1',
@@ -29,6 +30,7 @@ NotionMapping _mapping({
         NotionField.held: _p('p6', 'Held', 'number'),
         NotionField.credit: _p('p7', 'Attendance Credit', 'number'),
         if (withKey) NotionField.key: _p('p8', 'Zeolite ID', 'rich_text'),
+        if (withTime) NotionField.time: _p('p9', 'Time', 'rich_text'),
       },
       statusValues: statusValues ??
           const <String, String>{
@@ -50,6 +52,7 @@ Map<String, Object?> _page({
   num? held,
   num? credit,
   String? key,
+  String? time,
 }) =>
     <String, Object?>{
       'id': 'page-1',
@@ -96,6 +99,13 @@ Map<String, Object?> _page({
             'id': 'p8',
             'rich_text': <Object?>[
               <String, Object?>{'plain_text': key},
+            ],
+          },
+        if (time != null)
+          'Time': <String, Object?>{
+            'id': 'p9',
+            'rich_text': <Object?>[
+              <String, Object?>{'plain_text': time},
             ],
           },
       },
@@ -212,5 +222,26 @@ void main() {
 
     expect(rows.hasKeyed(pages), isFalse);
     expect(rows.read(pages, skipKeyed: true).rows, hasLength(1));
+  });
+
+  group('the optional Time column', () {
+    test('is read as minutes past midnight', () {
+      final NotionExport export = NotionPageRows(_mapping(withTime: true))
+          .read(<Map<String, Object?>>[_page(time: '14:20')]);
+
+      expect(export.problems, isEmpty);
+      expect(export.rows.single.startMinutes, 14 * 60 + 20);
+    });
+
+    test('a row with no time this can read is placed by the importer instead',
+        () {
+      // Not a problem to report: the column is optional.
+      for (final String? text in <String?>[null, 'after lunch', '99:99']) {
+        final NotionExport export = NotionPageRows(_mapping(withTime: true))
+            .read(<Map<String, Object?>>[_page(time: text)]);
+        expect(export.problems, isEmpty, reason: text);
+        expect(export.rows.single.startMinutes, isNull, reason: text);
+      }
+    });
   });
 }

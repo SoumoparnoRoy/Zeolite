@@ -21,6 +21,7 @@ class NotionProperties {
     SyncItem item, {
     required String? courseName,
     String? categoryName,
+    String? courseRelationId,
   }) {
     final String status = (item.fields['status'] as String?) ?? 'present';
     final String? tag = item.fields['tag'] as String?;
@@ -38,10 +39,16 @@ class NotionProperties {
     put(NotionField.date, (_) => <String, Object?>{
           'date': <String, Object?>{'start': _dayOf(item.localKey)},
         });
+    put(NotionField.time, (NotionProperty p) => _named(p, _timeOf(item.localKey)));
     put(NotionField.component, (NotionProperty p) => p.type == 'title'
         ? _title(courseName ?? '')
         : _text(courseName ?? ''));
-    put(NotionField.course, (NotionProperty p) => _named(p, courseName));
+    put(
+      NotionField.course,
+      (NotionProperty p) => p.type == 'relation'
+          ? _relation(courseRelationId)
+          : _named(p, courseName),
+    );
     put(NotionField.status, (NotionProperty p) => _named(p, _word(status, tag)));
     // Only a category the user has paired with an option. Sending the category
     // name itself would have Notion invent a new option beside the ones the
@@ -55,7 +62,13 @@ class NotionProperties {
             : mapping.kindValues[categoryName.trim().toLowerCase()],
       ),
     );
-    put(NotionField.held, (_) => <String, Object?>{'number': weight});
+    // Zero for a cancelled class, which is what the reader already believes:
+    // `NotionExport._statusOf` calls `held == 0` cancelled outright. It also
+    // makes the column summable — the Courses dashboard totals it, and a
+    // cancelled class counted as held would read as one you missed.
+    put(NotionField.held, (_) => <String, Object?>{
+          'number': status == 'cancelled' ? 0 : weight,
+        });
     // The credit is what decides whether a class counted, and the reader
     // trusts it over the word beside it — so an absence has to say zero
     // rather than leave it unset and read as agreement.
@@ -156,6 +169,18 @@ class NotionProperties {
 
   /// A select and a status column take the same envelope under different
   /// names, and sending the wrong one is a validation error on every row.
+  /// Null when there is no page to point at, which leaves the cell alone
+  /// rather than clearing it — a run that could not read the Courses table
+  /// must not wipe relations a previous run set.
+  static Object? _relation(String? pageId) {
+    if (pageId == null || pageId.isEmpty) return null;
+    return <String, Object?>{
+      'relation': <Object?>[
+        <String, Object?>{'id': pageId},
+      ],
+    };
+  }
+
   static Object? _named(NotionProperty property, String? value) {
     if (value == null || value.isEmpty) return null;
     return switch (property.type) {
@@ -167,10 +192,15 @@ class NotionProperties {
         },
       'title' => _title(value),
       'rich_text' => _text(value),
-      // A relation points at a page id, which a course name cannot supply.
       _ => null,
     };
   }
+
+  /// The rich-text and title shapes, for callers outside this class that write
+  /// pages of their own — the Courses table, which has no [SyncItem] behind it.
+  static Map<String, Object?> textOf(String value) => _text(value);
+
+  static Map<String, Object?> titleOf(String value) => _title(value);
 
   static Map<String, Object?> _text(String value) => <String, Object?>{
         'rich_text': <Object?>[
@@ -264,6 +294,21 @@ class NotionProperties {
   ///
   /// Written as a plain date with no time, because a mark belongs to a day and
   /// an instant would carry a timezone Notion would then shift.
+  /// The same key's third part as `HH:mm`.
+  ///
+  /// Always 24-hour, never the user's display format: a value that changed
+  /// when the 24-hour setting was flipped would rewrite every row in the
+  /// database for a preference the far side does not have.
+  static String? _timeOf(String localKey) {
+    final List<String> parts = localKey.split(':');
+    if (parts.length < 3) return null;
+    final int? minutes = int.tryParse(parts[2]);
+    if (minutes == null || minutes < 0) return null;
+    final String hour = (minutes ~/ 60).toString().padLeft(2, '0');
+    final String minute = (minutes % 60).toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
+
   static String? _dayOf(String localKey) {
     final List<String> parts = localKey.split(':');
     if (parts.length < 2) return null;

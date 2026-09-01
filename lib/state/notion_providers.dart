@@ -29,6 +29,13 @@ final notionConnectionProvider =
 /// that is what makes one refresh run however many calls meet a 401 together,
 /// and what lets a connection that has genuinely ended reach the screen
 /// instead of only the caller.
+/// The database a template migration left behind, until the user retires it.
+final retiredNotionDatabaseProvider =
+    FutureProvider<RetiredNotionDatabase?>((ref) async {
+  if (ref.watch(notionConnectionProvider).value == null) return null;
+  return ref.read(notionConnectionStoreProvider).readRetired();
+});
+
 final notionClientProvider = Provider<NotionClient>((ref) {
   final NotionConnectionController connection =
       ref.watch(notionConnectionProvider.notifier);
@@ -148,6 +155,97 @@ class NotionMappingController extends AsyncNotifier<NotionMapping?> {
   /// means something did not line up after all, and the caller shows the
   /// screen — a silent half-mapping would be worse than a question.
   Future<bool> adoptTemplate(String databaseId) async {
+    for (int attempt = 0; attempt < _adoptAttempts; attempt++) {
+      if (await _adopt(databaseId)) return true;
+      if (attempt == _adoptAttempts - 1) break;
+      await Future<void>.delayed(_adoptBackoff * (1 << attempt));
+    }
+    return false;
+  }
+
+  /// Straight after consent Notion answers the database but with
+  /// `data_sources: []` — the copy is not finished. Retried rather than slept
+  /// on: a delay long enough to always be safe feels broken.
+  static const int _adoptAttempts = 5;
+  static const Duration _adoptBackoff = Duration(milliseconds: 400);
+
+  /// A template that has to deliver two related databases is a *page* holding
+  /// both: a relation only survives duplication when both ends are copied in
+  /// the same operation, so the id consent hands back is the page's, not a
+  /// database's. Its children are tried in turn, and the one that maps
+  /// completely wins — a Courses table has no Date or Status column, so it
+  /// cannot be mistaken for the attendance one.
+  Future<bool> _adopt(String id) async {
+    if (await _adoptDatabase(id)) return true;
+
+    final List<String> children = await _childDatabasesOf(id);
+    for (final String child in children) {
+      if (!await _adoptDatabase(child)) continue;
+      // The Courses table is whichever sibling is not the one marks are filed
+      // in. Looked up only after the attendance table is settled, so a
+      // template without one still adopts exactly as it did before.
+      await _adoptCourses(children.where((String c) => c != child));
+      return true;
+    }
+    return false;
+  }
+
+  Future<void> _adoptCourses(Iterable<String> candidates) async {
+    final NotionClient client = ref.read(notionClientProvider);
+    for (final String databaseId in candidates) {
+      final NotionResult database = await client.database(databaseId);
+      final String? dataSourceId = _firstDataSourceOf(database.body);
+      if (dataSourceId == null) continue;
+
+      final NotionResult source = await client.dataSource(dataSourceId);
+      final Map<String, Object?>? body = source.body;
+      if (body == null) continue;
+
+      final NotionCourses courses = NotionCourses.match(
+        databaseId: databaseId,
+        dataSourceId: dataSourceId,
+        properties: notionPropertiesOf(body),
+      );
+      if (!courses.isComplete) continue;
+
+      final NotionMapping? mapping = state.value;
+      if (mapping == null) return;
+      await save(mapping.copyWith(courses: courses));
+      return;
+    }
+  }
+
+  /// Walks down, not just across: a database tucked inside a toggle heading is
+  /// a child of that heading rather than of the page, and laying the template
+  /// out with headings is the natural thing to do.
+  static const int _blockScanLimit = 8;
+
+  Future<List<String>> _childDatabasesOf(String pageId) async {
+    final NotionClient client = ref.read(notionClientProvider);
+    final List<String> found = <String>[];
+    final List<String> toVisit = <String>[pageId];
+
+    for (int calls = 0; toVisit.isNotEmpty && calls < _blockScanLimit; calls++) {
+      final NotionResult result =
+          await client.blockChildren(toVisit.removeAt(0));
+      final Object? blocks = result.body?['results'];
+      if (blocks is! List<Object?>) continue;
+
+      for (final Object? block in blocks) {
+        if (block is! Map<String, Object?>) continue;
+        final String? id = block['id'] as String?;
+        if (id == null) continue;
+        if (block['type'] == 'child_database') {
+          found.add(id);
+        } else if (block['has_children'] == true) {
+          toVisit.add(id);
+        }
+      }
+    }
+    return found;
+  }
+
+  Future<bool> _adoptDatabase(String databaseId) async {
     final NotionClient client = ref.read(notionClientProvider);
 
     final NotionResult database = await client.database(databaseId);

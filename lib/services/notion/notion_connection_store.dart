@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../../domain/notion/notion_mapping.dart';
@@ -17,6 +18,7 @@ class NotionConnectionStore {
       : _storage = storage ?? const FlutterSecureStorage();
 
   static const String _key = 'notion_connection';
+  static const String _retiredKey = 'notion_retired_database';
 
   final FlutterSecureStorage _storage;
 
@@ -59,7 +61,39 @@ class NotionConnectionStore {
   Future<void> clear() async {
     await _storage.delete(key: _key);
     await _storage.delete(key: _mappingKey);
+    await clearRetired();
   }
+
+  /// The database a template migration moved off, kept only so the offer to
+  /// retire it survives the moment it was made.
+  ///
+  /// Taking a new template asks once what should happen to the old database,
+  /// and "leave it for now" is a reasonable answer that used to be final —
+  /// there was no way back to that choice afterwards.
+  Future<void> writeRetired(String databaseId, String title) => _storage.write(
+        key: _retiredKey,
+        value: jsonEncode(<String, Object?>{'id': databaseId, 'title': title}),
+      );
+
+  Future<RetiredNotionDatabase?> readRetired() async {
+    final String? raw = await _storage.read(key: _retiredKey);
+    if (raw == null || raw.isEmpty) return null;
+    Object? decoded;
+    try {
+      decoded = jsonDecode(raw);
+    } on FormatException {
+      return null;
+    }
+    if (decoded is! Map<String, Object?>) return null;
+    final String? id = decoded['id'] as String?;
+    if (id == null || id.isEmpty) return null;
+    return RetiredNotionDatabase(
+      id: id,
+      title: (decoded['title'] as String?) ?? 'the old database',
+    );
+  }
+
+  Future<void> clearRetired() => _storage.delete(key: _retiredKey);
 
   /// Which data source attendance is filed in, and which column holds what.
   /// Null until the user has been through the mapping screen.
@@ -127,4 +161,13 @@ class NotionConnectionStore {
   static const String _pendingKey = 'notion_pending';
 
   static const String _mappingKey = 'notion_mapping';
+}
+
+/// A database a migration left behind, still full of the user's rows.
+@immutable
+class RetiredNotionDatabase {
+  const RetiredNotionDatabase({required this.id, required this.title});
+
+  final String id;
+  final String title;
 }

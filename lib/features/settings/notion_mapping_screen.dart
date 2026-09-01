@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -34,6 +36,8 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
   final List<_Choice> _sources = <_Choice>[];
   String? _cursor;
   bool _hasMore = false;
+  int _retries = 0;
+  Timer? _retry;
 
   String _databaseId = '';
   String _databaseTitle = '';
@@ -43,6 +47,7 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
   Map<NotionField, NotionProperty> _fields = <NotionField, NotionProperty>{};
   Map<String, String> _statusValues = <String, String>{};
   Map<String, String> _kindValues = <String, String>{};
+  NotionCourses? _courses;
 
   List<ClassCategory> get _categories =>
       ref.read(timetableProvider).value?.categories ?? const <ClassCategory>[];
@@ -68,6 +73,9 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
     _databaseTitle = existing.title;
     _fields = Map<NotionField, NotionProperty>.from(existing.fields);
     _statusValues = Map<String, String>.from(existing.statusValues);
+    _kindValues = Map<String, String>.from(existing.kindValues);
+    // Carried, not rebuilt: saving without it would drop the dashboard.
+    _courses = existing.courses;
     await _loadSchema(existing.dataSourceId, keepChoices: true);
   }
 
@@ -112,6 +120,35 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
       _hasMore = result.body?['has_more'] == true;
       _cursor = result.body?['next_cursor'] as String?;
     });
+
+    // Notion's search index lags a write, so "No tables shared" is a wrong
+    // answer, not a slow one. A timer, so `dispose` can cancel it.
+    if (_sources.isEmpty && !_hasMore && _retries < _searchRetries) {
+      _retries++;
+      _retry?.cancel();
+      _retry = Timer(_searchBackoff * _retries, () {
+        if (mounted) _loadSources();
+      });
+    }
+  }
+
+  static const int _searchRetries = 3;
+  static const Duration _searchBackoff = Duration(seconds: 1);
+
+  @override
+  void dispose() {
+    _retry?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _lookAgain() async {
+    _retry?.cancel();
+    setState(() {
+      _sources.clear();
+      _cursor = null;
+      _retries = 0;
+    });
+    await _loadSources();
   }
 
   static String? _parentDatabaseOf(Map<String, Object?> source) {
@@ -122,9 +159,12 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
   }
 
   Future<void> _chooseSource(_Choice choice) async {
+    // Another database relates into its own Courses table, if any at all.
+    final bool moved = choice.databaseId != _databaseId;
     setState(() {
       _databaseId = choice.databaseId;
       _databaseTitle = choice.title;
+      if (moved) _courses = null;
     });
     await _loadSchema(choice.id);
   }
@@ -189,6 +229,7 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
             fields: _fields,
             statusValues: _statusValues,
             kindValues: _kindValues,
+            courses: _courses,
           ),
         );
     if (mounted) navigator.pop();
@@ -264,8 +305,15 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
         const EmptyState(
           icon: Icons.table_chart_outlined,
           title: 'No tables shared',
-          message: 'Open Notion and share a database with Zeolite, or '
-              'reconnect and take the template.',
+          message: 'A database you have just made can take a moment to appear. '
+              'Try again, or open Notion and share one with Zeolite.',
+        ),
+        const SizedBox(height: AppSpacing.md),
+        Center(
+          child: TextButton(
+            onPressed: _lookAgain,
+            child: const Text('Look again'),
+          ),
         ),
       ];
     }

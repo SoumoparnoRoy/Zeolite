@@ -41,6 +41,7 @@ class NotionRow {
     required this.status,
     required this.weight,
     this.tagName,
+    this.startMinutes,
     this.creditDisagrees = false,
   });
 
@@ -58,6 +59,7 @@ class NotionRow {
     required String status,
     required int held,
     int? credit,
+    int? startMinutes,
   }) {
     final String raw = status.trim().toLowerCase();
     return NotionRow(
@@ -67,6 +69,7 @@ class NotionRow {
       date: date,
       status: NotionExport._statusOf(raw, held, credit),
       weight: math.max(1, held),
+      startMinutes: startMinutes,
       tagName: switch (raw) {
         'proxy' => 'Proxy',
         'cancelled' || 'canceled' => 'Cancelled',
@@ -79,6 +82,11 @@ class NotionRow {
   /// Whether a reader has anywhere to put this word.
   static bool knowsStatus(String status) =>
       NotionExport._known.contains(status.trim().toLowerCase());
+
+  /// When the class started, if the source said. Null is the ordinary case —
+  /// only a `Time` column can supply it — and leaves the importer to place the
+  /// row itself.
+  final int? startMinutes;
 
   /// The per-component code the export uses as a page title, e.g. `ABC101P`.
   final String component;

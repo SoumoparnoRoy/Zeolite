@@ -1,7 +1,9 @@
+import '../../domain/notion/notion_course.dart';
 import '../../domain/notion/notion_mapping.dart';
 import '../../domain/notion/notion_properties.dart';
 import '../../domain/sync/sync_target.dart';
 import 'notion_client.dart';
+import 'notion_courses_writer.dart';
 
 /// A Notion data source as somewhere attendance can be mirrored to.
 ///
@@ -11,20 +13,29 @@ class NotionSyncTarget implements SyncTarget {
   NotionSyncTarget({
     required NotionClient client,
     required NotionMapping mapping,
-    required String? Function(String subjectUuid) courseName,
+    required NotionCourse? Function(String subjectUuid) course,
     String? Function(String subjectUuid)? categoryName,
   })  : _client = client,
         _mapping = mapping,
-        _courseName = courseName,
+        _course = course,
         _categoryName = categoryName,
-        _properties = NotionProperties(mapping);
+        _properties = NotionProperties(mapping),
+        _courses = mapping.courses == null
+            ? null
+            : NotionCoursesWriter(
+                client: client,
+                courses: mapping.courses!,
+              );
 
   final NotionClient _client;
   final NotionMapping _mapping;
   final NotionProperties _properties;
 
   /// A mark names its subject by uuid, which means nothing in a workspace.
-  final String? Function(String subjectUuid) _courseName;
+  final NotionCourse? Function(String subjectUuid) _course;
+
+  /// Null unless the workspace has a Courses table to relate marks into.
+  final NotionCoursesWriter? _courses;
 
   /// What kind of session the subject holds, for Notion's `Type`.
   final String? Function(String subjectUuid)? _categoryName;
@@ -59,6 +70,10 @@ class NotionSyncTarget implements SyncTarget {
     if (kind != SyncKind.attendance) return null;
     if (!_mapping.fields.containsKey(NotionField.key)) return null;
 
+    // A run starts here, and course pages made in Notion since the last one
+    // have to be seen rather than duplicated.
+    _courses?.forget();
+
     final NotionRows rows = await _client.queryAllPages(_mapping.dataSourceId);
     if (!rows.ok) return null;
 
@@ -77,7 +92,7 @@ class NotionSyncTarget implements SyncTarget {
   Future<SyncOutcome> create(SyncItem item) async {
     final NotionResult result = await _client.createPage(
       dataSourceId: _mapping.dataSourceId,
-      properties: _encode(item),
+      properties: await _encode(item),
     );
     final String? id = result.body?['id'] as String?;
     if (!result.ok || id == null) return _failure(result);
@@ -90,7 +105,7 @@ class NotionSyncTarget implements SyncTarget {
   @override
   Future<SyncOutcome> update(SyncItem item, String remoteId) async {
     final NotionResult result =
-        await _client.updatePage(remoteId, _encode(item));
+        await _client.updatePage(remoteId, await _encode(item));
     if (!result.ok) return _failure(result);
     return SyncOutcome.done(
       remoteId: remoteId,
@@ -112,12 +127,15 @@ class NotionSyncTarget implements SyncTarget {
     return _failure(result);
   }
 
-  Map<String, Object?> _encode(SyncItem item) {
-    final String subject = _subjectOf(item.localKey);
+  Future<Map<String, Object?>> _encode(SyncItem item) async {
+    final String uuid = _subjectOf(item.localKey);
+    final NotionCourse? course = _course(uuid);
     return _properties.encode(
       item,
-      courseName: _courseName(subject),
-      categoryName: _categoryName?.call(subject),
+      courseName: course?.name,
+      categoryName: _categoryName?.call(uuid),
+      courseRelationId:
+          course == null ? null : await _courses?.pageIdFor(course),
     );
   }
 

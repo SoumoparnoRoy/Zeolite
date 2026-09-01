@@ -21,8 +21,10 @@ import '../../domain/notion_export.dart';
 import '../../services/backup_folder.dart';
 import '../../services/backup_service.dart';
 import '../../services/notification_service.dart';
+import '../../services/notion/notion_connection_store.dart';
 import '../../services/notion/notion_database_reader.dart';
 import '../../state/notion_providers.dart';
+import 'notion_template_migration.dart';
 import '../../state/providers.dart';
 import '../../state/auth_providers.dart';
 import '../../widgets/common.dart';
@@ -579,6 +581,24 @@ class SettingsScreen extends ConsumerWidget {
                                 const NotionMappingScreen(),
                           ),
                         ),
+                      ),
+                    // A new schema only arrives by taking the template again.
+                    if (ref.watch(notionMappingProvider).value != null)
+                      _Row(
+                        icon: Icons.auto_awesome_motion_outlined,
+                        title: 'Take the latest template',
+                        value: 'Move to a new database and rewrite every row',
+                        onTap: () =>
+                            NotionTemplateMigration(ref).start(context),
+                      ),
+                    if (ref.watch(retiredNotionDatabaseProvider).value
+                        case final RetiredNotionDatabase retired)
+                      _Row(
+                        icon: Icons.delete_outline_rounded,
+                        title: 'Move the old database to trash',
+                        value: retired.title,
+                        onTap: () => NotionTemplateMigration(ref)
+                            .trashRetired(context, retired),
                       ),
                     // Sync's own pull drops these rows, so this is the way in.
                     if (ref.watch(notionMappingProvider).value != null)

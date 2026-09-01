@@ -78,6 +78,14 @@ enum NotionField {
   date(label: 'Date', isRequired: true, types: <String>{'date'}),
   status(label: 'Status', isRequired: true, types: <String>{'select', 'status'}),
   component(label: 'Component', types: <String>{'title', 'rich_text'}),
+
+  /// The class's start time as plain `HH:mm`.
+  ///
+  /// Its own column rather than a time on [date], because Notion treats a
+  /// datetime as an instant and shifts it by timezone; `09:00` has no instant
+  /// to shift. Optional, and only an import of a database this app did not
+  /// write actually needs it — see `NotionImport._place`.
+  time(label: 'Time', types: <String>{'rich_text', 'select'}),
   kind(label: 'Type', types: <String>{'select'}),
   held(label: 'Held', types: <String>{'number'}),
   credit(label: 'Attendance Credit', types: <String>{'number'}),
@@ -114,6 +122,7 @@ enum NotionField {
       NotionField.date => n == 'date',
       NotionField.status => n == 'status',
       NotionField.component => n == 'name' || n == 'component' || n == 'code',
+      NotionField.time => n == 'time' || n == 'start' || n == 'start time',
       NotionField.kind => n == 'type' || n.contains('l/t/p'),
       // Plain `held` counts, unlike the CSV reader's rule: that one guards
       // against a database carrying both a `Held?` flag and a counter, which
@@ -122,6 +131,116 @@ enum NotionField {
       NotionField.credit => n.contains('credit'),
       NotionField.key => n == 'zeolite id' || n == 'zeolite key',
     };
+  }
+}
+
+/// What Zeolite needs a column for on the *Courses* table.
+///
+/// A second data source, holding one page per subject, so the workspace can
+/// roll attendance up per course. Only [name] and [key] are needed: the prior
+/// counts refine the dashboard and a table without them still works.
+enum NotionCourseField {
+  name(types: <String>{'title'}),
+  key(types: <String>{'rich_text'}),
+  priorHeld(types: <String>{'number'}),
+  priorAttended(types: <String>{'number'});
+
+  const NotionCourseField({required this.types});
+
+  final Set<String> types;
+
+  bool matches(String columnName) {
+    final String n = columnName.trim().toLowerCase();
+    return switch (this) {
+      NotionCourseField.name => n == 'name' || n == 'course' || n == 'subject',
+      NotionCourseField.key => n == 'zeolite id' || n == 'zeolite key',
+      NotionCourseField.priorHeld => n == 'prior held',
+      NotionCourseField.priorAttended => n == 'prior attended',
+    };
+  }
+}
+
+/// The Courses table a mark's `Course` relation points into.
+///
+/// Optional throughout: a workspace whose `Course` is a plain select has no
+/// Courses table, and everything except the dashboard works without one.
+@immutable
+class NotionCourses {
+  const NotionCourses({
+    required this.databaseId,
+    required this.dataSourceId,
+    required this.fields,
+  });
+
+  final String databaseId;
+  final String dataSourceId;
+  final Map<NotionCourseField, NotionProperty> fields;
+
+  /// A course page has to be findable again, and a title is the only thing a
+  /// person reads. Without both there is nothing worth writing.
+  bool get isComplete =>
+      fields.containsKey(NotionCourseField.name) &&
+      fields.containsKey(NotionCourseField.key);
+
+  static NotionCourses match({
+    required String databaseId,
+    required String dataSourceId,
+    required List<NotionProperty> properties,
+  }) {
+    final Map<NotionCourseField, NotionProperty> fields =
+        <NotionCourseField, NotionProperty>{};
+    final Set<String> taken = <String>{};
+    for (final NotionCourseField field in NotionCourseField.values) {
+      for (final NotionProperty property in properties) {
+        if (taken.contains(property.id)) continue;
+        if (!field.types.contains(property.type)) continue;
+        if (!field.matches(property.name)) continue;
+        fields[field] = property;
+        taken.add(property.id);
+        break;
+      }
+    }
+    return NotionCourses(
+      databaseId: databaseId,
+      dataSourceId: dataSourceId,
+      fields: fields,
+    );
+  }
+
+  Map<String, Object?> toJson() => <String, Object?>{
+        'databaseId': databaseId,
+        'dataSourceId': dataSourceId,
+        'fields': <String, Object?>{
+          for (final MapEntry<NotionCourseField, NotionProperty> e
+              in fields.entries)
+            e.key.name: e.value.toJson(),
+        },
+      };
+
+  static NotionCourses? fromJson(Object? raw) {
+    if (raw is! Map<String, Object?>) return null;
+    final String? dataSourceId = raw['dataSourceId'] as String?;
+    if (dataSourceId == null || dataSourceId.isEmpty) return null;
+
+    final Map<NotionCourseField, NotionProperty> fields =
+        <NotionCourseField, NotionProperty>{};
+    final Object? stored = raw['fields'];
+    if (stored is Map<String, Object?>) {
+      for (final MapEntry<String, Object?> entry in stored.entries) {
+        final Object? value = entry.value;
+        if (value is! Map<String, Object?>) continue;
+        for (final NotionCourseField field in NotionCourseField.values) {
+          if (field.name == entry.key) {
+            fields[field] = NotionProperty.restore(value);
+          }
+        }
+      }
+    }
+    return NotionCourses(
+      databaseId: (raw['databaseId'] as String?) ?? '',
+      dataSourceId: dataSourceId,
+      fields: fields,
+    );
   }
 }
 
@@ -144,6 +263,7 @@ class NotionMapping {
     required this.dataSourceId,
     required this.title,
     required this.fields,
+    this.courses,
     this.statusValues = const <String, String>{},
     this.kindValues = const <String, String>{},
   });
@@ -183,6 +303,7 @@ class NotionMapping {
     Map<NotionField, NotionProperty>? fields,
     Map<String, String>? statusValues,
     Map<String, String>? kindValues,
+    NotionCourses? courses,
   }) {
     return NotionMapping(
       databaseId: databaseId,
@@ -191,6 +312,7 @@ class NotionMapping {
       fields: fields ?? this.fields,
       statusValues: statusValues ?? this.statusValues,
       kindValues: kindValues ?? this.kindValues,
+      courses: courses ?? this.courses,
     );
   }
 
@@ -251,6 +373,10 @@ class NotionMapping {
     };
   }
 
+  /// The Courses table this database's `Course` relation points into, or null
+  /// when there is not one. Only the dashboard needs it.
+  final NotionCourses? courses;
+
   Map<String, Object?> toJson() => <String, Object?>{
         'databaseId': databaseId,
         'dataSourceId': dataSourceId,
@@ -261,6 +387,7 @@ class NotionMapping {
         },
         'statusValues': statusValues,
         'kindValues': kindValues,
+        if (courses != null) 'courses': courses!.toJson(),
       };
 
   /// Null when what is stored no longer parses. Remapping is the recovery,
@@ -288,6 +415,7 @@ class NotionMapping {
       fields: fields,
       statusValues: _stringMap(json['statusValues']),
       kindValues: _stringMap(json['kindValues']),
+      courses: NotionCourses.fromJson(json['courses']),
     );
   }
 

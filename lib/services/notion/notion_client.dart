@@ -144,6 +144,13 @@ class NotionClient {
 
   /// One page, for the far side of a relation — a relation cell holds ids and
   /// no names, so the course it points at has to be read to be named.
+  /// The blocks directly under a page. Used to find the databases inside a
+  /// duplicated template, which arrive as `child_database` blocks.
+  Future<NotionResult> blockChildren(String blockId) => _send(
+        'GET',
+        '/v1/blocks/$blockId/children?page_size=100',
+      );
+
   Future<NotionResult> page(String pageId) =>
       _send('GET', '/v1/pages/$pageId');
 
@@ -212,6 +219,26 @@ class NotionClient {
   Future<NotionResult> trashPage(String pageId) => _send(
         'PATCH',
         '/v1/pages/$pageId',
+        body: <String, Object?>{'in_trash': true},
+      );
+
+  /// A database is not a page, so neither of these can go through
+  /// [trashPage] — the id would not resolve under `/v1/pages`.
+  Future<NotionResult> renameDatabase(String databaseId, String title) => _send(
+        'PATCH',
+        '/v1/databases/$databaseId',
+        body: <String, Object?>{
+          'title': <Object?>[
+            <String, Object?>{
+              'text': <String, Object?>{'content': title},
+            },
+          ],
+        },
+      );
+
+  Future<NotionResult> trashDatabase(String databaseId) => _send(
+        'PATCH',
+        '/v1/databases/$databaseId',
         body: <String, Object?>{'in_trash': true},
       );
 

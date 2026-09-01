@@ -15,7 +15,7 @@ import 'package:zeolite/state/notion_providers.dart';
 const String _tokenPayload =
     '{"access_token":"token","workspace_name":"Study"}';
 
-Widget _app(MockClient client) => ProviderScope(
+Widget _app(MockClient client, {bool retakeTemplate = false}) => ProviderScope(
       overrides: [
         notionAuthClientProvider.overrideWithValue(
           NotionAuthClient(
@@ -29,7 +29,7 @@ Widget _app(MockClient client) => ProviderScope(
       ],
       child: MaterialApp(
         theme: AppTheme.dark(),
-        home: const NotionConnectScreen(),
+        home: NotionConnectScreen(retakeTemplate: retakeTemplate),
       ),
     );
 
@@ -71,6 +71,43 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(stored, isEmpty);
+  });
+
+  testWidgets('taking a newer template offers consent, not Disconnect',
+      (WidgetTester tester) async {
+    stored['notion_connection'] = _tokenPayload;
+
+    await tester.pumpWidget(
+      _app(
+        MockClient((_) async => http.Response('ok', 200)),
+        retakeTemplate: true,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Without this the screen offers a connected workspace nothing but
+    // Disconnect, and a new template could only be taken by tearing the
+    // working connection down first.
+    expect(find.text('Take the template'), findsOneWidget);
+    expect(find.text('Disconnect'), findsNothing);
+  });
+
+  testWidgets('taking a newer template offers consent, not Disconnect',
+      (WidgetTester tester) async {
+    stored['notion_connection'] = _tokenPayload;
+
+    await tester.pumpWidget(
+      _app(
+        MockClient((_) async => http.Response('ok', 200)),
+        retakeTemplate: true,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // A connected workspace was offered nothing but Disconnect, so the only
+    // way to a newer template was tearing down a working connection first.
+    expect(find.text('Take the template'), findsOneWidget);
+    expect(find.text('Disconnect'), findsNothing);
   });
 
   testWidgets('an attempt left in the browser is picked back up',

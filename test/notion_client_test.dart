@@ -237,4 +237,30 @@ void main() {
       greaterThanOrEqualTo(const Duration(milliseconds: 60)),
     );
   });
+
+  test('retiring a database goes to the database route, not the page one',
+      () async {
+    // A database is not a page, and its id does not resolve under /v1/pages.
+    final List<String> paths = <String>[];
+    final List<Object?> bodies = <Object?>[];
+    final NotionClient client = _client(MockClient((http.Request r) async {
+      paths.add(r.url.path);
+      bodies.add(jsonDecode(r.body));
+      return http.Response('{"id":"db-1"}', 200);
+    }));
+
+    await client.renameDatabase('db-1', 'Zeolite Attendance (old)');
+    await client.trashDatabase('db-1');
+
+    expect(paths, <String>['/v1/databases/db-1', '/v1/databases/db-1']);
+    expect(
+      (bodies.first! as Map<String, Object?>)['title'],
+      <Object?>[
+        <String, Object?>{
+          'text': <String, Object?>{'content': 'Zeolite Attendance (old)'},
+        },
+      ],
+    );
+    expect(bodies.last, <String, Object?>{'in_trash': true});
+  });
 }

@@ -650,6 +650,10 @@ class _CategoryFormState extends ConsumerState<_CategoryForm> {
   String? _error;
   bool _saving = false;
 
+  /// Held until save so the sheet can be abandoned, and so a new category can
+  /// be filled in before it has an id.
+  final Set<int> _subjectIds = <int>{};
+
   /// Lengths a timetable actually uses, so the common case is one tap.
   static const List<int> _presets = <int>[30, 45, 50, 60, 90, 120, 180];
 
@@ -659,6 +663,17 @@ class _CategoryFormState extends ConsumerState<_CategoryForm> {
     _name = TextEditingController(text: widget.category?.name ?? '');
     _minutes = widget.category?.defaultDurationMinutes ?? 60;
     _weight = widget.category?.weight ?? 1;
+
+    final int? id = widget.category?.id;
+    if (id != null) {
+      for (final Subject subject
+          in ref.read(timetableProvider).value?.subjects ??
+              const <Subject>[]) {
+        if (subject.categoryId == id && subject.id != null) {
+          _subjectIds.add(subject.id!);
+        }
+      }
+    }
   }
 
   @override
@@ -711,8 +726,30 @@ class _CategoryFormState extends ConsumerState<_CategoryForm> {
       );
     }
 
+    await _applyMembership(actions, id);
+
     if (!mounted) return;
     Navigator.of(context).pop(id);
+  }
+
+  /// Writes only the subjects that changed: `updated_at` drives sync, so a
+  /// rewrite of one already filed here would be a change nobody made.
+  Future<void> _applyMembership(TimetableActions actions, int id) async {
+    for (final Subject subject
+        in ref.read(timetableProvider).value?.subjects ?? const <Subject>[]) {
+      final int? subjectId = subject.id;
+      if (subjectId == null) continue;
+
+      final bool wanted = _subjectIds.contains(subjectId);
+      final bool held = subject.categoryId == id;
+      if (wanted == held) continue;
+
+      await actions.updateSubject(
+        wanted
+            ? subject.copyWith(categoryId: id)
+            : subject.copyWith(clearCategory: true),
+      );
+    }
   }
 
   @override
@@ -810,6 +847,15 @@ class _CategoryFormState extends ConsumerState<_CategoryForm> {
         _WeightPicker(
           value: _weight,
           onChanged: (int n) => setState(() => _weight = n),
+        ),
+        const SizedBox(height: AppSpacing.xl),
+        const SectionHeader('Subjects in this category'),
+        _CategorySubjects(
+          chosen: _subjectIds,
+          categoryId: widget.category?.id,
+          onToggle: (int id) => setState(() {
+            if (!_subjectIds.remove(id)) _subjectIds.add(id);
+          }),
         ),
         if (_error != null) ...<Widget>[
           const SizedBox(height: AppSpacing.md),
@@ -2945,6 +2991,112 @@ class _OptionTile extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Every subject, with the ones in this category ticked.
+///
+/// A subject is in one category at a time, so picking one filed elsewhere
+/// moves it — said on the row, because the other category quietly losing a
+/// subject is the surprise worth a line.
+class _CategorySubjects extends ConsumerWidget {
+  const _CategorySubjects({
+    required this.chosen,
+    required this.categoryId,
+    required this.onToggle,
+  });
+
+  final Set<int> chosen;
+  final int? categoryId;
+  final ValueChanged<int> onToggle;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final TimetableData? data = ref.watch(timetableProvider).value;
+    final List<Subject> subjects = data?.subjects ?? const <Subject>[];
+    if (subjects.isEmpty) {
+      return Text(
+        'No subjects yet. Add one and it can be filed here.',
+        style: TextStyle(
+          fontSize: 12,
+          height: 1.4,
+          color: context.palette.textTertiary,
+        ),
+      );
+    }
+
+    final Map<int, String> categoryNames = <int, String>{
+      for (final ClassCategory c in data?.categories ?? const <ClassCategory>[])
+        if (c.id != null) c.id!: c.name,
+    };
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        for (final Subject subject in subjects)
+          if (subject.id != null)
+            _SubjectToggle(
+              subject: subject,
+              selected: chosen.contains(subject.id),
+              // Only when it is somewhere else, and not where it already is.
+              heldBy: subject.categoryId == null ||
+                      subject.categoryId == categoryId
+                  ? null
+                  : categoryNames[subject.categoryId],
+              onTap: () => onToggle(subject.id!),
+            ),
+      ],
+    );
+  }
+}
+
+class _SubjectToggle extends StatelessWidget {
+  const _SubjectToggle({
+    required this.subject,
+    required this.selected,
+    required this.heldBy,
+    required this.onTap,
+  });
+
+  final Subject subject;
+  final bool selected;
+  final String? heldBy;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final AppPalette p = context.palette;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+        child: Row(
+          children: <Widget>[
+            Icon(
+              selected
+                  ? Icons.check_box_rounded
+                  : Icons.check_box_outline_blank_rounded,
+              size: 22,
+              color: selected ? p.accent : p.textTertiary,
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Text(
+                subject.name,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 14),
+              ),
+            ),
+            if (heldBy != null)
+              Text(
+                selected ? 'moved from $heldBy' : 'in $heldBy',
+                style: TextStyle(fontSize: 11.5, color: p.textTertiary),
+              ),
+          ],
+        ),
       ),
     );
   }

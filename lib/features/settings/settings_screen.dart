@@ -202,7 +202,10 @@ class SettingsScreen extends ConsumerWidget {
                         _Row(
                           icon: Icons.category_outlined,
                           title: categories[i].name,
-                          value: _categoryLine(categories[i]),
+                          value: _categoryLine(
+                            categories[i],
+                            timetable?.subjects ?? const <Subject>[],
+                          ),
                           onTap: () => showCategoryEditor(
                             context,
                             ref,
@@ -878,11 +881,19 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   /// Named only where it is not the ordinary one.
-  static String _categoryLine(ClassCategory category) {
-    final String length = 'Classes default to ${category.durationLabel}';
-    if (category.weight == 1) return length;
-    return '$length · counts as '
-        '${classWeightLabel(category.weight).toLowerCase()}';
+  static String _categoryLine(
+    ClassCategory category,
+    List<Subject> subjects,
+  ) {
+    final int held = subjects
+        .where((Subject s) => s.categoryId == category.id)
+        .length;
+    return <String>[
+      held == 1 ? '1 subject' : '$held subjects',
+      'defaults to ${category.durationLabel}',
+      if (category.weight != 1)
+        'counts as ${classWeightLabel(category.weight).toLowerCase()}',
+    ].join(' · ');
   }
 
   /// The unavailable case is not silent: a backup still happens, and this row

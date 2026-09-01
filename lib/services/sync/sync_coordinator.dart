@@ -572,10 +572,17 @@ class SyncCoordinator {
         continue;
       }
 
-      // With no link there is nothing to mark: the page was never adopted
-      // here, so leaving it be is the whole answer.
+      // A page with no link has no mark here to keep, so there is nothing to
+      // mark as needing a push — and a rewrite cannot make a link for a mark
+      // that does not exist. Left alone it was offered again on every run
+      // forever, so "mine wins" retires it instead. Trashed, not deleted.
       final RemoteLink? link = pull.link;
-      if (link == null) continue;
+      if (link == null) {
+        final SyncOutcome outcome =
+            await target.archive(SyncKind.attendance, pull.remote.remoteId);
+        if (!outcome.ok) settled--;
+        continue;
+      }
       write.add(
         link.copyWith(
           localHash: '',

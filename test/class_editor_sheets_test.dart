@@ -75,6 +75,11 @@ class _SubjectRecorder extends TimetableActions {
     saved.add(subject);
     return 1;
   }
+
+  /// The category sheet writes the category before it moves any subject, and
+  /// this test double is only interested in the subjects.
+  @override
+  Future<void> updateCategory(ClassCategory category) async {}
 }
 
 TimetableData _fixture({
@@ -606,5 +611,50 @@ void main() {
       );
       expect(saved, isEmpty);
     });
+  });
+
+  testWidgets('a category files subjects in and out of itself',
+      (WidgetTester tester) async {
+    final List<Subject> saved = <Subject>[];
+    await tester.pumpWidget(_host(
+      (BuildContext c, WidgetRef ref) => showCategoryEditor(
+        c,
+        ref,
+        category: const ClassCategory(
+          id: 1,
+          name: 'Lab',
+          defaultDurationMinutes: 120,
+        ),
+      ),
+      actions: (Ref ref) => _SubjectRecorder(ref, saved: saved),
+    ));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    // Physics is in this category and Maths is in none, so one tap each is a
+    // move in and a move out.
+    for (final String name in <String>['Maths', 'Physics']) {
+      await tester.ensureVisible(find.text(name));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(name));
+      await tester.pumpAndSettle();
+    }
+
+    final Finder save = find.widgetWithText(FilledButton, 'Save changes');
+    await tester.ensureVisible(save);
+    await tester.pumpAndSettle();
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+
+    expect(saved, hasLength(2));
+    expect(
+      saved.firstWhere((Subject s) => s.name == 'Maths').categoryId,
+      1,
+    );
+    expect(
+      saved.firstWhere((Subject s) => s.name == 'Physics').categoryId,
+      isNull,
+    );
   });
 }

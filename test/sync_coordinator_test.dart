@@ -14,6 +14,7 @@ import 'package:zeolite/data/models/class_slot.dart';
 import 'package:zeolite/data/models/subject.dart';
 import 'package:zeolite/data/settings/app_settings.dart';
 import 'package:zeolite/domain/sync/sync_merge.dart';
+import 'package:zeolite/domain/sync/sync_plan.dart';
 import 'package:zeolite/domain/sync/sync_target.dart';
 import 'package:zeolite/services/sync/sync_coordinator.dart';
 
@@ -423,6 +424,39 @@ void main() {
     );
     // Answered once: the same edit must not be raised again.
     expect((await sync.run(force: true)).review, isEmpty);
+  });
+
+  test('keeping mine retires a page this device has no mark for', () async {
+    // A row whose mark does not exist here has no link, so there was nothing
+    // to mark as answered and it came back on every run — a rewrite could not
+    // clear it either, because a rewrite only links rows that have a mark.
+    final Subject subject = await seed(status: AttendanceStatus.present);
+    target.trustsPulls = false;
+    final SyncCoordinator sync = coordinator();
+    await sync.run(force: true);
+
+    const String orphanKey = 'no-such-subject:20260819:600';
+    target.remote = <RemoteState>[
+      mark(subject.uuid!),
+      RemoteState(
+        kind: SyncKind.attendance,
+        localKey: orphanKey,
+        remoteId: 'orphan-page',
+        hash: 'whatever',
+        fields: const <String, Object?>{'status': 'cancelled', 'weight': 0},
+        editedAt: _late,
+      ),
+    ];
+    final SyncRunResult result = await sync.run(force: true);
+    expect(result.review.map((SyncPull p) => p.remote.localKey), <String>[
+      orphanKey,
+    ]);
+
+    await sync.applyReview(result.review, <String, SyncSide>{
+      orphanKey: SyncSide.here,
+    });
+
+    expect(target.calls, contains('archive orphan-page'));
   });
 
   test('keeping the local row leaves it alone and pushes it back', () async {

@@ -95,7 +95,12 @@ class NotionProperties {
     final String? tag = item.fields['tag'] as String?;
     return <String, Object?>{
       'status': wordFor(_word(status, tag)) ?? 'present',
-      'weight': (item.fields['weight'] as int?) ?? 1,
+      // Whatever `encode` puts in Held, because that column is where `decode`
+      // reads this back from. Predicting the mark's own weight for a cancelled
+      // class made every one of them read as changed on the far side forever.
+      'weight': status == 'cancelled'
+          ? 0
+          : (item.fields['weight'] as int?) ?? 1,
     };
   }
 

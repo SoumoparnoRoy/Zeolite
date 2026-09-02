@@ -77,6 +77,30 @@ void main() {
       expect(lab.hasWeighted, isFalse);
     });
 
+    test('a course already called Lab is not called Lab twice', () {
+      // The lab subject reached Notion under its own full name.
+      final NotionPlan plan = _plan(
+        _read(<String>[
+          'HY4L,1,Hydraulics,Aug 3,1,Yes,Lecture,Present',
+          'HY4P,2,Hydraulics Lab,Aug 5,1,Yes,Practical,Present',
+        ]),
+        grouping: NotionGrouping.separate,
+      );
+      expect(
+        plan.subjects.map((NotionPlanSubject s) => s.name),
+        <String>['Hydraulics', 'Hydraulics Lab'],
+      );
+    });
+
+    test('a course whose last word merely ends in lab still gains the suffix',
+        () {
+      final NotionPlan plan = _plan(
+        _read(<String>['ML2P,1,Matlab,Aug 3,1,Yes,Practical,Present']),
+        grouping: NotionGrouping.separate,
+      );
+      expect(plan.subjects.single.name, 'Matlab Lab');
+    });
+
     test('a tutorial is theory, so it shares the theory subject', () {
       final NotionPlan plan = _plan(
         _read(<String>[

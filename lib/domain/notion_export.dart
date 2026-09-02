@@ -26,8 +26,16 @@ enum NotionKind {
   /// A tutorial belongs with the theory rather than standing on its own: it is
   /// the same class counted the same way, and only the practical is assessed
   /// apart.
-  String subjectName(String course) =>
-      this == NotionKind.practical ? '$course Lab' : course;
+  ///
+  /// A course already ending in the word keeps it. The app files its own lab
+  /// subjects in Notion under their full names, so appending regardless
+  /// brought them back doubled, and as new subjects rather than the ones they
+  /// left as.
+  String subjectName(String course) {
+    if (this != NotionKind.practical) return course;
+    final List<String> words = course.trimRight().split(RegExp(r'\s+'));
+    return words.last.toLowerCase() == 'lab' ? course : '$course Lab';
+  }
 }
 
 /// One class occurrence as the export records it.

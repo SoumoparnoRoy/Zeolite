@@ -148,6 +148,22 @@ class NotionMappingController extends AsyncNotifier<NotionMapping?> {
     state = AsyncData<NotionMapping?>(mapping);
   }
 
+  /// Nothing matches a database by its name — the mapping is columns — so a
+  /// rename in Notion reaches nothing, and Settings goes on naming a table
+  /// under a name it no longer has. A read that fails keeps what is stored.
+  Future<void> refreshTitle() async {
+    final NotionMapping? mapping = state.value;
+    if (mapping == null || mapping.databaseId.isEmpty) return;
+
+    final NotionResult result =
+        await ref.read(notionClientProvider).database(mapping.databaseId);
+    if (!result.ok) return;
+
+    final String? title = notionTitleOf(result.body);
+    if (title == null || title == mapping.title) return;
+    await save(mapping.copyWith(title: title));
+  }
+
   /// Maps the database Notion copied in during consent, without asking.
   ///
   /// Only ever called with `duplicated_template_id`, so the schema on the far

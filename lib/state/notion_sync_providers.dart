@@ -142,6 +142,9 @@ class NotionSyncController extends Notifier<SyncStatus> {
             );
       }
       await _stamp(coordinator.status.lastRunAt);
+      // Off the back of a run: the workspace has just been reached, and the
+      // name is only ever shown, so nothing needs it any sooner than this.
+      await ref.read(notionMappingProvider.notifier).refreshTitle();
     }
     return result;
   }

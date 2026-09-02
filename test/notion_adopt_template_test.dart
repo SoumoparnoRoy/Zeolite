@@ -172,4 +172,57 @@ void main() {
     );
     expect(container.read(notionMappingProvider).value?.databaseId, 'db-1');
   });
+
+  test('a database renamed in Notion is picked up by the next run', () async {
+    String name = 'Zeolite Attendance';
+    final MockClient client = MockClient((http.Request r) async {
+      if (r.url.path.startsWith('/v1/databases/')) {
+        return http.Response(
+          '{"id":"db-1","data_sources":[{"id":"ds-1"}],'
+          '"title":[{"plain_text":"$name"}]}',
+          200,
+        );
+      }
+      return http.Response(_schema, 200);
+    });
+
+    final ProviderContainer container = _container(client);
+    addTearDown(container.dispose);
+    await container.read(notionMappingProvider.future);
+    await container.read(notionMappingProvider.notifier).adoptTemplate('db-1');
+
+    name = 'Zeolite Classes';
+    await container.read(notionMappingProvider.notifier).refreshTitle();
+
+    expect(container.read(notionMappingProvider).value?.title, 'Zeolite Classes');
+    // Written through as well, or the old name is back on the next launch.
+    final NotionConnectionStore store =
+        container.read(notionConnectionStoreProvider);
+    expect((await store.readMapping())?.title, 'Zeolite Classes');
+  });
+
+  test('a name that cannot be read leaves the stored one alone', () async {
+    bool reachable = true;
+    final MockClient client = MockClient((http.Request r) async {
+      if (r.url.path.startsWith('/v1/databases/')) {
+        return reachable
+            ? http.Response(_ready, 200)
+            : http.Response(_error('internal_server_error'), 500);
+      }
+      return http.Response(_schema, 200);
+    });
+
+    final ProviderContainer container = _container(client);
+    addTearDown(container.dispose);
+    await container.read(notionMappingProvider.future);
+    await container.read(notionMappingProvider.notifier).adoptTemplate('db-1');
+
+    reachable = false;
+    await container.read(notionMappingProvider.notifier).refreshTitle();
+
+    expect(
+      container.read(notionMappingProvider).value?.title,
+      'Zeolite Attendance',
+    );
+  });
 }

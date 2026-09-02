@@ -34,6 +34,7 @@ import '../domain/timetable_import.dart';
 import '../services/backup_folder.dart';
 import '../services/analytics_service.dart';
 import '../services/backup_service.dart';
+import '../services/launcher_icon_service.dart';
 import '../services/notification_service.dart';
 import '../services/sync/sync_coordinator.dart';
 import 'notion_sync_providers.dart';
@@ -95,6 +96,29 @@ final backupServiceProvider = Provider<BackupService>(
     ref.watch(settingsServiceProvider),
   ),
 );
+
+final launcherIconServiceProvider =
+    Provider<LauncherIconService>((ref) => const LauncherIconService());
+
+final launcherIconProvider =
+    AsyncNotifierProvider<LauncherIconController, LauncherIcon>(
+  LauncherIconController.new,
+);
+
+class LauncherIconController extends AsyncNotifier<LauncherIcon> {
+  @override
+  Future<LauncherIcon> build() =>
+      ref.watch(launcherIconServiceProvider).current();
+
+  /// Android may kill the process to apply this, so nothing is queued behind
+  /// it — the state is set first so the picker is correct if the app survives,
+  /// and read again from the platform on the next launch if it does not.
+  Future<void> select(LauncherIcon icon) async {
+    if (state.value == icon) return;
+    state = AsyncData<LauncherIcon>(icon);
+    await ref.read(launcherIconServiceProvider).select(icon);
+  }
+}
 
 // ----------------------------------------------------------------- settings
 

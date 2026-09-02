@@ -1,4 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#000A11</color>
+    <color name="ic_launcher_background_teal">#000D11</color>
+    <color name="ic_launcher_background_sky">#000611</color>
+    <color name="ic_launcher_background_indigo">#000011</color>
+    <color name="ic_launcher_background_violet">#080011</color>
+    <color name="ic_launcher_background_plum">#11000F</color>
+    <color name="ic_launcher_background_magenta">#110006</color>
+    <color name="ic_launcher_background_slate">#0E0E11</color>
 </resources>

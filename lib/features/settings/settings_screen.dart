@@ -20,6 +20,7 @@ import '../../domain/notion/notion_mapping.dart';
 import '../../domain/notion_export.dart';
 import '../../services/backup_folder.dart';
 import '../../services/backup_service.dart';
+import '../../services/launcher_icon_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/notion/notion_connection_store.dart';
 import '../../services/notion/notion_database_reader.dart';
@@ -351,6 +352,17 @@ class SettingsScreen extends ConsumerWidget {
               const SizedBox(height: AppSpacing.sm),
               _Hint('${settings.accentColour.label} tints the headers, the '
                   'buttons and every highlight. It stays on this device.'),
+              const SizedBox(height: AppSpacing.sm),
+              SurfaceCard(
+                padding: EdgeInsets.zero,
+                child: _Row(
+                  icon: Icons.apps_rounded,
+                  title: 'Launcher icon',
+                  value: ref.watch(launcherIconProvider).value?.label ??
+                      LauncherIcon.standard.label,
+                  onTap: () => _pickLauncherIcon(context, ref),
+                ),
+              ),
               const SizedBox(height: AppSpacing.xl),
               const SectionHeader('Notifications'),
               SurfaceCard(
@@ -839,6 +851,58 @@ class SettingsScreen extends ConsumerWidget {
 
     if (confirmed != true) return;
     await ref.read(actionsProvider).deleteCategory(id);
+  }
+
+  /// Deliberately its own picker rather than following the accent: swapping
+  /// the alias can take the app down with it, and the accent swatches are
+  /// tapped through freely.
+  Future<void> _pickLauncherIcon(BuildContext context, WidgetRef ref) async {
+    final LauncherIcon inForce =
+        ref.read(launcherIconProvider).value ?? LauncherIcon.standard;
+    final LauncherIcon? chosen = await showDialog<LauncherIcon>(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        backgroundColor: context.palette.surfaceHigh,
+        title: const Text('Launcher icon'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Wrap(
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.sm,
+              children: <Widget>[
+                for (final LauncherIcon icon in LauncherIcon.values)
+                  _LauncherIconOption(
+                    icon: icon,
+                    selected: icon == inForce,
+                    onTap: () => Navigator.of(context).pop(icon),
+                  ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              'Zeolite may close while the icon changes, and your home screen '
+              'can take a moment to catch up. A shortcut you pinned to the old '
+              'icon stops working.',
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.4,
+                color: context.palette.textTertiary,
+              ),
+            ),
+          ],
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+    if (chosen == null) return;
+    await ref.read(launcherIconProvider.notifier).select(chosen);
   }
 
   /// The one action that restates history, so it asks first.
@@ -1412,6 +1476,67 @@ class _Row extends StatelessWidget {
 }
 
 /// One of the three theme choices, shown as a tappable tile.
+class _LauncherIconOption extends StatelessWidget {
+  const _LauncherIconOption({
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final LauncherIcon icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final AppPalette p = context.palette;
+    return Semantics(
+      label: icon.label,
+      selected: selected,
+      button: true,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.xs),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Container(
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                  border: Border.all(
+                    color: selected ? p.accent : Colors.transparent,
+                    width: 2,
+                  ),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                  child: Image.asset(
+                    icon.preview,
+                    width: 52,
+                    height: 52,
+                    filterQuality: FilterQuality.medium,
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                icon.label,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: selected ? p.accent : p.textTertiary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _AccentOption extends StatelessWidget {
   const _AccentOption({
     required this.accent,

@@ -1,5 +1,6 @@
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/app_theme.dart';
@@ -109,6 +110,26 @@ class RootShell extends ConsumerStatefulWidget {
   /// Same order as the shell's screens, so a tab added to one and not the
   /// other shows. Public so [tabForPayload] and the tests resolve through it
   /// rather than through a second copy of the ordering.
+  /// Reading takes the bar away and reaching back brings it in. Null leaves it
+  /// as it is — including for the day pills, which scroll sideways inside the
+  /// screen's own list and would otherwise flicker the bar on every day.
+  static bool? navVisibleFor(
+    ScrollDirection direction, {
+    required int depth,
+    required Axis axis,
+    required double maxExtent,
+  }) {
+    if (depth != 0 || axis != Axis.vertical) return null;
+    return switch (direction) {
+      // Never conditional, or a screen that stopped scrolling once the bar
+      // went could never get it back.
+      ScrollDirection.forward => true,
+      // A screen that already fits has no room to win.
+      ScrollDirection.reverse => maxExtent > 0 ? false : null,
+      ScrollDirection.idle => null,
+    };
+  }
+
   static const List<String> tabNames = <String>[
     'today',
     'timetable',
@@ -169,8 +190,28 @@ class _RootShellState extends ConsumerState<RootShell> {
   }
 
   void _select(int index) {
+    // A tab arrived at with the bar hidden would look like it has no way back.
+    _showNav(true);
     ref.read(selectedTabProvider.notifier).select(index);
     _report(index);
+  }
+
+  bool _navVisible = true;
+
+  void _showNav(bool visible) {
+    if (_navVisible == visible) return;
+    setState(() => _navVisible = visible);
+  }
+
+  bool _onScroll(UserScrollNotification notification) {
+    final bool? visible = RootShell.navVisibleFor(
+      notification.direction,
+      depth: notification.depth,
+      axis: notification.metrics.axis,
+      maxExtent: notification.metrics.maxScrollExtent,
+    );
+    if (visible != null) _showNav(visible);
+    return false;
   }
 
   void _report([int? index]) => ref
@@ -181,11 +222,23 @@ class _RootShellState extends ConsumerState<RootShell> {
   Widget build(BuildContext context) {
     final int index = ref.watch(selectedTabProvider);
     return Scaffold(
-      body: IndexedStack(index: index, children: _screens),
+      body: NotificationListener<UserScrollNotification>(
+        onNotification: _onScroll,
+        child: IndexedStack(index: index, children: _screens),
+      ),
       // A shadow rather than a rule: the tab row is the one piece of chrome
       // that has to stay above the sheet, and a hairline read as one more
       // divider among the day rules above it.
-      bottomNavigationBar: DecoratedBox(
+      // Collapsed rather than slid away, so the sheet gains the room instead
+      // of scrolling underneath it.
+      bottomNavigationBar: ClipRect(
+        clipper: const _NavBarClip(),
+        child: AnimatedAlign(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.topCenter,
+          heightFactor: _navVisible ? 1 : 0,
+          child: DecoratedBox(
         decoration: BoxDecoration(
           color: context.palette.navSurface,
           boxShadow: <BoxShadow>[
@@ -223,8 +276,21 @@ class _RootShellState extends ConsumerState<RootShell> {
               label: 'Settings',
             ),
           ],
+            ),
+          ),
         ),
       ),
     );
   }
+}
+
+/// Leaves a strip above the bar unclipped, since its shadow falls upward.
+class _NavBarClip extends CustomClipper<Rect> {
+  const _NavBarClip();
+
+  @override
+  Rect getClip(Size size) => Rect.fromLTRB(0, -24, size.width, size.height);
+
+  @override
+  bool shouldReclip(CustomClipper<Rect> oldClipper) => false;
 }

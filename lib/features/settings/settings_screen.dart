@@ -1565,6 +1565,7 @@ class _SegmentedCell extends StatelessWidget {
     required this.onTap,
     required this.child,
     this.semanticsLabel,
+    this.square = false,
   });
 
   final bool selected;
@@ -1572,10 +1573,13 @@ class _SegmentedCell extends StatelessWidget {
   final Widget child;
   final String? semanticsLabel;
 
+  /// Squared off, so a round swatch is inset the same on all four sides.
+  final bool square;
+
   @override
   Widget build(BuildContext context) {
     final AppPalette p = context.palette;
-    final Widget cell = ClipRRect(
+    Widget cell = ClipRRect(
       borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
       child: Stack(
         children: <Widget>[
@@ -1597,16 +1601,22 @@ class _SegmentedCell extends StatelessWidget {
               color: Colors.transparent,
               child: InkWell(
                 onTap: onTap,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
-                  child: child,
-                ),
+                child: square
+                    ? child
+                    : Padding(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: AppSpacing.lg,
+                        ),
+                        child: child,
+                      ),
               ),
             ),
           ),
         ],
       ),
     );
+
+    if (square) cell = AspectRatio(aspectRatio: 1, child: cell);
 
     if (semanticsLabel == null) return cell;
     return Semantics(
@@ -1617,6 +1627,10 @@ class _SegmentedCell extends StatelessWidget {
     );
   }
 }
+
+/// Below this the tick stops reading; above it the swatch reads as a button.
+const double _minSwatch = 22;
+const double _maxSwatch = 36;
 
 class _AccentOption extends StatelessWidget {
   const _AccentOption({
@@ -1643,33 +1657,40 @@ class _AccentOption extends StatelessWidget {
       selected: selected,
       onTap: onTap,
       semanticsLabel: accent.label,
-      child: Center(
-        child: AnimatedContainer(
-          duration: _toggleDuration,
-          curve: _toggleCurve,
-          width: 30,
-          height: 30,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: sample.accentGradient,
-            // Slate on a dark card is barely a shape without the ring.
-            border: Border.all(
-              color: selected ? sample.accent : p.outline,
-              width: 2,
-            ),
-          ),
-          child: AnimatedScale(
-            duration: _toggleDuration,
-            curve: Curves.easeOutBack,
-            scale: selected ? 1 : 0.4,
-            child: AnimatedOpacity(
+      square: true,
+      child: LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints c) {
+          final double swatch =
+              (c.maxWidth - AppSpacing.sm * 2).clamp(_minSwatch, _maxSwatch);
+          return Center(
+            child: AnimatedContainer(
               duration: _toggleDuration,
-              opacity: selected ? 1 : 0,
-              child: const Icon(Icons.check_rounded,
-                  size: 16, color: Colors.white),
+              curve: _toggleCurve,
+              width: swatch,
+              height: swatch,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: sample.accentGradient,
+                // Slate on a dark card is barely a shape without the ring.
+                border: Border.all(
+                  color: selected ? sample.accent : p.outline,
+                  width: 2,
+                ),
+              ),
+              child: AnimatedScale(
+                duration: _toggleDuration,
+                curve: Curves.easeOutBack,
+                scale: selected ? 1 : 0.4,
+                child: AnimatedOpacity(
+                  duration: _toggleDuration,
+                  opacity: selected ? 1 : 0,
+                  child: Icon(Icons.check_rounded,
+                      size: swatch * 0.55, color: Colors.white),
+                ),
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }

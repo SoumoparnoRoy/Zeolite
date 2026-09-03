@@ -321,6 +321,7 @@ class SettingsScreen extends ConsumerWidget {
               SurfaceCard(
                 child: _SegmentedRow(
                   count: AccentColour.values.length,
+                  phoneColumns: 4,
                   itemBuilder: (BuildContext context, int i) => _AccentOption(
                     accent: AccentColour.values[i],
                     selected: settings.accentColour == AccentColour.values[i],
@@ -1525,30 +1526,59 @@ const Curve _toggleCurve = Curves.easeOutCubic;
 /// A row of equal cells, the same size on a phone and on a tablet — left to
 /// stretch, three across a tablet's content column stop reading as buttons.
 class _SegmentedRow extends StatelessWidget {
-  const _SegmentedRow({required this.count, required this.itemBuilder});
+  const _SegmentedRow({
+    required this.count,
+    required this.itemBuilder,
+    this.phoneColumns,
+  });
 
   static const double _maxWidth = 400;
 
+  static const double _maxWrappedCell = 56;
+
   final int count;
   final Widget Function(BuildContext, int) itemBuilder;
+
+  /// Wraps into this many columns under [AppScale.phoneWidth].
+  final int? phoneColumns;
 
   @override
   Widget build(BuildContext context) {
     final MediaQueryData mq = MediaQuery.of(context);
     final TextScaler scaler = mq.textScaler;
+    final bool wrapped =
+        phoneColumns != null && mq.size.shortestSide <= AppScale.phoneWidth;
+    final int columns = wrapped ? phoneColumns! : count;
+    final double maxWidth = wrapped
+        ? columns * _maxWrappedCell + (columns - 1) * AppSpacing.sm
+        : _maxWidth;
+
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: _maxWidth),
+        constraints: BoxConstraints(maxWidth: maxWidth),
         child: MediaQuery(
           // The viewer's own scaling still applies; only our ramp comes off.
           data: mq.copyWith(
             textScaler: scaler is ScaledText ? scaler.inner : scaler,
           ),
-          child: Row(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              for (int i = 0; i < count; i++) ...<Widget>[
-                if (i > 0) const SizedBox(width: AppSpacing.sm),
-                Expanded(child: itemBuilder(context, i)),
+              for (int first = 0; first < count; first += columns) ...<Widget>[
+                if (first > 0) const SizedBox(height: AppSpacing.sm),
+                Row(
+                  children: <Widget>[
+                    for (int c = 0; c < columns; c++) ...<Widget>[
+                      if (c > 0) const SizedBox(width: AppSpacing.sm),
+                      // Empty columns keep the short last row lined up.
+                      Expanded(
+                        child: first + c < count
+                            ? itemBuilder(context, first + c)
+                            : const SizedBox.shrink(),
+                      ),
+                    ],
+                  ],
+                ),
               ],
             ],
           ),

@@ -395,8 +395,7 @@ class NotificationService {
 
   /// Fires immediately for any subject below its target or sitting on the
   /// edge — all of them in one notification, because four arriving at once
-  /// otherwise read as four unrelated problems. Android truncates the inbox
-  /// lines, so the name and the percentage lead.
+  /// otherwise read as four unrelated problems.
   Future<void> _showDangerAlerts(OverallStats stats) async {
     final List<SubjectStats> danger = subjectsInDanger(stats);
     if (danger.isEmpty) return;
@@ -417,9 +416,12 @@ class NotificationService {
         channelDescription: _alertChannel.description,
         importance: Importance.high,
         priority: Priority.high,
-        styleInformation: single
-            ? BigTextStyleInformation(lines.first)
-            : InboxStyleInformation(lines, contentTitle: title),
+        // Inbox style clips every row to one line, which cut each subject
+        // off mid-advice on a phone. Big text wraps.
+        styleInformation: BigTextStyleInformation(
+          lines.join('\n'),
+          contentTitle: title,
+        ),
       ),
     );
 

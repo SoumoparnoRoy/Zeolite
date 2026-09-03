@@ -79,7 +79,7 @@ class SettingsScreen extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 96),
           sliver: SliverList.list(
             children: <Widget>[
-              const SectionHeader('Semester'),
+              const SectionHeader('Term'),
               SurfaceCard(
                 padding: EdgeInsets.zero,
                 child: Column(
@@ -298,24 +298,15 @@ class SettingsScreen extends ConsumerWidget {
               const SizedBox(height: AppSpacing.xl),
               const SectionHeader('Appearance'),
               SurfaceCard(
-                child: Row(
-                  children: <Widget>[
-                    for (final AppThemeMode mode in AppThemeMode.values)
-                      Expanded(
-                        child: Padding(
-                          padding: EdgeInsets.only(
-                            right:
-                                mode == AppThemeMode.dark ? 0 : AppSpacing.sm,
-                          ),
-                          child: _ThemeOption(
-                            mode: mode,
-                            selected: settings.themeMode == mode,
-                            onTap: () => controller
-                                .save(settings.copyWith(themeMode: mode)),
-                          ),
-                        ),
-                      ),
-                  ],
+                child: _SegmentedRow(
+                  count: AppThemeMode.values.length,
+                  itemBuilder: (BuildContext context, int i) => _ThemeOption(
+                    mode: AppThemeMode.values[i],
+                    selected: settings.themeMode == AppThemeMode.values[i],
+                    onTap: () => controller.save(
+                      settings.copyWith(themeMode: AppThemeMode.values[i]),
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: AppSpacing.sm),
@@ -328,25 +319,15 @@ class SettingsScreen extends ConsumerWidget {
               ),
               const SizedBox(height: AppSpacing.md),
               SurfaceCard(
-                child: Row(
-                  children: <Widget>[
-                    for (final AccentColour accent in AccentColour.values)
-                      Expanded(
-                        child: Padding(
-                          padding: EdgeInsets.only(
-                            right: accent == AccentColour.values.last
-                                ? 0
-                                : AppSpacing.sm,
-                          ),
-                          child: _AccentOption(
-                            accent: accent,
-                            selected: settings.accentColour == accent,
-                            onTap: () => controller
-                                .save(settings.copyWith(accentColour: accent)),
-                          ),
-                        ),
-                      ),
-                  ],
+                child: _SegmentedRow(
+                  count: AccentColour.values.length,
+                  itemBuilder: (BuildContext context, int i) => _AccentOption(
+                    accent: AccentColour.values[i],
+                    selected: settings.accentColour == AccentColour.values[i],
+                    onTap: () => controller.save(
+                      settings.copyWith(accentColour: AccentColour.values[i]),
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: AppSpacing.sm),
@@ -537,7 +518,7 @@ class SettingsScreen extends ConsumerWidget {
                 child: _SwitchRow(
                   icon: Icons.schedule_rounded,
                   title: '24-hour time',
-                  subtitle: settings.use24HourTime ? '14:30' : '2:30 pm',
+                  subtitle: settings.use24HourTime ? '14:30' : '2:30 PM',
                   value: settings.use24HourTime,
                   onChanged: (bool v) =>
                       controller.save(settings.copyWith(use24HourTime: v)),
@@ -1537,6 +1518,106 @@ class _LauncherIconOption extends StatelessWidget {
   }
 }
 
+/// Slow enough to read as the fill rising, and the curve the tab bar uses.
+const Duration _toggleDuration = Duration(milliseconds: 220);
+const Curve _toggleCurve = Curves.easeOutCubic;
+
+/// A row of equal cells, the same size on a phone and on a tablet — left to
+/// stretch, three across a tablet's content column stop reading as buttons.
+class _SegmentedRow extends StatelessWidget {
+  const _SegmentedRow({required this.count, required this.itemBuilder});
+
+  static const double _maxWidth = 400;
+
+  final int count;
+  final Widget Function(BuildContext, int) itemBuilder;
+
+  @override
+  Widget build(BuildContext context) {
+    final MediaQueryData mq = MediaQuery.of(context);
+    final TextScaler scaler = mq.textScaler;
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: _maxWidth),
+        child: MediaQuery(
+          // The viewer's own scaling still applies; only our ramp comes off.
+          data: mq.copyWith(
+            textScaler: scaler is ScaledText ? scaler.inner : scaler,
+          ),
+          child: Row(
+            children: <Widget>[
+              for (int i = 0; i < count; i++) ...<Widget>[
+                if (i > 0) const SizedBox(width: AppSpacing.sm),
+                Expanded(child: itemBuilder(context, i)),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One cell: the tint sits below it when off and rises to fill it when picked.
+class _SegmentedCell extends StatelessWidget {
+  const _SegmentedCell({
+    required this.selected,
+    required this.onTap,
+    required this.child,
+    this.semanticsLabel,
+  });
+
+  final bool selected;
+  final VoidCallback onTap;
+  final Widget child;
+  final String? semanticsLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final AppPalette p = context.palette;
+    final Widget cell = ClipRRect(
+      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+      child: Stack(
+        children: <Widget>[
+          Positioned.fill(child: ColoredBox(color: p.surfaceHigh)),
+          Positioned.fill(
+            child: AnimatedFractionallySizedBox(
+              duration: _toggleDuration,
+              curve: _toggleCurve,
+              alignment: Alignment.bottomCenter,
+              heightFactor: selected ? 1 : 0,
+              child: ColoredBox(color: p.accentSoft),
+            ),
+          ),
+          // An unpositioned stack child is laid out loose, so without this
+          // the cell is only tappable at its left edge.
+          SizedBox(
+            width: double.infinity,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: onTap,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+                  child: child,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (semanticsLabel == null) return cell;
+    return Semantics(
+      label: semanticsLabel,
+      selected: selected,
+      button: true,
+      child: cell,
+    );
+  }
+}
+
 class _AccentOption extends StatelessWidget {
   const _AccentOption({
     required this.accent,
@@ -1558,36 +1639,34 @@ class _AccentOption extends StatelessWidget {
             : AppPalette.light)
         .withAccent(accent);
 
-    return Semantics(
-      label: accent.label,
+    return _SegmentedCell(
       selected: selected,
-      button: true,
-      child: Material(
-        color: selected ? p.accentSoft : p.surfaceHigh,
-        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
-            child: Center(
-              child: Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: sample.accentGradient,
-                  // Slate on a dark card is barely a shape without the ring.
-                  border: Border.all(
-                    color: selected ? sample.accent : p.outline,
-                    width: 2,
-                  ),
-                ),
-                child: selected
-                    ? const Icon(Icons.check_rounded,
-                        size: 16, color: Colors.white)
-                    : null,
-              ),
+      onTap: onTap,
+      semanticsLabel: accent.label,
+      child: Center(
+        child: AnimatedContainer(
+          duration: _toggleDuration,
+          curve: _toggleCurve,
+          width: 30,
+          height: 30,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: sample.accentGradient,
+            // Slate on a dark card is barely a shape without the ring.
+            border: Border.all(
+              color: selected ? sample.accent : p.outline,
+              width: 2,
+            ),
+          ),
+          child: AnimatedScale(
+            duration: _toggleDuration,
+            curve: Curves.easeOutBack,
+            scale: selected ? 1 : 0.4,
+            child: AnimatedOpacity(
+              duration: _toggleDuration,
+              opacity: selected ? 1 : 0,
+              child: const Icon(Icons.check_rounded,
+                  size: 16, color: Colors.white),
             ),
           ),
         ),
@@ -1616,34 +1695,33 @@ class _ThemeOption extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final AppPalette p = context.palette;
-    return Material(
-      color: selected ? p.accentSoft : p.surfaceHigh,
-      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
-          child: Column(
-            children: <Widget>[
-              Icon(
-                _icon,
-                size: 22,
-                color: selected ? p.accent : p.textSecondary,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                // "Match system" is too wide for a third of the row.
-                mode == AppThemeMode.system ? 'System' : mode.label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                  color: selected ? p.accent : p.textTertiary,
-                ),
-              ),
-            ],
+    return _SegmentedCell(
+      selected: selected,
+      onTap: onTap,
+      child: Column(
+        children: <Widget>[
+          TweenAnimationBuilder<Color?>(
+            duration: _toggleDuration,
+            curve: _toggleCurve,
+            tween: ColorTween(end: selected ? p.accent : p.textSecondary),
+            builder: (BuildContext context, Color? tone, Widget? _) =>
+                Icon(_icon, size: 22, color: tone),
           ),
-        ),
+          const SizedBox(height: AppSpacing.sm),
+          AnimatedDefaultTextStyle(
+            duration: _toggleDuration,
+            curve: _toggleCurve,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+              color: selected ? p.accent : p.textTertiary,
+            ),
+            child: Text(
+              // "Match system" is too wide for a third of the row.
+              mode == AppThemeMode.system ? 'System' : mode.label,
+            ),
+          ),
+        ],
       ),
     );
   }

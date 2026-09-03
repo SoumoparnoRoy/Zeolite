@@ -242,7 +242,7 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
         onPressed: busy ? null : _start,
         child: Text(
           switch ((_stage, widget.retakeTemplate)) {
-            (_Stage.idle, true) => 'Take the template',
+            (_Stage.idle, true) => 'Take the latest template',
             (_Stage.idle, false) => 'Connect Notion',
             _ => 'Open Notion again',
           },
@@ -290,7 +290,7 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               const Text(
-                "Didn't get back from Notion?",
+                'Did not get back from Notion?',
                 style: TextStyle(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: AppSpacing.sm),

@@ -251,22 +251,23 @@ class NotionExport {
       final String course = _courseName(at(columns.course));
       final String component = at(columns.component);
       final String label = component.isEmpty ? course : component;
+      final String where = 'Row ${i + 1}${label.isEmpty ? '' : ' ($label)'}';
 
       final DateTime? date = _date(at(columns.date), today);
       if (date == null) {
-        problems.add('Row ${i + 1} ($label): "${at(columns.date)}" is not a '
-            'date.');
+        problems.add('$where: "${at(columns.date)}" is not a date this can '
+            'read.');
         continue;
       }
       if (course.isEmpty) {
-        problems.add('Row ${i + 1}: no course named.');
+        problems.add('$where: no course named.');
         continue;
       }
 
       final String raw = at(columns.status).toLowerCase();
       if (!NotionRow.knowsStatus(raw)) {
-        problems.add('Row ${i + 1} ($label): "${at(columns.status)}" is not a '
-            'status this can read.');
+        problems.add('$where: "${at(columns.status)}" is not a status this '
+            'can read.');
         continue;
       }
 

@@ -423,7 +423,7 @@ class _SubjectRow extends ConsumerWidget {
     if (confirmed != true) return;
     final TimetableActions actions = ref.read(actionsProvider);
     await actions.deleteSubject(id);
-    showUndoSnack(messenger, actions, 'Deleted ${subject.name}');
+    showUndoSnack(messenger, actions, '${subject.name} deleted');
   }
 
   /// "a, b and c" — reads like a sentence rather than a list of counts.

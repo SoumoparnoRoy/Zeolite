@@ -161,7 +161,7 @@ class SubjectStats {
             ? 'One more $_unit brings you back to target'
             : 'Attending the next $needToAttend brings you back to target';
       case AttendanceHealth.lost:
-        return 'Target is out of reach this semester';
+        return 'Target is out of reach this term';
     }
   }
 

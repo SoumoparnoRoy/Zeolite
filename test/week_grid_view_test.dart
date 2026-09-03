@@ -92,7 +92,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.textContaining('Break'), findsOneWidget);
-    expect(find.textContaining('12:20 pm – 1:00 pm'), findsOneWidget);
+    expect(find.textContaining('12:20 PM – 1:00 PM'), findsOneWidget);
 
     final double grid = tester.getSize(find.byType(WeekGridView)).width;
     final Finder band = find
@@ -118,8 +118,8 @@ void main() {
 
     // Four blocks before it, and the first one after starts at 13:00 rather
     // than carrying on from noon.
-    expect(find.text('9:00'), findsOneWidget);
-    expect(find.text('1:00'), findsOneWidget);
+    expect(find.text('9:00 AM'), findsOneWidget);
+    expect(find.text('1:00 PM'), findsOneWidget);
   });
 
   testWidgets('a holiday is named in the grid, not left blank',
@@ -173,10 +173,10 @@ void main() {
     expect(find.byIcon(Icons.add_rounded), findsNWidgets(10 * 7));
     // The gutter keeps the minutes — without them a sub-hourly block length
     // prints the same label twice in a row.
-    expect(find.text('9:00'), findsOneWidget);
-    expect(find.text('9:50'), findsOneWidget);
-    expect(find.text('3:40'), findsOneWidget);
-    expect(find.text('4:30'), findsOneWidget);
+    expect(find.text('9:00 AM'), findsOneWidget);
+    expect(find.text('9:50 AM'), findsOneWidget);
+    expect(find.text('3:40 PM'), findsOneWidget);
+    expect(find.text('4:30 PM'), findsOneWidget);
   });
 
   testWidgets('each empty cell opens its own block, not the last one',
@@ -190,7 +190,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Monday · block 1'), findsOneWidget);
-    expect(find.text('9:00 am – 9:50 am'), findsOneWidget);
+    expect(find.text('9:00 AM – 9:50 AM'), findsOneWidget);
   });
 
   testWidgets('a two-block class is twice the height of an empty cell',
@@ -264,7 +264,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Flagged rather than silently drawn as if it started at 9:00.
-    expect(find.text('9:30 am'), findsOneWidget);
+    expect(find.text('9:30 AM'), findsOneWidget);
   });
 
   testWidgets('without a block length the grid explains itself instead',

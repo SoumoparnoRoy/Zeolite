@@ -77,7 +77,7 @@ class DayGridSection extends ConsumerWidget {
                   ),
                   Text(
                     settings.blockMinutes <= 0
-                        ? 'not set'
+                        ? 'Not set'
                         : Clock.formatDuration(settings.blockMinutes),
                     style: TextStyle(
                       fontSize: 18,

@@ -272,7 +272,7 @@ class _SubjectFormState extends ConsumerState<_SubjectForm> {
                 textCapitalization: TextCapitalization.characters,
                 decoration: const InputDecoration(
                   labelText: 'Code',
-                  hintText: 'CS201',
+                  hintText: 'e.g. CS201',
                 ),
               ),
             ),
@@ -1502,7 +1502,7 @@ class _SlotFormState extends ConsumerState<_SlotForm> {
               child: _FieldButton(
                 label: 'Until',
                 value: _endDate == null
-                    ? 'Semester end'
+                    ? 'Term end'
                     : Dates.formatFull(_endDate!),
                 icon: Icons.stop_rounded,
                 onTap: () => _pickDate(isStart: false),
@@ -2093,7 +2093,7 @@ class _ExtraClassFormState extends ConsumerState<_ExtraClassForm> {
         const SizedBox(height: AppSpacing.xl),
         FilledButton(
           onPressed: _saving ? null : _save,
-          child: Text(_isEditing ? 'Save changes' : 'Add class'),
+          child: Text(_isEditing ? 'Save changes' : 'Add one-off class'),
         ),
       ],
     );
@@ -2438,7 +2438,7 @@ class _SubjectPicker extends ConsumerWidget {
                 SizedBox(width: AppSpacing.md),
                 Expanded(
                   child: Text(
-                    'Create your first subject',
+                    'Add your first subject',
                     style: TextStyle(fontWeight: FontWeight.w600),
                   ),
                 ),

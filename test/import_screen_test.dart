@@ -78,7 +78,7 @@ void main() {
     expect(find.text('TUESDAY'), findsOneWidget);
     expect(find.text('ECE1102'), findsOneWidget);
     expect(find.text('B204'), findsOneWidget);
-    expect(find.text('12:30 pm – 1:20 pm'), findsOneWidget);
+    expect(find.text('12:30 PM – 1:20 PM'), findsOneWidget);
     expect(find.textContaining('2 classes'), findsOneWidget);
   });
 

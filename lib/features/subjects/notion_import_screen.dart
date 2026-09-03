@@ -322,7 +322,7 @@ class _OutsideTermWarning extends StatelessWidget {
             const SizedBox(height: 5),
             const Text(
               'They will be brought in and shown in the attendance log, but '
-              'the percentages only count classes inside the semester dates. '
+              'the percentages only count classes inside the term dates. '
               'Widen the term in Settings if these should count.',
               style: TextStyle(fontSize: 12.5, height: 1.4),
             ),

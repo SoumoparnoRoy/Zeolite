@@ -7,7 +7,7 @@ import 'app_theme.dart';
 ///
 /// The Material picker takes `alwaysUse24HourFormat` from the device, so on a
 /// 24-hour phone it opens a 24-hour dial while every label the app draws
-/// through `Clock.format` still reads `9:00 am`. Overriding the MediaQuery flag
+/// through `Clock.format` still reads `9:00 AM`. Overriding the MediaQuery flag
 /// is the only hook the picker offers, and the same override is where the
 /// tablet scale ramp gets taken back off.
 ///

@@ -45,7 +45,7 @@ void main() {
           _session(room: 'LT-3', teacher: 'Dr A. Example'),
           use24Hour: false,
         ),
-        '9:00 am · LT-3 · Dr A. Example',
+        '9:00 AM · LT-3 · Dr A. Example',
       );
     });
 
@@ -55,7 +55,7 @@ void main() {
           _session(teacher: 'Dr A. Example'),
           use24Hour: false,
         ),
-        '9:00 am · Dr A. Example',
+        '9:00 AM · Dr A. Example',
       );
       expect(
         NotificationService.reminderDetailLine(

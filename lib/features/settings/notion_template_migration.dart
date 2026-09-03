@@ -97,7 +97,7 @@ class NotionTemplateMigration {
       result.ok
           ? (choice == _OldDatabase.rename
               ? 'Renamed to "${before.title} (old)".'
-              : 'Moved to Notion\'s trash.')
+              : 'Moved to the trash in Notion.')
           : 'Could not change the old database. It is still in Notion and '
               'can be renamed or deleted there.',
     );

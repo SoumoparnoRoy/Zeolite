@@ -168,7 +168,7 @@ class Clock {
     return now.hour * 60 + now.minute;
   }
 
-  /// Formats minutes-since-midnight as "9:05 am" / "14:05" depending on
+  /// Formats minutes-since-midnight as "9:05 AM" / "14:05" depending on
   /// [use24Hour].
   static String format(int minutes, {bool use24Hour = false}) {
     final int m = minutes.clamp(0, minutesPerDay - 1);
@@ -178,13 +178,13 @@ class Clock {
     if (use24Hour) {
       return '${h.toString().padLeft(2, '0')}:$two';
     }
-    final String suffix = h < 12 ? 'am' : 'pm';
+    final String suffix = h < 12 ? 'AM' : 'PM';
     int display = h % 12;
     if (display == 0) display = 12;
     return '$display:$two $suffix';
   }
 
-  /// "9:00 am – 10:30 am"
+  /// "9:00 AM – 10:30 AM"
   static String formatRange(
     int startMinutes,
     int endMinutes, {

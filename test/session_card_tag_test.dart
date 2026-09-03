@@ -343,7 +343,7 @@ void main() {
 
   group('the time gutter', () {
     testWidgets('does not wrap a 12-hour time onto two lines', (tester) async {
-      // The gutter was sized for "10:50" and wrapped every "10:00 am" into
+      // The gutter was sized for "10:50" and wrapped every "10:00 AM" into
       // three lines on the tablet.
       tester.view.physicalSize = const Size(320, 640);
       tester.view.devicePixelRatio = 1;
@@ -359,7 +359,7 @@ void main() {
         ),
       );
 
-      final double lineHeight = tester.getSize(find.text('9:00 am')).height;
+      final double lineHeight = tester.getSize(find.text('9:00 AM')).height;
       expect(lineHeight, lessThan(20));
     });
   });

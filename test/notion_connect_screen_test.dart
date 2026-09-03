@@ -88,7 +88,7 @@ void main() {
     // Without this the screen offers a connected workspace nothing but
     // Disconnect, and a new template could only be taken by tearing the
     // working connection down first.
-    expect(find.text('Take the template'), findsOneWidget);
+    expect(find.text('Take the latest template'), findsOneWidget);
     expect(find.text('Disconnect'), findsNothing);
   });
 
@@ -106,7 +106,7 @@ void main() {
 
     // A connected workspace was offered nothing but Disconnect, so the only
     // way to a newer template was tearing down a working connection first.
-    expect(find.text('Take the template'), findsOneWidget);
+    expect(find.text('Take the latest template'), findsOneWidget);
     expect(find.text('Disconnect'), findsNothing);
   });
 
@@ -128,7 +128,7 @@ void main() {
     expect(find.textContaining('tap Connect Notion first'), findsNothing);
 
     // Back here with the attempt outstanding is the hijack's signature.
-    expect(find.textContaining("Didn't get back from Notion?"), findsOneWidget);
+    expect(find.textContaining('Did not get back from Notion?'), findsOneWidget);
     expect(find.textContaining('using Email'), findsOneWidget);
   });
 
@@ -146,7 +146,7 @@ void main() {
     expect(tester.widget<OutlinedButton>(finish).onPressed, isNull);
     // Disabled is not enough on its own — the screen has to say why.
     expect(find.textContaining('tap Connect Notion first'), findsOneWidget);
-    expect(find.textContaining("Didn't get back from Notion?"), findsNothing);
+    expect(find.textContaining('Did not get back from Notion?'), findsNothing);
     expect(stored, isEmpty);
   });
 }

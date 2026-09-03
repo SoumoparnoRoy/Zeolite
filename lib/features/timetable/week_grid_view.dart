@@ -43,7 +43,11 @@ class WeekGridView extends ConsumerWidget {
   static const double _maxBlockHeight = 88;
 
   static const double _gap = 4;
+
+  /// Wider in 12-hour mode, where the ruler carries "AM"/"PM" as well.
   static const double _gutterWidth = 34;
+  static const double _gutterWidthMeridiem = 48;
+
   static const double _headerHeight = 34;
 
   @override
@@ -52,13 +56,14 @@ class WeekGridView extends ConsumerWidget {
     // type does or the tablet gets bigger labels in phone-sized boxes.
     final double scale = AppScale.of(MediaQuery.sizeOf(context));
     final double gap = _gap * scale;
-    final double gutterWidth = _gutterWidth * scale;
     final double headerHeight = _headerHeight * scale;
 
     final DayGrid grid = ref.watch(dayGridProvider);
     final ScheduleEngine? engine = ref.watch(scheduleEngineProvider);
     final bool use24Hour =
         ref.watch(settingsProvider).value?.use24HourTime ?? false;
+    final double gutterWidth =
+        (use24Hour ? _gutterWidth : _gutterWidthMeridiem) * scale;
 
     if (!grid.isConfigured) return const _NotConfigured();
 
@@ -277,19 +282,13 @@ class _TimeGutter extends StatelessWidget {
   final int from;
   final int to;
 
-  /// When a block starts, without the meridiem.
+  /// When a block starts, in the same words as every other time in the app.
   ///
-  /// The minutes have to stay: a 35-minute block would otherwise print
-  /// `9a, 9a, 10a, 10a` and the ruler would be lying. Dropping am/pm instead
-  /// costs nothing — this is an ordered column spanning one teaching day, so
-  /// there is no hour it could be confused with.
-  String _label(int index) {
-    final int minutes = grid.startOf(index);
-    final int hour = Clock.hourOf(minutes);
-    final String mm = Clock.minuteOf(minutes).toString().padLeft(2, '0');
-    if (use24Hour) return '${hour.toString().padLeft(2, '0')}:$mm';
-    return '${hour % 12 == 0 ? 12 : hour % 12}:$mm';
-  }
+  /// Through `Clock.format` rather than a formatter of its own: the ruler used
+  /// to drop the meridiem to fit a narrower gutter, which is the one place a
+  /// 12-hour time appeared without it.
+  String _label(int index) =>
+      Clock.format(grid.startOf(index), use24Hour: use24Hour);
 
   @override
   Widget build(BuildContext context) {

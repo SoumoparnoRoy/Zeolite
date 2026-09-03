@@ -71,10 +71,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('2 marks outside your semester'), findsOneWidget);
+    expect(find.textContaining('2 marks outside your term'), findsOneWidget);
     expect(find.textContaining('not counted'), findsOneWidget);
     expect(find.text('Count them'), findsOneWidget);
-    expect(find.text('Widen semester'), findsOneWidget);
+    expect(find.text('Widen term'), findsOneWidget);
   });
 
   testWidgets('says so once they are being counted, and offers the way back',
@@ -96,6 +96,6 @@ void main() {
     await tester.pumpWidget(_host(<AttendanceRecord>[_on(_start)], term));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('outside your semester'), findsNothing);
+    expect(find.textContaining('outside your term'), findsNothing);
   });
 }

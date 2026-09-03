@@ -515,7 +515,9 @@ class AppRow extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       sub,
-                      maxLines: 1,
+                      // A phone-width row cannot hold a value like "A Notion
+                      // export of what you have attended" on one line.
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: monoStyle(color: p.textTertiary),
                     ),

@@ -130,7 +130,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
           sliver: SliverList.list(
             children: <Widget>[
-              const SectionHeader('When is your semester?'),
+              const SectionHeader('When is your term?'),
               GroupedRows(
                 children: <Widget>[
                   AppRow(

@@ -140,7 +140,7 @@ Map<String, String> _namesByUuid(SyncMergePlan plan, List<Subject> subjects) {
 /// so everything else names itself.
 String _titleOf(SyncMergeRow row, Map<String, String> names) {
   return switch (row.kind) {
-    SyncKind.settings => 'Semester and teaching day',
+    SyncKind.settings => 'Term and teaching day',
     SyncKind.category => 'Class type · ${row.localKey}',
     SyncKind.room => 'Room · ${row.localKey}',
     SyncKind.tag => 'Label · ${row.localKey}',

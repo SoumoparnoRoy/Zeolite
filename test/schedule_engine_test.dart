@@ -88,10 +88,10 @@ void main() {
 
   group('clock formatting', () {
     test('formats 12-hour times', () {
-      expect(Clock.format(0), '12:00 am');
-      expect(Clock.format(9 * 60 + 5), '9:05 am');
-      expect(Clock.format(12 * 60), '12:00 pm');
-      expect(Clock.format(13 * 60 + 30), '1:30 pm');
+      expect(Clock.format(0), '12:00 AM');
+      expect(Clock.format(9 * 60 + 5), '9:05 AM');
+      expect(Clock.format(12 * 60), '12:00 PM');
+      expect(Clock.format(13 * 60 + 30), '1:30 PM');
     });
 
     test('formats 24-hour times', () {

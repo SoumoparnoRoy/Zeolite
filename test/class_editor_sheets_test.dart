@@ -193,11 +193,11 @@ void main() {
       await tester.tap(find.text('Physics'));
       await tester.pumpAndSettle();
       // Adopting the category on selection is what makes the order irrelevant.
-      expect(find.text('11:00 am'), findsOneWidget);
+      expect(find.text('11:00 AM'), findsOneWidget);
 
-      await _pickTime(tester, find.text('9:00 am'), 10, 0);
-      expect(find.text('10:00 am'), findsOneWidget);
-      expect(find.text('12:00 pm'), findsOneWidget);
+      await _pickTime(tester, find.text('9:00 AM'), 10, 0);
+      expect(find.text('10:00 AM'), findsOneWidget);
+      expect(find.text('12:00 PM'), findsOneWidget);
     });
 
     testWidgets('weekly form, start time chosen first',
@@ -206,12 +206,12 @@ void main() {
       await _openSheet(tester);
 
       // No subject yet, so the global hour applies.
-      await _pickTime(tester, find.text('9:00 am'), 10, 0);
-      expect(find.text('11:00 am'), findsOneWidget);
+      await _pickTime(tester, find.text('9:00 AM'), 10, 0);
+      expect(find.text('11:00 AM'), findsOneWidget);
 
       await tester.tap(find.text('Physics'));
       await tester.pumpAndSettle();
-      expect(find.text('12:00 pm'), findsOneWidget);
+      expect(find.text('12:00 PM'), findsOneWidget);
     });
 
     testWidgets('one-off form, either order', (WidgetTester tester) async {
@@ -220,11 +220,11 @@ void main() {
 
       await tester.tap(find.text('Physics'));
       await tester.pumpAndSettle();
-      expect(find.text('11:00 am'), findsOneWidget);
+      expect(find.text('11:00 AM'), findsOneWidget);
 
-      await _pickTime(tester, find.text('9:00 am'), 11, 0);
-      expect(find.text('11:00 am'), findsOneWidget);
-      expect(find.text('1:00 pm'), findsOneWidget);
+      await _pickTime(tester, find.text('9:00 AM'), 11, 0);
+      expect(find.text('11:00 AM'), findsOneWidget);
+      expect(find.text('1:00 PM'), findsOneWidget);
     });
 
     testWidgets('a subject with no category falls back to the global length',
@@ -237,7 +237,7 @@ void main() {
       // Named explicitly, so "the category is not applying" and "this subject
       // has no category" cannot look the same on screen.
       expect(find.text('no category · 1h'), findsOneWidget);
-      expect(find.text('10:00 am'), findsOneWidget);
+      expect(find.text('10:00 AM'), findsOneWidget);
     });
 
     testWidgets('an end time set by hand pins the length',
@@ -245,11 +245,11 @@ void main() {
       await tester.pumpWidget(_host((c, ref) => showSlotEditor(c, ref)));
       await _openSheet(tester);
 
-      await _pickTime(tester, find.text('10:00 am'), 9, 30);
+      await _pickTime(tester, find.text('10:00 AM'), 9, 30);
       // Picking the subject must not stretch a span the user chose.
       await tester.tap(find.text('Physics'));
       await tester.pumpAndSettle();
-      expect(find.text('9:30 am'), findsOneWidget);
+      expect(find.text('9:30 AM'), findsOneWidget);
     });
 
     testWidgets('editing an existing class keeps its own length until moved',
@@ -271,10 +271,10 @@ void main() {
         ),
       );
       await _openSheet(tester);
-      expect(find.text('10:00 am'), findsOneWidget);
+      expect(find.text('10:00 AM'), findsOneWidget);
 
-      await _pickTime(tester, find.text('9:00 am'), 11, 0);
-      expect(find.text('1:00 pm'), findsOneWidget);
+      await _pickTime(tester, find.text('9:00 AM'), 11, 0);
+      expect(find.text('1:00 PM'), findsOneWidget);
     });
   });
 
@@ -347,16 +347,16 @@ void main() {
 
       expect(find.text('Monday · block 1'), findsOneWidget);
       // Nothing chosen yet: the block's own times.
-      expect(find.text('9:00 am – 9:50 am'), findsOneWidget);
+      expect(find.text('9:00 AM – 9:50 AM'), findsOneWidget);
 
       // A 2h Lab on 50-minute blocks rounds to 2 blocks, so 9:00–10:40.
       await tester.tap(find.text('Physics'));
       await tester.pumpAndSettle();
-      expect(find.text('9:00 am – 10:40 am'), findsOneWidget);
+      expect(find.text('9:00 AM – 10:40 AM'), findsOneWidget);
 
       await tester.tap(find.text('3 blocks'));
       await tester.pumpAndSettle();
-      expect(find.text('9:00 am – 11:30 am'), findsOneWidget);
+      expect(find.text('9:00 AM – 11:30 AM'), findsOneWidget);
     });
 
     testWidgets('repeats weekly by default, and writes a rule',

@@ -282,8 +282,8 @@ class _SessionRow extends StatelessWidget {
                         ),
                         if (session.room != null && session.room!.isNotEmpty)
                           session.room!,
-                        if (session.isExtra) 'one-off',
-                        if (isCancelled) 'cancelled',
+                        if (session.isExtra) 'One-off',
+                        if (isCancelled) 'Cancelled',
                       ].join(' · '),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,

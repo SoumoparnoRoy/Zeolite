@@ -208,7 +208,7 @@ class _OverallHeader extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
             child: Text(
-              'Semester ${(settings.semesterProgress * 100).round()}% done · '
+              'Term ${(settings.semesterProgress * 100).round()}% done · '
               '${Words.plural(settings.daysLeftInSemester, 'day')} left',
               style: TextStyle(
                 fontSize: 10.5,
@@ -316,7 +316,7 @@ class _SubjectStatsCard extends StatelessWidget {
                     Text(
                       stats.hasData
                           ? '${stats.attended} of ${stats.held} attended'
-                          : 'nothing marked yet',
+                          : 'Nothing marked yet',
                       style: monoStyle(color: p.textTertiary, size: 10),
                     ),
                   ],
@@ -598,7 +598,7 @@ class _SubjectDetail extends ConsumerWidget {
     if (id != null) {
       final TimetableActions actions = ref.read(actionsProvider);
       await actions.deleteSubject(id);
-      showUndoSnack(messenger, actions, 'Deleted ${subject.name}');
+      showUndoSnack(messenger, actions, '${subject.name} deleted');
     }
     if (context.mounted) Navigator.of(context).pop();
   }
@@ -847,7 +847,7 @@ class _OutOfTermNotice extends ConsumerWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  '${Words.plural(marks.count, 'mark')} outside your semester '
+                  '${Words.plural(marks.count, 'mark')} outside your term '
                   'dates$span. ${counted ? 'They are counted below.' : 'They '
                       'are not counted below.'}',
                   style: Theme.of(context).textTheme.bodyMedium,
@@ -870,7 +870,7 @@ class _OutOfTermNotice extends ConsumerWidget {
                 ),
                 TextButton(
                   onPressed: () => _widen(context, ref),
-                  child: const Text('Widen semester'),
+                  child: const Text('Widen term'),
                 ),
               ],
             ),
@@ -890,12 +890,12 @@ class _OutOfTermNotice extends ConsumerWidget {
     final bool? go = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) => AlertDialog(
-        title: const Text('Widen the semester?'),
+        title: const Text('Widen the term?'),
         content: Text(
           'The term becomes ${Dates.formatFull(start)} – '
           '${Dates.formatFull(end)}, so these marks fall inside it. '
           'Recurring classes and the figures that project forward all follow '
-          'the semester dates, so they change too.',
+          'the term dates, so they change too.',
         ),
         actions: <Widget>[
           TextButton(

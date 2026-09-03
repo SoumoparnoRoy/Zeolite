@@ -218,12 +218,12 @@ class TodayScreen extends ConsumerWidget {
                   sliver: SliverToBoxAdapter(
                     child: _NoticeCard(
                       icon: Icons.event_busy_rounded,
-                      title: 'Outside the semester',
+                      title: 'Outside the term',
                       message: settings.hasSemester
-                          ? 'Your semester runs '
+                          ? 'Your term runs '
                               '${Dates.formatFull(settings.semesterStart!)} – '
                               '${Dates.formatFull(settings.semesterEnd!)}.'
-                          : 'Set your semester dates in Settings.',
+                          : 'Set your term dates in Settings.',
                       color: p.textTertiary,
                     ),
                   ),

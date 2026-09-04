@@ -691,6 +691,9 @@ class SyncCoordinator {
       breakAfterBlock: _int(f['breakAfterBlock']),
       breakMinutes: _int(f['breakMinutes']),
       scheduleChangedAt: state.editedAt,
+      // An account that knows its term has been set up, so a device joining
+      // one must not ask again and save the answer over what this pull brought.
+      onboarded: _date(f['semesterStart']) == null ? null : true,
     );
     await _settings.save(merged);
     return SyncItem.settings(merged, changedAt: merged.scheduleChangedAt);

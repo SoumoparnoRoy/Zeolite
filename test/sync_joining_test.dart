@@ -109,6 +109,37 @@ void main() {
     expect(after.blockMinutes, 50);
   });
 
+  test('an account with a term leaves the device set up', () async {
+    // Nothing saved first: signing in happens on the welcome screen, before
+    // the first-run questions. If the pull does not settle them, they are
+    // asked anyway and the answer goes back up over the account's term.
+    target.remote = <RemoteState>[accountSettings(), accountSubject('aabb')];
+
+    await coordinator().run(force: true);
+
+    final AppSettings after = await settings.load();
+    expect(after.semesterStart, DateTime(2026, 1, 12));
+    expect(after.onboarded, isTrue);
+  });
+
+  test('an account with no term of its own leaves the questions to ask',
+      () async {
+    target.remote = <RemoteState>[
+      RemoteState(
+        kind: SyncKind.settings,
+        localKey: SyncItem.settingsKey,
+        remoteId: SyncItem.settingsKey,
+        hash: 'settings-hash',
+        fields: const <String, Object?>{'targetPercent': 80.0},
+      ),
+      accountSubject('aabb'),
+    ];
+
+    await coordinator().run(force: true);
+
+    expect((await settings.load()).onboarded, isFalse);
+  });
+
   test('a device with a term of its own still states what it has', () async {
     await onboard();
     await repo.insertSubject(

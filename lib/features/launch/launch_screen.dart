@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/settings/app_settings.dart';
 import '../../state/auth_providers.dart';
 import '../../state/providers.dart';
+import 'joining_screen.dart';
 import 'launch_geometry.dart';
 import 'launch_painter.dart';
 import 'welcome_auth_screen.dart';
@@ -63,6 +64,10 @@ class _LaunchScreenState extends ConsumerState<LaunchScreen>
   bool _played = false;
   bool _handedOver = false;
 
+  /// Set once a sign-in has landed: what follows is the account's answer to
+  /// the first-run questions, not this device's.
+  bool _joining = false;
+
   @override
   void initState() {
     super.initState();
@@ -93,8 +98,9 @@ class _LaunchScreenState extends ConsumerState<LaunchScreen>
   }
 
   Future<void> _choose(WelcomeChoice choice) async {
+    bool signedIn = false;
     if (choice != WelcomeChoice.continueWithout) {
-      final bool signedIn = await Navigator.of(context).push<bool>(
+      signedIn = await Navigator.of(context).push<bool>(
             MaterialPageRoute<bool>(
               settings: const RouteSettings(name: 'welcome_auth'),
               builder: (BuildContext context) => WelcomeAuthScreen(
@@ -107,10 +113,19 @@ class _LaunchScreenState extends ConsumerState<LaunchScreen>
       if (!signedIn || !mounted) return;
     }
 
+    // Read again rather than from `widget`: signing in starts a sync, and the
+    // settings it pulls are newer than the ones this screen was built with.
+    final AppSettings current =
+        ref.read(settingsProvider).value ?? widget.settings;
     await ref
         .read(settingsProvider.notifier)
-        .save(widget.settings.copyWith(welcomeShown: true));
-    if (mounted) widget.onFinished();
+        .save(current.copyWith(welcomeShown: true));
+    if (!mounted) return;
+    if (signedIn) {
+      setState(() => _joining = true);
+      return;
+    }
+    widget.onFinished();
   }
 
   void _finishWhenReady(AsyncValue<User?> auth) {
@@ -127,6 +142,10 @@ class _LaunchScreenState extends ConsumerState<LaunchScreen>
     if (_landing == LaunchLanding.today) _finishWhenReady(auth);
 
     final LaunchColors colors = LaunchColors.of(widget.settings.accentColour);
+    if (_joining) {
+      return JoiningScreen(colors: colors, onDone: widget.onFinished);
+    }
+
     final MediaQueryData mq = MediaQuery.of(context);
     // The viewer's own scaling only; the app's size ramp is for reading.
     final double scale = mq.textScaler.scale(10) / 10;

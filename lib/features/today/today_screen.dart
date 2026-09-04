@@ -47,7 +47,12 @@ final dayMarkersProvider = Provider<Map<int, DayMarker>>((ref) {
 });
 
 /// The home screen: what is on today, and one tap to mark each class.
-class TodayScreen extends ConsumerWidget {
+///
+/// The day's classes sit in a pager, so dragging sideways carries them across
+/// and settles on the next day rather than waiting for you to let go. Being a
+/// horizontal scrollable it also keeps the drag away from the shell's own
+/// pager, which is why Today is the one tab you leave by tapping.
+class TodayScreen extends ConsumerStatefulWidget {
   const TodayScreen({super.key});
 
   static const double _pad = 20;
@@ -55,11 +60,85 @@ class TodayScreen extends ConsumerWidget {
   /// Clearance under the grid for the floating button.
   static const double _gridBottomPad = 96;
 
+  /// Where the pager counts from. Far enough in that neither end is reachable
+  /// by dragging — a term is a few hundred days, not twenty thousand.
+  static const int basePage = 20000;
+
+  /// The two views move by different units, so each has its own pager and the
+  /// same date maps to a different page in each.
+  static int pageFor(HomeView view, DateTime origin, DateTime date) =>
+      view == HomeView.grid
+          ? basePage +
+              Dates.daysBetween(origin, Dates.startOfWeek(date)) ~/ 7
+          : basePage + Dates.daysBetween(origin, date);
+
+  static DateTime dateForPage(HomeView view, DateTime origin, int page) =>
+      Dates.addDays(origin, (page - basePage) * (view == HomeView.grid ? 7 : 1));
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TodayScreen> createState() => _TodayScreenState();
+}
+
+class _TodayScreenState extends ConsumerState<TodayScreen> {
+  static const double _pad = TodayScreen._pad;
+  static const double _gridBottomPad = TodayScreen._gridBottomPad;
+
+  /// Fixed for the life of the screen: a pager whose origin moved at midnight
+  /// would renumber every page under the controller.
+  late final DateTime _origin;
+
+  /// Both built up front rather than on first use — a lazy one would be
+  /// created by [dispose] reaching for it, which is too late to read a
+  /// provider.
+  late final PageController _dayPages;
+  late final PageController _weekPages;
+
+  @override
+  void initState() {
+    super.initState();
+    _origin = Dates.startOfWeek(Dates.today());
+    final DateTime selected = ref.read(selectedDateProvider);
+    _dayPages = PageController(
+      initialPage: TodayScreen.pageFor(HomeView.day, _origin, selected),
+    );
+    _weekPages = PageController(
+      initialPage: TodayScreen.pageFor(HomeView.grid, _origin, selected),
+    );
+  }
+
+  PageController _pagesFor(HomeView view) =>
+      view == HomeView.grid ? _weekPages : _dayPages;
+
+  @override
+  void dispose() {
+    _dayPages.dispose();
+    _weekPages.dispose();
+    super.dispose();
+  }
+
+  /// Brings a pager onto the day the rest of the app is showing — a tapped
+  /// day pill, "jump to today", the unmarked banner, or the view it was not
+  /// showing while the other one moved.
+  void _followDate(HomeView view, DateTime date, {required bool animate}) {
+    final PageController pages = _pagesFor(view);
+    if (!pages.hasClients) return;
+    final int target = TodayScreen.pageFor(view, _origin, date);
+    if ((pages.page ?? target.toDouble()).round() == target) return;
+    if (!animate) {
+      pages.jumpToPage(target);
+      return;
+    }
+    pages.animateToPage(
+      target,
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutQuart,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final AppPalette p = context.palette;
     final DateTime selected = ref.watch(selectedDateProvider);
-    final List<ClassSession> sessions = ref.watch(selectedDaySessionsProvider);
     final AppSettings settings =
         ref.watch(settingsProvider).value ?? const AppSettings();
     final OverallStats stats = ref.watch(statsProvider);
@@ -73,11 +152,6 @@ class TodayScreen extends ConsumerWidget {
     // does not lose your place and needs no state of its own.
     final DateTime gridWeek = Dates.startOfWeek(selected);
 
-    final Holiday? holiday = engine?.holidayOn(selected);
-    final bool outsideSemester = engine?.isOutsideSemester(selected) ?? false;
-    final int unmarkedToday =
-        sessions.where((ClassSession s) => s.needsMarking).length;
-
     // Warnings the notification tray is no longer carrying have to surface
     // somewhere, so raise them here once the frame is on screen. Showing it
     // post-frame keeps the dialog out of the build phase, and the announced
@@ -89,8 +163,22 @@ class TodayScreen extends ConsumerWidget {
       ref.read(actionsProvider).maybeRunAutoBackup();
     });
 
+    // A date set anywhere else has to reach the pager: the day pills, the
+    // header arrows, "jump to today", the unmarked banner.
+    ref.listen<DateTime>(selectedDateProvider, (DateTime? _, DateTime next) {
+      _followDate(ref.read(homeViewProvider), next, animate: true);
+    });
+    // Switching views hands over to a pager that was left on an older date,
+    // and it is not on screen yet, so there is nothing to animate.
+    ref.listen<HomeView>(homeViewProvider, (HomeView? _, HomeView next) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _followDate(next, ref.read(selectedDateProvider), animate: false);
+        }
+      });
+    });
+
     return GradientScaffold(
-      onRefresh: () async => ref.invalidate(timetableProvider),
       header: view == HomeView.grid
           ? _GridHeader(
               weekStart: gridWeek,
@@ -121,162 +209,189 @@ class TodayScreen extends ConsumerWidget {
         label: 'Add class',
         onPressed: () => showAddClassSheet(context, ref, initialDate: selected),
       ),
-      slivers: view == HomeView.grid
-          ? <Widget>[
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(14, 0, 14, _gridBottomPad),
-                // The viewport, not what is left to paint — that shrinks as
-                // you scroll and would resize the blocks under your finger.
-                sliver: SliverLayoutBuilder(
-                  builder: (BuildContext context, SliverConstraints c) =>
-                      SliverToBoxAdapter(
-                    child: WeekGridView(
-                      weekStart: gridWeek,
-                      // Less this sliver's own padding, which the viewport
-                      // extent does not know about.
-                      availableHeight: c.viewportMainAxisExtent -
-                          c.precedingScrollExtent -
-                          _gridBottomPad,
-                    ),
-                  ),
-                ),
-              ),
-            ]
-          : <Widget>[
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(_pad, 0, _pad, 0),
-                sliver: SliverToBoxAdapter(
-                  child: Row(
-                    children: <Widget>[
-                      Expanded(
-                        child: Text(
-                          isToday
-                              ? "Today's classes"
-                              : Dates.formatDayMonth(selected),
-                          style: TextStyle(
-                            fontSize: 13,
-                            height: 1,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -0.2,
-                            color: p.textPrimary,
-                          ),
+      body: PageView.builder(
+        controller: _pagesFor(view),
+        onPageChanged: (int page) => ref
+            .read(selectedDateProvider.notifier)
+            .select(TodayScreen.dateForPage(view, _origin, page)),
+        itemBuilder: (BuildContext context, int page) {
+          final DateTime date = TodayScreen.dateForPage(view, _origin, page);
+          final DateTime weekStart = Dates.startOfWeek(date);
+          final bool isToday = Dates.isSameDay(date, Dates.today());
+          final List<ClassSession> sessions =
+              engine?.sessionsOn(date) ?? const <ClassSession>[];
+          final Holiday? holiday = engine?.holidayOn(date);
+          final bool outsideSemester =
+              engine?.isOutsideSemester(date) ?? false;
+          final int unmarkedToday =
+              sessions.where((ClassSession s) => s.needsMarking).length;
+
+          return RefreshIndicator(
+            color: p.accent,
+            backgroundColor: p.surface,
+            onRefresh: () async => ref.invalidate(timetableProvider),
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: view == HomeView.grid
+              ? <Widget>[
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(14, 0, 14, _gridBottomPad),
+                    // The viewport, not what is left to paint — that shrinks as
+                    // you scroll and would resize the blocks under your finger.
+                    sliver: SliverLayoutBuilder(
+                      builder: (BuildContext context, SliverConstraints c) =>
+                          SliverToBoxAdapter(
+                        child: WeekGridView(
+                          weekStart: weekStart,
+                          // Less this sliver's own padding, which the viewport
+                          // extent does not know about.
+                          availableHeight: c.viewportMainAxisExtent -
+                              c.precedingScrollExtent -
+                              _gridBottomPad,
                         ),
                       ),
-                      if (unmarkedToday > 1)
-                        InkWell(
-                          onTap: () => _markAllPresent(context, ref, sessions),
-                          borderRadius: BorderRadius.circular(8),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 4,
-                              vertical: 2,
-                            ),
+                    ),
+                  ),
+                ]
+              : <Widget>[
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(_pad, 0, _pad, 0),
+                    sliver: SliverToBoxAdapter(
+                      child: Row(
+                        children: <Widget>[
+                          Expanded(
                             child: Text(
-                              'All present',
+                              isToday
+                                  ? "Today's classes"
+                                  : Dates.formatDayMonth(date),
                               style: TextStyle(
-                                fontSize: 10.5,
+                                fontSize: 13,
                                 height: 1,
-                                fontWeight: FontWeight.w700,
-                                color: p.accent,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.2,
+                                color: p.textPrimary,
                               ),
                             ),
                           ),
+                          if (unmarkedToday > 1)
+                            InkWell(
+                              onTap: () => _markAllPresent(context, ref, sessions),
+                              borderRadius: BorderRadius.circular(8),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                  vertical: 2,
+                                ),
+                                child: Text(
+                                  'All present',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    height: 1,
+                                    fontWeight: FontWeight.w700,
+                                    color: p.accent,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 14)),
+                  if (unmarked.isNotEmpty)
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(_pad, 0, _pad, 12),
+                      sliver: SliverToBoxAdapter(
+                        child: _UnmarkedBanner(
+                          count: unmarked.length,
+                          onJump: () => ref
+                              .read(selectedDateProvider.notifier)
+                              .select(unmarked.first.date),
                         ),
-                    ],
-                  ),
-                ),
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: 14)),
-              if (unmarked.isNotEmpty)
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(_pad, 0, _pad, 12),
-                  sliver: SliverToBoxAdapter(
-                    child: _UnmarkedBanner(
-                      count: unmarked.length,
-                      onJump: () => ref
-                          .read(selectedDateProvider.notifier)
-                          .select(unmarked.first.date),
+                      ),
+                    ),
+                  if (holiday != null)
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(_pad, 0, _pad, 12),
+                      sliver: SliverToBoxAdapter(
+                        child: _NoticeCard(
+                          icon: Icons.celebration_rounded,
+                          title: holiday.name,
+                          message:
+                              'Marked as a holiday — no recurring classes today.',
+                          color: p.cyan,
+                        ),
+                      ),
+                    )
+                  else if (outsideSemester)
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(_pad, 0, _pad, 12),
+                      sliver: SliverToBoxAdapter(
+                        child: _NoticeCard(
+                          icon: Icons.event_busy_rounded,
+                          title: 'Outside the term',
+                          message: settings.hasSemester
+                              ? 'Your term runs '
+                                  '${Dates.formatFull(settings.semesterStart!)} – '
+                                  '${Dates.formatFull(settings.semesterEnd!)}.'
+                              : 'Set your term dates in Settings.',
+                          color: p.textTertiary,
+                        ),
+                      ),
+                    ),
+                  if (sessions.isEmpty && holiday == null && !outsideSemester)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 36),
+                        child: EmptyState(
+                          icon: Icons.wb_sunny_outlined,
+                          title: isToday ? 'Nothing on today' : 'No classes',
+                          message: isToday
+                              ? 'Enjoy the free day. Add classes from the Timetable tab.'
+                              : 'There are no classes scheduled for this day.',
+                        ),
+                      ),
+                    ),
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(_pad, 0, _pad, 96),
+                    sliver: SliverList.separated(
+                      itemCount: sessions.length,
+                      separatorBuilder: (_, __) =>
+                          const SizedBox(height: SessionCard.gap),
+                      itemBuilder: (BuildContext context, int index) {
+                        final ClassSession session = sessions[index];
+                        final List<Tag> tags = data?.tags ?? const <Tag>[];
+                        return SessionCard(
+                          session: session,
+                          use24Hour: settings.use24HourTime,
+                          nextColor: index + 1 < sessions.length
+                              ? SessionCard.spineColorOf(
+                                  sessions[index + 1],
+                                  context.palette,
+                                )
+                              : null,
+                          categoryName: data?.categoryFor(session.subject)?.name,
+                          tagName: data?.tagById(session.record?.tagId)?.name,
+                          isNext: next != null &&
+                              next.date == session.date &&
+                              next.startMinutes == session.startMinutes &&
+                              next.subject.id == session.subject.id,
+                          onMark: (AttendanceStatus status) =>
+                              ref.read(actionsProvider).mark(session, status),
+                          onTag: tags.isEmpty
+                              ? null
+                              : () => _pickTag(context, ref, session, tags),
+                          onLongPress: () =>
+                              showSessionOptions(context, ref, session),
+                        );
+                      },
                     ),
                   ),
-                ),
-              if (holiday != null)
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(_pad, 0, _pad, 12),
-                  sliver: SliverToBoxAdapter(
-                    child: _NoticeCard(
-                      icon: Icons.celebration_rounded,
-                      title: holiday.name,
-                      message:
-                          'Marked as a holiday — no recurring classes today.',
-                      color: p.cyan,
-                    ),
-                  ),
-                )
-              else if (outsideSemester)
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(_pad, 0, _pad, 12),
-                  sliver: SliverToBoxAdapter(
-                    child: _NoticeCard(
-                      icon: Icons.event_busy_rounded,
-                      title: 'Outside the term',
-                      message: settings.hasSemester
-                          ? 'Your term runs '
-                              '${Dates.formatFull(settings.semesterStart!)} – '
-                              '${Dates.formatFull(settings.semesterEnd!)}.'
-                          : 'Set your term dates in Settings.',
-                      color: p.textTertiary,
-                    ),
-                  ),
-                ),
-              if (sessions.isEmpty && holiday == null && !outsideSemester)
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 36),
-                    child: EmptyState(
-                      icon: Icons.wb_sunny_outlined,
-                      title: isToday ? 'Nothing on today' : 'No classes',
-                      message: isToday
-                          ? 'Enjoy the free day. Add classes from the Timetable tab.'
-                          : 'There are no classes scheduled for this day.',
-                    ),
-                  ),
-                ),
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(_pad, 0, _pad, 96),
-                sliver: SliverList.separated(
-                  itemCount: sessions.length,
-                  separatorBuilder: (_, __) =>
-                      const SizedBox(height: SessionCard.gap),
-                  itemBuilder: (BuildContext context, int index) {
-                    final ClassSession session = sessions[index];
-                    final List<Tag> tags = data?.tags ?? const <Tag>[];
-                    return SessionCard(
-                      session: session,
-                      use24Hour: settings.use24HourTime,
-                      nextColor: index + 1 < sessions.length
-                          ? SessionCard.spineColorOf(
-                              sessions[index + 1],
-                              context.palette,
-                            )
-                          : null,
-                      categoryName: data?.categoryFor(session.subject)?.name,
-                      tagName: data?.tagById(session.record?.tagId)?.name,
-                      isNext: next != null &&
-                          next.date == session.date &&
-                          next.startMinutes == session.startMinutes &&
-                          next.subject.id == session.subject.id,
-                      onMark: (AttendanceStatus status) =>
-                          ref.read(actionsProvider).mark(session, status),
-                      onTag: tags.isEmpty
-                          ? null
-                          : () => _pickTag(context, ref, session, tags),
-                      onLongPress: () =>
-                          showSessionOptions(context, ref, session),
-                    );
-                  },
-                ),
-              ),
-            ],
+                ],
+            ),
+          );
+        },
+      ),
     );
   }
 

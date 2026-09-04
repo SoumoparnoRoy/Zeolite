@@ -113,8 +113,8 @@ class _BootstrapState extends ConsumerState<_Bootstrap> {
 
 /// Bottom-navigation shell holding the four main screens.
 ///
-/// An [IndexedStack] keeps each tab's scroll position and state alive, so
-/// switching tabs feels instant rather than rebuilding from scratch.
+/// A [PageView], so a screen follows your finger across rather than waiting
+/// for you to let go. Each page is kept alive so scroll positions survive.
 class RootShell extends ConsumerStatefulWidget {
   const RootShell({super.key});
 
@@ -173,6 +173,12 @@ class _RootShellState extends ConsumerState<RootShell> {
     SettingsScreen(),
   ];
 
+  /// Only for a tap; a drag settles on the pager's own spring.
+  static const Duration _slide = Duration(milliseconds: 200);
+
+  late final PageController _pages =
+      PageController(initialPage: ref.read(selectedTabProvider));
+
   ValueNotifier<String?> get _tapped =>
       NotificationService.instance.tappedPayload;
 
@@ -190,7 +196,20 @@ class _RootShellState extends ConsumerState<RootShell> {
   @override
   void dispose() {
     _tapped.removeListener(_openTappedNotification);
+    _pages.dispose();
     super.dispose();
+  }
+
+  /// Sliding two screens at once in the time it takes to slide one is a blur,
+  /// so a jump between distant tabs cuts instead.
+  void _slideTo(int index) {
+    if (!_pages.hasClients) return;
+    final double from = _pages.page ?? index.toDouble();
+    if ((from - index).abs() > 1) {
+      _pages.jumpToPage(index);
+      return;
+    }
+    _pages.animateToPage(index, duration: _slide, curve: Curves.easeOutQuart);
   }
 
   void _openTappedNotification() {
@@ -200,7 +219,11 @@ class _RootShellState extends ConsumerState<RootShell> {
     _select(tab);
   }
 
-  void _select(int index) {
+  /// A tap on the bar or a notification; a drag moves the pager itself.
+  void _select(int index) => _slideTo(index);
+
+  /// Fires on crossing half way, so the bar lights up before it settles.
+  void _onPageChanged(int index) {
     // A tab arrived at with the bar hidden would look like it has no way back.
     _showNav(true);
     ref.read(selectedTabProvider.notifier).select(index);
@@ -233,9 +256,23 @@ class _RootShellState extends ConsumerState<RootShell> {
   Widget build(BuildContext context) {
     final int index = ref.watch(selectedTabProvider);
     return Scaffold(
-      body: NotificationListener<UserScrollNotification>(
-        onNotification: _onScroll,
-        child: IndexedStack(index: index, children: _screens),
+      // The day pills, Home's date pager and the settings sliders are deeper
+      // in the tree, so they take a sideways drag before this pager sees it.
+      body: PageView(
+        controller: _pages,
+        onPageChanged: _onPageChanged,
+        children: <Widget>[
+          for (final Widget screen in _screens)
+            // Listened per page rather than around the pager, which would
+            // otherwise count as a level and hide every screen's own scroll
+            // from [RootShell.navVisibleFor].
+            _KeptAlive(
+              child: NotificationListener<UserScrollNotification>(
+                onNotification: _onScroll,
+                child: screen,
+              ),
+            ),
+        ],
       ),
       // A shadow rather than a rule: the tab row is the one piece of chrome
       // that has to stay above the sheet, and a hairline read as one more
@@ -292,6 +329,28 @@ class _RootShellState extends ConsumerState<RootShell> {
         ),
       ),
     );
+  }
+}
+
+/// Keeps a built page alive, so a tab holds its scroll position.
+class _KeptAlive extends StatefulWidget {
+  const _KeptAlive({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_KeptAlive> createState() => _KeptAliveState();
+}
+
+class _KeptAliveState extends State<_KeptAlive>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
   }
 }
 

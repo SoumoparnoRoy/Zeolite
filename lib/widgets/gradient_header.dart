@@ -12,13 +12,14 @@ class GradientScaffold extends StatelessWidget {
   const GradientScaffold({
     super.key,
     required this.header,
-    required this.slivers,
+    this.slivers = const <Widget>[],
     this.floatingActionButton,
     this.onRefresh,
     this.bottom,
     this.headerGap = 20,
     this.bottomInset = 24,
     this.maxContentWidth,
+    this.body,
   });
 
   /// Drawn on the gradient, below the status bar.
@@ -46,6 +47,11 @@ class GradientScaffold extends StatelessWidget {
   /// stretched phone. Defaults to [AppScale.contentWidth].
   final double? maxContentWidth;
 
+  /// Fills the sheet instead of [slivers], with the header pinned above it.
+  /// For content that moves sideways: a header that scrolled away would carry
+  /// its own controls across with the page.
+  final Widget? body;
+
   @override
   Widget build(BuildContext context) {
     final AppPalette p = context.palette;
@@ -56,34 +62,35 @@ class GradientScaffold extends StatelessWidget {
     final double gutter = width > cap ? (width - cap) / 2 : 0;
     final EdgeInsets inset = EdgeInsets.symmetric(horizontal: gutter);
 
+    final Widget headerBlock = DecoratedBox(
+      decoration: BoxDecoration(gradient: p.headerGradient),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          SizedBox(height: statusBar),
+          Padding(padding: inset, child: header),
+          SizedBox(height: headerGap),
+          // The sheet's top lip has to be painted over the gradient, not
+          // over the scaffold, or its rounded corners would cut through
+          // to the canvas and be invisible.
+          Container(
+            height: AppSpacing.radiusSheet,
+            decoration: BoxDecoration(
+              color: p.canvas,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(AppSpacing.radiusSheet),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
     final Widget scroller = CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: <Widget>[
-        SliverToBoxAdapter(
-          child: DecoratedBox(
-            decoration: BoxDecoration(gradient: p.headerGradient),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: <Widget>[
-                SizedBox(height: statusBar),
-                Padding(padding: inset, child: header),
-                SizedBox(height: headerGap),
-                // The sheet's top lip has to be painted over the gradient, not
-                // over the scaffold, or its rounded corners would cut through
-                // to the canvas and be invisible.
-                Container(
-                  height: AppSpacing.radiusSheet,
-                  decoration: BoxDecoration(
-                    color: p.canvas,
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(AppSpacing.radiusSheet),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+        SliverToBoxAdapter(child: headerBlock),
         if (gutter == 0)
           ...slivers
         else
@@ -94,11 +101,17 @@ class GradientScaffold extends StatelessWidget {
     );
 
     final Future<void> Function()? refresh = onRefresh;
+    final Widget? pinned = body;
 
     return Scaffold(
       body: Stack(
         children: <Widget>[
-          if (refresh == null)
+          if (pinned != null)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[headerBlock, Expanded(child: pinned)],
+            )
+          else if (refresh == null)
             scroller
           else
             RefreshIndicator(

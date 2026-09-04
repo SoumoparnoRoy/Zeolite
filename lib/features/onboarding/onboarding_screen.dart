@@ -66,8 +66,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       await NotificationService.instance.requestPermissions();
     }
 
+    // Merged, not a fresh object: the welcome screen has already run, and a
+    // bare `AppSettings(...)` would default its answer away and ask again.
+    final AppSettings current =
+        ref.read(settingsProvider).value ?? const AppSettings();
+
     await ref.read(settingsProvider.notifier).save(
-          AppSettings(
+          current.copyWith(
             semesterStart: _start,
             semesterEnd: _end,
             targetPercent: _target,

@@ -357,6 +357,8 @@ class AppSettings {
         'breakMinutes': breakMinutes,
         'use24HourTime': use24HourTime,
         'themeMode': themeMode.name,
+        'accentColour': accentColour.name,
+        'launchAnimation': launchAnimation.name,
         'notificationsEnabled': notificationsEnabled,
         'inAppAlerts': inAppAlerts,
         'notifyBeforeClass': notifyBeforeClass,
@@ -386,6 +388,9 @@ class AppSettings {
       breakMinutes: (json['breakMinutes'] as num?)?.toInt() ?? 0,
       use24HourTime: json['use24HourTime'] as bool? ?? false,
       themeMode: AppThemeMode.fromName(json['themeMode'] as String?),
+      accentColour: AccentColour.fromName(json['accentColour'] as String?),
+      launchAnimation:
+          LaunchAnimation.fromName(json['launchAnimation'] as String?),
       // Backups written before these existed default to "on", which matches
       // how the app behaved when that backup was taken.
       notificationsEnabled: json['notificationsEnabled'] as bool? ?? true,
@@ -403,12 +408,11 @@ class AppSettings {
 
   /// The settings a backup does not carry, kept from the device restoring it.
   ///
-  /// [toJson] exports the timetable's only; the rest describes the device, and
-  /// reading their absence as "back to defaults" is what brought the welcome
-  /// screen back after a restore.
+  /// Everything the user chose travels in the file — a backup is that app as
+  /// it was, appearance included. What stays here is bookkeeping about this
+  /// install: taken from a file it put the welcome screen back, and points a
+  /// sync run at an account this device never agreed with.
   AppSettings onDeviceOf(AppSettings current) => copyWith(
-        accentColour: current.accentColour,
-        launchAnimation: current.launchAnimation,
         welcomeShown: current.welcomeShown,
         syncedAccountId: current.syncedAccountId,
         lastSyncAt: current.lastSyncAt,

@@ -189,31 +189,37 @@ void main() {
       );
     });
 
-    test('a restore keeps the settings that belong to the device', () async {
+    test('a restore brings back the app as it was, minus this install',
+        () async {
       await seed();
+      await settings.save(const AppSettings(
+        themeMode: AppThemeMode.light,
+        accentColour: AccentColour.teal,
+        launchAnimation: LaunchAnimation.short,
+        targetPercent: 60,
+        onboarded: true,
+      ));
       final String json =
           await BackupService(repo, settings).exportToJsonString();
 
-      // The device as it stands: themed, past the welcome screen, signed in.
+      // The device restoring it: default look, past the welcome screen, and
+      // already reconciled with an account.
       await settings.save(const AppSettings(
-        accentColour: AccentColour.teal,
-        launchAnimation: LaunchAnimation.short,
         welcomeShown: true,
         onboarded: true,
         syncedAccountId: 'account-1',
-        targetPercent: 60,
       ));
 
       await BackupService(repo, settings).importFromJsonString(json);
 
       final AppSettings after = await settings.load();
+      expect(after.themeMode, AppThemeMode.light);
       expect(after.accentColour, AccentColour.teal);
       expect(after.launchAnimation, LaunchAnimation.short);
-      // Defaulted, this brings the welcome screen back on the next launch,
-      // and the next sync run reads a cleared account as a new one.
+      expect(after.targetPercent, 60);
+      // From the file, these put the welcome screen back and re-point a sync.
       expect(after.welcomeShown, isTrue);
       expect(after.syncedAccountId, 'account-1');
-      expect(after.targetPercent, 75);
     });
 
     test('a first run re-points a restored term onto the account', () async {

@@ -159,6 +159,19 @@ void main() {
       expect(plan.archiving, 1);
     });
 
+    test('a store the app owns archives its own pulled rows too', () {
+      final SyncPlan plan = SyncPlan.from(
+        local: const <SyncItem>[],
+        links: <RemoteLink>[_link(present, origin: SyncOrigin.remote)],
+        remote: <RemoteState>[_state(present)],
+        ownsRows: true,
+      );
+
+      // Renaming a name-keyed row drops its old key, and left standing the
+      // next device pulls that name back alongside the new one.
+      expect(plan.drops.single.kind, SyncDropKind.archive);
+    });
+
     test('forgetting a link is not counted as archiving', () {
       final SyncPlan plan = SyncPlan.from(
         local: const <SyncItem>[],

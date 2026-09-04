@@ -56,6 +56,11 @@ class NotionSyncTarget implements SyncTarget {
   @override
   bool get trustsPulls => false;
 
+  /// The table is theirs, and a row this app stops holding may be one they
+  /// still want in front of them.
+  @override
+  bool get ownsEveryRow => false;
+
   @override
   Set<SyncKind> get kinds => const <SyncKind>{SyncKind.attendance};
 

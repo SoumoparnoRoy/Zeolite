@@ -29,6 +29,9 @@ class FirestoreSyncTarget implements SyncTarget {
   @override
   bool get trustsPulls => true;
 
+  @override
+  bool get ownsEveryRow => true;
+
   /// Everything, which is what makes the account the device's whole picture
   /// rather than a copy of one table.
   @override

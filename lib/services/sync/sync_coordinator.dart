@@ -437,6 +437,7 @@ class SyncCoordinator {
       links: links,
       remote: remote,
       recreateMissing: target.recreatesMissingRows,
+      ownsRows: target.ownsEveryRow,
     );
     final Map<String, RemoteState> remoteByKey = <String, RemoteState>{
       for (final RemoteState state in remote ?? const <RemoteState>[])

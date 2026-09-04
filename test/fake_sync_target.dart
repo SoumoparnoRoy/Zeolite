@@ -17,6 +17,9 @@ class FakeSyncTarget implements SyncTarget {
   @override
   bool recreatesMissingRows = false;
 
+  @override
+  bool ownsEveryRow = false;
+
   /// Mutable so a test can shrink it to the one kind a Notion-shaped target
   /// keeps.
   @override

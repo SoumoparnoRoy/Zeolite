@@ -409,6 +409,13 @@ abstract class SyncTarget {
   /// repair. False where a person works by hand and deleted it on purpose.
   bool get recreatesMissingRows => false;
 
+  /// Whether every row on the far side is this app's own. True for a store
+  /// only the app writes, where a row the device no longer holds has to go:
+  /// the alternative is a delete that never travels, and a rename that leaves
+  /// its old name for the next device to pull. False where a person keeps
+  /// their own rows alongside.
+  bool get ownsEveryRow => false;
+
   /// What this target keeps. Notion holds attendance and nothing else, and a
   /// target that answered "fine" to a room or a settings row would leave a
   /// ledger entry pointing at a page nobody ever made.

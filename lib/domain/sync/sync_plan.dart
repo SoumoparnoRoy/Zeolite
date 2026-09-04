@@ -116,12 +116,14 @@ class SyncPlan {
 
   /// [remote] null means the far side was not read this run — every link is
   /// then taken at its stored hash, which turns the run into a push-only one.
-  /// [recreateMissing] is the target's `recreatesMissingRows`.
+  /// [recreateMissing] is the target's `recreatesMissingRows`, and [ownsRows]
+  /// its `ownsEveryRow`.
   static SyncPlan from({
     required List<SyncItem> local,
     required List<RemoteLink> links,
     List<RemoteState>? remote,
     bool recreateMissing = false,
+    bool ownsRows = false,
   }) {
     final Map<String, RemoteLink> linkByKey = <String, RemoteLink>{
       for (final RemoteLink link in links) link.localKey: link,
@@ -184,7 +186,9 @@ class SyncPlan {
       drops.add(
         SyncDrop(
           link: link,
-          kind: link.origin == SyncOrigin.app
+          // Where the app owns everything, a pulled row is still the user's
+          // own, so leaving it would mean deletes that never travel.
+          kind: ownsRows || link.origin == SyncOrigin.app
               ? SyncDropKind.archive
               : SyncDropKind.dropLink,
         ),

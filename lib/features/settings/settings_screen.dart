@@ -334,6 +334,28 @@ class SettingsScreen extends ConsumerWidget {
               const SizedBox(height: AppSpacing.sm),
               _Hint('${settings.accentColour.label} tints the headers, the '
                   'buttons and every highlight. It stays on this device.'),
+              const SizedBox(height: AppSpacing.md),
+              SurfaceCard(
+                child: _SegmentedRow(
+                  count: LaunchAnimation.values.length,
+                  itemBuilder: (BuildContext context, int i) => _LaunchOption(
+                    animation: LaunchAnimation.values[i],
+                    selected:
+                        settings.launchAnimation == LaunchAnimation.values[i],
+                    onTap: () => controller.save(
+                      settings.copyWith(
+                        launchAnimation: LaunchAnimation.values[i],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              // Not a switch reading "Skip launch animation": it skips
+              // nothing, and a control that lies about what it does is worse
+              // than a longer label.
+              const _Hint('The launch animation. Short plays the wordmark '
+                  'only, about a second.'),
               const SizedBox(height: AppSpacing.sm),
               SurfaceCard(
                 padding: EdgeInsets.zero,
@@ -1721,6 +1743,54 @@ class _AccentOption extends StatelessWidget {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _LaunchOption extends StatelessWidget {
+  const _LaunchOption({
+    required this.animation,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final LaunchAnimation animation;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final AppPalette p = context.palette;
+    return _SegmentedCell(
+      selected: selected,
+      onTap: onTap,
+      child: Column(
+        children: <Widget>[
+          TweenAnimationBuilder<Color?>(
+            duration: _toggleDuration,
+            curve: _toggleCurve,
+            tween: ColorTween(end: selected ? p.accent : p.textSecondary),
+            builder: (BuildContext context, Color? tone, Widget? _) => Icon(
+              animation == LaunchAnimation.full
+                  ? Icons.auto_awesome_rounded
+                  : Icons.bolt_rounded,
+              size: 22,
+              color: tone,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          AnimatedDefaultTextStyle(
+            duration: _toggleDuration,
+            curve: _toggleCurve,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+              color: selected ? p.accent : p.textTertiary,
+            ),
+            child: Text(animation.label),
+          ),
+        ],
       ),
     );
   }

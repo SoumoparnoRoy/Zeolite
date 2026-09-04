@@ -10,6 +10,7 @@ import '../../services/sync/sync_coordinator.dart';
 import '../../state/auth_providers.dart';
 import '../../state/providers.dart';
 import '../../state/sync_providers.dart';
+import 'auth_form.dart';
 import 'sync_status_line.dart';
 import 'sync_merge_screen.dart';
 import '../../widgets/common.dart';
@@ -47,7 +48,7 @@ class AccountScreen extends ConsumerWidget {
                   'device still works.',
                 ),
                 data: (User? signedIn) => signedIn == null
-                    ? const _SignInForm()
+                    ? const AuthForm()
                     : _SignedIn(user: signedIn),
               ),
             ],
@@ -91,7 +92,7 @@ class _SignedIn extends ConsumerWidget {
     final AuthResult result =
         await ref.read(authServiceProvider).deleteAccount();
     if (!result.ok) {
-      messenger.showSnackBar(SnackBar(content: Text(_phrase(result.failure!))));
+      messenger.showSnackBar(SnackBar(content: Text(authFailureMessage(result.failure!))));
     }
   }
 
@@ -135,96 +136,6 @@ class _SignedIn extends ConsumerWidget {
             foregroundColor: Theme.of(context).colorScheme.error,
           ),
           child: const Text('Delete my account'),
-        ),
-      ],
-    );
-  }
-}
-
-class _SignInForm extends ConsumerStatefulWidget {
-  const _SignInForm();
-
-  @override
-  ConsumerState<_SignInForm> createState() => _SignInFormState();
-}
-
-class _SignInFormState extends ConsumerState<_SignInForm> {
-  final TextEditingController _email = TextEditingController();
-  final TextEditingController _password = TextEditingController();
-  bool _busy = false;
-
-  /// One form for both, because the only difference is which call it makes and
-  /// a separate sign-up screen would double the layout to save a sentence.
-  bool _creating = false;
-
-  @override
-  void dispose() {
-    _email.dispose();
-    _password.dispose();
-    super.dispose();
-  }
-
-  Future<void> _run(Future<AuthResult> Function() call) async {
-    setState(() => _busy = true);
-    final AuthResult result = await call();
-    if (!mounted) return;
-    setState(() => _busy = false);
-    if (!result.ok && result.failure != AuthFailure.cancelled) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(_phrase(result.failure!))));
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final AuthService auth = ref.read(authServiceProvider);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        const _Hint(
-          'An account backs your attendance up and keeps it the same on every '
-          'device you sign in on. Zeolite works without one.',
-        ),
-        const SizedBox(height: AppSpacing.md),
-        SurfaceCard(
-          child: Column(
-            children: <Widget>[
-              TextField(
-                controller: _email,
-                keyboardType: TextInputType.emailAddress,
-                autocorrect: false,
-                decoration: const InputDecoration(labelText: 'Email'),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              TextField(
-                controller: _password,
-                obscureText: true,
-                decoration: const InputDecoration(labelText: 'Password'),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        FilledButton(
-          onPressed: _busy
-              ? null
-              : () => _run(() => _creating
-                  ? auth.signUp(_email.text, _password.text)
-                  : auth.signIn(_email.text, _password.text)),
-          child: Text(_creating ? 'Create account' : 'Sign in'),
-        ),
-        TextButton(
-          onPressed: _busy ? null : () => setState(() => _creating = !_creating),
-          child: Text(_creating
-              ? 'I already have an account'
-              : 'Create an account instead'),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        OutlinedButton.icon(
-          onPressed: _busy ? null : () => _run(auth.signInWithGoogle),
-          icon: const Icon(Icons.account_circle_outlined, size: 18),
-          label: const Text('Continue with Google'),
         ),
       ],
     );
@@ -327,33 +238,6 @@ class _SyncSection extends ConsumerWidget {
       return Icons.help_outline;
     }
     return Icons.cloud_done_outlined;
-  }
-}
-
-/// Firebase's codes say what went wrong to a developer, not to whoever is
-/// holding the phone.
-String _phrase(AuthFailure failure) {
-  switch (failure) {
-    case AuthFailure.network:
-      return 'No connection. Your attendance is safe on this device.';
-    case AuthFailure.wrongPassword:
-      return 'That email and password do not match.';
-    case AuthFailure.noSuchUser:
-      return 'No account with that email.';
-    case AuthFailure.emailInUse:
-      return 'That email already has an account. Sign in instead.';
-    case AuthFailure.weakPassword:
-      return 'Pick a longer password — at least six characters.';
-    case AuthFailure.invalidEmail:
-      return 'That does not look like an email address.';
-    case AuthFailure.differentSignInMethod:
-      return 'That email was registered a different way. Try Continue with '
-          'Google.';
-    case AuthFailure.needsRecentLogin:
-      return 'Sign out and back in first, then delete the account.';
-    case AuthFailure.cancelled:
-    case AuthFailure.unknown:
-      return 'That did not work. Try again.';
   }
 }
 

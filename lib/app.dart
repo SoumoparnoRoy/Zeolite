@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/app_theme.dart';
 import 'data/settings/app_settings.dart';
+import 'features/launch/launch_screen.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'features/settings/settings_screen.dart';
 import 'features/stats/stats_screen.dart';
@@ -63,25 +64,28 @@ class ZeoliteApp extends ConsumerWidget {
   }
 }
 
-/// Decides between the first-run setup flow and the main shell once settings
-/// have loaded.
-class _Bootstrap extends ConsumerWidget {
+/// Plays the launch sequence, then decides between the first-run setup flow
+/// and the main shell.
+class _Bootstrap extends ConsumerStatefulWidget {
   const _Bootstrap();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_Bootstrap> createState() => _BootstrapState();
+}
+
+class _BootstrapState extends ConsumerState<_Bootstrap> {
+  /// Once per launch, so not a setting: `welcomeShown` says whether the
+  /// welcome screen is part of the sequence, not whether it has run.
+  bool _launched = false;
+
+  @override
+  Widget build(BuildContext context) {
     final AsyncValue<AppSettings> settings = ref.watch(settingsProvider);
 
     return settings.when(
-      loading: () => const Scaffold(
-        body: Center(
-          child: SizedBox(
-            width: 28,
-            height: 28,
-            child: CircularProgressIndicator(strokeWidth: 2.5),
-          ),
-        ),
-      ),
+      // The sequence draws in the chosen accent, so it waits for the stored
+      // choice rather than starting violet and changing colour part way.
+      loading: () => const ColoredBox(color: Color(0xFF0B0B11)),
       error: (Object error, StackTrace stack) => Scaffold(
         body: Center(
           child: Padding(
@@ -94,8 +98,15 @@ class _Bootstrap extends ConsumerWidget {
           ),
         ),
       ),
-      data: (AppSettings value) =>
-          value.onboarded ? const RootShell() : const OnboardingScreen(),
+      data: (AppSettings value) {
+        if (!_launched) {
+          return LaunchScreen(
+            settings: value,
+            onFinished: () => setState(() => _launched = true),
+          );
+        }
+        return value.onboarded ? const RootShell() : const OnboardingScreen();
+      },
     );
   }
 }

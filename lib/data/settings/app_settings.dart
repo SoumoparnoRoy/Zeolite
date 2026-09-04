@@ -29,6 +29,24 @@ enum AppThemeMode {
       };
 }
 
+/// How much of the launch sequence plays. Persisted by `name`, as above.
+enum LaunchAnimation {
+  full,
+  short;
+
+  static LaunchAnimation fromName(String? name) {
+    for (final LaunchAnimation value in LaunchAnimation.values) {
+      if (value.name == name) return value;
+    }
+    return LaunchAnimation.full;
+  }
+
+  String get label => switch (this) {
+        LaunchAnimation.full => 'Full',
+        LaunchAnimation.short => 'Short',
+      };
+}
+
 /// User preferences: semester bounds, attendance target and notification
 /// choices. Small scalar values, so they live in SharedPreferences rather than
 /// the database.
@@ -64,7 +82,9 @@ class AppSettings {
     this.scheduleChangedAt,
     this.backupFolderUri,
     this.backupFolderName,
+    this.launchAnimation = LaunchAnimation.full,
     this.onboarded = false,
+    this.welcomeShown = false,
   });
 
   final DateTime? semesterStart;
@@ -173,7 +193,17 @@ class AppSettings {
   /// Stored so the Settings row draws without a platform call per build.
   final String? backupFolderName;
 
+  /// Device preference, like [accentColour] — it describes this install, not
+  /// the account, so it stays out of [toJson].
+  final LaunchAnimation launchAnimation;
+
   final bool onboarded;
+
+  /// Whether the first-run welcome screen has had its answer. Separate from
+  /// [onboarded], which is only written once setup finishes: sharing one flag
+  /// would put anyone who quit halfway back in front of the sign-in choice
+  /// they had already made.
+  final bool welcomeShown;
 
   bool get hasBackupFolder => backupFolderUri != null;
 
@@ -265,7 +295,9 @@ class AppSettings {
     String? backupFolderUri,
     String? backupFolderName,
     bool clearBackupFolder = false,
+    LaunchAnimation? launchAnimation,
     bool? onboarded,
+    bool? welcomeShown,
   }) {
     return AppSettings(
       semesterStart: semesterStart ?? this.semesterStart,
@@ -305,7 +337,9 @@ class AppSettings {
           clearBackupFolder ? null : backupFolderUri ?? this.backupFolderUri,
       backupFolderName:
           clearBackupFolder ? null : backupFolderName ?? this.backupFolderName,
+      launchAnimation: launchAnimation ?? this.launchAnimation,
       onboarded: onboarded ?? this.onboarded,
+      welcomeShown: welcomeShown ?? this.welcomeShown,
     );
   }
 
@@ -401,6 +435,8 @@ class SettingsService {
   static const String _kBackupFolderUri = 'ut.backupFolderUri';
   static const String _kBackupFolderName = 'ut.backupFolderName';
   static const String _kOnboarded = 'ut.onboarded';
+  static const String _kLaunchAnimation = 'ut.launchAnimation';
+  static const String _kWelcomeShown = 'ut.welcomeShown';
 
   /// The modern, cache-free preferences API. `SharedPreferences.getInstance()`
   /// is a legacy surface that the plugin has flagged for deprecation.
@@ -410,6 +446,7 @@ class SettingsService {
     final SharedPreferencesAsync prefs = _prefs;
     final int? start = await prefs.getInt(_kSemesterStart);
     final int? end = await prefs.getInt(_kSemesterEnd);
+    final bool onboarded = await prefs.getBool(_kOnboarded) ?? false;
     return AppSettings(
       semesterStart: start == null ? null : Dates.fromKey(start),
       semesterEnd: end == null ? null : Dates.fromKey(end),
@@ -455,7 +492,13 @@ class SettingsService {
       },
       backupFolderUri: await prefs.getString(_kBackupFolderUri),
       backupFolderName: await prefs.getString(_kBackupFolderName),
-      onboarded: await prefs.getBool(_kOnboarded) ?? false,
+      launchAnimation:
+          LaunchAnimation.fromName(await prefs.getString(_kLaunchAnimation)),
+      onboarded: onboarded,
+      // An install that has already finished setup has plainly been past the
+      // first run, so updating into this version must not put the sign-in
+      // choice in front of someone who has been using the app for months.
+      welcomeShown: await prefs.getBool(_kWelcomeShown) ?? onboarded,
     );
   }
 
@@ -544,6 +587,8 @@ class SettingsService {
         settings.backupFolderName ?? '',
       );
     }
+    await prefs.setString(_kLaunchAnimation, settings.launchAnimation.name);
     await prefs.setBool(_kOnboarded, settings.onboarded);
+    await prefs.setBool(_kWelcomeShown, settings.welcomeShown);
   }
 }

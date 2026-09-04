@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -7,6 +8,18 @@ import '../core/date_utils.dart';
 import '../data/models/class_session.dart';
 import '../data/settings/app_settings.dart';
 import '../domain/attendance_stats.dart';
+
+/// What to do about the attendance warning on this pass.
+enum DangerAlert { raise, leave, clear }
+
+/// [DangerAlert.warned] is what to record once the action has been carried out.
+@immutable
+class DangerDecision {
+  const DangerDecision(this.action, this.warned);
+
+  final DangerAlert action;
+  final Set<int> warned;
+}
 
 /// All local notifications: class reminders, the evening "mark your
 /// attendance" nudge, and attendance danger alerts.
@@ -38,6 +51,10 @@ class NotificationService {
   /// Ids 2000-2004 belonged to the one-alert-per-subject version, so an
   /// upgrade has to clear them too.
   static const int _retiredDangerAlerts = 5;
+
+  /// Subjects the tray has already warned about. Stored rather than held in
+  /// memory: a restart is not news, and this runs on every data change.
+  static const String _warnedKey = 'ut.warnedSubjects';
 
   /// Stacks leftover reminders under one heading when classes run back to back.
   static const String _classGroupKey = 'zeolite.class_reminders';
@@ -206,12 +223,14 @@ class NotificationService {
 
     await _cancelRange(_classReminderBase, _maxClassReminders);
     await _plugin.cancel(id: _eveningReminderId);
-    await _cancelRange(_dangerAlertId, _retiredDangerAlerts);
 
     // The master switch short-circuits everything. The cancellations above have
     // already run, so flipping it off clears the tray rather than leaving
     // previously scheduled alarms behind.
-    if (!settings.notificationsEnabled) return;
+    if (!settings.notificationsEnabled) {
+      await _clearDangerAlerts();
+      return;
+    }
 
     final AndroidScheduleMode mode = await _scheduleMode();
 
@@ -222,7 +241,11 @@ class NotificationService {
       await _scheduleEveningReminder(settings, mode);
     }
     if (settings.notifyAttendanceDanger) {
-      await _showDangerAlerts(stats);
+      await _updateDangerAlerts(stats);
+    } else {
+      // Switching it off and on again is asking for the warning, so the record
+      // goes with the alert and the next slip counts as the first.
+      await _clearDangerAlerts();
     }
   }
 
@@ -231,6 +254,47 @@ class NotificationService {
   /// than reimplementing the rule and drifting from it.
   static List<SubjectStats> subjectsInDanger(OverallStats stats) =>
       <SubjectStats>[...stats.atRisk, ...stats.tight];
+
+  /// What the tray should do about [inDanger], given what it has already
+  /// warned about.
+  ///
+  /// This runs on every mark, edit, settings change and sync, so raising the
+  /// warning whenever anything sat below the line meant raising the same one
+  /// all day. Only a subject that has newly fallen is news; one that recovers
+  /// is forgotten, so a later slip warns afresh. The rule the in-app alert
+  /// already follows in `AnnouncedAlertsController`.
+  static DangerDecision decideDangerAlert({
+    required Set<int> inDanger,
+    required Set<int> warned,
+  }) {
+    if (inDanger.isEmpty) {
+      return const DangerDecision(DangerAlert.clear, <int>{});
+    }
+    if (inDanger.difference(warned).isEmpty) {
+      return DangerDecision(DangerAlert.leave, warned.intersection(inDanger));
+    }
+    return DangerDecision(DangerAlert.raise, inDanger);
+  }
+
+  Future<Set<int>> _warnedSubjects() async {
+    final List<String>? stored =
+        await SharedPreferencesAsync().getStringList(_warnedKey);
+    return <int>{
+      for (final String id in stored ?? const <String>[])
+        if (int.tryParse(id) != null) int.parse(id),
+    };
+  }
+
+  Future<void> _rememberWarned(Set<int> warned) =>
+      SharedPreferencesAsync().setStringList(
+        _warnedKey,
+        <String>[for (final int id in warned) id.toString()],
+      );
+
+  Future<void> _clearDangerAlerts() async {
+    await _cancelRange(_dangerAlertId, _retiredDangerAlerts);
+    await _rememberWarned(<int>{});
+  }
 
   Future<void> _cancelRange(int base, int count) async {
     for (int i = 0; i < count; i++) {
@@ -393,12 +457,29 @@ class NotificationService {
   static String dangerLine(SubjectStats subjectStats) =>
       '${subjectStats.subject.name} · ${dangerMessage(subjectStats)}';
 
-  /// Fires immediately for any subject below its target or sitting on the
-  /// edge — all of them in one notification, because four arriving at once
-  /// otherwise read as four unrelated problems.
-  Future<void> _showDangerAlerts(OverallStats stats) async {
+  /// Raises the warning when a subject has newly fallen below its target or
+  /// onto the edge — all of them in one notification, because four arriving
+  /// at once otherwise read as four unrelated problems.
+  Future<void> _updateDangerAlerts(OverallStats stats) async {
     final List<SubjectStats> danger = subjectsInDanger(stats);
-    if (danger.isEmpty) return;
+    final DangerDecision decision = decideDangerAlert(
+      inDanger: <int>{
+        for (final SubjectStats s in danger)
+          if (s.subject.id != null) s.subject.id!,
+      },
+      warned: await _warnedSubjects(),
+    );
+
+    switch (decision.action) {
+      case DangerAlert.clear:
+        return _clearDangerAlerts();
+      // Left standing rather than cancelled and shown again, which is what
+      // made every mark buzz.
+      case DangerAlert.leave:
+        return _rememberWarned(decision.warned);
+      case DangerAlert.raise:
+        break;
+    }
 
     final List<String> lines = danger.map(dangerLine).toList();
     final String title = dangerTitle(danger.length);
@@ -433,6 +514,7 @@ class NotificationService {
         notificationDetails: details,
         payload: 'danger',
       );
+      await _rememberWarned(decision.warned);
     } catch (error) {
       debugPrint('Zeolite: could not show attendance alert: $error');
     }

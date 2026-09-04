@@ -516,10 +516,11 @@ class AppRow extends StatelessWidget {
                     Text(
                       sub,
                       // A phone-width row cannot hold a value like "A Notion
-                      // export of what you have attended" on one line.
+                      // export of what you have attended" on one line, and the
+                      // mono default of 1 sets the two it wraps solid.
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: monoStyle(color: p.textTertiary),
+                      style: monoStyle(color: p.textTertiary, height: 1.35),
                     ),
                   ],
                 ],

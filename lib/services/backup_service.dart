@@ -546,15 +546,9 @@ class BackupService {
       AppSettings? settings;
       final Object? rawSettings = data['settings'];
       if (rawSettings is Map) {
-        // The backup folder is this device's, not the file's — it is left out
-        // of the export on purpose, so restoring must carry the current one
-        // forward rather than read its absence as "no folder chosen".
         final AppSettings current = await _settingsService.load();
         settings = AppSettings.fromJson(Map<String, Object?>.from(rawSettings))
-            .copyWith(
-          backupFolderUri: current.backupFolderUri,
-          backupFolderName: current.backupFolderName,
-        );
+            .onDeviceOf(current);
         await _settingsService.save(settings);
       }
 

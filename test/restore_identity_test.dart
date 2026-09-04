@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:zeolite/core/app_theme.dart';
 import 'package:zeolite/core/date_utils.dart';
 import 'package:zeolite/data/db/app_database.dart';
 import 'package:zeolite/data/db/zeolite_repository.dart';
@@ -186,6 +187,33 @@ void main() {
         after.firstWhere((Subject s) => s.code == null).uuid,
         isNot(uncoded),
       );
+    });
+
+    test('a restore keeps the settings that belong to the device', () async {
+      await seed();
+      final String json =
+          await BackupService(repo, settings).exportToJsonString();
+
+      // The device as it stands: themed, past the welcome screen, signed in.
+      await settings.save(const AppSettings(
+        accentColour: AccentColour.teal,
+        launchAnimation: LaunchAnimation.short,
+        welcomeShown: true,
+        onboarded: true,
+        syncedAccountId: 'account-1',
+        targetPercent: 60,
+      ));
+
+      await BackupService(repo, settings).importFromJsonString(json);
+
+      final AppSettings after = await settings.load();
+      expect(after.accentColour, AccentColour.teal);
+      expect(after.launchAnimation, LaunchAnimation.short);
+      // Defaulted, this brings the welcome screen back on the next launch,
+      // and the next sync run reads a cleared account as a new one.
+      expect(after.welcomeShown, isTrue);
+      expect(after.syncedAccountId, 'account-1');
+      expect(after.targetPercent, 75);
     });
 
     test('a first run re-points a restored term onto the account', () async {

@@ -400,6 +400,23 @@ class AppSettings {
       onboarded: true,
     );
   }
+
+  /// The settings a backup does not carry, kept from the device restoring it.
+  ///
+  /// [toJson] exports the timetable's only; the rest describes the device, and
+  /// reading their absence as "back to defaults" is what brought the welcome
+  /// screen back after a restore.
+  AppSettings onDeviceOf(AppSettings current) => copyWith(
+        accentColour: current.accentColour,
+        launchAnimation: current.launchAnimation,
+        welcomeShown: current.welcomeShown,
+        syncedAccountId: current.syncedAccountId,
+        lastSyncAt: current.lastSyncAt,
+        lastNotionSyncAt: current.lastNotionSyncAt,
+        notionAutoSync: current.notionAutoSync,
+        backupFolderUri: current.backupFolderUri,
+        backupFolderName: current.backupFolderName,
+      );
 }
 
 /// Reads and writes [AppSettings]. Keys are namespaced so a future feature can

@@ -973,15 +973,18 @@ class SettingsScreen extends ConsumerWidget {
     final String name = settings.backupFolderName?.isNotEmpty ?? false
         ? settings.backupFolderName!
         : 'Chosen folder';
-    return usable
-        ? '$name/${BackupFolder.folderName}'
-        : "$name is unavailable — using the app's own folder";
+    if (!usable) return "$name is unavailable — using the app's own folder";
+    return name == BackupFolder.folderName
+        ? name
+        : '$name/${BackupFolder.folderName}';
   }
 
   Future<void> _pickBackupFolder(BuildContext context, WidgetRef ref) async {
     try {
       final BackupFolder folder = BackupFolder();
-      final BackupFile? picked = await folder.choose();
+      final BackupFile? picked = await folder.choose(
+        initialUri: ref.read(settingsProvider).value?.backupFolderUri,
+      );
       if (picked == null) return;
       // Created now, not at the first backup, so a grant that cannot write
       // fails in front of the user rather than days later.
@@ -1117,6 +1120,17 @@ class SettingsScreen extends ConsumerWidget {
     showUndoSnack(messenger, actions, '${run.name} removed');
   }
 
+  /// Where both dialogs start. Null leaves the picker wherever it was.
+  static Future<String?> _backupFolderUri(WidgetRef ref) async {
+    final String? tree = ref.read(settingsProvider).value?.backupFolderUri;
+    if (tree == null) return null;
+    try {
+      return await BackupFolder().resolveFolder(tree);
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Saves through the system dialog so the file lands outside the app's own
   /// folder, which is deleted with the app. Falls back to the clipboard if the
   /// dialog fails — an awkward paste beats losing the export.
@@ -1129,6 +1143,7 @@ class SettingsScreen extends ConsumerWidget {
         fileName: BackupService.fileNameFor(DateTime.now()),
         bytes: utf8.encode(json),
         mimeType: 'application/json',
+        initialDirectory: await _backupFolderUri(ref),
       );
       if (!context.mounted) return;
 
@@ -1295,9 +1310,11 @@ class SettingsScreen extends ConsumerWidget {
   /// the Settings list and it replaces everything. Reads bytes rather than a
   /// path: a document-picker file is a `content://` URI with no path at all.
   Future<void> _import(BuildContext context, WidgetRef ref) async {
-    final PlatformFile? picked = await FilePicker.pickFile(
-      dialogTitle: 'Choose a Zeolite backup',
-    );
+    final BackupFolder folder = BackupFolder();
+    // Not `FilePicker`: its Android side never sets the initial-folder extra
+    // on an open dialog, so the starting folder below would be ignored.
+    final BackupFile? picked =
+        await folder.pickFile(initialUri: await _backupFolderUri(ref));
     if (picked == null || !context.mounted) return;
 
     final bool? confirmed = await showDialog<bool>(
@@ -1326,7 +1343,7 @@ class SettingsScreen extends ConsumerWidget {
 
     late final ImportResult result;
     try {
-      final String json = utf8.decode(await picked.readAsBytes());
+      final String json = utf8.decode(await folder.readBytes(picked.uri));
       result = await ref.read(backupServiceProvider).importFromJsonString(json);
     } catch (error) {
       if (!context.mounted) return;

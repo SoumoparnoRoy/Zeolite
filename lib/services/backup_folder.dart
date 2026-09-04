@@ -33,8 +33,11 @@ class BackupFolder {
   static const String folderName = 'Zeolite';
 
   /// Opens the folder picker and keeps the grant. Null if the user backed out.
-  Future<BackupFile?> choose() async {
+  ///
+  /// [initialUri] is where it opens, and only a hint: some pickers ignore it.
+  Future<BackupFile?> choose({String? initialUri}) async {
     final SafDocumentFile? picked = await _util.pickDirectory(
+      initialUri: initialUri,
       writePermission: true,
       persistablePermission: true,
     );
@@ -59,10 +62,37 @@ class BackupFolder {
 
   /// The `Zeolite` folder inside [treeUri], created if it is not there. Not
   /// stored, so deleting it from a file manager heals on the next backup.
+  ///
+  /// A tree that is already ours is taken as the destination: the picker
+  /// reopens inside it, so otherwise every re-pick nests another `Zeolite`.
   Future<String> resolveFolder(String treeUri) async {
+    // Its own uri, not the tree's: a bare tree uri is not a document, and the
+    // pickers take the folder to open in as one.
+    final SafDocumentFile? ours = await _ourFolder(treeUri);
+    if (ours != null) return ours.uri;
     final SafDocumentFile dir = await _util.mkdirp(treeUri, <String>[folderName]);
     return dir.uri;
   }
+
+  /// [treeUri] when it is a `Zeolite` folder in its own right. By name, which
+  /// is what the user reads in the picker.
+  Future<SafDocumentFile?> _ourFolder(String treeUri) async {
+    try {
+      final SafDocumentFile? dir = await _util.documentFileFromUri(treeUri, true);
+      return dir?.name == folderName ? dir : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// A backup to restore, chosen from [initialUri].
+  Future<BackupFile?> pickFile({String? initialUri}) async {
+    final SafDocumentFile? picked = await _util.pickFile(initialUri: initialUri);
+    if (picked == null) return null;
+    return BackupFile(name: picked.name, uri: picked.uri);
+  }
+
+  Future<Uint8List> readBytes(String uri) => _stream.readFileBytes(uri);
 
   Future<String> writeJson(String folderUri, String fileName, String json) async {
     final Uint8List bytes = Uint8List.fromList(utf8.encode(json));

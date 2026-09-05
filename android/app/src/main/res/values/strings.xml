@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_today_title">Today</string>
+    <string name="widget_today_description">Today\'s classes, marked without opening the app</string>
+    <string name="widget_week_title">This week</string>
+    <string name="widget_week_description">The week\'s timetable and what is still unmarked</string>
+    <string name="widget_week_placeholder">Open Zeolite to draw the week</string>
+    <string name="widget_stats_title">Attendance</string>
+    <string name="widget_stats_description">Where you stand, and every subject against your target</string>
+    <string name="widget_empty_preview">Nothing to show yet</string>
+    <string name="widget_present">Present</string>
+    <string name="widget_absent">Absent</string>
+    <string name="widget_cancelled">Cancelled</string>
+</resources>

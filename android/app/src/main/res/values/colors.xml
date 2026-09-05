@@ -8,4 +8,16 @@
     <color name="ic_launcher_background_plum">#11000F</color>
     <color name="ic_launcher_background_magenta">#110006</color>
     <color name="ic_launcher_background_slate">#0E0E11</color>
+
+    <!-- What a widget draws before its first update, and what the launcher's
+         widget picker renders as a preview: the runtime colours come from the
+         app's own palette and are pushed in onUpdate, which never runs for a
+         preview. These are AppPalette.dark. -->
+    <color name="widget_canvas">#0B0B11</color>
+    <color name="widget_surface">#16161F</color>
+    <color name="widget_surface_high">#1E1E28</color>
+    <color name="widget_text_primary">#F2F2F7</color>
+    <color name="widget_text_secondary">#A3A3B2</color>
+    <color name="widget_text_tertiary">#7E7E92</color>
+    <color name="widget_accent">#A28FFF</color>
 </resources>

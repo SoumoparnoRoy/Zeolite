@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app.dart';
 import 'core/app_theme.dart';
 import 'services/notification_service.dart';
+import 'state/home_widget_providers.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -37,6 +40,11 @@ Future<void> main() async {
   // Notification setup is best-effort — a failure here must never block
   // launch, so the service swallows and logs its own errors.
   await NotificationService.instance.init();
+
+  // Stores the callback handles Android needs to reach Dart from a widget tap.
+  // Cheap, and it has to happen before the first tap rather than before the
+  // first frame.
+  unawaited(registerHomeWidgetCallbacks());
 
   runApp(const ProviderScope(child: ZeoliteApp()));
 }

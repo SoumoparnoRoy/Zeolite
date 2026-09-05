@@ -45,6 +45,8 @@ is the full text.
 - **A day divided into blocks** - set when your day starts and ends and how long
   one lecture runs, and fill your timetable in on a grid instead of a form. A
   class takes up a whole number of blocks, so a double lab is two of them.
+- **Home-screen widgets** - mark today's classes without opening the app, plus
+  the week's grid and where every subject stands. Resizable.
 - **Saved rooms** - keep your room numbers once and pick them with a tap.
 - **Holidays** - skipped everywhere and never counted against you.
 - **Tags** - "Proxy", "Online", "Makeup": how a class went, recorded next to
@@ -170,7 +172,6 @@ ratios.
 
 ## Roadmap
 
-- [ ] Home-screen widget showing today's classes
 - [ ] Per-class notes and assignment deadlines
 - [ ] Calendar heatmap of attendance over the term
 

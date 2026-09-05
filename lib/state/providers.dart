@@ -691,6 +691,11 @@ class TimetableActions {
     _ref.read(notionSchedulerProvider)?.onLocalChange();
   }
 
+  /// A mark made from a home-screen widget is written by a second isolate, so
+  /// nothing in the running app knows the rows moved. Called on resume when the
+  /// widget reports it wrote something.
+  Future<void> reloadAfterWidgetMark() => _refresh();
+
   /// Split out of [_refresh] because a pull needs all of this without
   /// announcing a local change, which would schedule the rows it just brought
   /// down straight back up.

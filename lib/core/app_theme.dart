@@ -192,7 +192,8 @@ class AppPalette extends ThemeExtension<AppPalette> {
     textFaint: Color(0xFF5E5E70),
     present: Color(0xFF3DD68C),
     absent: Color(0xFFE87C7C),
-    cancelled: Color(0xFF8B8B9E),
+    // Yellow, not grey: a cancellation is a decision, and grey read as unmarked.
+    cancelled: Color(0xFFE3C34A),
     // A muted sand rather than alarm-orange: "tight" means pay attention, not
     // panic, and this colour fills a whole meter bar.
     warning: Color(0xFFFFCE85),
@@ -225,7 +226,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     textFaint: Color(0xFFB4B4C4),
     present: Color(0xFF12A05F),
     absent: Color(0xFFC0504E),
-    cancelled: Color(0xFF8B8B9E),
+    cancelled: Color(0xFF8F7210),
     // Bronze rather than a hot orange. On white a warning colour has to be
     // dark to stay legible, so the calm comes from dropping saturation
     // instead of lightening it.

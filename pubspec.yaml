@@ -60,6 +60,10 @@ dependencies:
   flutter_secure_storage: ^10.3.1
   app_links: ^7.2.1
   url_launcher: ^6.3.2
+  # Android cannot render Flutter into a home-screen widget, so this carries the
+  # payload into the launcher's own store and wakes a Dart isolate when a button
+  # is tapped. BSD-3-Clause.
+  home_widget: ^0.9.4
 
 dev_dependencies:
   flutter_test:

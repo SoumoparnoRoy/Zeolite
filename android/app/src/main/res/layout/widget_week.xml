@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/week_root"
+    android:background="@color/widget_canvas"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:id="@+id/week_header"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="8dp">
+
+        <TextView
+            android:id="@+id/week_title"
+            android:textColor="@color/widget_text_primary"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/widget_week_title"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/week_range"
+            android:textColor="@color/widget_text_secondary"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="end"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <!-- The grid takes everything under the header, edge to edge: it is drawn
+         at this box's own size, so it fills rather than being centred in it. -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <ImageView
+            android:id="@+id/week_image"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="fitCenter"
+            android:contentDescription="@string/widget_week_title" />
+
+        <TextView
+            android:id="@+id/week_placeholder"
+            android:textColor="@color/widget_text_tertiary"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:padding="16dp"
+            android:text="@string/widget_week_placeholder"
+            android:textSize="13sp" />
+
+        <!-- The grid is a render, so the only tap targets it can offer are
+             these seven transparent columns laid over it, one per day. -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="horizontal">
+
+            <FrameLayout android:id="@+id/week_day_0"
+                android:layout_width="0dp" android:layout_height="match_parent"
+                android:layout_weight="1"></FrameLayout>
+            <FrameLayout android:id="@+id/week_day_1"
+                android:layout_width="0dp" android:layout_height="match_parent"
+                android:layout_weight="1"></FrameLayout>
+            <FrameLayout android:id="@+id/week_day_2"
+                android:layout_width="0dp" android:layout_height="match_parent"
+                android:layout_weight="1"></FrameLayout>
+            <FrameLayout android:id="@+id/week_day_3"
+                android:layout_width="0dp" android:layout_height="match_parent"
+                android:layout_weight="1"></FrameLayout>
+            <FrameLayout android:id="@+id/week_day_4"
+                android:layout_width="0dp" android:layout_height="match_parent"
+                android:layout_weight="1"></FrameLayout>
+            <FrameLayout android:id="@+id/week_day_5"
+                android:layout_width="0dp" android:layout_height="match_parent"
+                android:layout_weight="1"></FrameLayout>
+            <FrameLayout android:id="@+id/week_day_6"
+                android:layout_width="0dp" android:layout_height="match_parent"
+                android:layout_weight="1"></FrameLayout>
+        </LinearLayout>
+    </FrameLayout>
+</LinearLayout>

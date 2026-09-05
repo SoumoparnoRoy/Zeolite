@@ -12,6 +12,7 @@ import 'features/stats/stats_screen.dart';
 import 'features/timetable/timetable_screen.dart';
 import 'features/today/today_screen.dart';
 import 'services/notification_service.dart';
+import 'state/home_widget_providers.dart';
 import 'state/providers.dart';
 import 'state/notion_sync_providers.dart';
 import 'state/sync_providers.dart';
@@ -30,6 +31,8 @@ class ZeoliteApp extends ConsumerWidget {
     // Watched for their lifetime rather than their value; see the providers.
     ref.watch(syncSchedulerProvider);
     ref.watch(notionSchedulerProvider);
+    ref.watch(homeWidgetSyncProvider);
+    ref.watch(homeWidgetMarkWatcherProvider);
 
     final FirebaseAnalyticsObserver? observer =
         ref.watch(analyticsObserverProvider);

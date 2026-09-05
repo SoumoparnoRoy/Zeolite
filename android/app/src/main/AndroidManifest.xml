@@ -73,6 +73,10 @@
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="zeolite" android:host="notion"/>
             </intent-filter>
+            <!-- Where a home-screen widget's tap lands. -->
+            <intent-filter>
+                <action android:name="es.antonborri.home_widget.action.LAUNCH" />
+            </intent-filter>
         </activity>
 
         <!-- One alias per launcher icon, all of them the same activity, exactly
@@ -174,6 +178,52 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity-alias>
+
+        <!-- Home-screen widgets. Each draws from a payload the app writes on
+             every change; none of them touches the database. -->
+        <receiver
+            android:name=".widget.TodayWidgetProvider"
+            android:label="@string/widget_today_title"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_today_info" />
+        </receiver>
+        <receiver
+            android:name=".widget.WeekWidgetProvider"
+            android:label="@string/widget_week_title"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_week_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.StatsWidgetProvider"
+            android:label="@string/widget_stats_title"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_stats_info" />
+        </receiver>
+
+        <!-- Wakes a background isolate when a Present/Absent button is tapped. -->
+        <receiver
+            android:name="es.antonborri.home_widget.HomeWidgetBackgroundReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="es.antonborri.home_widget.action.BACKGROUND" />
+            </intent-filter>
+        </receiver>
 
         <!-- flutter_local_notifications: delivers scheduled notifications and
              re-registers them after a reboot or app update. -->

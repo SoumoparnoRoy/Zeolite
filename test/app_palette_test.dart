@@ -31,6 +31,7 @@ void main() {
       expect(AppPalette.light.present, isNot(AppPalette.dark.present));
       expect(AppPalette.light.absent, isNot(AppPalette.dark.absent));
       expect(AppPalette.light.warning, isNot(AppPalette.dark.warning));
+      expect(AppPalette.light.cancelled, isNot(AppPalette.dark.cancelled));
       expect(AppPalette.light.accent, isNot(AppPalette.dark.accent));
     });
 
@@ -68,7 +69,12 @@ void main() {
         AppPalette.dark,
         AppPalette.light,
       ]) {
-        for (final Color c in <Color>[p.present, p.absent, p.warning]) {
+        for (final Color c in <Color>[
+          p.present,
+          p.absent,
+          p.warning,
+          p.cancelled,
+        ]) {
           // 3:1 is the WCAG threshold for large text and graphical objects,
           // which is what these are used for.
           expect(

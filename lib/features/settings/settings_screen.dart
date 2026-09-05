@@ -578,13 +578,19 @@ class SettingsScreen extends ConsumerWidget {
                               .value
                               ?.workspaceName ??
                           'Not connected',
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          settings: const RouteSettings(name: 'notion_connect'),
-                          builder: (BuildContext context) =>
-                              const NotionConnectScreen(),
-                        ),
-                      ),
+                      onTap: () {
+                        // The connect screen wakes the host too, but not until
+                        // it is built, so the push transition is spent idle.
+                        unawaited(ref.read(notionAuthClientProvider).health());
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            settings:
+                                const RouteSettings(name: 'notion_connect'),
+                            builder: (BuildContext context) =>
+                                const NotionConnectScreen(),
+                          ),
+                        );
+                      },
                     ),
                     // A mapping the app chose itself has to be visible.
                     if (ref.watch(notionConnectionProvider).value != null)

@@ -26,11 +26,14 @@ Future<void> main() async {
     debugPrint('Firebase unavailable, continuing offline: $error');
   }
 
-  // Set the chrome dark before the first frame so launch never flashes light.
-  // Once MaterialApp is up its AppBarTheme takes over and follows whichever
-  // theme the user chose.
+  // The stored choice is not readable this early, so the chrome follows the
+  // system for one frame. Launch then annotates its own once settings land.
   SystemChrome.setSystemUIOverlayStyle(
-    AppTheme.overlayStyleFor(AppPalette.dark),
+    AppTheme.overlayStyleFor(
+      PlatformDispatcher.instance.platformBrightness == Brightness.light
+          ? AppPalette.light
+          : AppPalette.dark,
+    ),
   );
   await SystemChrome.setPreferredOrientations(<DeviceOrientation>[
     DeviceOrientation.portraitUp,

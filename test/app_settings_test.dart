@@ -66,14 +66,14 @@ void main() {
   });
 
   group('theme mode', () {
-    test('an existing install stays dark rather than changing on update', () {
-      expect(const AppSettings().themeMode, AppThemeMode.dark);
+    test('a fresh install follows the system', () {
+      expect(const AppSettings().themeMode, AppThemeMode.system);
     });
 
-    test('an unknown or missing stored name falls back to dark', () {
-      expect(AppThemeMode.fromName(null), AppThemeMode.dark);
-      expect(AppThemeMode.fromName(''), AppThemeMode.dark);
-      expect(AppThemeMode.fromName('sepia'), AppThemeMode.dark);
+    test('an unknown or missing stored name falls back to the system', () {
+      expect(AppThemeMode.fromName(null), AppThemeMode.system);
+      expect(AppThemeMode.fromName(''), AppThemeMode.system);
+      expect(AppThemeMode.fromName('sepia'), AppThemeMode.system);
     });
 
     test('every mode round-trips through its stored name', () {
@@ -90,10 +90,10 @@ void main() {
       );
     });
 
-    test('a backup taken before themes existed restores as dark', () {
+    test('a backup taken before themes existed restores as the system', () {
       final AppSettings restored =
           AppSettings.fromJson(<String, Object?>{'targetPercent': 75});
-      expect(restored.themeMode, AppThemeMode.dark);
+      expect(restored.themeMode, AppThemeMode.system);
     });
   });
 

@@ -31,16 +31,18 @@ class LaunchColors {
     required this.present,
     required this.absent,
     required this.cancelled,
+    required this.wash,
   });
 
-  /// Always the dark palette: at these alphas the lattice is close to
-  /// invisible on a light canvas, and a splash is a brand moment rather than a
-  /// screen that has to follow the theme.
-  factory LaunchColors.of(AccentColour accent) {
-    final AppPalette p = AppPalette.dark.withAccent(accent);
+  /// The sequence in one brightness.
+  factory LaunchColors.of(AccentColour accent, Brightness brightness) {
+    final bool dark = brightness == Brightness.dark;
+    final AppPalette p =
+        (dark ? AppPalette.dark : AppPalette.light).withAccent(accent);
     return LaunchColors(
       canvas: p.canvas,
-      surfaceHigh: p.surfaceHigh,
+      // Light's surfaceHigh is the canvas, so a button taking it would vanish.
+      surfaceHigh: dark ? p.surfaceHigh : p.surface,
       accent: p.accent,
       text: p.textPrimary,
       textSecondary: p.textSecondary,
@@ -48,6 +50,7 @@ class LaunchColors {
       present: p.present,
       absent: p.absent,
       cancelled: p.cancelled,
+      wash: dark ? 1 : 0.75,
     );
   }
 
@@ -61,12 +64,24 @@ class LaunchColors {
   final Color absent;
   final Color cancelled;
 
-  @override
-  bool operator ==(Object other) =>
-      other is LaunchColors && other.accent == accent && other.text == text;
+  /// Exponent on the lattice's accent alphas, 1 for no change. They were tuned
+  /// against near-black, where 5% still separates from the canvas and the same
+  /// value over near-white is nothing. A curve rather than a multiplier
+  /// because the outer shells need all of the lift and the two cages in front
+  /// need none — scaling everything equally made the near lattice the subject.
+  final double wash;
+
+  double lift(double a) => wash == 1 ? a : math.pow(a, wash).toDouble();
 
   @override
-  int get hashCode => Object.hash(accent, text);
+  bool operator ==(Object other) =>
+      other is LaunchColors &&
+      other.accent == accent &&
+      other.text == text &&
+      other.wash == wash;
+
+  @override
+  int get hashCode => Object.hash(accent, text, wash);
 
   Color forMark(LaunchMark mark) => switch (mark) {
         LaunchMark.present => present,
@@ -423,8 +438,8 @@ class LaunchPainter extends CustomPainter {
         final double d = LaunchGeometry.depthCue((qa.persp + qb.persp) / 2);
         _stroke
           ..strokeWidth = (0.7 + 1.1 * d * d) * frame
-          ..color =
-              colors.accent.withValues(alpha: (0.045 + 0.13 * d * d * d) * a);
+          ..color = colors.accent
+              .withValues(alpha: colors.lift((0.045 + 0.13 * d * d * d) * a));
         canvas.drawLine(Offset(qa.x, qa.y), Offset(qb.x, qb.y), _stroke);
       }
 
@@ -435,10 +450,11 @@ class LaunchPainter extends CustomPainter {
         final double r = (1.2 + 1.8 * d * d) * frame;
         // A wide faint disc under each node reads as glow without a gradient,
         // which matters at this many nodes a frame.
-        _fill.color = colors.accent.withValues(alpha: 0.05 * d * a);
-        canvas.drawCircle(Offset(q.x, q.y), r * 2.6, _fill);
         _fill.color =
-            colors.accent.withValues(alpha: (0.10 + 0.22 * d * d * d) * a);
+            colors.accent.withValues(alpha: colors.lift(0.05 * d * a));
+        canvas.drawCircle(Offset(q.x, q.y), r * 2.6, _fill);
+        _fill.color = colors.accent
+            .withValues(alpha: colors.lift((0.10 + 0.22 * d * d * d) * a));
         canvas.drawCircle(Offset(q.x, q.y), r, _fill);
       }
     }
@@ -511,8 +527,8 @@ class LaunchPainter extends CustomPainter {
         final double depth = (qa.persp + qb.persp) / 2;
         _stroke
           ..strokeWidth = frame
-          ..color =
-              colors.accent.withValues(alpha: 0.15 * depth * grow * opacity);
+          ..color = colors.accent
+              .withValues(alpha: colors.lift(0.15 * depth * grow) * opacity);
         canvas.drawLine(
           Offset(lerpd(mx, qa.x, grow), lerpd(my, qa.y, grow)),
           Offset(lerpd(mx, qb.x, grow), lerpd(my, qb.y, grow)),
@@ -534,8 +550,9 @@ class LaunchPainter extends CustomPainter {
       if (!n.isCell) {
         final double show = seg(o, 0.18, 0.88);
         if (show <= 0) continue;
-        _fill.color =
-            colors.forMark(n.mark).withValues(alpha: dot * show * opacity);
+        _fill.color = colors
+            .forMark(n.mark)
+            .withValues(alpha: colors.lift(dot * show) * opacity);
         canvas.drawCircle(Offset(p.x, p.y), 2 * p.persp * frame, _fill);
         continue;
       }
@@ -570,7 +587,9 @@ class LaunchPainter extends CustomPainter {
       // An unmarked day has no colour of its own, so it settles as an accent
       // node rather than losing its outline to nothing.
       _fill.color = (filled ? colors.forMark(n.mark) : colors.accent)
-          .withValues(alpha: lerpd(filled ? 0.92 : 0, dot, o) * opacity);
+          .withValues(
+        alpha: lerpd(filled ? 0.92 : 0, colors.lift(dot), o) * opacity,
+      );
       canvas.drawRRect(box, _fill);
       if (!filled) {
         _stroke

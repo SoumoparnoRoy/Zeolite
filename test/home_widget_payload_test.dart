@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zeolite/core/date_utils.dart';
 import 'package:zeolite/data/models/attendance_record.dart';
@@ -174,5 +176,37 @@ void main() {
     expect(standing['verdict'], stats.verdict);
     expect(standing['percent'], 75);
     expect(standing['meetsTarget'], isTrue);
+  });
+
+  group('the brightness the launcher draws in', () {
+    testWidgets('follows the platform when the app is on System',
+        (WidgetTester tester) async {
+      tester.platformDispatcher.platformBrightnessTestValue = Brightness.light;
+      addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+
+      expect(
+        HomeWidgetPayload.widgetBrightness(const AppSettings()),
+        Brightness.light,
+      );
+
+      tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
+      expect(
+        HomeWidgetPayload.widgetBrightness(const AppSettings()),
+        Brightness.dark,
+      );
+    });
+
+    testWidgets('ignores the platform once the user has chosen',
+        (WidgetTester tester) async {
+      tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
+      addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+
+      expect(
+        HomeWidgetPayload.widgetBrightness(
+          const AppSettings(themeMode: AppThemeMode.light),
+        ),
+        Brightness.light,
+      );
+    });
   });
 }

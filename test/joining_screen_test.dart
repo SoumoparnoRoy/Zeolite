@@ -61,7 +61,7 @@ void main() {
         child: MaterialApp(
           theme: AppTheme.dark(),
           home: JoiningScreen(
-            colors: LaunchColors.of(AccentColour.violet),
+            colors: LaunchColors.of(AccentColour.violet, Brightness.dark),
             onDone: () => done++,
           ),
         ),

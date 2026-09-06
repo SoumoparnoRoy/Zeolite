@@ -10,6 +10,7 @@ import '../core/app_theme.dart';
 import '../core/date_utils.dart';
 import '../data/settings/app_settings.dart';
 import '../domain/day_grid.dart';
+import '../domain/home_widget_payload.dart';
 import '../features/timetable/week_grid_view.dart';
 import '../state/providers.dart';
 
@@ -183,10 +184,8 @@ class _WeekGridSnapshot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // The launcher has no light/dark signal to give us, so the widget follows
-    // the app's own theme choice and treats "system" as dark, the way launch
-    // does.
-    final bool dark = settings.themeMode != AppThemeMode.light;
+    final bool dark =
+        HomeWidgetPayload.widgetBrightness(settings) == Brightness.dark;
     final ThemeData theme = dark
         ? AppTheme.dark(settings.accentColour)
         : AppTheme.light(settings.accentColour);

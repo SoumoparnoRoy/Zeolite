@@ -1,3 +1,5 @@
+import 'package:flutter/widgets.dart';
+
 import '../core/app_theme.dart';
 import '../core/date_utils.dart';
 import '../data/models/attendance_status.dart';
@@ -128,15 +130,28 @@ class HomeWidgetPayload {
     };
   }
 
+  /// Which brightness the launcher should be drawn in. A launcher gives no
+  /// light/dark signal of its own, so System is resolved here — otherwise a
+  /// widget would sit dark beside a light app.
+  static Brightness widgetBrightness(AppSettings settings) =>
+      switch (settings.themeMode) {
+        AppThemeMode.light => Brightness.light,
+        AppThemeMode.dark => Brightness.dark,
+        // Through the binding, not `PlatformDispatcher.instance`: both callers
+        // initialise one first, and only this form is overridable in a test.
+        AppThemeMode.system =>
+          WidgetsBinding.instance.platformDispatcher.platformBrightness,
+      };
+
   /// The colours the launcher draws with.
   ///
   /// Sent rather than duplicated in `values-night`, because the widget follows
   /// the app's own theme choice — a user who runs the app dark on a light
   /// system would otherwise get a white widget beside a dark app.
   static Map<String, Object?> theme(AppSettings settings) {
-    final AppPalette p = settings.themeMode == AppThemeMode.light
-        ? AppPalette.light
-        : AppPalette.dark;
+    final AppPalette p = widgetBrightness(settings) == Brightness.light
+            ? AppPalette.light
+            : AppPalette.dark;
     return <String, Object?>{
       'canvas': p.canvas.toARGB32(),
       'surface': p.surface.toARGB32(),

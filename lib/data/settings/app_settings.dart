@@ -19,7 +19,7 @@ enum AppThemeMode {
     for (final AppThemeMode mode in AppThemeMode.values) {
       if (mode.name == name) return mode;
     }
-    return AppThemeMode.dark;
+    return AppThemeMode.system;
   }
 
   String get label => switch (this) {
@@ -64,7 +64,7 @@ class AppSettings {
     this.breakAfterBlock = 0,
     this.breakMinutes = 0,
     this.use24HourTime = false,
-    this.themeMode = AppThemeMode.dark,
+    this.themeMode = AppThemeMode.system,
     this.notificationsEnabled = true,
     this.inAppAlerts = true,
     this.notifyBeforeClass = true,

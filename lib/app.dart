@@ -23,9 +23,9 @@ class ZeoliteApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Until settings have loaded there is no stored choice to honour, so the
-    // app opens dark rather than flashing a light frame first.
+    // app follows the system, which is also what a fresh install settles on.
     final AppSettings? settings = ref.watch(settingsProvider).value;
-    final AppThemeMode mode = settings?.themeMode ?? AppThemeMode.dark;
+    final AppThemeMode mode = settings?.themeMode ?? AppThemeMode.system;
     final AccentColour accent = settings?.accentColour ?? AccentColour.violet;
 
     // Watched for their lifetime rather than their value; see the providers.
@@ -88,7 +88,7 @@ class _BootstrapState extends ConsumerState<_Bootstrap> {
     return settings.when(
       // The sequence draws in the chosen accent, so it waits for the stored
       // choice rather than starting violet and changing colour part way.
-      loading: () => const ColoredBox(color: Color(0xFF0B0B11)),
+      loading: () => ColoredBox(color: context.palette.canvas),
       error: (Object error, StackTrace stack) => Scaffold(
         body: Center(
           child: Padding(

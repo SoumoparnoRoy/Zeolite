@@ -1,7 +1,9 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/app_theme.dart';
 import '../../data/settings/app_settings.dart';
 import '../../state/auth_providers.dart';
 import '../../state/providers.dart';
@@ -141,7 +143,11 @@ class _LaunchScreenState extends ConsumerState<LaunchScreen>
     final AsyncValue<User?> auth = ref.watch(signedInUserProvider);
     if (_landing == LaunchLanding.today) _finishWhenReady(auth);
 
-    final LaunchColors colors = LaunchColors.of(widget.settings.accentColour);
+    final AppPalette palette = context.palette;
+    final LaunchColors colors = LaunchColors.of(
+      widget.settings.accentColour,
+      palette.brightness,
+    );
     if (_joining) {
       return JoiningScreen(colors: colors, onDone: widget.onFinished);
     }
@@ -150,68 +156,71 @@ class _LaunchScreenState extends ConsumerState<LaunchScreen>
     // The viewer's own scaling only; the app's size ramp is for reading.
     final double scale = mq.textScaler.scale(10) / 10;
 
-    return Scaffold(
-      backgroundColor: colors.canvas,
-      body: LayoutBuilder(
-        builder: (BuildContext context, BoxConstraints constraints) {
-          final Size size = constraints.biggest;
-          final WelcomeMetrics metrics = WelcomeMetrics(
-            size: size,
-            scale: scale,
-            frame: WelcomeMetrics.frameFor(size),
-            bottomInset: mq.padding.bottom,
-          );
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: AppTheme.overlayStyleFor(palette),
+      child: Scaffold(
+        backgroundColor: colors.canvas,
+        body: LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints constraints) {
+            final Size size = constraints.biggest;
+            final WelcomeMetrics metrics = WelcomeMetrics(
+              size: size,
+              scale: scale,
+              frame: WelcomeMetrics.frameFor(size),
+              bottomInset: mq.padding.bottom,
+            );
 
-          return AnimatedBuilder(
-            animation: _clock,
-            builder: (BuildContext context, Widget? child) {
-              final double progress = seg(_clock.value, _mainEnd, _total);
-              // Expanded, and never given an unpositioned child: a Stack
-              // sizes itself to those, so one shrunken child collapses it and
-              // the painter is handed a zero canvas.
-              return Stack(
-                fit: StackFit.expand,
-                children: <Widget>[
-                  Positioned.fill(
-                    child: RepaintBoundary(
-                      child: CustomPaint(
-                        painter: LaunchPainter(
-                          clock: _clock,
-                          short: _short,
-                          landing: _landing,
-                          colors: colors,
-                          metrics: metrics,
-                          textScale: scale,
+            return AnimatedBuilder(
+              animation: _clock,
+              builder: (BuildContext context, Widget? child) {
+                final double progress = seg(_clock.value, _mainEnd, _total);
+                // Expanded, and never given an unpositioned child: a Stack
+                // sizes itself to those, so one shrunken child collapses it and
+                // the painter is handed a zero canvas.
+                return Stack(
+                  fit: StackFit.expand,
+                  children: <Widget>[
+                    Positioned.fill(
+                      child: RepaintBoundary(
+                        child: CustomPaint(
+                          painter: LaunchPainter(
+                            clock: _clock,
+                            short: _short,
+                            landing: _landing,
+                            colors: colors,
+                            metrics: metrics,
+                            textScale: scale,
+                          ),
+                          size: size,
                         ),
-                        size: size,
                       ),
                     ),
-                  ),
-                  if (_landing == LaunchLanding.welcome) ...<Widget>[
-                    // The heading is painted, so this is what a reader finds.
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      top: metrics.headingBaseline - metrics.headingSize,
-                      height: metrics.headingSize * 1.6,
-                      child: Semantics(
-                        header: true,
-                        label: WelcomeCopy.heading,
-                        child: const SizedBox.expand(),
+                    if (_landing == LaunchLanding.welcome) ...<Widget>[
+                      // The heading is painted, so this is what a reader finds.
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        top: metrics.headingBaseline - metrics.headingSize,
+                        height: metrics.headingSize * 1.6,
+                        child: Semantics(
+                          header: true,
+                          label: WelcomeCopy.heading,
+                          child: const SizedBox.expand(),
+                        ),
                       ),
-                    ),
-                    WelcomeCopy(
-                      metrics: metrics,
-                      colors: colors,
-                      progress: progress,
-                      onChoice: _choose,
-                    ),
+                      WelcomeCopy(
+                        metrics: metrics,
+                        colors: colors,
+                        progress: progress,
+                        onChoice: _choose,
+                      ),
+                    ],
                   ],
-                ],
-              );
-            },
-          );
-        },
+                );
+              },
+            );
+          },
+        ),
       ),
     );
   }

@@ -1,9 +1,13 @@
+import 'dart:ui';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 import 'package:zeolite/data/settings/app_settings.dart';
+import 'package:zeolite/core/app_theme.dart';
 import 'package:zeolite/features/launch/launch_geometry.dart';
+import 'package:zeolite/features/launch/launch_painter.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -134,6 +138,23 @@ void main() {
     test('a value written by a newer build reads back as the default', () {
       expect(LaunchAnimation.fromName('cinematic'), LaunchAnimation.full);
       expect(LaunchAnimation.fromName(null), LaunchAnimation.full);
+    });
+
+    test('the light sequence separates its buttons from the canvas', () {
+      final LaunchColors light =
+          LaunchColors.of(AccentColour.violet, Brightness.light);
+      expect(light.canvas, AppPalette.light.canvas);
+      expect(light.surfaceHigh, isNot(light.canvas));
+    });
+
+    test('light lifts the lattice alphas, dark leaves them alone', () {
+      final LaunchColors dark =
+          LaunchColors.of(AccentColour.violet, Brightness.dark);
+      final LaunchColors light =
+          LaunchColors.of(AccentColour.violet, Brightness.light);
+      expect(dark.lift(0.05), 0.05);
+      // The faint outer shells gain far more than the two cages in front.
+      expect(light.lift(0.05) / 0.05, greaterThan(light.lift(0.4) / 0.4));
     });
 
     test('quitting part way through setup does not re-ask the choice', () {

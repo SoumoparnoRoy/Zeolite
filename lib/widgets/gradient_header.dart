@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../core/app_theme.dart';
 
@@ -103,42 +104,48 @@ class GradientScaffold extends StatelessWidget {
     final Future<void> Function()? refresh = onRefresh;
     final Widget? pinned = body;
 
-    return Scaffold(
-      body: Stack(
-        children: <Widget>[
-          if (pinned != null)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: <Widget>[headerBlock, Expanded(child: pinned)],
-            )
-          else if (refresh == null)
-            scroller
-          else
-            RefreshIndicator(
-              color: p.accent,
-              backgroundColor: p.surface,
-              onRefresh: refresh,
-              child: scroller,
-            ),
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: statusBar,
-            child: ColoredBox(color: p.gradientTop),
-          ),
-        ],
-      ),
-      floatingActionButton: floatingActionButton,
-      bottomNavigationBar: bottom == null
-          ? null
-          : SafeArea(
-              top: false,
-              child: Padding(
-                padding: inset + const EdgeInsets.fromLTRB(20, 8, 20, 16),
-                child: bottom,
+    // These screens carry a gradient rather than an app bar, so nothing else
+    // states the status bar's style for them — and the gradient wants light
+    // icons in both themes, not the ones the canvas would ask for.
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: AppTheme.overlayStyleOnGradient(p),
+      child: Scaffold(
+        body: Stack(
+          children: <Widget>[
+            if (pinned != null)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[headerBlock, Expanded(child: pinned)],
+              )
+            else if (refresh == null)
+              scroller
+            else
+              RefreshIndicator(
+                color: p.accent,
+                backgroundColor: p.surface,
+                onRefresh: refresh,
+                child: scroller,
               ),
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: statusBar,
+              child: ColoredBox(color: p.gradientTop),
             ),
+          ],
+        ),
+        floatingActionButton: floatingActionButton,
+        bottomNavigationBar: bottom == null
+            ? null
+            : SafeArea(
+                top: false,
+                child: Padding(
+                  padding: inset + const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                  child: bottom,
+                ),
+              ),
+      ),
     );
   }
 }

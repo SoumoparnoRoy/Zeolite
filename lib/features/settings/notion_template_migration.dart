@@ -239,26 +239,7 @@ class NotionTemplateMigration {
     }
     ref.invalidate(retiredNotionDatabasesProvider);
     if (!context.mounted) return;
-    _say(context, _trashOutcome(moved: moved, of: chosen.length));
-  }
-
-  /// What the batch did. Each database is its own call, so one deleted by
-  /// hand in Notion, or one the integration has lost access to, says nothing
-  /// about the rest.
-  static String _trashOutcome({required int moved, required int of}) {
-    if (moved == of) {
-      return of == 1
-          ? 'Moved to the trash in Notion.'
-          : 'Moved $of to the trash in Notion.';
-    }
-    if (moved == 0) {
-      return of == 1
-          ? 'Could not move it. It can be deleted in Notion instead.'
-          : 'Could not move them. They can be deleted in Notion instead.';
-    }
-    final int failed = of - moved;
-    return 'Moved $moved. Could not move $failed — '
-        '${failed == 1 ? 'it' : 'they'} can be deleted in Notion instead.';
+    _say(context, notionTrashOutcome(moved: moved, of: chosen.length));
   }
 
   Future<List<RetiredNotionDatabase>?> _pickOldDatabases(
@@ -358,6 +339,26 @@ class NotionTemplateMigration {
   }
 }
 
+/// What a batch of retirements did.
+///
+/// Each database is its own call, so one the integration can no longer reach
+/// says nothing about the rest. Only the all-succeeded case can be reached on
+/// a device, which is why the strings are asserted in a test.
+String notionTrashOutcome({required int moved, required int of}) {
+  if (moved == of) {
+    return of == 1
+        ? 'Moved to the trash in Notion.'
+        : 'Moved $of to the trash in Notion.';
+  }
+  if (moved == 0) {
+    return of == 1
+        ? 'Could not move it. It can be deleted in Notion instead.'
+        : 'Could not move them. They can be deleted in Notion instead.';
+  }
+  final int failed = of - moved;
+  return 'Moved $moved. Could not move $failed — '
+      '${failed == 1 ? 'it' : 'they'} can be deleted in Notion instead.';
+}
 
 /// Picks which of the old databases go, when more than one is waiting.
 class _OldDatabasePicker extends ConsumerStatefulWidget {

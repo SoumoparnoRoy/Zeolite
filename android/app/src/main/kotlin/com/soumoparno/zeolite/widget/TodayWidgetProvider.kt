@@ -18,11 +18,10 @@ import org.json.JSONObject
  * Today's classes, each markable without opening the app.
  *
  * The rows are built into the RemoteViews rather than served by a
- * RemoteViewsService. A collection adapter is cached by the launcher, and the
- * notification that refreshes it is dropped whenever the widget's views have
- * not been inflated yet — which left a class showing its old status under a
- * header that had already updated. Built this way the two cannot fall out of
- * step, at the price of a fixed number of rows rather than a scroll.
+ * RemoteViewsService. A collection re-attaches its adapter on every update and
+ * the launcher paints its loading view while it does, which blinks the list on
+ * every mark — tried twice, reverted twice. The price is a fixed number of
+ * rows.
  */
 class TodayWidgetProvider : ZeoliteWidgetProvider() {
 
@@ -39,27 +38,20 @@ class TodayWidgetProvider : ZeoliteWidgetProvider() {
         val count = if (state == "classes") (classes?.length() ?: 0) else 0
 
         appWidgetIds.forEach { widgetId ->
-            val shown = minOf(count, MAX_ROWS)
-            // The empty state gets the whole cell to itself, so it is sized as
-            // though it were a single row rather than none.
             val options = appWidgetManager.getAppWidgetOptions(widgetId)
-            val rows = maxOf(shown, 1)
-            val scale = WidgetScale.of(options, rows)
+            val shown = minOf(count, WidgetScale.rowsThatFit(options, PADDING_DP, ROW_DP))
 
             val views = RemoteViews(context.packageName, R.layout.widget_today).apply {
-                setScaledTextSize(R.id.today_title, 15f, scale)
-                setScaledTextSize(R.id.today_date, 12f, scale)
-                setScaledTextSize(R.id.today_empty, 13f, scale)
-                setScaledPadding(context, R.id.today_root, 12f, 12f, 12f, 12f, scale)
-                setInt(R.id.today_root, "setBackgroundColor", theme.canvas)
-                setTextColor(R.id.today_title, theme.textPrimary)
-                setTextColor(R.id.today_date, theme.textSecondary)
+                setTintedBackground(R.id.today_root, theme.canvas)
                 setTextColor(R.id.today_empty, theme.textTertiary)
 
-                setTextViewText(R.id.today_date, today?.optString("dateLabel") ?: "")
                 setOnClickPendingIntent(
-                    R.id.today_header,
-                    HomeWidgetLaunchIntent.getActivity(context, MainActivity::class.java),
+                    R.id.today_root,
+                    HomeWidgetLaunchIntent.getActivity(
+                        context,
+                        MainActivity::class.java,
+                        Uri.parse("zeolite://open?tab=today"),
+                    ),
                 )
 
                 setViewVisibility(R.id.today_rows, if (count > 0) View.VISIBLE else View.GONE)
@@ -75,11 +67,11 @@ class TodayWidgetProvider : ZeoliteWidgetProvider() {
                 for (index in 0 until shown) {
                     addView(
                         R.id.today_rows,
-                        row(context, theme, classes!!.getJSONObject(index), widgetId, index, scale),
+                        row(context, theme, classes!!.getJSONObject(index), widgetId, index),
                     )
                 }
                 if (count > shown) {
-                    addView(R.id.today_rows, moreRow(context, theme, count - shown, scale))
+                    addView(R.id.today_rows, moreRow(context, theme, count - shown))
                 }
             }
             appWidgetManager.updateAppWidget(widgetId, views)
@@ -92,20 +84,12 @@ class TodayWidgetProvider : ZeoliteWidgetProvider() {
         session: JSONObject,
         widgetId: Int,
         index: Int,
-        scale: Float,
     ): RemoteViews {
-        val status = session.optString("status").takeIf { it.isNotBlank() && it != "null" }
+        val status = session.optString("status")
+            .takeIf { it.isNotBlank() && it != "null" }
         val room = session.optString("room").takeIf { it.isNotBlank() && it != "null" }
 
         return RemoteViews(context.packageName, R.layout.widget_today_row).apply {
-            setScaledTextSize(R.id.row_subject, 14f, scale)
-            setScaledTextSize(R.id.row_meta, 11f, scale)
-            setScaledPadding(context, R.id.row_text, 10f, 8f, 8f, 8f, scale)
-            for (button in BUTTONS) {
-                setScaledTextSize(button, 11f, scale)
-                setScaledPadding(context, button, 12f, 9f, 12f, 9f, scale)
-            }
-
             setInt(R.id.row_card, "setBackgroundColor", theme.surface)
             setInt(R.id.row_stripe, "setBackgroundColor", session.optInt("color", theme.accent))
             setTextColor(R.id.row_subject, theme.textPrimary)
@@ -114,30 +98,26 @@ class TodayWidgetProvider : ZeoliteWidgetProvider() {
             setTextViewText(R.id.row_subject, session.optString("subject"))
             setTextViewText(
                 R.id.row_meta,
-                listOfNotNull(session.optString("time").takeIf { it.isNotBlank() }, room)
-                    .joinToString("  ·  "),
+                listOfNotNull(
+                    session.optString("time").takeIf { it.isNotBlank() },
+                    room,
+                ).joinToString("  ·  "),
             )
 
             // The same three the class card offers, in the same order, so a
             // status set here can be corrected or cleared here too.
-            STATUSES.forEachIndexed { slot, entry ->
-                paint(entry.first, status == entry.second, colourFor(theme, entry.second), theme)
+            STATUSES.forEachIndexed { slot, (id, name) ->
+                paint(id, status == name, colourFor(theme, name), theme)
                 setOnClickPendingIntent(
-                    entry.first,
-                    mark(context, session, entry.second, widgetId, index * STATUSES.size + slot),
+                    id,
+                    mark(context, session, name, widgetId, index * STATUSES.size + slot),
                 )
             }
         }
     }
 
-    private fun moreRow(
-        context: Context,
-        theme: WidgetTheme,
-        hidden: Int,
-        scale: Float,
-    ): RemoteViews =
+    private fun moreRow(context: Context, theme: WidgetTheme, hidden: Int): RemoteViews =
         RemoteViews(context.packageName, R.layout.widget_today_more).apply {
-            setScaledTextSize(R.id.more_label, 11f, scale)
             setTextColor(R.id.more_label, theme.textTertiary)
             setTextViewText(
                 R.id.more_label,
@@ -145,13 +125,17 @@ class TodayWidgetProvider : ZeoliteWidgetProvider() {
             )
             setOnClickPendingIntent(
                 R.id.more_label,
-                HomeWidgetLaunchIntent.getActivity(context, MainActivity::class.java),
+                HomeWidgetLaunchIntent.getActivity(
+                    context,
+                    MainActivity::class.java,
+                    Uri.parse("zeolite://open?tab=today"),
+                ),
             )
         }
 
-    /** Filled to the status colour when set, outlined when not. */
+    /** Filled to the status colour when set, quiet when not. */
     private fun RemoteViews.paint(id: Int, on: Boolean, colour: Int, theme: WidgetTheme) {
-        setInt(id, "setBackgroundColor", if (on) theme.dim(colour, 46) else theme.surfaceHigh)
+        setTintedBackground(id, if (on) theme.dim(colour, 46) else theme.surfaceHigh)
         setTextColor(id, if (on) colour else theme.textSecondary)
     }
 
@@ -206,11 +190,12 @@ class TodayWidgetProvider : ZeoliteWidgetProvider() {
             R.id.row_cancelled to "cancelled",
         )
 
-        val BUTTONS = STATUSES.map { it.first }
-
         const val BACKGROUND_ACTION = "es.antonborri.home_widget.action.BACKGROUND"
 
-        /** What fits a four-by-two cell before the rows start being squeezed. */
-        const val MAX_ROWS = 4
+        /** The root's own padding, top and bottom. */
+        const val PADDING_DP = 24f
+
+        /** A row: two lines of text beside a 40dp button, plus its margin. */
+        const val ROW_DP = 54f
     }
 }

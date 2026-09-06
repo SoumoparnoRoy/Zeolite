@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The corner radius matches AppSpacing.radiusLg, so a widget reads as one
+     of the app's own cards rather than a panel bolted to the launcher. The
+     solid colour is only the preview's: the real one is tinted on at runtime,
+     because it follows the app's theme rather than the system's. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="20dp" />
+    <solid android:color="@color/widget_canvas" />
+</shape>

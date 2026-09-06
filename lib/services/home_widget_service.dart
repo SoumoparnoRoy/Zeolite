@@ -112,13 +112,18 @@ class HomeWidgetService {
       // and letting the launcher scale the picture down shows the whole week
       // instead — the same trade as zooming out, and it undoes itself as the
       // widget is made taller.
-      final Size size = cell * _zoomOut(container, cell.height);
+      final double zoom = _zoomOut(container, cell.height);
+      final Size size = cell * zoom;
 
       await HomeWidget.renderFlutterWidget(
         _WeekGridSnapshot(
           container: container,
           settings: settings,
           size: size,
+          // The grid runs to the widget's own edges, so nothing else can round
+          // its corners for it. Drawn at [zoom] and shown scaled back down,
+          // which the radius has to be multiplied by to survive the trip.
+          cornerRadius: AppSpacing.radiusLg * zoom,
         ),
         key: weekImageKey,
         logicalSize: size,
@@ -176,11 +181,13 @@ class _WeekGridSnapshot extends StatelessWidget {
     required this.container,
     required this.settings,
     required this.size,
+    required this.cornerRadius,
   });
 
   final ProviderContainer container;
   final AppSettings settings;
   final Size size;
+  final double cornerRadius;
 
   @override
   Widget build(BuildContext context) {
@@ -198,6 +205,8 @@ class _WeekGridSnapshot extends StatelessWidget {
           data: theme,
           child: Material(
             color: theme.colorScheme.surface,
+            borderRadius: BorderRadius.circular(cornerRadius),
+            clipBehavior: Clip.antiAlias,
             child: SizedBox.fromSize(
               size: size,
               child: WeekGridView(

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Radius matches AppSpacing.radiusSm. The colour here is only the preview's:
+     the real one is tinted on per row, because it says whether the status is
+     set. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="10dp" />
+    <solid android:color="@color/widget_surface_high" />
+</shape>

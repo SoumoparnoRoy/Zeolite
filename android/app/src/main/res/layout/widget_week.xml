@@ -1,45 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/week_root"
-    android:background="@color/widget_canvas"
+    android:background="@drawable/widget_background"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical">
 
-    <LinearLayout
-        android:id="@+id/week_header"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:paddingStart="12dp"
-        android:paddingEnd="12dp"
-        android:paddingTop="10dp"
-        android:paddingBottom="8dp">
-
-        <TextView
-            android:id="@+id/week_title"
-            android:textColor="@color/widget_text_primary"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/widget_week_title"
-            android:textSize="15sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/week_range"
-            android:textColor="@color/widget_text_secondary"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:gravity="end"
-            android:maxLines="1"
-            android:ellipsize="end"
-            android:textSize="12sp" />
-    </LinearLayout>
-
-    <!-- The grid takes everything under the header, edge to edge: it is drawn
-         at this box's own size, so it fills rather than being centred in it. -->
+    <!-- The grid takes the whole cell, edge to edge: it is drawn at this
+         box's own size, so it fills rather than being centred in it. -->
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -52,8 +20,13 @@
             android:scaleType="fitCenter"
             android:contentDescription="@string/widget_week_title" />
 
+        <!-- Hidden by default, and shown by the provider only when there is
+             no image. Left visible it sits over the grid for the one frame
+             between the launcher inflating this XML and applying the actions
+             that hide it, which read as the widget flickering on every mark. -->
         <TextView
             android:id="@+id/week_placeholder"
+            android:visibility="gone"
             android:textColor="@color/widget_text_tertiary"
             android:layout_width="match_parent"
             android:layout_height="match_parent"

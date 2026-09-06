@@ -99,10 +99,11 @@ class HomeWidgetPayload {
 
   /// Every subject, weakest first.
   ///
-  /// The order is the point: a widget shows four rows, and the four that matter
-  /// are the ones closest to their target — the Stats screen can afford to list
-  /// subjects in its own order because it scrolls. Subjects with nothing marked
-  /// sort last, since a subject at zero held is not in trouble, it is untouched.
+  /// The order is the point: a widget shows as many rows as its cell has room
+  /// for, and the ones that matter are those closest to their target — the
+  /// Stats screen can afford to list subjects in its own order because it
+  /// scrolls. Subjects with nothing marked sort last, since a subject at zero
+  /// held is not in trouble, it is untouched.
   static Map<String, Object?> subjects(OverallStats stats) {
     final List<SubjectStats> ordered = stats.subjects.toList()
       ..sort((SubjectStats a, SubjectStats b) {

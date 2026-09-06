@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:home_widget/home_widget.dart';
 
 import 'core/app_theme.dart';
 import 'data/settings/app_settings.dart';
@@ -151,6 +154,15 @@ class RootShell extends ConsumerStatefulWidget {
     'settings',
   ];
 
+  /// Where a `zeolite://open?tab=` link lands, so each widget opens the screen
+  /// it is a view of. An unknown name returns null and the app opens where it
+  /// was, which is what a widget older than the tab it names should do.
+  static int? tabForLink(Uri? uri) {
+    if (uri == null || uri.host != 'open') return null;
+    final int index = tabNames.indexOf(uri.queryParameters['tab'] ?? '');
+    return index == -1 ? null : index;
+  }
+
   /// Where a tapped notification lands. The warning is about percentages, so
   /// it opens Stats; both reminders are about a class you are meant to mark,
   /// which is Today. Resolved through [tabNames] so reordering the tabs cannot
@@ -185,10 +197,17 @@ class _RootShellState extends ConsumerState<RootShell> {
   ValueNotifier<String?> get _tapped =>
       NotificationService.instance.tappedPayload;
 
+  StreamSubscription<Uri?>? _linkSub;
+
   @override
   void initState() {
     super.initState();
     _tapped.addListener(_openTappedNotification);
+    // The stream carries a tap that arrived while the app was running; only
+    // the launch link carries the one that started it. Not app_links — a
+    // widget tap comes in on home_widget's LAUNCH action, not as a VIEW.
+    _linkSub = HomeWidget.widgetClicked.listen(_openLink);
+    unawaited(HomeWidget.initiallyLaunchedFromHomeWidget().then(_openLink));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _report();
       // A tap that launched the app was recorded before this shell existed.
@@ -199,8 +218,15 @@ class _RootShellState extends ConsumerState<RootShell> {
   @override
   void dispose() {
     _tapped.removeListener(_openTappedNotification);
+    unawaited(_linkSub?.cancel());
     _pages.dispose();
     super.dispose();
+  }
+
+  void _openLink(Uri? uri) {
+    final int? tab = RootShell.tabForLink(uri);
+    if (tab == null || !mounted) return;
+    _select(tab);
   }
 
   /// Sliding two screens at once in the time it takes to slide one is a blur,

@@ -2,6 +2,8 @@ package com.soumoparno.zeolite.widget
 
 import android.appwidget.AppWidgetManager
 import android.content.Context
+import android.content.res.ColorStateList
+import android.os.Build
 import android.os.Bundle
 import android.util.TypedValue
 import android.widget.RemoteViews
@@ -35,24 +37,28 @@ object WidgetScale {
 
     /** The smallest cell offered, which the layouts are drawn against. */
     private const val BASE_WIDTH_DP = 250f
-    private const val BASE_ROW_DP = 46f
+    private const val BASE_ROW_DP = 40f
 
     private const val MAX = 2.1f
 
-    private const val MAX_HEADLINE = 3.2f
+    /** What a cell shows before Android has said how big it is. */
+    private const val DEFAULT_ROWS = 4
+
+    /**
+     * How many rows of [rowDp] the cell has room for, once [reservedDp] is
+     * spent. The Today widget builds its rows in, so it has to know when to
+     * stop rather than letting the last one be clipped.
+     */
+    fun rowsThatFit(options: Bundle?, reservedDp: Float = 0f, rowDp: Float = BASE_ROW_DP): Int {
+        val heightDp = options
+            ?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0)
+            ?.takeIf { it > 0 }?.toFloat() ?: return DEFAULT_ROWS
+        return ((heightDp - reservedDp) / rowDp).toInt().coerceAtLeast(1)
+    }
 
     /** The narrower dimension wins, or a short wide cell sets type it cannot fit. */
     fun of(options: Bundle?, rows: Int, headerDp: Float = 34f): Float =
         min(vertical(options, rows, headerDp), horizontal(options)).coerceIn(1f, MAX)
-
-    /**
-     * For a figure short enough to follow the height alone, where the sentence
-     * beside it is what the width has to hold. Still bounded by the width, or a
-     * tall narrow cell sets a number wider than the widget.
-     */
-    fun headline(options: Bundle?, headerDp: Float = 34f): Float =
-        min(vertical(options, 1, headerDp), horizontal(options) * 2f)
-            .coerceIn(1f, MAX_HEADLINE)
 
     private fun vertical(options: Bundle?, rows: Int, headerDp: Float): Float {
         // Portrait is minWidth by maxHeight; the app is portrait-locked, so the
@@ -75,15 +81,19 @@ fun RemoteViews.setScaledTextSize(viewId: Int, sp: Float, scale: Float) {
     setTextViewTextSize(viewId, TypedValue.COMPLEX_UNIT_SP, sp * scale)
 }
 
-fun RemoteViews.setScaledPadding(
-    context: Context,
-    viewId: Int,
-    left: Float,
-    top: Float,
-    right: Float,
-    bottom: Float,
-    scale: Float,
-) {
-    fun px(dp: Float) = (dp * scale * context.resources.displayMetrics.density).toInt()
-    setViewPadding(viewId, px(left), px(top), px(right), px(bottom))
+/**
+ * Colours a rounded background without flattening it.
+ *
+ * These colours are pushed from Dart rather than read from the system, so they
+ * cannot sit in the drawable; and setting a background colour the plain way
+ * replaces the drawable and squares the corners again. Tinting keeps both, but
+ * only from S — below that the corners stay square rather than the colour
+ * going wrong.
+ */
+fun RemoteViews.setTintedBackground(viewId: Int, color: Int) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        setColorStateList(viewId, "setBackgroundTintList", ColorStateList.valueOf(color))
+    } else {
+        setInt(viewId, "setBackgroundColor", color)
+    }
 }

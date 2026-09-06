@@ -33,28 +33,28 @@ class WeekWidgetProvider : ZeoliteWidgetProvider() {
 
         appWidgetIds.forEach { widgetId ->
             val options = appWidgetManager.getAppWidgetOptions(widgetId)
-            val scale = WidgetScale.of(options, rows = 4)
+            val scale = WidgetScale.of(options, rows = 4, headerDp = 0f)
 
-            // Dart cannot ask how big this widget is, so the box under the
-            // header is written here and read on the next render. The grid is
-            // then drawn at the size it will be shown at rather than a guessed
-            // aspect, which is what stops it being letterboxed inside itself.
-            recordCell(context, options, scale)
+            // Dart cannot ask how big this widget is, so the box is written
+            // here and read on the next render. The grid is then drawn at the
+            // size it will be shown at rather than a guessed aspect, which is
+            // what stops it being letterboxed inside itself.
+            recordCell(context, options)
 
             val views = RemoteViews(context.packageName, R.layout.widget_week).apply {
-                setScaledTextSize(R.id.week_title, 15f, scale)
-                setScaledTextSize(R.id.week_range, 12f, scale)
                 setScaledTextSize(R.id.week_placeholder, 13f, scale)
-                setScaledPadding(context, R.id.week_header, 12f, 10f, 12f, 8f, scale)
 
-                setInt(R.id.week_root, "setBackgroundColor", theme.canvas)
-                setTextColor(R.id.week_title, theme.textPrimary)
-                setTextColor(R.id.week_range, theme.textSecondary)
+                setTintedBackground(R.id.week_root, theme.canvas)
                 setTextColor(R.id.week_placeholder, theme.textTertiary)
-                setTextViewText(R.id.week_range, week?.optString("label") ?: "")
+                // On the root now the header has gone. The day columns sit
+                // above it and keep their own taps.
                 setOnClickPendingIntent(
-                    R.id.week_header,
-                    HomeWidgetLaunchIntent.getActivity(context, MainActivity::class.java),
+                    R.id.week_root,
+                    HomeWidgetLaunchIntent.getActivity(
+                        context,
+                        MainActivity::class.java,
+                        Uri.parse("zeolite://open?tab=timetable"),
+                    ),
                 )
 
                 // Absent until the app has been opened once since the widget
@@ -73,7 +73,10 @@ class WeekWidgetProvider : ZeoliteWidgetProvider() {
                         HomeWidgetLaunchIntent.getActivity(
                             context,
                             MainActivity::class.java,
-                            Uri.parse("zeolite://open?day=${monday + index}&pending=$pending"),
+                            Uri.parse(
+                                "zeolite://open?tab=timetable" +
+                                    "&day=${monday + index}&pending=$pending",
+                            ),
                         ),
                     )
                 }
@@ -82,20 +85,14 @@ class WeekWidgetProvider : ZeoliteWidgetProvider() {
         }
     }
 
-    private fun recordCell(context: Context, options: android.os.Bundle?, scale: Float) {
+    private fun recordCell(context: Context, options: android.os.Bundle?) {
         val width = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0) ?: 0
         val height = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0) ?: 0
-        // The header scales with everything else, so what it leaves the grid
-        // has to be measured at the same scale.
-        val body = height - (HEADER_DP * scale).toInt()
-        if (width <= 0 || body <= 0) return
-        WidgetData.write(context, "weekCell", "${width}x$body")
+        if (width <= 0 || height <= 0) return
+        WidgetData.write(context, "weekCell", "${width}x$height")
     }
 
     private companion object {
-        /** The header row plus its padding, at scale 1. */
-        const val HEADER_DP = 38f
-
         val DAY_COLUMNS = listOf(
             R.id.week_day_0, R.id.week_day_1, R.id.week_day_2, R.id.week_day_3,
             R.id.week_day_4, R.id.week_day_5, R.id.week_day_6,

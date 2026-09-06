@@ -79,6 +79,13 @@
             </intent-filter>
         </activity>
 
+        <!-- The stats list. BIND_REMOTEVIEWS keeps anything but the launcher
+             from binding it. -->
+        <service
+            android:name=".widget.StatsWidgetService"
+            android:permission="android.permission.BIND_REMOTEVIEWS"
+            android:exported="false" />
+
         <!-- One alias per launcher icon, all of them the same activity, exactly
              one enabled at a time. The names are what the launcher and any
              pinned shortcut record, so they are fixed once shipped. -->

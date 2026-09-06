@@ -616,12 +616,17 @@ class SettingsScreen extends ConsumerWidget {
                         onTap: () =>
                             NotionTemplateMigration(ref).start(context),
                       ),
-                    if (ref.watch(retiredNotionDatabaseProvider).value
-                        case final RetiredNotionDatabase retired)
+                    // Several wait whenever a template was retaken without
+                    // answering the prompt.
+                    if (ref.watch(retiredNotionDatabasesProvider).value
+                        case final List<RetiredNotionDatabase> retired
+                        when retired.isNotEmpty)
                       _Row(
                         icon: Icons.delete_outline_rounded,
-                        title: 'Move the old database to trash',
-                        value: retired.title,
+                        title: 'Move an old database to trash',
+                        value: retired.length == 1
+                            ? retired.single.title
+                            : '${retired.length} are waiting',
                         onTap: () => NotionTemplateMigration(ref)
                             .trashRetired(context, retired),
                       ),

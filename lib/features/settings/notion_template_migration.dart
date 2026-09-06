@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
+import '../../core/date_utils.dart';
 import '../../domain/notion/notion_mapping.dart';
 import '../../services/notion/notion_client.dart';
 import '../../services/notion/notion_connection_store.dart';
 import '../../services/notion/notion_template_retirement.dart';
 import '../../services/sync/sync_coordinator.dart';
 import '../../state/notion_providers.dart';
+import '../../state/providers.dart';
 import '../../state/notion_sync_providers.dart';
+import '../../widgets/common.dart';
 import 'notion_connect_screen.dart';
 import 'notion_mapping_gaps.dart';
 
@@ -91,7 +94,7 @@ class NotionTemplateMigration {
       // Remembered so the offer outlives the moment it was made: Settings
       // keeps a way back until it is dealt with.
       await store.writeRetired(before.databaseId, before.title, pageId: page);
-      ref.invalidate(retiredNotionDatabaseProvider);
+      ref.invalidate(retiredNotionDatabasesProvider);
       return;
     }
 
@@ -108,7 +111,7 @@ class NotionTemplateMigration {
         renamed.result.ok ? renamed.title : before.title,
         pageId: page,
       );
-      ref.invalidate(retiredNotionDatabaseProvider);
+      ref.invalidate(retiredNotionDatabasesProvider);
       if (!context.mounted) return;
       _say(
         context,
@@ -125,8 +128,10 @@ class NotionTemplateMigration {
       coursesDatabaseId: before.courses?.databaseId,
     );
     if (result.ok) {
-      await store.clearRetired();
-      ref.invalidate(retiredNotionDatabaseProvider);
+      // Only this one: an offer still open for a different page is not ours
+      // to answer here.
+      await store.removeRetired(before.databaseId);
+      ref.invalidate(retiredNotionDatabasesProvider);
     }
     if (!context.mounted) return;
     _say(
@@ -175,61 +180,132 @@ class NotionTemplateMigration {
     return go ?? false;
   }
 
-  /// Retires the database a migration left behind, from Settings rather than
+  /// Retires the databases a migration left behind, from Settings rather than
   /// from the prompt that ran at the time.
+  ///
+  /// Several can be waiting: dismissing the prompt defers it, and taking the
+  /// template again leaves another behind.
   Future<void> trashRetired(
     BuildContext context,
-    RetiredNotionDatabase retired,
+    List<RetiredNotionDatabase> retired,
   ) async {
+    if (retired.isEmpty) return;
+
+    // One is the ordinary case, and a sheet holding a single checkbox is
+    // ceremony around a decision already made by tapping the row.
+    final List<RetiredNotionDatabase> chosen = retired.length == 1
+        ? retired
+        : await _pickOldDatabases(context, retired) ??
+            const <RetiredNotionDatabase>[];
+    if (chosen.isEmpty || !context.mounted) return;
+
     // Resolved, not trusted: a record written before the page could be found
     // carries no id, and this is the last chance to retire the whole thing.
-    final String? page = await _retirement.pageOf(
-      databaseId: retired.id,
-      knownPageId: retired.pageId,
-    );
+    final Map<RetiredNotionDatabase, String?> pages =
+        <RetiredNotionDatabase, String?>{
+      for (final RetiredNotionDatabase old in chosen)
+        old: await _retirement.pageOf(
+          databaseId: old.id,
+          knownPageId: old.pageId,
+        ),
+    };
     if (!context.mounted) return;
-    if (!await _confirmTrash(context, retired.title, whole: page != null)) {
-      return;
-    }
 
-    final NotionResult result = await _retirement.trash(
-      databaseId: retired.id,
-      pageId: page,
-    );
-    // Already gone is the outcome that was asked for, so the row goes too.
-    if (result.ok || result.message == 'object_not_found') {
-      await ref.read(notionConnectionStoreProvider).clearRetired();
-      ref.invalidate(retiredNotionDatabaseProvider);
-    }
-    if (!context.mounted) return;
-    _say(
+    final bool go = await _confirmTrash(
       context,
-      result.ok
+      chosen.length == 1 ? chosen.single.title : null,
+      // Whenever any of them came in a page, that is the sentence which has
+      // to be read: it is the one saying the Courses table goes too.
+      whole: pages.values.any((String? page) => page != null),
+      count: chosen.length,
+    );
+    if (!go || !context.mounted) return;
+
+    // Sequentially, and through a failure rather than stopping at it: the
+    // alternative leaves an arbitrary subset done with no way to tell which.
+    int moved = 0;
+    for (final MapEntry<RetiredNotionDatabase, String?> old in pages.entries) {
+      final NotionResult result = await _retirement.trash(
+        databaseId: old.key.id,
+        pageId: old.value,
+      );
+      // Already gone is the outcome that was asked for, so the row goes too.
+      if (result.ok || result.message == 'object_not_found') {
+        moved++;
+        await ref
+            .read(notionConnectionStoreProvider)
+            .removeRetired(old.key.id);
+      }
+    }
+    ref.invalidate(retiredNotionDatabasesProvider);
+    if (!context.mounted) return;
+    _say(context, _trashOutcome(moved: moved, of: chosen.length));
+  }
+
+  /// What the batch did. Each database is its own call, so one deleted by
+  /// hand in Notion, or one the integration has lost access to, says nothing
+  /// about the rest.
+  static String _trashOutcome({required int moved, required int of}) {
+    if (moved == of) {
+      return of == 1
           ? 'Moved to the trash in Notion.'
-          : 'Could not move it. It can be deleted in Notion instead.',
+          : 'Moved $of to the trash in Notion.';
+    }
+    if (moved == 0) {
+      return of == 1
+          ? 'Could not move it. It can be deleted in Notion instead.'
+          : 'Could not move them. They can be deleted in Notion instead.';
+    }
+    final int failed = of - moved;
+    return 'Moved $moved. Could not move $failed — '
+        '${failed == 1 ? 'it' : 'they'} can be deleted in Notion instead.';
+  }
+
+  Future<List<RetiredNotionDatabase>?> _pickOldDatabases(
+    BuildContext context,
+    List<RetiredNotionDatabase> retired,
+  ) {
+    return showAppSheet<List<RetiredNotionDatabase>>(
+      context: context,
+      title: 'Which ones?',
+      child: _OldDatabasePicker(retired: retired),
     );
   }
 
   Future<bool> _confirmTrash(
     BuildContext context,
-    String title, {
+    String? title, {
     required bool whole,
+    required int count,
   }) async {
     final bool? go = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) => AlertDialog(
         backgroundColor: context.palette.surfaceHigh,
-        title: const Text('Move it to trash?'),
+        title: Text(count == 1 ? 'Move it to trash?' : 'Move them to trash?'),
         content: Text(
-          // Unnamed here: after a rename the stored title is the page's own,
-          // and "the whole page X came in" then reads as X inside itself.
-          whole
-              ? 'The whole page this came in goes to the trash in Notion — '
+          // Unnamed wherever a page is involved: after a rename the stored
+          // title is the page's own, and "the whole page X came in" then
+          // reads as X inside itself.
+          switch ((whole, count)) {
+            (true, 1) =>
+              'The whole page this came in goes to the trash in Notion — '
                   'its Courses table and every row with it. They can be '
-                  'restored for thirty days. Nothing on this device changes.'
-              : '$title and every row in it go to the trash in Notion, where '
+                  'restored for thirty days. Nothing on this device changes.',
+            (true, _) =>
+              'The whole page each of these came in goes to the trash in '
+                  'Notion — the Courses table and every row with it. They '
+                  'can be restored for thirty days. Nothing on this device '
+                  'changes.',
+            (false, 1) =>
+              '$title and every row in it go to the trash in Notion, where '
                   'they can be restored for thirty days. Nothing on this '
                   'device changes.',
+            (false, _) =>
+              'They go to the trash in Notion with every row in them, where '
+                  'they can be restored for thirty days. Nothing on this '
+                  'device changes.',
+          },
           style: const TextStyle(height: 1.4),
         ),
         actions: <Widget>[
@@ -278,6 +354,97 @@ class NotionTemplateMigration {
           ),
         ],
       ),
+    );
+  }
+}
+
+
+/// Picks which of the old databases go, when more than one is waiting.
+class _OldDatabasePicker extends ConsumerStatefulWidget {
+  const _OldDatabasePicker({required this.retired});
+
+  final List<RetiredNotionDatabase> retired;
+
+  @override
+  ConsumerState<_OldDatabasePicker> createState() => _OldDatabasePickerState();
+}
+
+class _OldDatabasePickerState extends ConsumerState<_OldDatabasePicker> {
+  /// Nothing ticked to begin with. These hold the user's rows, so the batch
+  /// has to be assembled deliberately rather than opted out of.
+  final Set<String> _chosen = <String>{};
+
+  /// Two retakes in one sitting are minutes apart, so the time earns its
+  /// place here even though the date carries most cases.
+  String? _leftBehind(RetiredNotionDatabase old) {
+    final DateTime? at = old.retiredAt;
+    if (at == null) return null;
+    final bool use24Hour =
+        ref.watch(settingsProvider).value?.use24HourTime ?? false;
+    return 'Left behind ${Dates.formatFull(at)}, '
+        '${Clock.format(at.hour * 60 + at.minute, use24Hour: use24Hour)}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        for (final RetiredNotionDatabase old in widget.retired) ...<Widget>[
+          SurfaceCard(
+            onTap: () => setState(() {
+              if (!_chosen.remove(old.id)) _chosen.add(old.id);
+            }),
+            child: Row(
+              children: <Widget>[
+                Checkbox.adaptive(
+                  value: _chosen.contains(old.id),
+                  onChanged: (_) => setState(() {
+                    if (!_chosen.remove(old.id)) _chosen.add(old.id);
+                  }),
+                  visualDensity: VisualDensity.compact,
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        old.title,
+                        style: const TextStyle(
+                          fontSize: 13.5,
+                          height: 1.25,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      if (_leftBehind(old) case final String label)
+                        Text(
+                          label,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: context.palette.textTertiary,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+        ],
+        const SizedBox(height: AppSpacing.sm),
+        FilledButton(
+          onPressed: _chosen.isEmpty
+              ? null
+              : () => Navigator.of(context).pop(<RetiredNotionDatabase>[
+                    for (final RetiredNotionDatabase old in widget.retired)
+                      if (_chosen.contains(old.id)) old,
+                  ]),
+          child: const Text('Move to trash'),
+        ),
+      ],
     );
   }
 }

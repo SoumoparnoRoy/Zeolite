@@ -64,46 +64,106 @@ class NotionConnectionStore {
     await clearRetired();
   }
 
-  /// The database a template migration moved off, kept only so the offer to
-  /// retire it survives the moment it was made.
+  /// The databases a template migration moved off, kept only so the offer to
+  /// retire them survives the moment it was made.
   ///
   /// Taking a new template asks once what should happen to the old database,
   /// and "leave it for now" is a reasonable answer that used to be final —
   /// there was no way back to that choice afterwards.
+  ///
+  /// A list rather than one slot: retaking twice without answering the first
+  /// prompt used to overwrite the first record, stranding that page in Notion
+  /// with nothing in the app able to reach it.
   Future<void> writeRetired(
     String databaseId,
     String title, {
     String? pageId,
-  }) =>
-      _storage.write(
-        key: _retiredKey,
-        value: jsonEncode(<String, Object?>{
-          'id': databaseId,
-          'title': title,
-          if (pageId != null) 'pageId': pageId,
-        }),
-      );
+    DateTime? retiredAt,
+  }) async {
+    final List<RetiredNotionDatabase> kept = await readRetired();
+    // Keyed by database id so the rename path, which records the same one
+    // again under the name the rename settled on, replaces instead of doubles.
+    final int at =
+        kept.indexWhere((RetiredNotionDatabase e) => e.id == databaseId);
+    final RetiredNotionDatabase entry = RetiredNotionDatabase(
+      id: databaseId,
+      title: title,
+      pageId: pageId,
+      // Every retake produces a database with the same template name, so the
+      // moment it was left behind is the only thing telling two of them apart.
+      retiredAt: retiredAt ?? (at == -1 ? DateTime.now() : kept[at].retiredAt),
+    );
+    if (at == -1) {
+      kept.add(entry);
+    } else {
+      kept[at] = entry;
+    }
+    await _writeRetired(kept);
+  }
 
-  Future<RetiredNotionDatabase?> readRetired() async {
+  /// Oldest first, which is the order they were left behind in.
+  ///
+  /// Reads the single object earlier versions stored as well as the list, so
+  /// an install upgrading with an offer still open does not lose it.
+  Future<List<RetiredNotionDatabase>> readRetired() async {
     final String? raw = await _storage.read(key: _retiredKey);
-    if (raw == null || raw.isEmpty) return null;
+    if (raw == null || raw.isEmpty) return <RetiredNotionDatabase>[];
     Object? decoded;
     try {
       decoded = jsonDecode(raw);
     } on FormatException {
-      return null;
+      return <RetiredNotionDatabase>[];
     }
-    if (decoded is! Map<String, Object?>) return null;
-    final String? id = decoded['id'] as String?;
-    if (id == null || id.isEmpty) return null;
-    return RetiredNotionDatabase(
-      id: id,
-      title: (decoded['title'] as String?) ?? 'the old database',
-      pageId: decoded['pageId'] as String?,
-    );
+    final List<Object?> entries = switch (decoded) {
+      final List<Object?> many => many,
+      final Map<String, Object?> one => <Object?>[one],
+      _ => const <Object?>[],
+    };
+    return <RetiredNotionDatabase>[
+      for (final Object? entry in entries)
+        if (_retiredFrom(entry) case final RetiredNotionDatabase read) read,
+    ];
+  }
+
+  /// Only the one dealt with: clearing them all here is how a pending offer
+  /// for a different page would go missing.
+  Future<void> removeRetired(String databaseId) async {
+    final List<RetiredNotionDatabase> kept = await readRetired();
+    kept.removeWhere((RetiredNotionDatabase e) => e.id == databaseId);
+    if (kept.isEmpty) return clearRetired();
+    await _writeRetired(kept);
   }
 
   Future<void> clearRetired() => _storage.delete(key: _retiredKey);
+
+  Future<void> _writeRetired(List<RetiredNotionDatabase> entries) =>
+      _storage.write(
+        key: _retiredKey,
+        value: jsonEncode(<Map<String, Object?>>[
+          for (final RetiredNotionDatabase e in entries)
+            <String, Object?>{
+              'id': e.id,
+              'title': e.title,
+              if (e.pageId != null) 'pageId': e.pageId,
+              if (e.retiredAt != null)
+                'retiredAt': e.retiredAt!.toIso8601String(),
+            },
+        ]),
+      );
+
+  static RetiredNotionDatabase? _retiredFrom(Object? entry) {
+    if (entry is! Map<String, Object?>) return null;
+    final String? id = entry['id'] as String?;
+    if (id == null || id.isEmpty) return null;
+    return RetiredNotionDatabase(
+      id: id,
+      title: (entry['title'] as String?) ?? 'the old database',
+      pageId: entry['pageId'] as String?,
+      // Null on a record written before this was stored, and on one whose
+      // stamp no longer parses. The row simply goes without a date.
+      retiredAt: DateTime.tryParse((entry['retiredAt'] as String?) ?? ''),
+    );
+  }
 
   /// Which data source attendance is filed in, and which column holds what.
   /// Null until the user has been through the mapping screen.
@@ -180,10 +240,15 @@ class RetiredNotionDatabase {
     required this.id,
     required this.title,
     this.pageId,
+    this.retiredAt,
   });
 
   final String id;
   final String title;
+
+  /// When the migration left it behind. Null on a record from a version that
+  /// did not store one.
+  final DateTime? retiredAt;
 
   /// The template page [id] sits in, when it came from one. Retiring the
   /// database alone would leave that page and its Courses table behind.

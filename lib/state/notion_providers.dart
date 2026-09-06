@@ -30,10 +30,13 @@ final notionConnectionProvider =
 /// that is what makes one refresh run however many calls meet a 401 together,
 /// and what lets a connection that has genuinely ended reach the screen
 /// instead of only the caller.
-/// The database a template migration left behind, until the user retires it.
-final retiredNotionDatabaseProvider =
-    FutureProvider<RetiredNotionDatabase?>((ref) async {
-  if (ref.watch(notionConnectionProvider).value == null) return null;
+/// The databases a template migration left behind, until the user retires
+/// them. Oldest first.
+final retiredNotionDatabasesProvider =
+    FutureProvider<List<RetiredNotionDatabase>>((ref) async {
+  if (ref.watch(notionConnectionProvider).value == null) {
+    return <RetiredNotionDatabase>[];
+  }
   return ref.read(notionConnectionStoreProvider).readRetired();
 });
 

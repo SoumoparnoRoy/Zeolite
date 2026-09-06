@@ -19,12 +19,36 @@ class NotionTemplateRetirement {
     if (knownPageId != null && knownPageId.isNotEmpty) return knownPageId;
 
     final NotionResult database = await _client.database(databaseId);
-    final Object? parent = database.body?['parent'];
-    if (parent is! Map<String, Object?> || parent['type'] != 'page_id') {
-      return null;
+    return _pageAbove(database.body?['parent']);
+  }
+
+  static const int _maxHops = 4;
+
+  /// Walks up to the page something sits in. Notion reports an *inline*
+  /// database's parent as the block holding it rather than as a page, so
+  /// checking only for `page_id` left the whole template behind. That block is
+  /// the page itself when the database sits directly in one; deeper it is not,
+  /// hence a chain rather than an assumption.
+  Future<String?> _pageAbove(Object? from) async {
+    Object? parent = from;
+    for (int hop = 0; hop < _maxHops; hop++) {
+      if (parent is! Map<String, Object?>) return null;
+
+      if (parent['type'] == 'page_id') {
+        final String? id = parent['page_id'] as String?;
+        return id != null && id.isNotEmpty ? id : null;
+      }
+      if (parent['type'] != 'block_id') return null;
+
+      final String? id = parent['block_id'] as String?;
+      if (id == null || id.isEmpty) return null;
+      final NotionResult block = await _client.block(id);
+      if (!block.ok) return null;
+      // A page is a block too, and this is how it says so.
+      if (block.body?['type'] == 'child_page') return id;
+      parent = block.body?['parent'];
     }
-    final String? id = parent['page_id'] as String?;
-    return id != null && id.isNotEmpty ? id : null;
+    return null;
   }
 
   /// Renames what the user actually reads in their sidebar.

@@ -12,8 +12,9 @@ import '../../state/notion_sync_providers.dart';
 import 'notion_connect_screen.dart';
 import 'notion_mapping_gaps.dart';
 
-/// What the user chose to do with the database they moved off.
-enum _OldDatabase { keep, rename, trash }
+/// What the user chose. Dismissing the prompt defers it, so there is no
+/// button for that — Settings keeps the offer open either way.
+enum _OldDatabase { rename, trash }
 
 /// Moving to a newer version of the template Notion hands out at consent.
 ///
@@ -86,7 +87,7 @@ class NotionTemplateMigration {
 
     final _OldDatabase? choice =
         await _askAboutOld(context, before.title, whole: page != null);
-    if (choice == null || choice == _OldDatabase.keep) {
+    if (choice == null) {
       // Remembered so the offer outlives the moment it was made: Settings
       // keeps a way back until it is dealt with.
       await store.writeRetired(before.databaseId, before.title, pageId: page);
@@ -180,7 +181,13 @@ class NotionTemplateMigration {
     BuildContext context,
     RetiredNotionDatabase retired,
   ) async {
-    final String? page = retired.pageId;
+    // Resolved, not trusted: a record written before the page could be found
+    // carries no id, and this is the last chance to retire the whole thing.
+    final String? page = await _retirement.pageOf(
+      databaseId: retired.id,
+      knownPageId: retired.pageId,
+    );
+    if (!context.mounted) return;
     if (!await _confirmTrash(context, retired.title, whole: page != null)) {
       return;
     }
@@ -214,8 +221,10 @@ class NotionTemplateMigration {
         backgroundColor: context.palette.surfaceHigh,
         title: const Text('Move it to trash?'),
         content: Text(
+          // Unnamed here: after a rename the stored title is the page's own,
+          // and "the whole page X came in" then reads as X inside itself.
           whole
-              ? 'The whole page $title came in goes to the trash in Notion — '
+              ? 'The whole page this came in goes to the trash in Notion — '
                   'its Courses table and every row with it. They can be '
                   'restored for thirty days. Nothing on this device changes.'
               : '$title and every row in it go to the trash in Notion, where '
@@ -259,10 +268,6 @@ class NotionTemplateMigration {
           style: const TextStyle(height: 1.4),
         ),
         actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(_OldDatabase.keep),
-            child: const Text('Leave it'),
-          ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(_OldDatabase.rename),
             child: const Text('Rename it'),

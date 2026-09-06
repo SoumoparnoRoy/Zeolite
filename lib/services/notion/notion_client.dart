@@ -154,6 +154,10 @@ class NotionClient {
   Future<NotionResult> page(String pageId) =>
       _send('GET', '/v1/pages/$pageId');
 
+  /// One block, for walking up to whatever page holds it.
+  Future<NotionResult> block(String blockId) =>
+      _send('GET', '/v1/blocks/$blockId');
+
   /// Walks the cursor to the end of a data source.
   ///
   /// [maxPages] stops a run pulling a whole workspace into memory on a

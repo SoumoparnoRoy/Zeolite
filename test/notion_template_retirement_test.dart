@@ -54,6 +54,68 @@ void main() {
       expect(await retirement.pageOf(databaseId: 'db-1'), 'page-1');
     });
 
+    test('an inline database reports its block, and that block is the page',
+        () async {
+      final NotionTemplateRetirement retirement =
+          NotionTemplateRetirement(_client(MockClient((http.Request r) async {
+        if (r.url.path == '/v1/databases/db-1') {
+          return http.Response(
+            jsonEncode(<String, Object?>{
+              'is_inline': true,
+              'parent': <String, Object?>{
+                'type': 'block_id',
+                'block_id': 'page-1',
+              },
+            }),
+            200,
+          );
+        }
+        expect(r.url.path, '/v1/blocks/page-1');
+        return http.Response('{"type":"child_page"}', 200);
+      })));
+
+      expect(await retirement.pageOf(databaseId: 'db-1'), 'page-1');
+    });
+
+    test('a database nested in a toggle keeps walking up to the page',
+        () async {
+      final NotionTemplateRetirement retirement =
+          NotionTemplateRetirement(_client(MockClient((http.Request r) async {
+        if (r.url.path == '/v1/databases/db-1') {
+          return http.Response(
+            '{"parent":{"type":"block_id","block_id":"toggle-1"}}',
+            200,
+          );
+        }
+        if (r.url.path == '/v1/blocks/toggle-1') {
+          return http.Response(
+            '{"type":"toggle","parent":{"type":"page_id","page_id":"page-1"}}',
+            200,
+          );
+        }
+        return http.Response('{}', 404);
+      })));
+
+      expect(await retirement.pageOf(databaseId: 'db-1'), 'page-1');
+    });
+
+    test('a chain that never reaches a page gives up rather than looping',
+        () async {
+      int calls = 0;
+      final NotionTemplateRetirement retirement =
+          NotionTemplateRetirement(_client(MockClient((http.Request r) async {
+        calls++;
+        return http.Response(
+          '{"type":"toggle","parent":{"type":"block_id","block_id":"b"}}',
+          200,
+        );
+      })));
+
+      expect(await retirement.pageOf(databaseId: 'db-1'), isNull);
+      // One database read plus a bounded number of block reads.
+      expect(calls, lessThanOrEqualTo(6));
+    });
+
     test('a database sitting straight in the workspace has no page', () async {
       final NotionTemplateRetirement retirement =
           NotionTemplateRetirement(_client(MockClient((http.Request r) async {

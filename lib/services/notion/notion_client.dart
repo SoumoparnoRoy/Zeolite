@@ -222,6 +222,24 @@ class NotionClient {
         body: <String, Object?>{'in_trash': true},
       );
 
+  /// A page's name is a property rather than a field, and for a page parented
+  /// by another page Notion always keys that property `title`.
+  Future<NotionResult> renamePage(String pageId, String title) => _send(
+        'PATCH',
+        '/v1/pages/$pageId',
+        body: <String, Object?>{
+          'properties': <String, Object?>{
+            'title': <String, Object?>{
+              'title': <Object?>[
+                <String, Object?>{
+                  'text': <String, Object?>{'content': title},
+                },
+              ],
+            },
+          },
+        },
+      );
+
   /// A database is not a page, so neither of these can go through
   /// [trashPage] — the id would not resolve under `/v1/pages`.
   Future<NotionResult> renameDatabase(String databaseId, String title) => _send(

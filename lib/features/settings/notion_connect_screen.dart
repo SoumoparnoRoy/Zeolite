@@ -13,6 +13,7 @@ import '../../state/notion_providers.dart';
 import '../../widgets/common.dart';
 import '../../widgets/gradient_header.dart';
 import 'notion_mapping_screen.dart';
+import 'notion_mapping_gaps.dart';
 
 /// Authorising Notion, both ways it can come back.
 ///
@@ -149,7 +150,14 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
           .adoptTemplate(template);
       if (!mounted) return;
       if (mapped) {
-        navigator.pop();
+        // Replaced rather than pushed, so Back from either destination lands
+        // in Settings and not on a connection already made. A retake is
+        // sequenced by the migration instead, which has more to ask after.
+        if (!widget.retakeTemplate && notionMappingHasGaps(ref)) {
+          unawaited(navigator.pushReplacement(notionMappingGapsRoute()));
+        } else {
+          navigator.pop();
+        }
         return;
       }
     }

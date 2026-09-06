@@ -7,10 +7,17 @@ import 'package:flutter_secure_storage_platform_interface/flutter_secure_storage
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:zeolite/data/models/attendance_record.dart';
+import 'package:zeolite/data/models/class_category.dart';
+import 'package:zeolite/data/models/class_slot.dart';
+import 'package:zeolite/data/models/extra_class.dart';
+import 'package:zeolite/data/models/holiday.dart';
+import 'package:zeolite/data/models/subject.dart';
 import 'package:zeolite/domain/notion/notion_mapping.dart';
 import 'package:zeolite/services/notion/notion_client.dart';
 import 'package:zeolite/services/notion/notion_connection_store.dart';
 import 'package:zeolite/state/notion_providers.dart';
+import 'package:zeolite/state/providers.dart';
 
 String _error(String code) => jsonEncode(<String, String>{'code': code});
 
@@ -42,8 +49,23 @@ String get _schema => jsonEncode(<String, Object?>{
       },
     });
 
-ProviderContainer _container(MockClient http) => ProviderContainer(
+ProviderContainer _container(
+  MockClient http, {
+  List<String> categories = const <String>[],
+}) =>
+    ProviderContainer(
       overrides: [
+        timetableProvider.overrideWith((Ref ref) async => TimetableData(
+              categories: <ClassCategory>[
+                for (final String name in categories)
+                  ClassCategory(name: name, defaultDurationMinutes: 60),
+              ],
+              subjects: const <Subject>[],
+              slots: const <ClassSlot>[],
+              extras: const <ExtraClass>[],
+              holidays: const <Holiday>[],
+              records: const <AttendanceRecord>[],
+            )),
         notionConnectionStoreProvider.overrideWithValue(
           NotionConnectionStore(storage: const FlutterSecureStorage()),
         ),
@@ -135,6 +157,119 @@ void main() {
       mapping.courses?.fields[NotionCourseField.priorAttended]?.id,
       'c2',
     );
+    expect(mapping.templatePageId, 'page-1');
+  });
+
+  test('a template that no longer matches names what it left unmapped',
+      () async {
+    // Course, Date and Status are all adopting checks, so a template missing
+    // Zeolite ID still saves — and used to do it without saying so.
+    const String thin = '{"properties":{'
+        '"Course":{"id":"p1","type":"select"},'
+        '"Date":{"id":"p2","type":"date"},'
+        '"Status":{"id":"p3","type":"select","select":{"options":['
+        '{"name":"Present"},{"name":"Absent"}]}}}}';
+
+    final MockClient client = MockClient((http.Request r) async {
+      if (r.url.path == '/v1/databases/db-1') {
+        return http.Response(_ready, 200);
+      }
+      return http.Response(thin, 200);
+    });
+
+    final ProviderContainer container = _container(client);
+    addTearDown(container.dispose);
+    await container.read(notionMappingProvider.future);
+
+    expect(
+      await container
+          .read(notionMappingProvider.notifier)
+          .adoptTemplate('db-1'),
+      isTrue,
+    );
+
+    final List<String> missing =
+        container.read(notionMappingProvider).value!.unmapped(
+              categoryNames: <String>['Lab'],
+            );
+    expect(missing, contains('Zeolite ID'));
+    expect(missing, contains('Attendance Credit'));
+    // The two status words the workspace does spell the same way are paired,
+    // so only the two it does not are reported.
+    expect(missing, contains('Status: cancelled'));
+    expect(missing, isNot(contains('Status: present')));
+    // Type has no column at all, so its options are not asked about — the
+    // field itself is what needs pointing at first.
+    expect(missing, isNot(contains('Type: Lab')));
+  });
+
+  test('a mapping that matched all the way through reports nothing', () async {
+    const String full = '{"properties":{'
+        '"Course":{"id":"p1","type":"select"},'
+        '"Date":{"id":"p2","type":"date"},'
+        '"Status":{"id":"p3","type":"status","status":{"options":['
+        '{"name":"present"},{"name":"absent"},{"name":"cancelled"},'
+        '{"name":"proxy"}]}},'
+        '"Name":{"id":"p4","type":"title"},'
+        '"Time":{"id":"p5","type":"rich_text"},'
+        '"Type":{"id":"p6","type":"select","select":{"options":['
+        '{"name":"Lab"}]}},'
+        '"Held":{"id":"p8","type":"number"},'
+        '"Attendance Credit":{"id":"p9","type":"number"},'
+        '"Zeolite ID":{"id":"p7","type":"rich_text"}}}';
+
+    final MockClient client = MockClient((http.Request r) async {
+      if (r.url.path == '/v1/databases/db-1') {
+        return http.Response(_ready, 200);
+      }
+      return http.Response(full, 200);
+    });
+
+    final ProviderContainer container = _container(client);
+    addTearDown(container.dispose);
+    await container.read(notionMappingProvider.future);
+    await container.read(notionMappingProvider.notifier).adoptTemplate('db-1');
+
+    final NotionMapping mapping =
+        container.read(notionMappingProvider).value!;
+    expect(mapping.unmapped(), isEmpty);
+  });
+
+  test('adopting pairs Type against the categories on this device', () async {
+    // Status pairs off a constant list, so it always worked; Type needs the
+    // categories, and adopting used to leave them for the mapping screen —
+    // which meant reporting a gap that fixed itself on arrival.
+    const String schema = '{"properties":{'
+        '"Course":{"id":"p1","type":"select"},'
+        '"Date":{"id":"p2","type":"date"},'
+        '"Status":{"id":"p3","type":"select"},'
+        '"Type":{"id":"p6","type":"select","select":{"options":['
+        '{"name":"Lab"},{"name":"Theory"}]}}}}';
+
+    final MockClient client = MockClient((http.Request r) async {
+      if (r.url.path == '/v1/databases/db-1') {
+        return http.Response(_ready, 200);
+      }
+      return http.Response(schema, 200);
+    });
+
+    final ProviderContainer container =
+        _container(client, categories: <String>['Lab', 'Seminar']);
+    addTearDown(container.dispose);
+    await container.read(timetableProvider.future);
+    await container.read(notionMappingProvider.future);
+    await container.read(notionMappingProvider.notifier).adoptTemplate('db-1');
+
+    final NotionMapping mapping =
+        container.read(notionMappingProvider).value!;
+    expect(mapping.kindValues['lab'], 'Lab');
+
+    // Seminar has no option spelled that way, so it is left for the user —
+    // guessing would file classes under the wrong word.
+    final List<String> missing =
+        mapping.unmapped(categoryNames: <String>['Lab', 'Seminar']);
+    expect(missing, contains('Type: Seminar'));
+    expect(missing, isNot(contains('Type: Lab')));
   });
 
   test('a database inside a toggle heading is still found', () async {

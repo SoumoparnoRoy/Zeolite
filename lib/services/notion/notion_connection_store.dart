@@ -70,9 +70,18 @@ class NotionConnectionStore {
   /// Taking a new template asks once what should happen to the old database,
   /// and "leave it for now" is a reasonable answer that used to be final —
   /// there was no way back to that choice afterwards.
-  Future<void> writeRetired(String databaseId, String title) => _storage.write(
+  Future<void> writeRetired(
+    String databaseId,
+    String title, {
+    String? pageId,
+  }) =>
+      _storage.write(
         key: _retiredKey,
-        value: jsonEncode(<String, Object?>{'id': databaseId, 'title': title}),
+        value: jsonEncode(<String, Object?>{
+          'id': databaseId,
+          'title': title,
+          if (pageId != null) 'pageId': pageId,
+        }),
       );
 
   Future<RetiredNotionDatabase?> readRetired() async {
@@ -90,6 +99,7 @@ class NotionConnectionStore {
     return RetiredNotionDatabase(
       id: id,
       title: (decoded['title'] as String?) ?? 'the old database',
+      pageId: decoded['pageId'] as String?,
     );
   }
 
@@ -166,8 +176,16 @@ class NotionConnectionStore {
 /// A database a migration left behind, still full of the user's rows.
 @immutable
 class RetiredNotionDatabase {
-  const RetiredNotionDatabase({required this.id, required this.title});
+  const RetiredNotionDatabase({
+    required this.id,
+    required this.title,
+    this.pageId,
+  });
 
   final String id;
   final String title;
+
+  /// The template page [id] sits in, when it came from one. Retiring the
+  /// database alone would leave that page and its Courses table behind.
+  final String? pageId;
 }

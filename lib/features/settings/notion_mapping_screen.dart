@@ -19,7 +19,11 @@ import '../../widgets/gradient_header.dart';
 /// then a column inside it is one decision the user is making, and a back
 /// stack through it would let them leave half a mapping behind.
 class NotionMappingScreen extends ConsumerStatefulWidget {
-  const NotionMappingScreen({super.key});
+  const NotionMappingScreen({super.key, this.onlyUnmapped = false});
+
+  /// Shows only what a template did not match, with a way past it. The whole
+  /// form would bury two gaps among ten rows that are already right.
+  final bool onlyUnmapped;
 
   @override
   ConsumerState<NotionMappingScreen> createState() =>
@@ -51,6 +55,14 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
 
   /// Saved from, not rebuilt, so a field this screen does not edit survives.
   NotionMapping? _loaded;
+
+  /// What was unmapped when this opened. Captured once, not recomputed: a row
+  /// that vanished the moment you answered it would leave no way to change it.
+  Set<NotionField>? _gapFields;
+  Set<String>? _gapStatus;
+  Set<String>? _gapKinds;
+
+  bool get _narrowed => widget.onlyUnmapped && _gapFields != null;
 
   List<ClassCategory> get _categories =>
       ref.read(timetableProvider).value?.categories ?? const <ClassCategory>[];
@@ -222,7 +234,26 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
         ...guess.kindValues,
         if (keepChoices) ..._kindValues,
       };
+      if (widget.onlyUnmapped) _captureGaps();
     });
+  }
+
+  void _captureGaps() {
+    _gapFields = <NotionField>{
+      for (final NotionField field in NotionField.values)
+        if (!_fields.containsKey(field)) field,
+    };
+    _gapStatus = <String>{
+      if (_fields.containsKey(NotionField.status))
+        for (final String word in kNotionStatusValues)
+          if (!_statusValues.containsKey(word)) word,
+    };
+    _gapKinds = <String>{
+      if (_fields.containsKey(NotionField.kind))
+        for (final ClassCategory category in _categories)
+          if (!_kindValues.containsKey(category.name.toLowerCase()))
+            category.name.toLowerCase(),
+    };
   }
 
   Future<void> _save() async {
@@ -359,12 +390,16 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
     final NotionProperty? kind = _fields[NotionField.kind];
     return <Widget>[
       Text(
-        'Zeolite filled these in from the column names. Change anything it '
-        'guessed wrong.',
+        _narrowed
+            ? 'Your template matched everything Zeolite needs. These are the '
+                'rest — map them, or carry on without them.'
+            : 'Zeolite filled these in from the column names. Change anything '
+                'it guessed wrong.',
         style: TextStyle(color: context.palette.textSecondary),
       ),
       const SizedBox(height: AppSpacing.lg),
-      for (final NotionField field in NotionField.values) ...<Widget>[
+      for (final NotionField field in NotionField.values)
+        if (!_narrowed || _gapFields!.contains(field)) ...<Widget>[
         _PropertyPicker(
           field: field,
           properties: _properties,
@@ -383,11 +418,15 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
         ),
         const SizedBox(height: AppSpacing.sm),
       ],
-      if (kind != null && kind.options.isNotEmpty && _categories.isNotEmpty)
-        ...<Widget>[
+      if (kind != null &&
+          kind.options.isNotEmpty &&
+          _categories.isNotEmpty &&
+          (!_narrowed || _gapKinds!.isNotEmpty)) ...<Widget>[
         const SizedBox(height: AppSpacing.lg),
         const SectionHeader('What each class type is called'),
-        for (final ClassCategory category in _categories) ...<Widget>[
+        for (final ClassCategory category in _categories)
+          if (!_narrowed || _gapKinds!.contains(category.name.toLowerCase()))
+            ...<Widget>[
           _ValuePicker(
             word: category.name.toLowerCase(),
             label: category.name,
@@ -404,10 +443,13 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
           const SizedBox(height: AppSpacing.sm),
         ],
       ],
-      if (status != null && status.options.isNotEmpty) ...<Widget>[
+      if (status != null &&
+          status.options.isNotEmpty &&
+          (!_narrowed || _gapStatus!.isNotEmpty)) ...<Widget>[
         const SizedBox(height: AppSpacing.lg),
         const SectionHeader('What each status is called'),
-        for (final String word in kNotionStatusValues) ...<Widget>[
+        for (final String word in kNotionStatusValues)
+          if (!_narrowed || _gapStatus!.contains(word)) ...<Widget>[
           _ValuePicker(
             word: word,
             options: status.options,
@@ -428,6 +470,22 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
         onPressed: _busy || !_complete ? null : _save,
         child: const Text('Save'),
       ),
+      // Only where every gap is optional — adoption guarantees that, but a
+      // required field left unmapped still has to be answered.
+      if (_narrowed && !_gapFields!.any((NotionField f) => f.isRequired))
+        ...<Widget>[
+        const SizedBox(height: AppSpacing.sm),
+        OutlinedButton(
+          onPressed: _busy ? null : () => Navigator.of(context).maybePop(),
+          child: const Text('Skip for now'),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          'Sync works without these. You can map them later from Notion sync '
+          'in Settings.',
+          style: TextStyle(fontSize: 12, color: context.palette.textTertiary),
+        ),
+      ],
       if (!_complete) ...<Widget>[
         const SizedBox(height: AppSpacing.sm),
         Text(

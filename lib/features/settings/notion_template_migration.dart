@@ -5,10 +5,12 @@ import '../../core/app_theme.dart';
 import '../../domain/notion/notion_mapping.dart';
 import '../../services/notion/notion_client.dart';
 import '../../services/notion/notion_connection_store.dart';
+import '../../services/notion/notion_template_retirement.dart';
 import '../../services/sync/sync_coordinator.dart';
 import '../../state/notion_providers.dart';
 import '../../state/notion_sync_providers.dart';
 import 'notion_connect_screen.dart';
+import 'notion_mapping_gaps.dart';
 
 /// What the user chose to do with the database they moved off.
 enum _OldDatabase { keep, rename, trash }
@@ -23,6 +25,9 @@ class NotionTemplateMigration {
   const NotionTemplateMigration(this.ref);
 
   final WidgetRef ref;
+
+  NotionTemplateRetirement get _retirement =>
+      NotionTemplateRetirement(ref.read(notionClientProvider));
 
   Future<void> start(BuildContext context) async {
     final NotionMapping? before = ref.read(notionMappingProvider).value;
@@ -56,6 +61,13 @@ class NotionTemplateMigration {
     }
 
     await _settleOldDatabase(context, before);
+    if (!context.mounted) return;
+
+    // After the old database is dealt with, not before: that decision is the
+    // one the user is waiting on, and the new template's gaps keep.
+    if (notionMappingHasGaps(ref)) {
+      await Navigator.of(context).push(notionMappingGapsRoute());
+    }
   }
 
   Future<void> _settleOldDatabase(
@@ -64,44 +76,67 @@ class NotionTemplateMigration {
   ) async {
     final NotionConnectionStore store =
         ref.read(notionConnectionStoreProvider);
-    final _OldDatabase? choice = await _askAboutOld(context, before.title);
+    // Resolved before the prompt, because it decides what the prompt can
+    // honestly say is going: the page, or only the one table inside it.
+    final String? page = await _retirement.pageOf(
+      databaseId: before.databaseId,
+      knownPageId: before.templatePageId,
+    );
+    if (!context.mounted) return;
 
-    // Remembered for anything short of trashing it, so the offer outlives the
-    // moment it was made: Settings keeps a way back until it is dealt with.
-    if (choice != _OldDatabase.trash) {
+    final _OldDatabase? choice =
+        await _askAboutOld(context, before.title, whole: page != null);
+    if (choice == null || choice == _OldDatabase.keep) {
+      // Remembered so the offer outlives the moment it was made: Settings
+      // keeps a way back until it is dealt with.
+      await store.writeRetired(before.databaseId, before.title, pageId: page);
+      ref.invalidate(retiredNotionDatabaseProvider);
+      return;
+    }
+
+    if (choice == _OldDatabase.rename) {
+      final NotionRename renamed = await _retirement.rename(
+        databaseId: before.databaseId,
+        databaseTitle: before.title,
+        pageId: page,
+      );
+      // Stored from what the rename settled on rather than rebuilt here: the
+      // page's name is not the table's, so the two would not agree.
       await store.writeRetired(
         before.databaseId,
-        choice == _OldDatabase.rename
-            ? '${before.title} (old)'
-            : before.title,
+        renamed.result.ok ? renamed.title : before.title,
+        pageId: page,
       );
       ref.invalidate(retiredNotionDatabaseProvider);
+      if (!context.mounted) return;
+      _say(
+        context,
+        renamed.result.ok
+            ? 'Renamed to "${renamed.title}".'
+            : _changeFailed,
+      );
+      return;
     }
-    if (choice == null || choice == _OldDatabase.keep) return;
 
-    final NotionClient client = ref.read(notionClientProvider);
-    final NotionResult result = switch (choice) {
-      _OldDatabase.rename =>
-        await client.renameDatabase(before.databaseId, '${before.title} (old)'),
-      _OldDatabase.trash => await client.trashDatabase(before.databaseId),
-      _OldDatabase.keep => throw StateError('handled above'),
-    };
-    if (choice == _OldDatabase.trash && result.ok) {
+    final NotionResult result = await _retirement.trash(
+      databaseId: before.databaseId,
+      pageId: page,
+      coursesDatabaseId: before.courses?.databaseId,
+    );
+    if (result.ok) {
       await store.clearRetired();
       ref.invalidate(retiredNotionDatabaseProvider);
     }
     if (!context.mounted) return;
-
     _say(
       context,
-      result.ok
-          ? (choice == _OldDatabase.rename
-              ? 'Renamed to "${before.title} (old)".'
-              : 'Moved to the trash in Notion.')
-          : 'Could not change the old database. It is still in Notion and '
-              'can be renamed or deleted there.',
+      result.ok ? 'Moved to the trash in Notion.' : _changeFailed,
     );
   }
+
+  static const String _changeFailed =
+      'Could not change the old database. It is still in Notion and can be '
+      'renamed or deleted there.';
 
   static const String _rewriteFailed =
       'The new database is connected, but writing your marks into it did not '
@@ -145,10 +180,15 @@ class NotionTemplateMigration {
     BuildContext context,
     RetiredNotionDatabase retired,
   ) async {
-    if (!await _confirmTrash(context, retired.title)) return;
+    final String? page = retired.pageId;
+    if (!await _confirmTrash(context, retired.title, whole: page != null)) {
+      return;
+    }
 
-    final NotionResult result =
-        await ref.read(notionClientProvider).trashDatabase(retired.id);
+    final NotionResult result = await _retirement.trash(
+      databaseId: retired.id,
+      pageId: page,
+    );
     // Already gone is the outcome that was asked for, so the row goes too.
     if (result.ok || result.message == 'object_not_found') {
       await ref.read(notionConnectionStoreProvider).clearRetired();
@@ -163,15 +203,24 @@ class NotionTemplateMigration {
     );
   }
 
-  Future<bool> _confirmTrash(BuildContext context, String title) async {
+  Future<bool> _confirmTrash(
+    BuildContext context,
+    String title, {
+    required bool whole,
+  }) async {
     final bool? go = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) => AlertDialog(
         backgroundColor: context.palette.surfaceHigh,
         title: const Text('Move it to trash?'),
         content: Text(
-          '$title and every row in it go to the trash in Notion, where they '
-          'can be restored for thirty days. Nothing on this device changes.',
+          whole
+              ? 'The whole page $title came in goes to the trash in Notion — '
+                  'its Courses table and every row with it. They can be '
+                  'restored for thirty days. Nothing on this device changes.'
+              : '$title and every row in it go to the trash in Notion, where '
+                  'they can be restored for thirty days. Nothing on this '
+                  'device changes.',
           style: const TextStyle(height: 1.4),
         ),
         actions: <Widget>[
@@ -189,15 +238,24 @@ class NotionTemplateMigration {
     return go ?? false;
   }
 
-  Future<_OldDatabase?> _askAboutOld(BuildContext context, String title) {
+  Future<_OldDatabase?> _askAboutOld(
+    BuildContext context,
+    String title, {
+    required bool whole,
+  }) {
     return showDialog<_OldDatabase>(
       context: context,
       builder: (BuildContext context) => AlertDialog(
         backgroundColor: context.palette.surfaceHigh,
         title: const Text('And the old database?'),
         content: Text(
-          'Your marks are now in the new database. "$title" is still in your '
-          'workspace with a copy of all of them.',
+          <String>[
+            'Your marks are now in the new database. "$title" is still in '
+                'your workspace with a copy of all of them.',
+            if (whole)
+              'It came in a page of its own, so renaming or trashing it takes '
+                  'that page and its Courses table with it.',
+          ].join('\n\n'),
           style: const TextStyle(height: 1.4),
         ),
         actions: <Widget>[

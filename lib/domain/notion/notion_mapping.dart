@@ -264,11 +264,18 @@ class NotionMapping {
     required this.title,
     required this.fields,
     this.courses,
+    this.templatePageId,
     this.statusValues = const <String, String>{},
     this.kindValues = const <String, String>{},
   });
 
   final String databaseId;
+
+  /// The page the template was duplicated into, when it came from one.
+  ///
+  /// [databaseId] is only the attendance half of a template, so retiring one
+  /// means retiring the page. Null for a database mapped by hand.
+  final String? templatePageId;
 
   /// Since 2025-09-03 the schema lives on the data source, not the database,
   /// and a database can hold more than one — so this is what a page parents on
@@ -297,6 +304,28 @@ class NotionMapping {
       .where((NotionField f) => f.isRequired)
       .every(fields.containsKey);
 
+  /// Everything still waiting on a choice, labelled as the mapping screen
+  /// labels it.
+  ///
+  /// [isComplete] covers only the three fields a row cannot be read without,
+  /// so a drifted schema maps far enough to save and leaves the rest unset —
+  /// `Zeolite ID` above all, without which a sync can only push and never
+  /// recognises a page it wrote. [categoryNames] are this device's own, since
+  /// the schema cannot say which `Type` options are missing.
+  List<String> unmapped({List<String> categoryNames = const <String>[]}) {
+    return <String>[
+      for (final NotionField field in NotionField.values)
+        if (!fields.containsKey(field)) field.label,
+      if (fields.containsKey(NotionField.status))
+        for (final String word in kNotionStatusValues)
+          if (!statusValues.containsKey(word)) 'Status: $word',
+      if (fields.containsKey(NotionField.kind))
+        for (final String name in categoryNames)
+          if (!kindValues.containsKey(name.trim().toLowerCase()))
+            'Type: $name',
+    ];
+  }
+
   NotionMapping copyWith({
     String? dataSourceId,
     String? title,
@@ -304,6 +333,7 @@ class NotionMapping {
     Map<String, String>? statusValues,
     Map<String, String>? kindValues,
     NotionCourses? courses,
+    String? templatePageId,
   }) {
     return NotionMapping(
       databaseId: databaseId,
@@ -313,6 +343,7 @@ class NotionMapping {
       statusValues: statusValues ?? this.statusValues,
       kindValues: kindValues ?? this.kindValues,
       courses: courses ?? this.courses,
+      templatePageId: templatePageId ?? this.templatePageId,
     );
   }
 
@@ -388,6 +419,7 @@ class NotionMapping {
         'statusValues': statusValues,
         'kindValues': kindValues,
         if (courses != null) 'courses': courses!.toJson(),
+        if (templatePageId != null) 'templatePageId': templatePageId,
       };
 
   /// Null when what is stored no longer parses. Remapping is the recovery,
@@ -416,6 +448,7 @@ class NotionMapping {
       statusValues: _stringMap(json['statusValues']),
       kindValues: _stringMap(json['kindValues']),
       courses: NotionCourses.fromJson(json['courses']),
+      templatePageId: json['templatePageId'] as String?,
     );
   }
 

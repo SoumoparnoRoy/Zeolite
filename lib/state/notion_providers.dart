@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/models/class_category.dart';
 import '../domain/notion/notion_mapping.dart';
 import '../domain/sync/sync_target.dart';
 import '../services/notion/notion_auth_client.dart';
@@ -196,7 +197,9 @@ class NotionMappingController extends AsyncNotifier<NotionMapping?> {
 
     final List<String> children = await _childDatabasesOf(id);
     for (final String child in children) {
-      if (!await _adoptDatabase(child)) continue;
+      // Remembered here and nowhere else, because this is the one point at
+      // which the page id is in hand.
+      if (!await _adoptDatabase(child, templatePageId: id)) continue;
       // The Courses table is whichever sibling is not the one marks are filed
       // in. Looked up only after the attendance table is settled, so a
       // template without one still adopts exactly as it did before.
@@ -261,7 +264,7 @@ class NotionMappingController extends AsyncNotifier<NotionMapping?> {
     return found;
   }
 
-  Future<bool> _adoptDatabase(String databaseId) async {
+  Future<bool> _adoptDatabase(String databaseId, {String? templatePageId}) async {
     final NotionClient client = ref.read(notionClientProvider);
 
     final NotionResult database = await client.database(databaseId);
@@ -277,10 +280,19 @@ class NotionMappingController extends AsyncNotifier<NotionMapping?> {
       dataSourceId: dataSourceId,
       title: notionTitleOf(database.body) ?? 'Notion',
       properties: notionPropertiesOf(body),
+      // Passed here too, or a template spelling its Type options exactly like
+      // the categories is reported unmapped and sent to a screen that pairs
+      // them on arrival. Empty before the timetable loads, as it always was.
+      categoryNames: <String>[
+        for (final ClassCategory category
+            in ref.read(timetableProvider).value?.categories ??
+                const <ClassCategory>[])
+          category.name,
+      ],
     );
     if (!mapping.isComplete) return false;
 
-    await save(mapping);
+    await save(mapping.copyWith(templatePageId: templatePageId));
     return true;
   }
 

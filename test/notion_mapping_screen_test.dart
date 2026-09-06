@@ -79,7 +79,7 @@ MockClient _notion({
   });
 }
 
-Widget _app(MockClient client) => ProviderScope(
+Widget _app(MockClient client, {bool onlyUnmapped = false}) => ProviderScope(
       overrides: [
         notionClientProvider.overrideWithValue(
           NotionClient(
@@ -96,7 +96,7 @@ Widget _app(MockClient client) => ProviderScope(
       ],
       child: MaterialApp(
         theme: AppTheme.dark(),
-        home: const NotionMappingScreen(),
+        home: NotionMappingScreen(onlyUnmapped: onlyUnmapped),
       ),
     );
 
@@ -259,6 +259,70 @@ void main() {
     // the Courses table went silently.
     expect(saved!.kindValues, <String, String>{'theory': 'Lecture'});
     expect(saved.courses?.dataSourceId, 'ds-2');
+  });
+
+  testWidgets('narrowed to the gaps, only the unmapped columns are shown',
+      (WidgetTester tester) async {
+    final NotionConnectionStore store =
+        NotionConnectionStore(storage: const FlutterSecureStorage());
+    await store.write(const NotionTokens(accessToken: 'a-token'));
+    await store.writeMapping(const NotionMapping(
+      databaseId: 'db-1',
+      dataSourceId: 'ds-1',
+      title: 'Zeolite Attendance',
+      fields: <NotionField, NotionProperty>{},
+    ));
+
+    // Course, Date, Status and Held all match by name; Zeolite ID is in the
+    // schema but named nothing like it, so the guess cannot place it.
+    await tester.pumpWidget(_app(
+      _notion(schema: <String, Object?>{
+        ..._schema(),
+        'Ref': <String, Object?>{'id': 'p7', 'type': 'rich_text'},
+      }),
+      onlyUnmapped: true,
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Zeolite ID'), findsOneWidget);
+    // Matched, so it is not something the user is being asked about.
+    expect(find.text('Date'), findsNothing);
+    expect(find.text('Held'), findsNothing);
+
+    // Every gap here is optional, so there is a way past the screen.
+    expect(find.widgetWithText(OutlinedButton, 'Skip for now'), findsOneWidget);
+  });
+
+  testWidgets('a gap answered does not vanish from under the finger',
+      (WidgetTester tester) async {
+    final NotionConnectionStore store =
+        NotionConnectionStore(storage: const FlutterSecureStorage());
+    await store.write(const NotionTokens(accessToken: 'a-token'));
+    await store.writeMapping(const NotionMapping(
+      databaseId: 'db-1',
+      dataSourceId: 'ds-1',
+      title: 'Zeolite Attendance',
+      fields: <NotionField, NotionProperty>{},
+    ));
+
+    await tester.pumpWidget(_app(
+      _notion(schema: <String, Object?>{
+        ..._schema(),
+        'Ref': <String, Object?>{'id': 'p7', 'type': 'rich_text'},
+      }),
+      onlyUnmapped: true,
+    ));
+    await tester.pumpAndSettle();
+
+    final Finder dropdown = find.byType(DropdownButton<String>).first;
+    await tester.ensureVisible(dropdown);
+    await tester.pumpAndSettle();
+    await tester.tap(dropdown);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ref').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Zeolite ID'), findsOneWidget);
   });
 
   testWidgets('every shared table is offered, not just the first',

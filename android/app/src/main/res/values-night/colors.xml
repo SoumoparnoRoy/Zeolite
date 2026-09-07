@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- AppPalette.dark. See values/colors.xml for why a preview follows the
+     system's theme rather than the app's. -->
+<resources>
+    <color name="widget_canvas">#0B0B11</color>
+    <color name="widget_surface">#16161F</color>
+    <color name="widget_text_primary">#F2F2F7</color>
+    <color name="widget_text_secondary">#A3A3B2</color>
+    <color name="widget_text_tertiary">#7E7E92</color>
+    <color name="widget_accent">#A28FFF</color>
+    <color name="widget_present">#3DD68C</color>
+    <color name="widget_absent">#E87C7C</color>
+    <color name="widget_cancelled">#E3C34A</color>
+
+    <color name="widget_preview_subject_1">#A28FFF</color>
+    <color name="widget_preview_subject_2">#E87C7C</color>
+    <color name="widget_preview_subject_3">#3DD68C</color>
+    <color name="widget_preview_subject_4">#E3C34A</color>
+
+    <color name="widget_preview_present_fill">#2E3DD68C</color>
+</resources>

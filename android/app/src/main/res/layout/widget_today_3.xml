@@ -20,7 +20,6 @@
         <include layout="@layout/widget_today_slot_0" />
         <include layout="@layout/widget_today_slot_1" />
         <include layout="@layout/widget_today_slot_2" />
-        <include layout="@layout/widget_today_slot_3" />
 
         <TextView
             android:id="@+id/more_label"

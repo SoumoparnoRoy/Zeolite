@@ -9,5 +9,5 @@
     android:resizeMode="horizontal|vertical"
     android:description="@string/widget_stats_description"
     android:initialLayout="@layout/widget_stats"
-    android:previewLayout="@layout/widget_stats"
+    android:previewLayout="@layout/widget_stats_preview"
     android:widgetCategory="home_screen" />

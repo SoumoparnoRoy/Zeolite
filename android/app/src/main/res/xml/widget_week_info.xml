@@ -9,5 +9,5 @@
     android:resizeMode="horizontal|vertical"
     android:description="@string/widget_week_description"
     android:initialLayout="@layout/widget_week"
-    android:previewLayout="@layout/widget_week"
+    android:previewLayout="@layout/widget_week_preview"
     android:widgetCategory="home_screen" />

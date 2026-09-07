@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The picker only, never a placed widget. The real layout starts empty so
+    that nothing flashes over the grid on an update, which leaves the picker
+    with a blank card unless it is given something of its own to draw.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:background="@drawable/widget_background"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:text="@string/widget_week_placeholder"
+        android:textColor="@color/widget_text_tertiary"
+        android:textSize="13sp" />
+</LinearLayout>

@@ -17,11 +17,15 @@ import org.json.JSONObject
 /**
  * Today's classes, each markable without opening the app.
  *
- * The rows are built into the RemoteViews rather than served by a
- * RemoteViewsService. A collection re-attaches its adapter on every update and
- * the launcher paints its loading view while it does, which blinks the list on
- * every mark — tried twice, reverted twice. The price is a fixed number of
- * rows.
+ * Every row is a slot already in the selected layout, filled by setters.
+ * Nothing here adds, removes, or initially hides a row: the launcher paints
+ * the inflated layout before it applies the RemoteViews actions, so the XML
+ * must already have the same row structure as the final widget.
+ *
+ * A collection would scroll, but it also rebinds on updates and has previously
+ * left a tapped row showing stale status. It cannot prevent the launcher from
+ * re-inflating the widget when the process starts, so reliable marking takes
+ * precedence here.
  */
 class TodayWidgetProvider : ZeoliteWidgetProvider() {
 
@@ -39,9 +43,10 @@ class TodayWidgetProvider : ZeoliteWidgetProvider() {
 
         appWidgetIds.forEach { widgetId ->
             val options = appWidgetManager.getAppWidgetOptions(widgetId)
-            val shown = minOf(count, WidgetScale.rowsThatFit(options, PADDING_DP, ROW_DP))
+            val fits = WidgetScale.rowsThatFit(options, PADDING_DP, ROW_DP)
+            val shown = minOf(count, fits, SLOTS.size)
 
-            val views = RemoteViews(context.packageName, R.layout.widget_today).apply {
+            val views = RemoteViews(context.packageName, layoutFor(shown)).apply {
                 setTintedBackground(R.id.today_root, theme.canvas)
                 setTextColor(R.id.today_empty, theme.textTertiary)
 
@@ -63,79 +68,77 @@ class TodayWidgetProvider : ZeoliteWidgetProvider() {
                     )
                 }
 
-                removeAllViews(R.id.today_rows)
-                for (index in 0 until shown) {
-                    addView(
-                        R.id.today_rows,
-                        row(context, theme, classes!!.getJSONObject(index), widgetId, index),
-                    )
+                SLOTS.take(shown).forEachIndexed { index, slot ->
+                    fill(context, theme, slot, classes!!.getJSONObject(index), widgetId, index)
                 }
-                if (count > shown) {
-                    addView(R.id.today_rows, moreRow(context, theme, count - shown))
-                }
+                more(context, theme, count - shown)
             }
             appWidgetManager.updateAppWidget(widgetId, views)
         }
     }
 
-    private fun row(
+    private fun RemoteViews.fill(
         context: Context,
         theme: WidgetTheme,
+        slot: Slot,
         session: JSONObject,
         widgetId: Int,
         index: Int,
-    ): RemoteViews {
+    ) {
         val status = session.optString("status")
             .takeIf { it.isNotBlank() && it != "null" }
         val room = session.optString("room").takeIf { it.isNotBlank() && it != "null" }
 
-        return RemoteViews(context.packageName, R.layout.widget_today_row).apply {
-            setInt(R.id.row_card, "setBackgroundColor", theme.surface)
-            setInt(R.id.row_stripe, "setBackgroundColor", session.optInt("color", theme.accent))
-            setTextColor(R.id.row_subject, theme.textPrimary)
-            setTextColor(R.id.row_meta, theme.textSecondary)
+        setInt(slot.stripe, "setBackgroundColor", session.optInt("color", theme.accent))
+        setTextColor(slot.subject, theme.textPrimary)
+        setTextColor(slot.meta, theme.textSecondary)
 
-            setTextViewText(R.id.row_subject, session.optString("subject"))
-            setTextViewText(
-                R.id.row_meta,
-                listOfNotNull(
-                    session.optString("time").takeIf { it.isNotBlank() },
-                    room,
-                ).joinToString("  ·  "),
+        setTextViewText(slot.subject, session.optString("subject"))
+        setTextViewText(
+            slot.meta,
+            listOfNotNull(
+                session.optString("time").takeIf { it.isNotBlank() },
+                room,
+            ).joinToString("  ·  "),
+        )
+
+        // The same three the class card offers, in the same order, so a status
+        // set here can be corrected or cleared here too.
+        slot.buttons.forEachIndexed { position, (id, name) ->
+            paint(id, status == name, colourFor(theme, name), theme)
+            setOnClickPendingIntent(
+                id,
+                mark(context, session, name, widgetId, index * slot.buttons.size + position),
             )
-
-            // The same three the class card offers, in the same order, so a
-            // status set here can be corrected or cleared here too.
-            STATUSES.forEachIndexed { slot, (id, name) ->
-                paint(id, status == name, colourFor(theme, name), theme)
-                setOnClickPendingIntent(
-                    id,
-                    mark(context, session, name, widgetId, index * STATUSES.size + slot),
-                )
-            }
         }
     }
 
-    private fun moreRow(context: Context, theme: WidgetTheme, hidden: Int): RemoteViews =
-        RemoteViews(context.packageName, R.layout.widget_today_more).apply {
-            setTextColor(R.id.more_label, theme.textTertiary)
-            setTextViewText(
-                R.id.more_label,
-                if (hidden == 1) "1 more class" else "$hidden more classes",
-            )
-            setOnClickPendingIntent(
-                R.id.more_label,
-                HomeWidgetLaunchIntent.getActivity(
-                    context,
-                    MainActivity::class.java,
-                    Uri.parse("zeolite://open?tab=today"),
-                ),
-            )
-        }
+    private fun RemoteViews.more(context: Context, theme: WidgetTheme, hidden: Int) {
+        setViewVisibility(R.id.more_label, if (hidden > 0) View.VISIBLE else View.GONE)
+        if (hidden <= 0) return
+        setTextColor(R.id.more_label, theme.textTertiary)
+        setTextViewText(
+            R.id.more_label,
+            if (hidden == 1) "1 more class" else "$hidden more classes",
+        )
+        setOnClickPendingIntent(
+            R.id.more_label,
+            HomeWidgetLaunchIntent.getActivity(
+                context,
+                MainActivity::class.java,
+                Uri.parse("zeolite://open?tab=today"),
+            ),
+        )
+    }
 
-    /** Filled to the status colour when set, quiet when not. */
+    /**
+     * Filled to the status colour when set, quiet when not. Quiet is [surface]
+     * rather than [surfaceHigh] because the rows are transparent: the button
+     * has only the canvas behind it, and in the light palette surfaceHigh is
+     * near enough to it that the square disappears.
+     */
     private fun RemoteViews.paint(id: Int, on: Boolean, colour: Int, theme: WidgetTheme) {
-        setTintedBackground(id, if (on) theme.dim(colour, 46) else theme.surfaceHigh)
+        setTintedBackground(id, if (on) theme.dim(colour, 46) else theme.surface)
         setTextColor(id, if (on) colour else theme.textSecondary)
     }
 
@@ -183,11 +186,63 @@ class TodayWidgetProvider : ZeoliteWidgetProvider() {
         else -> "Nothing on today"
     }
 
+    private fun layoutFor(rows: Int): Int = when (rows) {
+        0 -> R.layout.widget_today_0
+        1 -> R.layout.widget_today_1
+        2 -> R.layout.widget_today_2
+        3 -> R.layout.widget_today_3
+        4 -> R.layout.widget_today
+        5 -> R.layout.widget_today_5
+        6 -> R.layout.widget_today_6
+        else -> R.layout.widget_today_7
+    }
+
+    private class Slot(
+        val card: Int,
+        val stripe: Int,
+        val subject: Int,
+        val meta: Int,
+        present: Int,
+        absent: Int,
+        cancelled: Int,
+    ) {
+        val buttons = listOf(
+            present to "present",
+            absent to "absent",
+            cancelled to "cancelled",
+        )
+    }
+
     private companion object {
-        val STATUSES = listOf(
-            R.id.row_present to "present",
-            R.id.row_absent to "absent",
-            R.id.row_cancelled to "cancelled",
+        val SLOTS = listOf(
+            Slot(
+                R.id.row0_card, R.id.row0_stripe, R.id.row0_subject, R.id.row0_meta,
+                R.id.row0_present, R.id.row0_absent, R.id.row0_cancelled,
+            ),
+            Slot(
+                R.id.row1_card, R.id.row1_stripe, R.id.row1_subject, R.id.row1_meta,
+                R.id.row1_present, R.id.row1_absent, R.id.row1_cancelled,
+            ),
+            Slot(
+                R.id.row2_card, R.id.row2_stripe, R.id.row2_subject, R.id.row2_meta,
+                R.id.row2_present, R.id.row2_absent, R.id.row2_cancelled,
+            ),
+            Slot(
+                R.id.row3_card, R.id.row3_stripe, R.id.row3_subject, R.id.row3_meta,
+                R.id.row3_present, R.id.row3_absent, R.id.row3_cancelled,
+            ),
+            Slot(
+                R.id.row4_card, R.id.row4_stripe, R.id.row4_subject, R.id.row4_meta,
+                R.id.row4_present, R.id.row4_absent, R.id.row4_cancelled,
+            ),
+            Slot(
+                R.id.row5_card, R.id.row5_stripe, R.id.row5_subject, R.id.row5_meta,
+                R.id.row5_present, R.id.row5_absent, R.id.row5_cancelled,
+            ),
+            Slot(
+                R.id.row6_card, R.id.row6_stripe, R.id.row6_subject, R.id.row6_meta,
+                R.id.row6_present, R.id.row6_absent, R.id.row6_cancelled,
+            ),
         )
 
         const val BACKGROUND_ACTION = "es.antonborri.home_widget.action.BACKGROUND"

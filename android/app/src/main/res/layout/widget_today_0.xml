@@ -16,11 +16,9 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:orientation="vertical">
-        <include layout="@layout/widget_today_slot_0" />
-        <include layout="@layout/widget_today_slot_1" />
-        <include layout="@layout/widget_today_slot_2" />
-        <include layout="@layout/widget_today_slot_3" />
+        android:orientation="vertical"
+        android:visibility="gone">
+
 
         <TextView
             android:id="@+id/more_label"
@@ -43,5 +41,5 @@
         android:text="@string/widget_empty_preview"
         android:textColor="@color/widget_text_tertiary"
         android:textSize="13sp"
-        android:visibility="gone" />
+        android:visibility="visible" />
 </LinearLayout>

@@ -12,12 +12,25 @@
     <!-- What a widget draws before its first update, and what the launcher's
          widget picker renders as a preview: the runtime colours come from the
          app's own palette and are pushed in onUpdate, which never runs for a
-         preview. These are AppPalette.dark. -->
-    <color name="widget_canvas">#0B0B11</color>
-    <color name="widget_surface">#16161F</color>
-    <color name="widget_surface_high">#1E1E28</color>
-    <color name="widget_text_primary">#F2F2F7</color>
-    <color name="widget_text_secondary">#A3A3B2</color>
-    <color name="widget_text_tertiary">#7E7E92</color>
-    <color name="widget_accent">#A28FFF</color>
+         preview. These are AppPalette.light, with values-night carrying dark.
+         A preview cannot read the app's theme setting, so it follows the
+         system's — right whenever the two agree, which is the usual case. -->
+    <color name="widget_canvas">#F3F4FB</color>
+    <color name="widget_surface">#FFFFFF</color>
+    <color name="widget_text_primary">#14141B</color>
+    <color name="widget_text_secondary">#5A5A6E</color>
+    <color name="widget_text_tertiary">#8B8B9E</color>
+    <color name="widget_accent">#6C4CF0</color>
+    <color name="widget_present">#12A05F</color>
+    <color name="widget_absent">#C0504E</color>
+    <color name="widget_cancelled">#8F7210</color>
+
+    <!-- Stripe colours for the preview's invented subjects only. -->
+    <color name="widget_preview_subject_1">#6C4CF0</color>
+    <color name="widget_preview_subject_2">#C0504E</color>
+    <color name="widget_preview_subject_3">#12A05F</color>
+    <color name="widget_preview_subject_4">#8F7210</color>
+
+    <!-- A set status fills its button at the same alpha the provider uses. -->
+    <color name="widget_preview_present_fill">#2E12A05F</color>
 </resources>

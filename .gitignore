@@ -31,6 +31,7 @@ android/app/debug/
 android/app/profile/
 android/app/release/
 android/.cxx/
+android/.kotlin/
 
 # ------------------------------------------------ Signing / secrets / env
 # Never commit these. Anything matching is a private key or a credential.

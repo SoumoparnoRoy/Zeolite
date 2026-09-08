@@ -33,8 +33,12 @@ class SyncScheduler {
   void start() {
     _listener = AppLifecycleListener(onResume: onResumed, onPause: onPaused);
     // A process that has just started is already resumed, so the listener will
-    // not report the resume that launching the app is.
-    onResumed();
+    // not report the resume that launching the app is. Deferred, though: both
+    // callers build this inside a provider, and writing another provider's
+    // status mid-initialisation throws the run away before it does anything.
+    scheduleMicrotask(() {
+      if (_listener != null) onResumed();
+    });
   }
 
   void dispose() {

@@ -25,6 +25,24 @@ void main() {
     return (scheduler: scheduler, runs: runs);
   }
 
+  testWidgets('starting does not run inside the build that made it',
+      (WidgetTester tester) async {
+    final List<void> runs = <void>[];
+    final SyncScheduler scheduler = SyncScheduler(
+      run: () async => runs.add(null),
+      lastSyncAt: () => null,
+    );
+    addTearDown(scheduler.dispose);
+
+    scheduler.start();
+    // Both callers build this inside a provider, where writing another
+    // provider's state throws the run away before it does anything.
+    expect(runs, isEmpty);
+
+    await tester.pump();
+    expect(runs, hasLength(1));
+  });
+
   test('a burst of edits settles into one run after the last of them', () {
     fakeAsync((FakeAsync async) {
       final built = build(async, lastSyncAt: start);

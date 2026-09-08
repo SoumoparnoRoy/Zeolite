@@ -201,6 +201,9 @@ class SyncPlan {
     for (final RemoteState state in remote ?? const <RemoteState>[]) {
       if (linkByKey.containsKey(state.localKey)) continue;
       if (localKeys.contains(state.localKey)) continue;
+      // Applying a tombstone writes no link back, so an unlinked one would be
+      // planned, apply nothing, and be counted again on every run after that.
+      if (state.deleted) continue;
       pulls.add(SyncPull(remote: state));
     }
 

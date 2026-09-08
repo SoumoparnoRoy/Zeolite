@@ -193,6 +193,19 @@ void main() {
     expect(await repo.getRemoteLinks(target.id, SyncKind.attendance), isEmpty);
   });
 
+  test('a tombstone already applied is not received again', () async {
+    final Subject subject = await seed(status: AttendanceStatus.present);
+    await coordinator().run();
+
+    target.remote = <RemoteState>[mark(subject.uuid!, deleted: true)];
+    await coordinator().run();
+    final SyncRunResult again = await coordinator().run();
+
+    // Without a guard this is what made a settled account report a row
+    // received on every single sync, forever.
+    expect(again.pulled, 0);
+  });
+
   test('the later edit wins on a target holding only this app writes',
       () async {
     final Subject subject = await seed(

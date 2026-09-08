@@ -194,6 +194,25 @@ void main() {
       expect(plan.pushes, isEmpty);
     });
 
+    test('a tombstone for a mark this device never had is not work', () {
+      // Archiving forgets the link, so the tombstone outlives it with no mark.
+      final SyncPlan plan = SyncPlan.from(
+        local: const <SyncItem>[],
+        links: const <RemoteLink>[],
+        remote: <RemoteState>[
+          RemoteState(
+            kind: present.kind,
+            localKey: present.localKey,
+            remoteId: 'page-4',
+            hash: 'deleted',
+            deleted: true,
+          ),
+        ],
+      );
+
+      expect(plan.isEmpty, isTrue);
+    });
+
     test('a mark whose page exists but whose link is gone is adopted', () {
       final SyncPlan plan = SyncPlan.from(
         local: <SyncItem>[present],

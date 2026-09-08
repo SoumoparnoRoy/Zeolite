@@ -108,6 +108,7 @@ flutter:
     # Small copies of the launcher icons, for the picker to show. The Android
     # resources themselves are not reachable from Dart.
     - assets/icon/launcher/
+    - assets/icon/google_g.png
 
   # Bundled rather than fetched. Release builds carry no INTERNET permission,
   # so anything downloaded at runtime would silently fall back to Roboto on a

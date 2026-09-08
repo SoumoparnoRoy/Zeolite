@@ -5,6 +5,7 @@ import '../../core/app_theme.dart';
 import '../../services/auth_service.dart';
 import '../../state/auth_providers.dart';
 import '../../widgets/common.dart';
+import '../../widgets/google_g.dart';
 
 /// The email, password and Google form, shared by Settings › Account and the
 /// two screens the welcome screen offers.
@@ -113,7 +114,7 @@ class _AuthFormState extends ConsumerState<AuthForm> {
         const SizedBox(height: AppSpacing.sm),
         OutlinedButton.icon(
           onPressed: _busy ? null : () => _run(auth.signInWithGoogle),
-          icon: const Icon(Icons.account_circle_outlined, size: 18),
+          icon: const GoogleG(),
           label: const Text('Continue with Google'),
         ),
       ],

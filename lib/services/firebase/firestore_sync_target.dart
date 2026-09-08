@@ -168,12 +168,17 @@ class FirestoreSyncTarget implements SyncTarget {
           ? _deletedHash
           : SyncItem(kind: kind, localKey: id, fields: fields).hash,
       fields: deleted ? const <String, Object?>{} : fields,
-      editedAt: changedAt == null
-          ? null
-          : DateTime.fromMillisecondsSinceEpoch(changedAt),
+      // A tombstone is timed by when it was written, not by the last edit
+      // before it: the coordinator needs to know whether a local row of the
+      // same name predates the burial or reuses the name after it.
+      editedAt: _timeOf(deleted ? data['deletedAt'] : changedAt),
       deleted: deleted,
     );
   }
+
+  static DateTime? _timeOf(Object? millis) => millis is int
+      ? DateTime.fromMillisecondsSinceEpoch(millis)
+      : null;
 
   /// One value for every tombstone, so a delete looks like a change exactly
   /// once and a device that has already applied it sees no further difference.

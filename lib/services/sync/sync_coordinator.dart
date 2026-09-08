@@ -472,7 +472,8 @@ class SyncCoordinator {
       final bool defaultsHere = joining &&
           push.kind == SyncPushKind.adopt &&
           !_content.contains(kind) &&
-          state != null;
+          state != null &&
+          !_reusesABuriedName(push.item, state);
       if (chosenAway ||
           defaultsHere ||
           (push.kind == SyncPushKind.conflict &&
@@ -539,6 +540,18 @@ class SyncCoordinator {
 
     await _commit(kind, write, forget);
     return null;
+  }
+
+  /// Whether a local row only shares its name with a tombstone rather than
+  /// being the thing that was buried — a name renamed back, or seeded as a
+  /// default since. Without this a joining device deletes a row it made
+  /// tonight on the word of a deletion from months ago. Only categories carry
+  /// a creation time, so only they can be told apart.
+  bool _reusesABuriedName(SyncItem item, RemoteState state) {
+    final DateTime? buried = state.editedAt;
+    final DateTime? made = item.changedAt;
+    if (!state.deleted || buried == null || made == null) return false;
+    return made.isAfter(buried);
   }
 
   /// Settles rows a person answered on, for a target whose pulls are never

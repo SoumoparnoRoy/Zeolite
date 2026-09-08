@@ -620,7 +620,7 @@ final dayGridProvider = Provider<DayGrid>((ref) {
 /// the subject's category first, then the global setting.
 ///
 /// This is what lets picking a start time fill in the end time — a Lab gets
-/// two hours where a Theory class gets one, without asking every time.
+/// two hours where a Lecture gets one, without asking every time.
 final defaultDurationProvider =
     Provider.family<int, int?>((ref, int? subjectId) {
   final int fallback =

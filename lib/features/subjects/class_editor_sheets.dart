@@ -768,7 +768,7 @@ class _CategoryFormState extends ConsumerState<_CategoryForm> {
           textCapitalization: TextCapitalization.words,
           decoration: const InputDecoration(
             labelText: 'Category name',
-            hintText: 'e.g. Lab, Theory, Tutorial',
+            hintText: 'e.g. Lecture, Practical, Tutorial',
           ),
         ),
         const SizedBox(height: AppSpacing.xl),

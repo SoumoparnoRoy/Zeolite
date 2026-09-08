@@ -42,7 +42,7 @@ class SessionCard extends StatefulWidget {
   final VoidCallback? onLongPress;
   final bool showDate;
 
-  /// Category label (Lab, Theory, ...), when the subject has one.
+  /// Category label (Lecture, Practical, ...), when the subject has one.
   final String? categoryName;
 
   /// The mark's tag, already resolved to a name. Passed in rather than looked

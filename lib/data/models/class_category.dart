@@ -2,7 +2,8 @@ import 'package:flutter/foundation.dart';
 
 import '../../core/date_utils.dart';
 
-/// A kind of class — Theory, Lab, Tutorial, Seminar — that the user defines.
+/// A kind of class — Lecture, Practical, Tutorial, Seminar — that the user
+/// defines.
 ///
 /// Carries what follows from the kind of class it is: a default length, and
 /// how much one of them counts towards attendance. An institution that counts

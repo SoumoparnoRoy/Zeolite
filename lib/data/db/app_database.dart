@@ -52,8 +52,8 @@ class AppDatabase {
           // Migrations run in order so an old install can climb to current
           // without losing anything already recorded.
           if (oldVersion < 2) {
-            // v2 introduced class categories (Theory, Lab, ...) which carry a
-            // default class length, and linked subjects to them.
+            // v2 introduced class categories (Lecture, Practical, ...)
+            // which carry a default class length, and linked subjects to them.
             await db.execute(_categoriesTable);
             await db.execute(
               'ALTER TABLE subjects ADD COLUMN category_id INTEGER',
@@ -246,12 +246,12 @@ class AppDatabase {
     final int now = DateTime.now().millisecondsSinceEpoch;
     final Batch batch = db.batch();
     batch.insert('categories', <String, Object?>{
-      'name': 'Theory',
+      'name': 'Lecture',
       'default_minutes': 60,
       'created_at': now,
     });
     batch.insert('categories', <String, Object?>{
-      'name': 'Lab',
+      'name': 'Practical',
       'default_minutes': 120,
       'created_at': now,
     });

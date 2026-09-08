@@ -188,7 +188,7 @@ class SettingsScreen extends ConsumerWidget {
               if (categories.isEmpty)
                 const SurfaceCard(
                   child: _Hint(
-                    'No categories yet. Create one — Lab, Theory, Tutorial — '
+                    'No categories yet. Create one — Lecture, Practical, Tutorial — '
                     'give it a default length and say what one of its classes '
                     'counts as, then put your subjects in it.',
                   ),

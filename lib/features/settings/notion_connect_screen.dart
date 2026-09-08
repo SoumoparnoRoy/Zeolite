@@ -195,18 +195,27 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
       title: 'Connect Notion',
       subtitle: 'Sync your attendance into your own workspace',
       slivers: <Widget>[
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.lg,
-              vertical: AppSpacing.lg,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: _body(context),
+        // The tokens are stored before the template is adopted, so the
+        // connected card would otherwise stand here offering Disconnect over a
+        // claim still running — and then vanish when the mapping replaces it.
+        if (_stage == _Stage.claiming)
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(child: _finishing(context)),
+          )
+        else
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg,
+                vertical: AppSpacing.lg,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: _body(context),
+              ),
             ),
           ),
-        ),
       ],
     );
   }
@@ -217,7 +226,6 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
       return _connected(context, connected);
     }
 
-    final bool busy = _stage == _Stage.claiming;
     return <Widget>[
       SurfaceCard(
         child: Column(
@@ -247,7 +255,7 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
       ),
       const SizedBox(height: AppSpacing.lg),
       FilledButton(
-        onPressed: busy ? null : _start,
+        onPressed: _start,
         child: Text(
           switch ((_stage, widget.retakeTemplate)) {
             (_Stage.idle, true) => 'Take the latest template',
@@ -264,16 +272,15 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
       const SizedBox(height: AppSpacing.sm),
       TextField(
         controller: _code,
-        enabled: !busy && _verifier != null,
+        enabled: _verifier != null,
         textCapitalization: TextCapitalization.characters,
         decoration: const InputDecoration(hintText: 'Eight characters'),
         onSubmitted: (String value) => _claim(pairingCode: value),
       ),
       const SizedBox(height: AppSpacing.sm),
       OutlinedButton(
-        onPressed: busy || _verifier == null
-            ? null
-            : () => _claim(pairingCode: _code.text),
+        onPressed:
+            _verifier == null ? null : () => _claim(pairingCode: _code.text),
         child: const Text('Finish connecting'),
       ),
       if (_verifier == null) ...<Widget>[
@@ -291,7 +298,7 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
       // An attempt still outstanding while this screen is visible *is* the
       // failure signature — a redirect that worked would have popped it. The
       // cause is Notion's app swallowing the Google sign-in redirect.
-      if (_verifier != null && !busy) ...<Widget>[
+      if (_verifier != null) ...<Widget>[
         const SizedBox(height: AppSpacing.lg),
         SurfaceCard(
           child: Column(
@@ -312,10 +319,6 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
           ),
         ),
       ],
-      if (busy) ...<Widget>[
-        const SizedBox(height: AppSpacing.lg),
-        const Center(child: CircularProgressIndicator()),
-      ],
       if (_error != null) ...<Widget>[
         const SizedBox(height: AppSpacing.lg),
         Text(
@@ -324,6 +327,27 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
         ),
       ],
     ];
+  }
+
+  /// Claiming covers the template adoption as well, which is several Notion
+  /// reads, and the screen leaves by itself at the end of it either way.
+  Widget _finishing(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          const CircularProgressIndicator(),
+          const SizedBox(height: AppSpacing.lg),
+          Text(
+            'Finishing the connection. This screen moves on by itself when it '
+            'is done.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: context.palette.textSecondary),
+          ),
+        ],
+      ),
+    );
   }
 
   /// The privacy policy promises disconnecting stops sync and leaves the app

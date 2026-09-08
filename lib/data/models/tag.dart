@@ -8,7 +8,12 @@ import 'package:flutter/foundation.dart';
 /// picked rather than typed and has to survive being renamed.
 @immutable
 class Tag {
-  const Tag({this.id, required this.name, this.position = 0});
+  const Tag({
+    this.id,
+    required this.name,
+    this.position = 0,
+    this.createdAt,
+  });
 
   final int? id;
   final String name;
@@ -16,11 +21,14 @@ class Tag {
   /// Kept in the order they were added rather than alphabetically, like rooms.
   final int position;
 
-  Tag copyWith({int? id, String? name, int? position}) {
+  final DateTime? createdAt;
+
+  Tag copyWith({int? id, String? name, int? position, DateTime? createdAt}) {
     return Tag(
       id: id ?? this.id,
       name: name ?? this.name,
       position: position ?? this.position,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
 
@@ -28,6 +36,7 @@ class Tag {
         if (id != null) 'id': id,
         'name': name,
         'position': position,
+        if (createdAt != null) 'created_at': createdAt!.millisecondsSinceEpoch,
       };
 
   factory Tag.fromMap(Map<String, Object?> map) {
@@ -35,6 +44,9 @@ class Tag {
       id: map['id'] as int?,
       name: (map['name'] as String?) ?? '',
       position: (map['position'] as int?) ?? 0,
+      createdAt: map['created_at'] == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int),
     );
   }
 

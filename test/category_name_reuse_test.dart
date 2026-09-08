@@ -8,6 +8,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:zeolite/data/db/app_database.dart';
 import 'package:zeolite/data/db/zeolite_repository.dart';
 import 'package:zeolite/data/models/class_category.dart';
+import 'package:zeolite/data/models/room.dart';
 import 'package:zeolite/data/settings/app_settings.dart';
 import 'package:zeolite/domain/sync/sync_target.dart';
 import 'package:zeolite/services/firebase/firestore_sync_target.dart';
@@ -96,6 +97,30 @@ void main() {
     await syncFor(joining).run(force: true);
 
     expect(await namesOn(joining), contains('Practical'));
+  });
+
+  test('a room made after the burial of its name survives too', () async {
+    await putContentOnTheAccount();
+    await target().create(
+      const SyncItem(
+        kind: SyncKind.room,
+        localKey: 'Studio',
+        fields: <String, Object?>{'position': 0},
+      ),
+    );
+    await target().archive(SyncKind.room, 'Studio');
+
+    // v12 gave rooms a creation time for exactly this: without one the room
+    // makes no claim and the old tombstone takes it.
+    final ZeoliteRepository joining = await device('joining');
+    await joining.insertRoom(const Room(name: 'Studio'));
+
+    await syncFor(joining).run(force: true);
+
+    expect(
+      <String>[for (final Room r in await joining.getRooms()) r.name],
+      contains('Studio'),
+    );
   });
 
   test('a burial still takes a row that predates it', () async {

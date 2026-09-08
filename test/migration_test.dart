@@ -202,6 +202,15 @@ void main() {
     }
   });
 
+  test('a row that predates the creation time is left undated', () async {
+    final Database db = await openAt(await oldInstall());
+
+    // Backfilling these to now would make a row from last term claim to
+    // outlive a deletion another device made yesterday, and that delete would
+    // stop travelling.
+    expect((await db.query('holidays')).single['created_at'], isNull);
+  });
+
   test('every subject comes out of the climb with a uuid of its own', () async {
     final Database db = await openAt(await oldInstall());
     await db.insert('subjects', <String, Object?>{

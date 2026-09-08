@@ -98,7 +98,14 @@ class ZeoliteRepository {
     final List<Map<String, Object?>> rows =
         await db.rawQuery('SELECT MAX(position) AS m FROM rooms');
     final int next = ((rows.first['m'] as int?) ?? -1) + 1;
-    return db.insert('rooms', room.copyWith(position: next).toMap());
+    // Dated here rather than in the model, so only a row this device actually
+    // made carries a time — see the v12 note in AppDatabase.
+    return db.insert(
+      'rooms',
+      room
+          .copyWith(position: next, createdAt: room.createdAt ?? DateTime.now())
+          .toMap(),
+    );
   }
 
   Future<void> updateRoom(Room room) async {
@@ -135,7 +142,12 @@ class ZeoliteRepository {
     final List<Map<String, Object?>> rows =
         await db.rawQuery('SELECT MAX(position) AS m FROM tags');
     final int next = ((rows.first['m'] as int?) ?? -1) + 1;
-    return db.insert('tags', tag.copyWith(position: next).toMap());
+    return db.insert(
+      'tags',
+      tag
+          .copyWith(position: next, createdAt: tag.createdAt ?? DateTime.now())
+          .toMap(),
+    );
   }
 
   /// Renaming reaches every mark at once, which is the whole reason marks
@@ -467,7 +479,7 @@ class ZeoliteRepository {
     final Database db = await _db;
     return db.insert(
       'holidays',
-      holiday.toMap(),
+      holiday.copyWith(createdAt: holiday.createdAt ?? DateTime.now()).toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
@@ -475,11 +487,12 @@ class ZeoliteRepository {
   Future<void> insertHolidays(List<Holiday> holidays) async {
     if (holidays.isEmpty) return;
     final Database db = await _db;
+    final DateTime now = DateTime.now();
     final Batch batch = db.batch();
     for (final Holiday holiday in holidays) {
       batch.insert(
         'holidays',
-        holiday.toMap(),
+        holiday.copyWith(createdAt: holiday.createdAt ?? now).toMap(),
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
     }

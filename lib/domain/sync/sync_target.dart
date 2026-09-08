@@ -134,18 +134,21 @@ class SyncItem {
         kind: SyncKind.room,
         localKey: room.name,
         fields: <String, Object?>{'position': room.position},
+        changedAt: room.createdAt,
       );
 
   factory SyncItem.tag(Tag tag) => SyncItem(
         kind: SyncKind.tag,
         localKey: tag.name,
         fields: <String, Object?>{'position': tag.position},
+        changedAt: tag.createdAt,
       );
 
   factory SyncItem.holiday(Holiday holiday) => SyncItem(
         kind: SyncKind.holiday,
         localKey: '${Dates.keyOf(holiday.date)}',
         fields: <String, Object?>{'name': holiday.name},
+        changedAt: holiday.createdAt,
       );
 
   /// The rule, not its occurrences. `subject` is the far side's key for the

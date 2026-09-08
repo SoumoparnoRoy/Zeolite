@@ -28,7 +28,7 @@ class AppDatabase {
   // install finds its data, so renaming it would strand every database in
   // place and read as a wipe. It is never shown to the user.
   static const String fileName = 'attend_it.db';
-  static const int schemaVersion = 11;
+  static const int schemaVersion = 12;
 
   Database? _db;
 
@@ -169,6 +169,14 @@ class AppDatabase {
             // slots and marks keep theirs, so nothing moves until asked.
             await db.execute(_categoryWeightColumn);
           }
+          if (oldVersion < 12) {
+            // v12 dates rooms, tags and holidays, so a tombstone can be told
+            // from a row that merely reuses the buried name. Null on existing
+            // rows: dating them now would outlive deletes still travelling.
+            for (final String column in _createdAtColumns) {
+              await db.execute(column);
+            }
+          }
           await db.execute(_subjectUuidIndex);
           await db.execute(_slotUuidIndex);
           await db.execute(_extraUuidIndex);
@@ -204,6 +212,15 @@ class AppDatabase {
   /// migration would add it early and v11 would fail on a duplicate.
   static const String _categoryWeightColumn =
       'ALTER TABLE categories ADD COLUMN weight INTEGER NOT NULL DEFAULT 1';
+
+  /// Shared by the create path and v12, for the same reason as
+  /// [_categoryWeightColumn]: v3 and v4 build these tables from the constants
+  /// below, so a column written into them would already exist by v12.
+  static const List<String> _createdAtColumns = <String>[
+    'ALTER TABLE rooms ADD COLUMN created_at INTEGER',
+    'ALTER TABLE tags ADD COLUMN created_at INTEGER',
+    'ALTER TABLE holidays ADD COLUMN created_at INTEGER',
+  ];
 
   /// Same reasoning as [_categoriesTable]: shared by the create path and the
   /// v3 migration so the two cannot drift.
@@ -354,6 +371,10 @@ class AppDatabase {
         name TEXT    NOT NULL
       )
     ''');
+
+    for (final String column in _createdAtColumns) {
+      batch.execute(column);
+    }
 
     batch.execute(
       'CREATE INDEX idx_slots_subject ON class_slots (subject_id)',

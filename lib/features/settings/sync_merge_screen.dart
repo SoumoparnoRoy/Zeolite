@@ -40,18 +40,24 @@ class _SyncMergeScreenState extends ConsumerState<SyncMergeScreen> {
 
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
     final NavigatorState navigator = Navigator.of(context);
+    final TimetableActions actions = ref.read(actionsProvider);
     setState(() => _merging = true);
 
-    final TimetableActions actions = ref.read(actionsProvider);
-    final SyncRunResult? result =
-        await ref.read(syncStatusProvider.notifier).merge(_choices);
-    if (!mounted || result == null) return;
+    SyncRunResult? result;
+    try {
+      result = await ref.read(syncStatusProvider.notifier).merge(_choices);
+    } catch (_) {
+      // The button is gone the moment the merge starts, so a run that ends
+      // any way but cleanly still has to close the screen behind it.
+      result = null;
+    }
+    if (!mounted) return;
 
     navigator.pop();
     showUndoSnack(
       messenger,
       actions,
-      result.ok
+      result != null && result.ok
           ? 'Merged. ${Words.plural(result.pushed, 'row')} sent, '
               '${Words.plural(result.pulled, 'row')} brought down.'
           : 'The merge did not finish. Nothing on this device changed.',
@@ -75,7 +81,7 @@ class _SyncMergeScreenState extends ConsumerState<SyncMergeScreen> {
           ? 'Nothing to decide'
           : '${Words.plural(plan.differing.length, 'disagreement')} to settle',
       floatingActionButton: _merging
-          ? null
+          ? const _Merging()
           : GradientFab(label: 'Merge', onPressed: _merge),
       slivers: <Widget>[
         SliverPadding(
@@ -370,6 +376,26 @@ String _when(String localKey) {
   if (dateKey == null || start == null) return '';
   return '${Dates.formatDayMonth(Dates.fromKey(dateKey))} · '
       '${Clock.format(start)}';
+}
+
+class _Merging extends StatelessWidget {
+  const _Merging();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        const SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Text('Merging…', style: Theme.of(context).textTheme.bodyMedium),
+      ],
+    );
+  }
 }
 
 class _Hint extends StatelessWidget {

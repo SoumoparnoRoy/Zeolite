@@ -51,6 +51,14 @@ class NotionTemplateMigration {
     final NotionMapping? after = ref.read(notionMappingProvider).value;
     if (after == null || after.databaseId == before?.databaseId) return;
 
+    // Before the rewrite rather than after it: the rewrite is what consumes
+    // the mapping, and a column left unset is only filled in by paying for the
+    // whole write again. Backing out is an answer too, and syncs as it stands.
+    if (notionMappingHasGaps(ref)) {
+      await navigator.push(notionMappingGapsRoute());
+      if (!context.mounted) return;
+    }
+
     // Every mark still points at a page in the database we just left, so the
     // links have to go before anything is written to the new one.
     final SyncRunResult? run =
@@ -65,13 +73,6 @@ class NotionTemplateMigration {
     }
 
     await _settleOldDatabase(context, before);
-    if (!context.mounted) return;
-
-    // After the old database is dealt with, not before: that decision is the
-    // one the user is waiting on, and the new template's gaps keep.
-    if (notionMappingHasGaps(ref)) {
-      await Navigator.of(context).push(notionMappingGapsRoute());
-    }
   }
 
   Future<void> _settleOldDatabase(
@@ -116,7 +117,7 @@ class NotionTemplateMigration {
       _say(
         context,
         renamed.result.ok
-            ? 'Renamed to "${renamed.title}".'
+            ? 'Renamed to "${renamed.title}"'
             : _changeFailed,
       );
       return;
@@ -136,7 +137,7 @@ class NotionTemplateMigration {
     if (!context.mounted) return;
     _say(
       context,
-      result.ok ? 'Moved to the trash in Notion.' : _changeFailed,
+      result.ok ? 'Moved to the trash in Notion' : _changeFailed,
     );
   }
 
@@ -347,8 +348,8 @@ class NotionTemplateMigration {
 String notionTrashOutcome({required int moved, required int of}) {
   if (moved == of) {
     return of == 1
-        ? 'Moved to the trash in Notion.'
-        : 'Moved $of to the trash in Notion.';
+        ? 'Moved to the trash in Notion'
+        : 'Moved $of to the trash in Notion';
   }
   if (moved == 0) {
     return of == 1

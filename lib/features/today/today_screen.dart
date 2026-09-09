@@ -221,6 +221,8 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
           final List<ClassSession> sessions =
               engine?.sessionsOn(date) ?? const <ClassSession>[];
           final Holiday? holiday = engine?.holidayOn(date);
+          final bool nothingScheduled = (data?.slots.isEmpty ?? true) &&
+              (data?.extras.isEmpty ?? true);
           final bool outsideSemester =
               engine?.isOutsideSemester(date) ?? false;
           final int unmarkedToday =
@@ -343,13 +345,36 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                     SliverToBoxAdapter(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 36),
-                        child: EmptyState(
-                          icon: Icons.wb_sunny_outlined,
-                          title: isToday ? 'Nothing on today' : 'No classes',
-                          message: isToday
-                              ? 'Enjoy the free day. Add classes from the Timetable tab.'
-                              : 'There are no classes scheduled for this day.',
-                        ),
+                        // A timetable with nothing in it at all is a first
+                        // run, not a free day — "enjoy the free day" told
+                        // someone who had just finished setting up that the
+                        // schedule they have not made yet is clear.
+                        child: nothingScheduled
+                            ? EmptyState(
+                                icon: Icons.event_note_outlined,
+                                title: 'No classes yet',
+                                message: 'Add your first class and Zeolite '
+                                    'starts tracking attendance for it.',
+                                action: FilledButton.icon(
+                                  onPressed: () => showAddClassSheet(
+                                    context,
+                                    ref,
+                                    initialDate: date,
+                                  ),
+                                  icon: const Icon(Icons.add_rounded),
+                                  label: const Text('Add your first class'),
+                                ),
+                              )
+                            : EmptyState(
+                                icon: Icons.wb_sunny_outlined,
+                                title:
+                                    isToday ? 'Nothing on today' : 'No classes',
+                                message: isToday
+                                    ? 'Enjoy the free day. Add classes from '
+                                        'the Timetable tab.'
+                                    : 'There are no classes scheduled for '
+                                        'this day.',
+                              ),
                       ),
                     ),
                   SliverPadding(
@@ -604,7 +629,7 @@ class _GridHeader extends StatelessWidget {
                     HeaderEyebrow(
                       '${weekStart.day} ${kMonthNamesShort[weekStart.month - 1]}'
                       ' – ${weekEnd.day} '
-                      '${kMonthNamesLong[weekEnd.month - 1]}',
+                      '${kMonthNamesShort[weekEnd.month - 1]}',
                     ),
                     const SizedBox(height: 6),
                     HeaderTitle(

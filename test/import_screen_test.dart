@@ -72,12 +72,12 @@ void main() {
       (WidgetTester tester) async {
     await _open(tester);
 
-    await _paste(tester, 'ECE1102, Mo, 5, B204\nECE3311, Tu, 9');
+    await _paste(tester, 'GEN201, Mo, 5, R201\nGEN203, Tu, 9');
 
     expect(find.text('MONDAY'), findsOneWidget);
     expect(find.text('TUESDAY'), findsOneWidget);
-    expect(find.text('ECE1102'), findsOneWidget);
-    expect(find.text('B204'), findsOneWidget);
+    expect(find.text('GEN201'), findsOneWidget);
+    expect(find.text('R201'), findsOneWidget);
     expect(find.text('12:30 PM – 1:20 PM'), findsOneWidget);
     expect(find.textContaining('2 classes'), findsOneWidget);
   });
@@ -86,12 +86,12 @@ void main() {
       (WidgetTester tester) async {
     await _open(tester);
 
-    await _paste(tester, 'ECE1102, Mo, 5\nECE1102, Moon, 1');
+    await _paste(tester, 'GEN201, Mo, 5\nGEN201, Moon, 1');
 
     expect(find.text('Line 2'), findsOneWidget);
     expect(find.textContaining('Moon'), findsWidgets);
     // The good line still previews; only the button is withheld.
-    expect(find.text('ECE1102'), findsOneWidget);
+    expect(find.text('GEN201'), findsOneWidget);
     expect(find.textContaining('Add 1 to my timetable'), findsNothing);
   });
 
@@ -100,7 +100,7 @@ void main() {
     await _open(tester);
     expect(find.textContaining('to my timetable'), findsNothing);
 
-    await _paste(tester, 'ECE1102, Mo, 5');
+    await _paste(tester, 'GEN201, Mo, 5');
     expect(find.textContaining('Add 1 to my timetable'), findsOneWidget);
   });
 }

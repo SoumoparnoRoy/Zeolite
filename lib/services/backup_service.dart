@@ -554,7 +554,7 @@ class BackupService {
 
       return ImportResult(
         success: true,
-        message: 'Backup restored.',
+        message: 'Backup restored',
         settings: settings,
       );
     } catch (error) {

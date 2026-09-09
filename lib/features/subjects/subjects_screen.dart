@@ -33,7 +33,7 @@ class SubjectsScreen extends ConsumerWidget {
       title: 'Subjects',
       subtitle: subjects.isEmpty
           ? null
-          : '${subjects.length} ${subjects.length == 1 ? 'course' : 'courses'}'
+          : '${subjects.length} ${subjects.length == 1 ? 'subject' : 'subjects'}'
               ' · $weekly weekly ${weekly == 1 ? 'class' : 'classes'}',
       floatingActionButton: subjects.isEmpty
           ? null
@@ -50,7 +50,7 @@ class SubjectsScreen extends ConsumerWidget {
               child: EmptyState(
                 icon: Icons.school_outlined,
                 title: 'No subjects yet',
-                message: 'Add the courses you are taking. Classes hang off a '
+                message: 'Add the subjects you are taking. Classes hang off a '
                     'subject, and your attendance is tracked per subject.',
                 action: FilledButton.icon(
                   onPressed: () => showSubjectEditor(context, ref),

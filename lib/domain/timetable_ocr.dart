@@ -445,14 +445,14 @@ class TimetableOcr {
   /// these sheets name a class.
   static final RegExp _code = RegExp(r'^[A-Z]{2,5}-?\d{2,5}[A-Z]?$');
 
-  /// A room: `B204`, `B311A`, `509`, `LT401`, `L208`.
+  /// A room: `B101`, `B101A`, `509`, `LT101`, `L101`.
   static final RegExp _room = RegExp(r'^[A-Z]{0,3}-?\d{2,4}[A-Z]?$');
 
   /// Initials, as the teacher column and the legend both print them.
   static final RegExp _initials = RegExp(r'^[A-Z]{2,4}$');
 
   /// Initials glued to a room, which the small bottom row does often:
-  /// `ABB204`, `CDB311`. Splitting these is most of what that row needs.
+  /// `ABB101`, `CDB102`. Splitting these is most of what that row needs.
   static final RegExp _initialsAndRoom =
       RegExp(r'^([A-Z]{2,3})(B\d{2,4}[A-Z]?)$');
 

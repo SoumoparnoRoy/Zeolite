@@ -114,7 +114,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             const SizedBox(height: 8),
             const HeaderCaption(
               'Your timetable and attendance, in one place. '
-              'Two quick answers and you are set up.',
+              'Three quick answers and you are set up.',
               emphasis: 0.8,
             ),
           ],

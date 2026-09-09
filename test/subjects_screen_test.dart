@@ -116,7 +116,7 @@ void main() {
     // duplicates of each other. Per-subject counts moved to the header.
     expect(find.text('PH101 · LAB'), findsOneWidget);
     // Two weekly slots; the one-off is not a weekly class.
-    expect(find.text('2 courses · 2 weekly classes'), findsOneWidget);
+    expect(find.text('2 subjects · 2 weekly classes'), findsOneWidget);
     // Nothing scheduled is the one count still worth saying inline.
     expect(find.text('no classes'), findsOneWidget);
 

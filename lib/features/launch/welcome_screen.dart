@@ -29,7 +29,7 @@ class WelcomeCopy extends StatefulWidget {
   static const String termsName = 'Terms of Use';
   static const String privacyName = 'Privacy Policy';
   static const String createLabel = 'Create a new account';
-  static const String signInLabel = 'Already have an account';
+  static const String signInLabel = 'Sign in to your account';
   static const String continueLabel = 'Continue without an account';
 
   /// Without this, "Continue without an account" reads as a limited trial

@@ -54,13 +54,13 @@ TimetableData _fixture() {
     categories: const <ClassCategory>[
       ClassCategory(id: 1, name: 'Laboratory', defaultDurationMinutes: 100),
     ],
-    rooms: const <Room>[Room(id: 1, name: 'B311A')],
+    rooms: const <Room>[Room(id: 1, name: 'R202')],
     tags: const <Tag>[Tag(id: 1, name: 'Proxy')],
     subjects: const <Subject>[
       Subject(
         id: 1,
         name: 'Signals and Systems Laboratory Practical',
-        code: 'ECE2104L',
+        code: 'GEN202L',
         teacher: 'Dr A. Example',
         categoryId: 1,
         colorValue: 0xFF9BE36D,
@@ -68,7 +68,7 @@ TimetableData _fixture() {
       Subject(
         id: 2,
         name: 'Thermodynamics and Heat Transfer',
-        code: 'MEC2205',
+        code: 'GEN204',
         teacher: 'Dr B. Example',
         colorValue: 0xFFFFB84D,
       ),
@@ -81,7 +81,7 @@ TimetableData _fixture() {
           weekday: day,
           startMinutes: 9 * 60 + (day - 1) * 50,
           endMinutes: 9 * 60 + (day - 1) * 50 + 100,
-          room: 'B311A',
+          room: 'R202',
           startDate: Dates.addDays(monday, -30),
         ),
     ],

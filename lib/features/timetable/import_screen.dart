@@ -121,7 +121,7 @@ class _ImportTimetableScreenState
       setState(() => _controller.text = read.join('\n'));
       messenger.showSnackBar(SnackBar(
         content: Text('Read ${Words.plural(read.length, 'line')} — check them '
-            'against the sheet before importing.'),
+            'against the sheet before importing'),
       ));
     } catch (error) {
       messenger.showSnackBar(
@@ -182,7 +182,7 @@ class _ImportTimetableScreenState
                 ),
                 decoration: const InputDecoration(
                   border: InputBorder.none,
-                  hintText: 'ECE2104L, Mo, 1-2, B415, SM',
+                  hintText: 'Subject 1, Mo, 1-2, Room 1, Teacher 1',
                 ),
                 onChanged: (_) => setState(() {}),
               ),

@@ -167,7 +167,7 @@ class SettingsScreen extends ConsumerWidget {
               ),
               const SizedBox(height: AppSpacing.sm),
               const _Hint(
-                'Add courses, change their colour or attendance target, and '
+                'Add subjects, change their colour or attendance target, and '
                 'delete ones you have dropped.',
               ),
               const SizedBox(height: AppSpacing.xl),
@@ -1007,13 +1007,13 @@ class SettingsScreen extends ConsumerWidget {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Automatic backups go to ${picked.name} from now on.'),
+          content: Text('Automatic backups go to ${picked.name} from now on'),
         ),
       );
     } catch (error) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not use that folder.')),
+        const SnackBar(content: Text('Could not use that folder')),
       );
     }
   }
@@ -1161,13 +1161,13 @@ class SettingsScreen extends ConsumerWidget {
       if (saved == null) {
         // Cancelled. Saying nothing would look like a failure.
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Export cancelled.')),
+          const SnackBar(content: Text('Export cancelled')),
         );
         return;
       }
       unawaited(ref.read(analyticsProvider).backupExported());
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Backup saved.')),
+        const SnackBar(content: Text('Backup saved')),
       );
     } catch (error) {
       final String json = await backup.exportToJsonString();

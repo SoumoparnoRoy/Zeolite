@@ -151,11 +151,11 @@ String _titleOf(SyncMergeRow row, Map<String, String> names) {
     SyncKind.room => 'Room · ${row.localKey}',
     SyncKind.tag => 'Label · ${row.localKey}',
     SyncKind.holiday => 'Holiday · ${_day(row.localKey)}',
-    SyncKind.subject => names[row.localKey] ?? 'A course',
+    SyncKind.subject => names[row.localKey] ?? 'A subject',
     SyncKind.slot || SyncKind.extraClass =>
       names[row.fields['subject'] as String? ?? ''] ?? 'A class',
     SyncKind.attendance =>
-      names[row.localKey.split(':').first] ?? 'A course',
+      names[row.localKey.split(':').first] ?? 'A subject',
   };
 }
 

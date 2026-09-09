@@ -450,7 +450,7 @@ Future<String?> _promptRoomName(
       initial: initial,
       submitLabel: 'Save',
       labelText: 'Room',
-      hintText: 'e.g. LT-3, B204, Physics Lab',
+      hintText: 'e.g. LT-3, B101, Physics Lab',
       textCapitalization: TextCapitalization.characters,
     ),
   );

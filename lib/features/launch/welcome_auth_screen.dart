@@ -16,7 +16,7 @@ class WelcomeAuthScreen extends StatelessWidget {
   final bool creating;
 
   static const String createTitle = 'Create a new account';
-  static const String signInTitle = 'Already have an account';
+  static const String signInTitle = 'Sign in';
 
   @override
   Widget build(BuildContext context) {

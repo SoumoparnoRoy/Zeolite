@@ -127,7 +127,7 @@ class _SignedIn extends ConsumerWidget {
         const _Hint(
           'Deletion removes the account and everything backed up to it. '
           'You can also do this from the web without reinstalling — the '
-          'address is in the privacy policy.',
+          'address is in the Privacy Policy.',
         ),
         const SizedBox(height: AppSpacing.sm),
         TextButton(

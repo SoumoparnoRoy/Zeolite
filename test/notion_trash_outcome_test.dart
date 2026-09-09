@@ -5,14 +5,14 @@ void main() {
   test('one that went says so without counting', () {
     expect(
       notionTrashOutcome(moved: 1, of: 1),
-      'Moved to the trash in Notion.',
+      'Moved to the trash in Notion',
     );
   });
 
   test('several that went are counted', () {
     expect(
       notionTrashOutcome(moved: 3, of: 3),
-      'Moved 3 to the trash in Notion.',
+      'Moved 3 to the trash in Notion',
     );
   });
 

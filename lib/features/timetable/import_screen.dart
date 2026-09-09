@@ -106,9 +106,9 @@ class _ImportTimetableScreenState
       }
 
       final TimetableGrid? grid = TimetableGridReader.read(lines);
-      final List<String> read =
-          grid == null ? <String>[] : TimetableOcr.toLines(lines, grid);
-      if (read.isEmpty) {
+      final List<OcrEntry> entries =
+          grid == null ? <OcrEntry>[] : TimetableOcr.read(lines, grid);
+      if (entries.isEmpty) {
         messenger.showSnackBar(SnackBar(
           content: Text(grid == null
               ? 'Could not find a timetable in that image. The weekdays and '
@@ -117,11 +117,34 @@ class _ImportTimetableScreenState
         ));
         return;
       }
+
+      final List<String> groups = TimetableOcr.groupsIn(entries);
+      String? mine;
+      if (groups.length > 1) {
+        if (!mounted) return;
+        mine = await _askGroup(groups);
+        if (!mounted) return;
+      }
+
+      // Behind a `#`, which the parser already skips, so answering wrong
+      // costs a deleted character rather than another read of the image.
+      final List<String> read = <String>[
+        for (final OcrEntry e in entries)
+          if (mine == null || e.group == null || e.group == mine)
+            e.toLine()
+          else
+            '# ${e.toLine()}',
+      ];
+      final int kept = read.where((String l) => !l.startsWith('#')).length;
+
       if (!mounted) return;
       setState(() => _controller.text = read.join('\n'));
       messenger.showSnackBar(SnackBar(
-        content: Text('Read ${Words.plural(read.length, 'line')} — check them '
-            'against the sheet before importing'),
+        content: Text(mine == null
+            ? 'Read ${Words.plural(kept, 'line')} — check them against the '
+                'sheet before importing'
+            : 'Read ${Words.plural(kept, 'line')} for $mine. The other groups '
+                'are commented out.'),
       ));
     } catch (error) {
       messenger.showSnackBar(
@@ -130,6 +153,41 @@ class _ImportTimetableScreenState
     } finally {
       if (mounted) setState(() => _reading = false);
     }
+  }
+
+  /// Which group's classes to keep, or null for all of them. Only asked when
+  /// the sheet actually splits a period, so most timetables never see it.
+  Future<String?> _askGroup(List<String> groups) {
+    return showAppSheet<String>(
+      context: context,
+      title: 'Which group are you in?',
+      child: Column(
+        children: <Widget>[
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.md),
+            child: Text(
+              'Some periods on this sheet are split between groups. The ones '
+              'you do not pick stay in the box, commented out.',
+              style: TextStyle(
+                fontSize: 13,
+                color: context.palette.textSecondary,
+              ),
+            ),
+          ),
+          for (final String group in groups)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(group),
+              onTap: () => Navigator.of(context).pop(group),
+            ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Keep all of them'),
+            onTap: () => Navigator.of(context).pop(),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

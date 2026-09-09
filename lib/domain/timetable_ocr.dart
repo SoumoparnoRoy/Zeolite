@@ -462,6 +462,7 @@ class OcrEntry {
     required this.to,
     this.room,
     this.teacher,
+    this.group,
   });
 
   final String subject;
@@ -473,6 +474,12 @@ class OcrEntry {
 
   final String? room;
   final String? teacher;
+
+  /// The batch this class is for, where the sheet splits a period between
+  /// groups. Kept out of [toLine]: the paste format is five positional fields
+  /// and a sixth would change what every hand-typed line means, so the group
+  /// decides which lines get written and is then dropped.
+  final String? group;
 
   /// The line the paste format already parses.
   String toLine() {
@@ -517,12 +524,25 @@ class TimetableOcr {
   static final RegExp _initialsAndRoom =
       RegExp(r'^([A-Z]{2,3})(B\d{2,4}[A-Z]?)$');
 
+  /// A batch marker in a packed cell, narrow enough to separate
+  /// `ABC:DEF:B1:410LAB` from `Honors:ABC:DEF:250`, which has no group in it.
+  /// `I`, `l` and `O` count as digits: the recogniser returns `Bl` for `B1`
+  /// about as often as not, and a missed marker leaves that class in for all.
+  static final RegExp _group = RegExp(r'^([BG])([0-9IlO])$');
+
   static final RegExp _digit = RegExp(r'\d');
   static final RegExp _splitTokens = RegExp(r'[\s,]+');
   static final RegExp _bareClock = RegExp(r'^\d{3,4}$');
 
   static List<String> toLines(List<OcrLine> lines, TimetableGrid grid) =>
       read(lines, grid).map((OcrEntry e) => e.toLine()).toList();
+
+  /// The groups this read found, for a caller that has to ask which is theirs.
+  static List<String> groupsIn(List<OcrEntry> entries) => <String>{
+        for (final OcrEntry e in entries)
+          if (e.group != null) e.group!,
+      }.toList()
+        ..sort();
 
   static List<OcrEntry> read(List<OcrLine> lines, TimetableGrid grid) {
     final Map<String, List<OcrLine>> cells = <String, List<OcrLine>>{};
@@ -555,6 +575,7 @@ class TimetableOcr {
           to: span.$2,
           room: c.room,
           teacher: c.teacher,
+          group: c.group,
         ));
       }
     }
@@ -622,11 +643,17 @@ class TimetableOcr {
         }
         final List<String> parts =
             line.text.split(':').map((String s) => s.trim()).toList();
+        final String? group =
+            parts.skip(1).map(_groupOf).whereType<String>().firstOrNull;
+        // The room is whatever the cell ends on. A lab named `410LAB` matches
+        // no room pattern, so looking for one left every packed class roomless.
+        final String last = parts.last;
         found.add(_Candidate(
           subject: parts.first,
           box: line.box,
           teacher: parts.length > 1 ? parts[1] : null,
-          room: parts.skip(1).where(_looksLikeRoom).firstOrNull,
+          room: parts.length > 2 && last != group ? last : null,
+          group: group,
         ));
       }
       return found;
@@ -666,6 +693,20 @@ class TimetableOcr {
     final _Candidate one = _Candidate(subject: subject, box: naming.box);
     _attach(one, tokens.where((String t) => t != subject));
     return <_Candidate>[one];
+  }
+
+  /// The group [part] names, normalised so a misread letter is not offered
+  /// as a group of its own.
+  static String? _groupOf(String part) {
+    final RegExpMatch? m = _group.firstMatch(part.trim());
+    if (m == null) return null;
+    const Map<String, String> digits = <String, String>{
+      'I': '1',
+      'l': '1',
+      'O': '0',
+    };
+    final String second = m.group(2)!;
+    return '${m.group(1)}${digits[second] ?? second}';
   }
 
   static bool _isPacked(String text) => ':'.allMatches(text).length >= 2;
@@ -938,10 +979,12 @@ class _Candidate {
     required this.box,
     this.room,
     this.teacher,
+    this.group,
   });
 
   final String subject;
   final OcrBox box;
   String? room;
   String? teacher;
+  final String? group;
 }

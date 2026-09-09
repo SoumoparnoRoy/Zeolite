@@ -443,6 +443,46 @@ void main() {
       expect(orphan.room, 'LT201');
     });
 
+    test('a batch marker is read, and the room survives with it', () {
+      final Sheet sheet = Sheet()
+        ..build()
+        ..stack(0, 2, <String>[
+          'ABC:DEF:B1:410LAB',
+          'GHI:JKL:B2:420LAB',
+          'MNO:PQR:B3:430LAB',
+        ]);
+      final List<OcrEntry> entries = TimetableOcr.read(
+          sheet.lines, TimetableGridReader.read(sheet.lines)!);
+      expect(TimetableOcr.groupsIn(entries), <String>['B1', 'B2', 'B3']);
+      expect(
+        entries.map((OcrEntry e) => '${e.group}:${e.room}').toSet(),
+        <String>{'B1:410LAB', 'B2:420LAB', 'B3:430LAB'},
+      );
+    });
+
+    test('a batch marker misread as a letter still counts as its digit', () {
+      final Sheet sheet = Sheet()
+        ..build()
+        ..stack(0, 2, <String>['ABC:DEF:Bl:410LAB', 'GHI:JKL:B2:420LAB']);
+      final List<OcrEntry> entries = TimetableOcr.read(
+          sheet.lines, TimetableGridReader.read(sheet.lines)!);
+      expect(TimetableOcr.groupsIn(entries), <String>['B1', 'B2']);
+    });
+
+    // Four parts with no marker is an elective, not a batch split.
+    test('a four-part cell with no marker belongs to no group', () {
+      final Sheet sheet = Sheet()
+        ..build()
+        ..stack(0, 2, <String>['Honors:ABC:DEF:250', 'ABC:DEF:B1:410LAB']);
+      final List<OcrEntry> entries = TimetableOcr.read(
+          sheet.lines, TimetableGridReader.read(sheet.lines)!);
+      final OcrEntry honors =
+          entries.firstWhere((OcrEntry e) => e.subject == 'Honors');
+      expect(honors.group, isNull);
+      expect(honors.room, '250');
+      expect(TimetableOcr.groupsIn(entries), <String>['B1']);
+    });
+
     test('a line drops the trailing separators it has nothing for', () {
       const OcrEntry bare = OcrEntry(
         subject: 'ABC1234',

@@ -272,7 +272,8 @@ class _Problems extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 3),
                 child: Text(
                   problem,
-                  style: monoStyle(color: p.textTertiary, size: 10.5),
+                  // A sentence, not a figure — mono is for the numbers.
+                  style: TextStyle(fontSize: 10.5, color: p.textTertiary),
                 ),
               ),
             if (problems.length > 5)

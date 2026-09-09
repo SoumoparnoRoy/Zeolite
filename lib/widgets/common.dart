@@ -515,12 +515,17 @@ class AppRow extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       sub,
-                      // A phone-width row cannot hold a value like "A Notion
-                      // export of what you have attended" on one line, and the
-                      // mono default of 1 sets the two it wraps solid.
+                      // A phone-width row cannot hold a subtitle like "A Notion
+                      // export of what you have attended" on one line.
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: monoStyle(color: p.textTertiary, height: 1.35),
+                      // Proportional: these are sentences, and mono is this
+                      // app's voice for data — times, codes, dates, counts.
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        height: 1.35,
+                        color: p.textTertiary,
+                      ),
                     ),
                   ],
                 ],

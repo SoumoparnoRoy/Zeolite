@@ -359,16 +359,20 @@ class _StatusButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Text(
-            status.label,
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 10.5,
-              height: 1,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-              color: selected ? color : p.textTertiary,
+          // Shrunk rather than clipped: "Cancelled" cannot wrap, and a third
+          // of a narrow row at a large text scale gave "Cancell…".
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              status.label,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              style: TextStyle(
+                fontSize: 10.5,
+                height: 1,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                color: selected ? color : p.textTertiary,
+              ),
             ),
           ),
         ),

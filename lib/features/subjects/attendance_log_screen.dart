@@ -242,7 +242,8 @@ class _LogTile extends ConsumerWidget {
                           entry.room!,
                         if (tagName != null) tagName,
                       ].join(' · '),
-                      maxLines: 1,
+                      // Two: one cut the room off and left a dangling "· …".
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: monoStyle(color: p.textTertiary, size: 10),
                     ),

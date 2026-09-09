@@ -123,6 +123,8 @@ class NotionSyncController extends Notifier<SyncStatus> {
     if (coordinator == null) return null;
     if (state.state == SyncState.running) return null;
 
+    await _forgetLedgerIfDatabaseChanged();
+
     state = coordinator.status.running();
     final SyncRunResult result =
         await coordinator.run(force: force, rewrite: rewrite);
@@ -184,6 +186,28 @@ class NotionSyncController extends Notifier<SyncStatus> {
         .read(repositoryProvider)
         .deleteRemoteLinksFor(NotionSyncTarget.targetId);
     return run(force: true, rewrite: true);
+  }
+
+  /// The ledger keys on the target id, and that string is `notion` whichever
+  /// workspace is connected — so reconnecting elsewhere left every mark
+  /// carrying a link into the workspace just left, and nothing was pushed.
+  ///
+  /// No stamp counts as a mismatch, unlike the account rule next door: a stale
+  /// ledger leaves the workspace empty for good, while forgetting a sound one
+  /// costs one rewrite that adopts each page by its `Zeolite ID`.
+  Future<void> _forgetLedgerIfDatabaseChanged() async {
+    final String? databaseId =
+        ref.read(notionMappingProvider).value?.databaseId;
+    final AppSettings? settings = ref.read(settingsProvider).value;
+    if (databaseId == null || settings == null) return;
+    if (settings.syncedNotionDatabaseId == databaseId) return;
+
+    await ref
+        .read(repositoryProvider)
+        .deleteRemoteLinksFor(NotionSyncTarget.targetId);
+    await ref.read(settingsProvider.notifier).save(
+          settings.copyWith(syncedNotionDatabaseId: databaseId),
+        );
   }
 
   /// Its own stamp, so staleness is judged per target — see

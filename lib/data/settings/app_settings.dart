@@ -77,6 +77,7 @@ class AppSettings {
     this.lastSyncAt,
     this.lastNotionSyncAt,
     this.syncedAccountId,
+    this.syncedNotionDatabaseId,
     this.accentColour = AccentColour.violet,
     this.notionAutoSync = true,
     this.scheduleChangedAt,
@@ -164,6 +165,14 @@ class AppSettings {
   /// Which account the `firebase` ledger was built against. Without it a new
   /// account inherits links saying its rows are already pushed.
   final String? syncedAccountId;
+
+  /// Which database the `notion` ledger was built against.
+  ///
+  /// The ledger keys on the target id alone, and that string does not change
+  /// when the workspace does — so reconnecting somewhere else left every mark
+  /// looking pushed and the new database was filled with nothing while
+  /// Settings reported a successful run.
+  final String? syncedNotionDatabaseId;
 
   /// Whether marking also writes to Notion without being asked.
   ///
@@ -289,12 +298,14 @@ class AppSettings {
     DateTime? lastSyncAt,
     DateTime? lastNotionSyncAt,
     String? syncedAccountId,
+    String? syncedNotionDatabaseId,
     AccentColour? accentColour,
     bool? notionAutoSync,
     DateTime? scheduleChangedAt,
     String? backupFolderUri,
     String? backupFolderName,
     bool clearBackupFolder = false,
+    bool clearLastNotionSync = false,
     LaunchAnimation? launchAnimation,
     bool? onboarded,
     bool? welcomeShown,
@@ -326,8 +337,12 @@ class AppSettings {
       autoBackupEnabled: autoBackupEnabled ?? this.autoBackupEnabled,
       lastAutoBackupAt: lastAutoBackupAt ?? this.lastAutoBackupAt,
       lastSyncAt: lastSyncAt ?? this.lastSyncAt,
-      lastNotionSyncAt: lastNotionSyncAt ?? this.lastNotionSyncAt,
+      lastNotionSyncAt: clearLastNotionSync
+          ? null
+          : lastNotionSyncAt ?? this.lastNotionSyncAt,
       syncedAccountId: syncedAccountId ?? this.syncedAccountId,
+      syncedNotionDatabaseId:
+          syncedNotionDatabaseId ?? this.syncedNotionDatabaseId,
       accentColour: accentColour ?? this.accentColour,
       notionAutoSync: notionAutoSync ?? this.notionAutoSync,
       scheduleChangedAt: scheduleChangedAt ?? this.scheduleChangedAt,
@@ -415,6 +430,7 @@ class AppSettings {
   AppSettings onDeviceOf(AppSettings current) => copyWith(
         welcomeShown: current.welcomeShown,
         syncedAccountId: current.syncedAccountId,
+        syncedNotionDatabaseId: current.syncedNotionDatabaseId,
         lastSyncAt: current.lastSyncAt,
         lastNotionSyncAt: current.lastNotionSyncAt,
         notionAutoSync: current.notionAutoSync,
@@ -451,6 +467,7 @@ class SettingsService {
   static const String _kLastSync = 'ut.lastSync';
   static const String _kLastNotionSync = 'ut.lastNotionSync';
   static const String _kSyncedAccount = 'ut.syncedAccount';
+  static const String _kSyncedNotionDatabase = 'ut.syncedNotionDatabase';
   static const String _kAccentColour = 'ut.accentColour';
   static const String _kNotionAutoSync = 'ut.notionAutoSync';
   static const String _kBackupFolderUri = 'ut.backupFolderUri';
@@ -504,6 +521,8 @@ class SettingsService {
         null => null,
       },
       syncedAccountId: await prefs.getString(_kSyncedAccount),
+      syncedNotionDatabaseId:
+          await prefs.getString(_kSyncedNotionDatabase),
       accentColour:
           AccentColour.fromName(await prefs.getString(_kAccentColour)),
       notionAutoSync: await prefs.getBool(_kNotionAutoSync) ?? true,
@@ -595,6 +614,14 @@ class SettingsService {
       await prefs.remove(_kSyncedAccount);
     } else {
       await prefs.setString(_kSyncedAccount, settings.syncedAccountId!);
+    }
+    if (settings.syncedNotionDatabaseId == null) {
+      await prefs.remove(_kSyncedNotionDatabase);
+    } else {
+      await prefs.setString(
+        _kSyncedNotionDatabase,
+        settings.syncedNotionDatabaseId!,
+      );
     }
     await prefs.setString(_kAccentColour, settings.accentColour.name);
     await prefs.setBool(_kNotionAutoSync, settings.notionAutoSync);

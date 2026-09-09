@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/models/class_category.dart';
+import '../data/settings/app_settings.dart';
 import '../domain/notion/notion_mapping.dart';
 import '../domain/sync/sync_target.dart';
 import '../services/notion/notion_auth_client.dart';
@@ -150,6 +151,21 @@ class NotionMappingController extends AsyncNotifier<NotionMapping?> {
   Future<void> save(NotionMapping mapping) async {
     await ref.read(notionConnectionStoreProvider).writeMapping(mapping);
     state = AsyncData<NotionMapping?>(mapping);
+    await _dropLastRunOfAnotherDatabase(mapping.databaseId);
+  }
+
+  /// A database nothing has been written to yet was greeted with "Synced 9
+  /// min ago", because the stamp describes the workspace just left. Cleared
+  /// here rather than on the next run, since the line is read long before
+  /// anyone taps Sync now.
+  Future<void> _dropLastRunOfAnotherDatabase(String databaseId) async {
+    final AppSettings? settings = ref.read(settingsProvider).value;
+    if (settings == null || settings.lastNotionSyncAt == null) return;
+    if (settings.syncedNotionDatabaseId == databaseId) return;
+
+    await ref
+        .read(settingsProvider.notifier)
+        .save(settings.copyWith(clearLastNotionSync: true));
   }
 
   /// Nothing matches a database by its name — the mapping is columns — so a

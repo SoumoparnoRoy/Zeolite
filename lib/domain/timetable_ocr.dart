@@ -30,7 +30,8 @@ class OcrLine {
 
 /// Which way round a timetable is drawn.
 enum GridAxis {
-  /// Days run down the page, periods across it — aSc and Symbiosis.
+  /// Days run down the page, periods across it — the shape both printed
+  /// sheets take.
   daysAsRows,
 
   /// Days run across the page, periods down it.
@@ -137,8 +138,8 @@ class TimetableGridReader {
 
   /// Whether [text] is a period header rather than something inside a cell.
   ///
-  /// Matched against the *whole* line, never a substring, because a Symbiosis
-  /// cell reads `MAL:HKR:B3:510TLI` and the `B3:51` in the middle of it would
+  /// Matched against the *whole* line, never a substring, because a packed
+  /// cell reads `ABC:DEF:B3:510LAB` and the `B3:51` in the middle of it would
   /// otherwise pass for a clock time and invent a column.
   ///
   /// A lost colon is accepted — the recogniser drops it often on a small header
@@ -178,18 +179,27 @@ class TimetableGridReader {
     final GridAxis axis = _axisOf(dayLines);
     final bool daysVertical = axis == GridAxis.daysAsRows;
 
+    // Everything that is not an axis label, so the bands can be pushed off the
+    // labels and onto the gaps the cells themselves leave.
+    final List<OcrLine> content = <OcrLine>[
+      for (final OcrLine line in lines)
+        if (weekdayOf(line.text) == null && !namesATime(line.text)) line,
+    ];
+
     final Map<OcrLine, int> named =
         _withRecoveredDays(dayLines, lines, vertical: daysVertical);
     final List<GridBand> days = _bandsFrom(
       named.keys.toList(),
       vertical: daysVertical,
       limit: _extentOf(lines, vertical: daysVertical),
+      content: content,
       weekdays: named,
     );
     final List<GridBand> periods = _bandsFrom(
       _withMissingPeriods(timeLines, vertical: !daysVertical),
       vertical: !daysVertical,
       limit: _extentOf(lines, vertical: !daysVertical),
+      content: content,
     );
     if (days.isEmpty || periods.isEmpty) return null;
 
@@ -324,6 +334,7 @@ class TimetableGridReader {
     List<OcrLine> labels, {
     required bool vertical,
     required (double, double) limit,
+    required List<OcrLine> content,
     Map<OcrLine, int>? weekdays,
   }) {
     double at(OcrLine l) => vertical ? l.box.centreY : l.box.centreX;
@@ -347,14 +358,21 @@ class TimetableGridReader {
     if (unique.isEmpty) return const <GridBand>[];
 
     final double half = _medianPitch(unique.map(at).toList()) / 2;
+    final List<(double, double)> runs = _runsOf(content, vertical: vertical);
+    final List<double> cuts = <double>[
+      for (int i = 1; i < unique.length; i++)
+        _divide(at(unique[i - 1]), at(unique[i]), runs),
+    ];
+    // The outermost edges keep the old guess of half a header pitch: nothing
+    // marks their far side, and giving them the depth of a real row instead
+    // reaches past the table and reads the legend under it as six more classes.
     final List<GridBand> bands = <GridBand>[];
     for (int i = 0; i < unique.length; i++) {
-      final double start = i == 0
-          ? _atLeast(at(unique.first) - half, limit.$1)
-          : (at(unique[i - 1]) + at(unique[i])) / 2;
+      final double start =
+          i == 0 ? _atLeast(at(unique.first) - half, limit.$1) : cuts[i - 1];
       final double end = i == unique.length - 1
           ? _atMost(at(unique.last) + half, limit.$2)
-          : (at(unique[i]) + at(unique[i + 1])) / 2;
+          : cuts[i];
       bands.add(GridBand(
         label: unique[i].text.trim(),
         start: start,
@@ -363,6 +381,49 @@ class TimetableGridReader {
       ));
     }
     return bands;
+  }
+
+  /// Where one band ends and the next begins.
+  ///
+  /// Halfway between the two labels is only right when a label sits in the
+  /// middle of its own row, and on a sheet that prints its times against the
+  /// top of the row it is wrong by half a row — enough to drop each cell's last
+  /// line, its room, into the period below. So the split goes in the widest
+  /// strip of blank page between [a] and [b] instead, pooled over the whole
+  /// table because one column's gaps say nothing, and falls back to the
+  /// midpoint when there is no strip to find.
+  static double _divide(double a, double b, List<(double, double)> runs) {
+    double split = (a + b) / 2;
+    double widest = 0;
+    for (int i = 1; i < runs.length; i++) {
+      final double from = runs[i - 1].$2;
+      final double to = runs[i].$1;
+      if (from <= a || to >= b || to - from <= widest) continue;
+      widest = to - from;
+      split = (from + to) / 2;
+    }
+    return split;
+  }
+
+  /// The stretches of the axis that hold text at all, overlaps merged.
+  static List<(double, double)> _runsOf(
+    List<OcrLine> content, {
+    required bool vertical,
+  }) {
+    final List<(double, double)> spans = <(double, double)>[
+      for (final OcrLine l in content)
+        vertical ? (l.box.top, l.box.bottom) : (l.box.left, l.box.right),
+    ]..sort(((double, double) a, (double, double) b) => a.$1.compareTo(b.$1));
+
+    final List<(double, double)> runs = <(double, double)>[];
+    for (final (double, double) span in spans) {
+      if (runs.isNotEmpty && span.$1 <= runs.last.$2) {
+        if (span.$2 > runs.last.$2) runs.last = (runs.last.$1, span.$2);
+        continue;
+      }
+      runs.add(span);
+    }
+    return runs;
   }
 
   /// The typical distance between neighbouring labels. Median rather than mean
@@ -445,14 +506,14 @@ class TimetableOcr {
   /// these sheets name a class.
   static final RegExp _code = RegExp(r'^[A-Z]{2,5}-?\d{2,5}[A-Z]?$');
 
-  /// A room: `B101`, `B101A`, `509`, `LT101`, `L101`.
+  /// A room: `B101`, `B101A`, `250`, `LT201`, `L101`.
   static final RegExp _room = RegExp(r'^[A-Z]{0,3}-?\d{2,4}[A-Z]?$');
 
   /// Initials, as the teacher column and the legend both print them.
   static final RegExp _initials = RegExp(r'^[A-Z]{2,4}$');
 
   /// Initials glued to a room, which the small bottom row does often:
-  /// `ABB101`, `CDB102`. Splitting these is most of what that row needs.
+  /// `ABB101`, `CDB204`. Splitting these is most of what that row needs.
   static final RegExp _initialsAndRoom =
       RegExp(r'^([A-Z]{2,3})(B\d{2,4}[A-Z]?)$');
 
@@ -479,10 +540,12 @@ class TimetableOcr {
 
     final List<(int, int)?> schedule = _scheduleOf(grid);
 
+    final Set<String> rooms = _roomsOf(cells.values);
+
     final List<OcrEntry> out = <OcrEntry>[];
     for (final MapEntry<String, List<OcrLine>> cell in cells.entries) {
       final int weekday = dayOf[cell.key]!.weekday!;
-      for (final _Candidate c in _candidatesIn(cell.value)) {
+      for (final _Candidate c in _candidatesIn(cell.value, rooms)) {
         final (int, int)? span = _spanOf(c.box, grid, schedule);
         if (span == null) continue;
         out.add(OcrEntry(
@@ -506,7 +569,34 @@ class TimetableOcr {
   /// by y in both layouts. A sub-row naming a subject opens a candidate;
   /// anything else — a room, initials, the prose course name, a `PRACTICAL`
   /// badge — is detail belonging to the one above it.
-  static List<_Candidate> _candidatesIn(List<OcrLine> cell) {
+  /// The tokens this sheet only ever prints in a cell's last line.
+  ///
+  /// `LT201` is a lecture theatre and `PQR3011` is a course, and no regex tells
+  /// them apart — both are letters then digits. The sheet does: a room is the
+  /// line a cell ends on and nothing else, while a course code has its room
+  /// printed under it somewhere.
+  ///
+  /// A cell of one line is no evidence either way and is left out, or a day
+  /// holding a single class would hand back that class as a room.
+  static Set<String> _roomsOf(Iterable<List<OcrLine>> cells) {
+    final Set<String> last = <String>{};
+    final Set<String> above = <String>{};
+    for (final List<OcrLine> cell in cells) {
+      final List<List<OcrLine>> rows = _rowsOf(cell);
+      if (rows.length < 2) continue;
+      for (int i = 0; i < rows.length; i++) {
+        final Iterable<String> tokens = rows[i]
+            .map((OcrLine l) => l.text)
+            .join(' ')
+            .split(_splitTokens)
+            .where((String t) => t.isNotEmpty);
+        (i == rows.length - 1 ? last : above).addAll(tokens);
+      }
+    }
+    return last.difference(above);
+  }
+
+  static List<_Candidate> _candidatesIn(List<OcrLine> cell, Set<String> rooms) {
     final List<List<OcrLine>> rows = _rowsOf(cell);
     final List<({String text, OcrBox box})> lines = <({String text, OcrBox box})>[
       for (final List<OcrLine> row in rows)
@@ -548,13 +638,17 @@ class TimetableOcr {
       for (final ({String text, OcrBox box}) l in lines)
         ...l.text.split(_splitTokens).where((String t) => t.isNotEmpty),
     ];
-    final String? code = tokens.where((String t) => _code.hasMatch(t)).firstOrNull;
+    final String? code = tokens
+        .where((String t) => _code.hasMatch(t) && !rooms.contains(t))
+        .firstOrNull;
 
     String? subject = code;
     if (subject == null) {
       final List<({String text, OcrBox box})> naming = lines
           .where((({String text, OcrBox box}) l) =>
-              l.text.isNotEmpty && !_isBadge(l.text) && !_allDetail(l.text.split(_splitTokens)))
+              l.text.isNotEmpty &&
+              !_isBadge(l.text) &&
+              !_allDetail(l.text.split(_splitTokens), rooms))
           .toList();
       if (naming.isEmpty) return const <_Candidate>[];
       naming.sort((({String text, OcrBox box}) a, ({String text, OcrBox box}) b) =>
@@ -588,8 +682,9 @@ class TimetableOcr {
         'honors',
       }.contains(text.trim().toLowerCase());
 
-  static bool _allDetail(List<String> tokens) => tokens
-      .every((String t) => _looksLikeRoom(t) || _initials.hasMatch(t));
+  static bool _allDetail(List<String> tokens, Set<String> rooms) =>
+      tokens.every((String t) =>
+          rooms.contains(t) || _looksLikeRoom(t) || _initials.hasMatch(t));
 
   /// Reads a room and a teacher out of whatever else the cell holds.
   static void _attach(_Candidate c, Iterable<String> tokens) {

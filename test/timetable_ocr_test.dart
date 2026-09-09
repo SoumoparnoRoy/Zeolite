@@ -150,6 +150,41 @@ List<OcrLine> _transposedSheet() {
   return lines;
 }
 
+/// The same shape drawn the way a photographed weekly grid is: each period's
+/// time sits high in its row instead of centred in it.
+List<OcrLine> _toppedLabelSheet() {
+  final List<OcrLine> lines = <OcrLine>[];
+  const List<String> days = <String>['MONDAY', 'TUESDAY', 'WEDNESDAY'];
+  for (int d = 0; d < days.length; d++) {
+    lines.add(_at(days[d], 200 + d * 200.0, 30, w: 120, h: 14));
+  }
+
+  double top(int p) => 65 + p * 145.0;
+  for (int p = 0; p < 4; p++) {
+    lines.add(_at('${8 + p}:00AM', 60, top(p) + 35, w: 60, h: 12));
+  }
+
+  void cell(int day, int period, String name, String code, String room) {
+    final double x = 200 + day * 200.0;
+    final double y = top(period);
+    final List<String> halves = name.split(' ');
+    lines
+      ..add(_at('LECTURE', x, y + 20, w: 70, h: 10))
+      ..add(_at(halves.first, x, y + 46, w: 150, h: 12))
+      ..add(_at(halves.last, x, y + 66, w: 150, h: 12))
+      ..add(_at(code, x, y + 91, w: 80, h: 11))
+      ..add(_at(room, x, y + 119, w: 60, h: 11));
+  }
+
+  cell(0, 0, 'Operating Systems', 'PQR3011', 'LT201');
+  cell(0, 1, 'Linear Algebra', 'STU5033', 'LT202');
+  cell(1, 1, 'Discrete Structures', 'PQR4022', 'LT201');
+  cell(1, 2, 'Operating Systems', 'PQR3011', 'LT203');
+  cell(2, 2, 'Linear Algebra', 'STU5033', 'LT202');
+  cell(2, 3, 'Discrete Structures', 'PQR4022', 'LT203');
+  return lines;
+}
+
 void main() {
   group('naming a weekday', () {
     test('takes long, short and two-letter forms in any case', () {
@@ -198,13 +233,13 @@ void main() {
 
     // A colon-separated cell would hand `B3:51` to a substring match.
     test('a colon inside a cell is not a time', () {
-      expect(TimetableGridReader.namesATime('MAL:HKR:B3:510TLI'), isFalse);
-      expect(TimetableGridReader.namesATime('VLL:SRK:B2:40STL'), isFalse);
+      expect(TimetableGridReader.namesATime('ABC:DEF:B3:510LAB'), isFalse);
+      expect(TimetableGridReader.namesATime('GHI:JKL:B2:40LAB'), isFalse);
     });
 
     test('a bare number that is not a clock is refused', () {
       expect(TimetableGridReader.namesATime('2999'), isFalse);
-      expect(TimetableGridReader.namesATime('3708'), isFalse);
+      expect(TimetableGridReader.namesATime('3011'), isFalse);
     });
   });
 
@@ -382,6 +417,30 @@ void main() {
                 .contains(e.subject.toUpperCase())),
         isFalse,
       );
+    });
+
+    test('a room stays with its class when the times sit high in the row', () {
+      final List<OcrLine> lines = _toppedLabelSheet();
+      final List<OcrEntry> entries =
+          TimetableOcr.read(lines, TimetableGridReader.read(lines)!);
+      expect(entries.length, 6);
+      expect(
+        entries.map((OcrEntry e) => e.subject).toSet(),
+        <String>{'PQR3011', 'STU5033', 'PQR4022'},
+      );
+      final OcrEntry first = entries.first;
+      expect(first.weekday, 1);
+      expect(first.room, 'LT201');
+    });
+
+    test('a cell whose code was misread does not fall back on its room', () {
+      final List<OcrLine> lines = _toppedLabelSheet()
+        ..removeWhere((OcrLine l) => l.text == 'PQR4022');
+      final List<OcrEntry> entries =
+          TimetableOcr.read(lines, TimetableGridReader.read(lines)!);
+      final OcrEntry orphan = entries.firstWhere((OcrEntry e) => e.weekday == 2);
+      expect(orphan.subject, 'Structures');
+      expect(orphan.room, 'LT201');
     });
 
     test('a line drops the trailing separators it has nothing for', () {

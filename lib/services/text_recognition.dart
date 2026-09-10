@@ -35,13 +35,17 @@ class TextRecognition {
   ///
   /// Read once at native size and again larger if the text came back too small,
   /// which is the difference between reading a dense table and losing a third
-  /// of its rows.
-  static Future<List<OcrLine>> readImage(Uint8List bytes) async {
+  /// of its rows. Both are handed back, because enlarging is not reliably
+  /// better overall and only the caller can tell.
+  static Future<ImageReads> readImage(Uint8List bytes) async {
     final TextRecognizer recognizer = TextRecognizer();
     try {
-      final List<OcrLine> first = await _read(recognizer, bytes);
-      if (!_tooSmall(first)) return first;
-      return await _readScaled(recognizer, bytes, null) ?? first;
+      final List<OcrLine> asIs = await _read(recognizer, bytes);
+      if (!_tooSmall(asIs)) return ImageReads(asIs: asIs);
+      return ImageReads(
+        asIs: asIs,
+        enlarged: await _readScaled(recognizer, bytes, null),
+      );
     } finally {
       await recognizer.close();
     }
@@ -203,4 +207,23 @@ class TextRecognition {
       } catch (_) {}
     }
   }
+}
+
+/// The reads of one image, largest first.
+class ImageReads {
+  const ImageReads({required this.asIs, this.enlarged});
+
+  final List<OcrLine> asIs;
+
+  /// Sharper on small text, and occasionally loses a cell [asIs] caught, which
+  /// is why it does not simply replace it.
+  final List<OcrLine>? enlarged;
+
+  List<List<OcrLine>> get all => <List<OcrLine>>[
+        if (enlarged != null) enlarged!,
+        asIs,
+      ];
+
+  /// For a caller with no way to tell the two apart.
+  List<OcrLine> get best => enlarged ?? asIs;
 }

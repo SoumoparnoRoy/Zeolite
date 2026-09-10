@@ -38,6 +38,35 @@ enum GridAxis {
   daysAsColumns,
 }
 
+/// Why a local reading looks doubtful, and so worth a second opinion.
+///
+/// Deliberately quick to raise. A false alarm costs one call to whatever is
+/// asked next; a read that sails through wrong costs someone their timetable.
+enum ReadDoubt {
+  /// Nothing in the image looked like a timetable at all.
+  noGrid,
+
+  /// A period column whose clock had to be guessed — its header was missing,
+  /// or it read as a time that could not follow the one before it.
+  guessedPeriod,
+
+  /// A weekday the grid found with nothing under it. Sometimes true of a real
+  /// sheet, which is why it is a doubt and not a verdict.
+  emptyDay,
+
+  /// Fewer classes than there are teaching days, which no real week is.
+  sparse,
+}
+
+/// What a reading of a sheet is worth, and why.
+class ReadConfidence {
+  const ReadConfidence(this.doubts);
+
+  final Set<ReadDoubt> doubts;
+
+  bool get isConfident => doubts.isEmpty;
+}
+
 /// A labelled strip of the image: one weekday, or one period.
 class GridBand {
   const GridBand({
@@ -543,6 +572,78 @@ class TimetableOcr {
           if (e.group != null) e.group!,
       }.toList()
         ..sort();
+
+  /// Whether a local reading can be trusted on its own.
+  ///
+  /// The signals are the ones the parser can check about itself without a
+  /// second reader: a column whose times it invented, a day it left empty, a
+  /// week too thin to be one. Each is a reason a person — or a model — should
+  /// look again, never a reason to throw the reading away.
+  static ReadConfidence confidenceOf(
+    TimetableGrid? grid,
+    List<OcrEntry> entries,
+  ) {
+    if (grid == null) {
+      return const ReadConfidence(<ReadDoubt>{ReadDoubt.noGrid});
+    }
+    final Set<ReadDoubt> doubts = <ReadDoubt>{};
+
+    if (_guessedPeriods(grid) > 0) doubts.add(ReadDoubt.guessedPeriod);
+
+    final Set<int> taught = <int>{for (final OcrEntry e in entries) e.weekday};
+    final Set<int> named = <int>{
+      for (final GridBand b in grid.days)
+        if (b.weekday != null) b.weekday!,
+    };
+    if (named.difference(taught).isNotEmpty) doubts.add(ReadDoubt.emptyDay);
+    if (named.isNotEmpty && entries.length < named.length) {
+      doubts.add(ReadDoubt.sparse);
+    }
+
+    return ReadConfidence(doubts);
+  }
+
+  /// Period columns whose clock is not the one printed on them — a header that
+  /// would not parse, or one [_scheduleOf] rejected and interpolated over.
+  static int _guessedPeriods(TimetableGrid grid) {
+    final List<(int, int)?> settled = _scheduleOf(grid);
+    int guessed = 0;
+    for (int i = 0; i < grid.periods.length; i++) {
+      final int? raw = _startOf(grid.periods[i]);
+      final (int, int)? got = settled[i];
+      if (got == null || raw == null) {
+        guessed++;
+      } else if (got.$1 != raw && got.$1 != raw + 720) {
+        guessed++;
+      }
+    }
+    return guessed;
+  }
+
+  /// The fullest reading of one sheet across several reads of its image.
+  ///
+  /// Enlarging to reach small text can drop a cell it read before, so the reads
+  /// are compared rather than the sharpest trusted. Classes decide it: a lost
+  /// one is lost outright, while a lost header is rebuilt by [_scheduleOf].
+  ///
+  /// [grid] comes back even when no classes did — "no timetable here" and "a
+  /// timetable with nothing in it" are different things to be told.
+  static ({TimetableGrid? grid, List<OcrEntry> entries}) bestOf(
+    Iterable<List<OcrLine>> reads,
+  ) {
+    TimetableGrid? grid;
+    List<OcrEntry> entries = const <OcrEntry>[];
+    for (final List<OcrLine> lines in reads) {
+      final TimetableGrid? candidate = TimetableGridReader.read(lines);
+      if (candidate == null) continue;
+      final List<OcrEntry> found = read(lines, candidate);
+      if (grid == null || found.length > entries.length) {
+        grid = candidate;
+        entries = found;
+      }
+    }
+    return (grid: grid, entries: entries);
+  }
 
   static List<OcrEntry> read(List<OcrLine> lines, TimetableGrid grid) {
     final Map<String, List<OcrLine>> cells = <String, List<OcrLine>>{};

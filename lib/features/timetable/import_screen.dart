@@ -74,7 +74,8 @@ class _ImportTimetableScreenState
       final PlatformFile? picked = await FilePicker.pickFile();
       if (picked == null) return;
       final Uint8List bytes = await picked.readAsBytes();
-      final List<OcrLine> lines = await TextRecognition.readImage(bytes);
+      final ImageReads reads = await TextRecognition.readImage(bytes);
+      final List<OcrLine> lines = reads.best;
 
       // Spotted before the timetable parse, which would only fail on it.
       if (AttendanceTotalsOcr.looksLikeTotals(lines)) {
@@ -105,12 +106,14 @@ class _ImportTimetableScreenState
         return;
       }
 
-      final TimetableGrid? grid = TimetableGridReader.read(lines);
-      final List<OcrEntry> entries =
-          grid == null ? <OcrEntry>[] : TimetableOcr.read(lines, grid);
+      // Every read, not just the best one: which of them reads this sheet
+      // furthest is a property of the sheet, not something decidable upstream.
+      final ({TimetableGrid? grid, List<OcrEntry> entries}) best =
+          TimetableOcr.bestOf(reads.all);
+      final List<OcrEntry> entries = best.entries;
       if (entries.isEmpty) {
         messenger.showSnackBar(SnackBar(
-          content: Text(grid == null
+          content: Text(best.grid == null
               ? 'Could not find a timetable in that image. The weekdays and '
                   'the period times both have to be readable.'
               : 'Found the grid, but no classes in it.'),

@@ -493,4 +493,112 @@ void main() {
       expect(bare.toLine(), 'ABC1234, We, 09:10-10:00');
     });
   });
+
+  // The gate that decides whether a reading needs a second opinion. It is
+  // meant to be quick to raise: each case below is a defect measured on a real
+  // sheet, not a shape invented to have something to assert.
+  group('doubting a reading', () {
+    test('a sheet that read cleanly raises nothing', () {
+      final List<OcrLine> lines = _weekOfClasses();
+      final TimetableGrid grid = TimetableGridReader.read(lines)!;
+      final ReadConfidence c =
+          TimetableOcr.confidenceOf(grid, TimetableOcr.read(lines, grid));
+      expect(c.isConfident, isTrue);
+      expect(c.doubts, isEmpty);
+    });
+
+    // A real sheet lost one column header outright, so that column's clock was
+    // rebuilt from the ones either side of it.
+    test('a column with no header is a guessed period', () {
+      final List<OcrLine> lines = _weekOfClasses(headers: <int, String>{7: ''});
+      final TimetableGrid grid = TimetableGridReader.read(lines)!;
+      final ReadConfidence c =
+          TimetableOcr.confidenceOf(grid, TimetableOcr.read(lines, grid));
+      expect(c.doubts, contains(ReadDoubt.guessedPeriod));
+    });
+
+    // And another came back as the wrong hour — a header that parses perfectly
+    // well and simply cannot follow the period before it.
+    test('a header that cannot follow the one before it is doubted', () {
+      final List<OcrLine> lines =
+          _weekOfClasses(headers: <int, String>{3: '1:00- 11:50'});
+      final TimetableGrid grid = TimetableGridReader.read(lines)!;
+      final ReadConfidence c =
+          TimetableOcr.confidenceOf(grid, TimetableOcr.read(lines, grid));
+      expect(c.doubts, contains(ReadDoubt.guessedPeriod));
+    });
+
+    test('a weekday with nothing under it is doubted', () {
+      final List<OcrLine> lines = _weekOfClasses(
+        days: const <String>['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'],
+      );
+      final TimetableGrid grid = TimetableGridReader.read(lines)!;
+      final ReadConfidence c =
+          TimetableOcr.confidenceOf(grid, TimetableOcr.read(lines, grid));
+      expect(c.doubts, contains(ReadDoubt.emptyDay));
+    });
+
+    test('a week thinner than its own days is doubted', () {
+      final Sheet sheet = Sheet()
+        ..build()
+        ..put(0, 0, 'AAA1001', room: 'R101', teacher: 'AB');
+      final TimetableGrid grid = TimetableGridReader.read(sheet.lines)!;
+      final ReadConfidence c = TimetableOcr.confidenceOf(
+          grid, TimetableOcr.read(sheet.lines, grid));
+      expect(c.doubts, contains(ReadDoubt.sparse));
+    });
+
+    test('nothing that looks like a timetable is its own doubt', () {
+      final ReadConfidence c =
+          TimetableOcr.confidenceOf(null, const <OcrEntry>[]);
+      expect(c.doubts, <ReadDoubt>{ReadDoubt.noGrid});
+      expect(c.isConfident, isFalse);
+    });
+  });
+
+  // Enlarging an image to reach small text can drop a cell it read before, so
+  // the reads are compared rather than the later one trusted. This is the
+  // class-wise sheet's 21-versus-20, reproduced without a device.
+  group('choosing between two reads of one image', () {
+    test('keeps the read that finds more classes, whichever came first', () {
+      final List<OcrLine> full = _weekOfClasses();
+      final List<OcrLine> short = <OcrLine>[
+        for (final OcrLine l in full)
+          if (l.text != 'FFF6006') l,
+      ];
+
+      expect(TimetableOcr.bestOf(<List<OcrLine>>[short, full]).entries,
+          hasLength(21));
+      expect(TimetableOcr.bestOf(<List<OcrLine>>[full, short]).entries,
+          hasLength(21));
+      expect(
+        TimetableOcr.bestOf(<List<OcrLine>>[short, full])
+            .entries
+            .map((OcrEntry e) => e.subject)
+            .toSet(),
+        contains('FFF6006'),
+      );
+    });
+
+    test('a read with no grid in it never wins', () {
+      final List<OcrLine> noise = <OcrLine>[
+        OcrLine('nothing here', const OcrBox(0, 0, 90, 14)),
+      ];
+      final ({TimetableGrid? grid, List<OcrEntry> entries}) best =
+          TimetableOcr.bestOf(<List<OcrLine>>[noise, _weekOfClasses()]);
+      expect(best.grid, isNotNull);
+      expect(best.entries, hasLength(21));
+      expect(TimetableOcr.bestOf(<List<OcrLine>>[noise]).grid, isNull);
+    });
+
+    // The screen says different things for these two, so the grid has to
+    // survive a read that found one and no classes under it.
+    test('an empty grid is still a grid', () {
+      final List<OcrLine> empty = (Sheet()..build()).lines;
+      final ({TimetableGrid? grid, List<OcrEntry> entries}) best =
+          TimetableOcr.bestOf(<List<OcrLine>>[empty]);
+      expect(best.grid, isNotNull);
+      expect(best.entries, isEmpty);
+    });
+  });
 }

@@ -95,7 +95,7 @@ test("the recognised text rides along with the image", async () => {
   await read(configured, { image, text: "GHI9012 at 11:40" });
   const sent = JSON.parse(lastRequest.options.body);
   assert.match(sent.messages[1].content, /GHI9012 at 11:40/);
-  assert.ok(Array.isArray(sent.image) && sent.image.length > 0);
+  assert.match(sent.image, /^data:image\/png;base64,iVBOR/);
 });
 
 test("entries that are not classes are dropped, and the rest survive", async () => {
@@ -141,8 +141,11 @@ test("an upstream failure says nothing about the upstream", async () => {
 test("something that is not an image is refused before the upstream", async () => {
   upstreamOk = true;
   lastRequest = undefined;
-  const response = await read(configured, { image: "not base64 !!" });
-  assert.equal(response.status, 400);
+  assert.equal((await read(configured, { image: "not base64 !!" })).status, 400);
+  assert.equal(lastRequest, undefined);
+
+  const notAnImage = Buffer.from("PK a zip, not a picture").toString("base64");
+  assert.equal((await read(configured, { image: notAnImage })).status, 400);
   assert.equal(lastRequest, undefined);
 });
 

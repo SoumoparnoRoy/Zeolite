@@ -33,15 +33,16 @@ function withTranscript(text) {
   return `Read this timetable. Text recognition on the same image found:\n${text}`;
 }
 
-// Kept in one place because the docs do not pin the image encoding down, so
-// this is the line to change if the upstream rejects the request outright.
+// `messages` and `image` sit side by side, and the image is a base64 data URI
+// rather than the byte array the schema reads as if it wants. An array of a
+// hundred thousand numbers is rejected in about two seconds.
 function requestBody(image, text) {
   return {
     messages: [
       { role: "system", content: INSTRUCTION },
       { role: "user", content: withTranscript(text) },
     ],
-    image: [...image],
+    image,
     max_tokens: MAX_TOKENS,
     // Extraction, not writing: the same sheet should read the same way twice.
     temperature: 0,
@@ -118,9 +119,11 @@ export async function readTimetable(
     },
   );
 
-  // Upstream response details stay server-side so provider errors cannot leak
-  // the account id, the token, or how much of the day's budget is left.
+  // Details stay server-side rather than being discarded: the caller learns
+  // nothing, and whoever is holding the logs learns why.
   if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    process.stderr.write(`Workers AI ${response.status}: ${detail.slice(0, 400)}\n`);
     throw new Error("Workers AI request failed");
   }
 

@@ -13,6 +13,18 @@ const MOST_TEXT_LENGTH = 20_000;
 
 const INVALID = { error: "Invalid request." };
 
+// Read off the bytes rather than taken from the caller, which also refuses
+// anything that is base64 of something other than an image.
+function typeOf(bytes) {
+  if (bytes.length > 8 && bytes[0] === 0x89 && bytes[1] === 0x50) {
+    return "image/png";
+  }
+  if (bytes.length > 3 && bytes[0] === 0xff && bytes[1] === 0xd8) {
+    return "image/jpeg";
+  }
+  return undefined;
+}
+
 function imageIn(value) {
   if (typeof value !== "string" || value.length === 0) {
     return undefined;
@@ -25,7 +37,8 @@ function imageIn(value) {
   if (bytes.length === 0 || bytes.length > MOST_IMAGE_BYTES) {
     return undefined;
   }
-  return bytes;
+  const type = typeOf(bytes);
+  return type ? `data:${type};base64,${cleaned}` : undefined;
 }
 
 export function createTimetableRouter({ config, limit, budget, fetchImpl }) {

@@ -76,7 +76,10 @@ export function createTimetableRouter({ config, limit, budget, fetchImpl }) {
         fetchImpl,
       );
       response.status(200).json({ classes });
-    } catch {
+    } catch (error) {
+      // Covers the paths that reach here without having said anything — a
+      // fetch that threw rather than answered, most of all.
+      process.stderr.write(`Timetable read failed: ${error.message}\n`);
       response.status(502).json({ error: "Unable to read that image." });
     }
   });

@@ -128,8 +128,15 @@ export async function readTimetable(
   }
 
   const body = await response.json();
-  const classes = classesIn(body?.result?.response ?? "");
+  const reply = body?.result?.response ?? "";
+  const classes = classesIn(reply);
   if (!classes) {
+    // Bounded on purpose. A reply that failed to parse is usually prose about
+    // the image, and the opening of it is enough to see why — but it is read
+    // off someone's timetable, so only the opening goes anywhere.
+    process.stderr.write(
+      `Workers AI reply unparseable (${reply.length} chars): ${reply.slice(0, 300)}\n`,
+    );
     throw new Error("Workers AI returned no readable timetable");
   }
   return classes;

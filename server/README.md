@@ -41,6 +41,10 @@ npm start
 
 Run the tests with `npm test`.
 
+To run it against the real upstreams, put the values in a local `.env` — which
+is gitignored — and use `npm run dev`. Node reads the file itself, so there is
+no dependency for it.
+
 ## What this service must never become
 
 - It stores no users.

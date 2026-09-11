@@ -8,6 +8,7 @@
   },
   "scripts": {
     "start": "node src/index.js",
+    "dev": "node --env-file=.env src/index.js",
     "test": "node --test"
   },
   "dependencies": {

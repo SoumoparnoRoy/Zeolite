@@ -14,7 +14,7 @@ const image =
 const accountId = "test-account";
 const apiToken = "test-cloudflare-token";
 
-let upstreamReply = '{"classes":[["ABC1234",1,550,600,"R101"]]}';
+let upstreamReply = "Monday\n* 09:10-10:00: ABC1234 (R101)";
 let upstreamOk = true;
 let lastRequest;
 let currentTime = 1_760_000_000_000;
@@ -75,7 +75,12 @@ after(async () => {
 
 test("a read comes back as classes, and the token stays here", async () => {
   upstreamOk = true;
-  upstreamReply = '{"classes":[["ABC1234",1,550,600,"R101"],["DEF5678",3,600,700,null]]}';
+  upstreamReply = [
+    "**Monday**",
+    "*   09:10-10:00: ABC1234 (R101)",
+    "**Wednesday**",
+    "*   10:00-11:40: DEF5678",
+  ].join("\n");
   const response = await read(configured, { image, text: "ABC1234 09:10" });
 
   assert.equal(response.status, 200);
@@ -98,33 +103,48 @@ test("the recognised text rides along with the image", async () => {
   assert.match(sent.image, /^data:image\/png;base64,iVBOR/);
 });
 
-test("entries that are not classes are dropped, and the rest survive", async () => {
+// The model writes the subject on either side of the time depending on whether
+// it had a transcript to read from, and puts the room in brackets or after a
+// comma. All of it is one reply shape as far as the sheet is concerned.
+test("the subject is found on either side of the time", async () => {
   upstreamOk = true;
-  upstreamReply = JSON.stringify({
-    classes: [
-      ["ABC1234", 1, 550, 600, "R101"],
-      ["", 1, 550, 600, "R101"],
-      ["BAD", 9, 550, 600, null],
-      ["BAD", 1, 600, 550, null],
-      ["BAD", 1, -5, 600, null],
-      ["SHORT", 1],
-      "not even an array",
-      ["DEF5678", 7, 0, 1439, "R102"],
-    ],
-  });
+  upstreamReply = [
+    "**Monday**",
+    "*   09:10-10:00: ABC1234 (R101)",
+    "*   DEF5678: 10:00-10:50 (R102, PRG)",
+    "*   GHI9012, 11:00-11:50, R103",
+  ].join("\n");
   const body = await read(configured, { image }).then((r) => r.json());
   assert.deepEqual(
-    body.classes.map((c) => c.subject),
-    ["ABC1234", "DEF5678"],
+    body.classes.map((c) => `${c.subject}@${c.room}`),
+    ["ABC1234@R101", "DEF5678@R102", "GHI9012@R103"],
   );
 });
 
-test("json wrapped in prose is still read", async () => {
+test("prose around the list is not mistaken for classes", async () => {
   upstreamOk = true;
-  upstreamReply = 'Sure! Here is the timetable:\n```json\n{"classes":[["ABC1234",2,540,590,null]]}\n```';
+  upstreamReply = [
+    "Here is the timetable I read from the image:",
+    "**Monday**",
+    "*   09:10-10:00: ABC1234",
+    "Let me know if you would like it in another format.",
+  ].join("\n");
   const body = await read(configured, { image }).then((r) => r.json());
-  assert.equal(body.classes.length, 1);
-  assert.equal(body.classes[0].subject, "ABC1234");
+  assert.deepEqual(body.classes.map((c) => c.subject), ["ABC1234"]);
+});
+
+test("a line that cannot be a class is dropped", async () => {
+  upstreamOk = true;
+  upstreamReply = [
+    "*   14:00-15:00: BEFORE ANY DAY IS NAMED",
+    "**Monday**",
+    "*   09:10-10:00: ABC1234",
+    "*   11:00-10:00: BACKWARDS",
+    "*   25:00-26:00: NOTATIME",
+    "*   12:00-13:00: ",
+  ].join("\n");
+  const body = await read(configured, { image }).then((r) => r.json());
+  assert.deepEqual(body.classes.map((c) => c.subject), ["ABC1234"]);
 });
 
 test("an upstream failure says nothing about the upstream", async () => {
@@ -144,14 +164,14 @@ test("something that is not an image is refused before the upstream", async () =
   assert.equal((await read(configured, { image: "not base64 !!" })).status, 400);
   assert.equal(lastRequest, undefined);
 
-  const notAnImage = Buffer.from("PK a zip, not a picture").toString("base64");
+  const notAnImage = Buffer.from("PK a zip, not a picture").toString("base64");
   assert.equal((await read(configured, { image: notAnImage })).status, 400);
   assert.equal(lastRequest, undefined);
 });
 
 test("the day's allowance runs out, and says so", async () => {
   upstreamOk = true;
-  upstreamReply = '{"classes":[["ABC1234",1,550,600,null]]}';
+  upstreamReply = "**Monday**\n*   09:10-10:00: ABC1234";
   assert.equal((await read(stingy, { image })).status, 200);
 
   const spent = await read(stingy, { image });

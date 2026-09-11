@@ -595,7 +595,9 @@ class TimetableOcr {
   /// `ABC:DEF:B1:410LAB` from `Honors:ABC:DEF:250`, which has no group in it.
   /// `I`, `l` and `O` count as digits: the recogniser returns `Bl` for `B1`
   /// about as often as not, and a missed marker leaves that class in for all.
-  static final RegExp _group = RegExp(r'^([BG])([0-9IlO])$');
+  /// The number is optional — a sheet that numbers most of its cohorts can
+  /// still print a bare `B` for one, and that is as much a cohort as `B1`.
+  static final RegExp _group = RegExp(r'^([BG])([0-9IlO])?$');
 
   static final RegExp _digit = RegExp(r'\d');
   static final RegExp _splitTokens = RegExp(r'[\s,]+');
@@ -1007,7 +1009,8 @@ class TimetableOcr {
       'l': '1',
       'O': '0',
     };
-    final String second = m.group(2)!;
+    final String? second = m.group(2);
+    if (second == null) return m.group(1)!;
     return '${m.group(1)}${digits[second] ?? second}';
   }
 

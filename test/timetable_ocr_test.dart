@@ -651,6 +651,28 @@ void main() {
       expect(TimetableOcr.basketsIn(entries), isEmpty);
     });
 
+    // One slot prints a bare `B` where the others print B1, B2, B3.
+    test('a marker with no number is still a marker', () {
+      final Sheet sheet = Sheet()
+        ..build()
+        ..stack(0, 2, <String>['AAA:XY:B:410LAB', 'BBB:XY:B1:420LAB']);
+      final List<OcrEntry> entries = TimetableOcr.read(
+          sheet.lines, TimetableGridReader.read(sheet.lines)!);
+      expect(TimetableOcr.groupsIn(entries), <String>['B', 'B1']);
+      expect(TimetableOcr.groupAxesIn(entries), <String, List<String>>{
+        'B': <String>['B', 'B1'],
+      });
+    });
+
+    test('a bare letter that names no cohort is not a marker', () {
+      final Sheet sheet = Sheet()
+        ..build()
+        ..stack(0, 2, <String>['AAA:XY:D:410LAB', 'BBB:XY:R:420LAB']);
+      final List<OcrEntry> entries = TimetableOcr.read(
+          sheet.lines, TimetableGridReader.read(sheet.lines)!);
+      expect(TimetableOcr.groupsIn(entries), isEmpty);
+    });
+
     test('a line drops the trailing separators it has nothing for', () {
       const OcrEntry bare = OcrEntry(
         subject: 'ABC1234',

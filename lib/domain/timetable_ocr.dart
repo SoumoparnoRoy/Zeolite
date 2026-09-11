@@ -645,6 +645,71 @@ class TimetableOcr {
     return (grid: grid, entries: entries);
   }
 
+  /// The same classes with their clocks moved onto the periods this sheet
+  /// actually prints.
+  ///
+  /// For classes that came from somewhere with no sense of the grid — a model
+  /// reading the image, which infers an evenly spaced day and drifts a little
+  /// further from the truth with every period. Both a small model and a large
+  /// one do this: the large one merely drifts less, so it is not something a
+  /// better reader fixes. The header row is right here and was read exactly,
+  /// so the times are taken from it and the reader is trusted only for which
+  /// column a class sits in.
+  ///
+  /// Snapping is unconditional. A tolerance would need somewhere to report what
+  /// it rejected, and there is nowhere: the preview is what a person checks, and
+  /// a class at plainly the wrong hour is easier to spot there than one quietly
+  /// left alone.
+  static List<OcrEntry> snappedTo(TimetableGrid grid, List<OcrEntry> entries) {
+    final List<(int, int)?> schedule = _scheduleOf(grid);
+    final List<int> starts = <int>[
+      for (final (int, int)? span in schedule)
+        if (span != null) span.$1,
+    ];
+    final List<int> ends = <int>[
+      for (final (int, int)? span in schedule)
+        if (span != null) span.$2,
+    ];
+    if (starts.isEmpty || ends.isEmpty) {
+      return entries;
+    }
+    return <OcrEntry>[
+      for (final OcrEntry e in entries) _snapped(e, starts, ends),
+    ];
+  }
+
+  static OcrEntry _snapped(OcrEntry e, List<int> starts, List<int> ends) {
+    final int from = _nearestTo(starts, e.from);
+    int to = _nearestTo(ends, e.to);
+    if (to <= from) {
+      // A class shorter than the period it landed in still has to last one.
+      to = ends.where((int end) => end > from).fold<int?>(
+                null,
+                (int? best, int end) => best == null || end < best ? end : best,
+              ) ??
+          from + (e.to - e.from);
+    }
+    return OcrEntry(
+      subject: e.subject,
+      weekday: e.weekday,
+      from: from,
+      to: to,
+      room: e.room,
+      teacher: e.teacher,
+      group: e.group,
+    );
+  }
+
+  static int _nearestTo(List<int> options, int value) {
+    int best = options.first;
+    for (final int option in options) {
+      if ((option - value).abs() < (best - value).abs()) {
+        best = option;
+      }
+    }
+    return best;
+  }
+
   static List<OcrEntry> read(List<OcrLine> lines, TimetableGrid grid) {
     final Map<String, List<OcrLine>> cells = <String, List<OcrLine>>{};
     final Map<String, GridBand> dayOf = <String, GridBand>{};

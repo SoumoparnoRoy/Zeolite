@@ -494,6 +494,73 @@ void main() {
     });
   });
 
+  // A reader that never saw the header row infers an evenly spaced day and
+  // drifts. The sheet these tests build runs fifty-minute periods from 8:30,
+  // so 510, 560, 610 ... are the boundaries a class is allowed to have.
+  group('snapping a reading onto the printed periods', () {
+    TimetableGrid gridOf() =>
+        TimetableGridReader.read((Sheet()..build()).lines)!;
+
+    OcrEntry at(int from, int to) => OcrEntry(
+          subject: 'AAA1001',
+          weekday: 1,
+          from: from,
+          to: to,
+          room: 'R101',
+        );
+
+    test('a drifted class lands on the boundaries the sheet prints', () {
+      final List<OcrEntry> snapped =
+          TimetableOcr.snappedTo(gridOf(), <OcrEntry>[at(520, 575)]);
+      expect(snapped.single.from, 510);
+      expect(snapped.single.to, 560);
+    });
+
+    test('a class across two periods keeps both of them', () {
+      final List<OcrEntry> snapped =
+          TimetableOcr.snappedTo(gridOf(), <OcrEntry>[at(515, 615)]);
+      expect(snapped.single.from, 510);
+      expect(snapped.single.to, 610);
+    });
+
+    test('what is already on the grid is left alone', () {
+      final TimetableGrid grid = gridOf();
+      final List<OcrEntry> once =
+          TimetableOcr.snappedTo(grid, <OcrEntry>[at(520, 575)]);
+      final List<OcrEntry> twice = TimetableOcr.snappedTo(grid, once);
+      expect(twice.single.from, once.single.from);
+      expect(twice.single.to, once.single.to);
+    });
+
+    // Otherwise a class that drifted onto its own start would end before it
+    // began, and the paste format would refuse the line.
+    test('an end that lands on its own start is pushed to the next period', () {
+      final List<OcrEntry> snapped =
+          TimetableOcr.snappedTo(gridOf(), <OcrEntry>[at(905, 915)]);
+      expect(snapped.single.from, 910);
+      expect(snapped.single.to, greaterThan(910));
+    });
+
+    test('everything else about the class survives', () {
+      const OcrEntry full = OcrEntry(
+        subject: 'BBB2002',
+        weekday: 4,
+        from: 520,
+        to: 575,
+        room: 'R102',
+        teacher: 'AB',
+        group: 'B1',
+      );
+      final OcrEntry snapped =
+          TimetableOcr.snappedTo(gridOf(), <OcrEntry>[full]).single;
+      expect(snapped.subject, 'BBB2002');
+      expect(snapped.weekday, 4);
+      expect(snapped.room, 'R102');
+      expect(snapped.teacher, 'AB');
+      expect(snapped.group, 'B1');
+    });
+  });
+
   // The gate that decides whether a reading needs a second opinion. It is
   // meant to be quick to raise: each case below is a defect measured on a real
   // sheet, not a shape invented to have something to assert.

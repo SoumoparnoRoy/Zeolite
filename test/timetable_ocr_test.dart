@@ -585,6 +585,72 @@ void main() {
       expect(daysOf('EEE'), <int>{4});
     });
 
+    test('batch and group markers are two questions, not one list', () {
+      final Sheet sheet = Sheet()
+        ..build()
+        ..stack(0, 2, <String>[
+          'AAA:XY:B1:410LAB',
+          'BBB:XY:B2:420LAB',
+          'CCC:XY:B3:430LAB',
+        ])
+        ..stack(0, 5, <String>['DDD:ZW:G2:510LAB', 'EEE:ZW:G3:520LAB']);
+      final List<OcrEntry> entries = TimetableOcr.read(
+          sheet.lines, TimetableGridReader.read(sheet.lines)!);
+      expect(TimetableOcr.groupAxesIn(entries), <String, List<String>>{
+        'B': <String>['B1', 'B2', 'B3'],
+        'G': <String>['G2', 'G3'],
+      });
+    });
+
+    // The same choice printed on three days is one question, not three.
+    test('slots offering the same courses are one basket', () {
+      const List<String> cell = <String>[
+        'AAA:XY:R201',
+        'BBB:XY:R202',
+        'CCC:XY:R203',
+      ];
+      final Sheet sheet = Sheet()
+        ..build()
+        ..put(0, 0, 'DDD4004', room: 'R101', teacher: 'AB')
+        ..put(4, 0, 'EEE5005', room: 'R102', teacher: 'CD')
+        ..stack(1, 2, cell)
+        ..stack(2, 2, cell)
+        ..stack(3, 2, cell);
+      final List<OcrEntry> entries = TimetableOcr.read(
+          sheet.lines, TimetableGridReader.read(sheet.lines)!);
+
+      final List<ElectiveBasket> baskets = TimetableOcr.basketsIn(entries);
+      expect(baskets, hasLength(1));
+      expect(baskets.single.subjects, <String>['AAA', 'BBB', 'CCC']);
+      expect(baskets.single.slots, hasLength(3));
+      OcrEntry named(String code) =>
+          entries.firstWhere((OcrEntry e) => e.subject == code);
+      expect(baskets.single.holds(named('AAA')), isTrue);
+      expect(baskets.single.holds(named('DDD4004')), isFalse);
+    });
+
+    test('a batch split is not a basket, however many rows it has', () {
+      final Sheet sheet = Sheet()
+        ..build()
+        ..stack(0, 2, <String>[
+          'AAA:XY:B1:410LAB',
+          'BBB:XY:B2:420LAB',
+          'CCC:XY:B3:430LAB',
+        ]);
+      final List<OcrEntry> entries = TimetableOcr.read(
+          sheet.lines, TimetableGridReader.read(sheet.lines)!);
+      expect(TimetableOcr.basketsIn(entries), isEmpty);
+    });
+
+    test('two courses in a period are too few to be a choice', () {
+      final Sheet sheet = Sheet()
+        ..build()
+        ..stack(0, 2, <String>['AAA:XY:R201', 'BBB:XY:R202']);
+      final List<OcrEntry> entries = TimetableOcr.read(
+          sheet.lines, TimetableGridReader.read(sheet.lines)!);
+      expect(TimetableOcr.basketsIn(entries), isEmpty);
+    });
+
     test('a line drops the trailing separators it has nothing for', () {
       const OcrEntry bare = OcrEntry(
         subject: 'ABC1234',

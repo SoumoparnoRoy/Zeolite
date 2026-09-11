@@ -504,6 +504,22 @@ class TimetableGridReader {
   }
 }
 
+/// A period offering a choice of course, and everywhere it runs.
+class ElectiveBasket {
+  const ElectiveBasket({required this.subjects, required this.slots});
+
+  /// The courses on offer, sorted.
+  final List<String> subjects;
+
+  /// `(weekday, from, to)` for each period this choice is printed in.
+  final List<(int, int, int)> slots;
+
+  bool holds(OcrEntry e) =>
+      subjects.contains(e.subject) &&
+      slots.any((( int, int, int) s) =>
+          s.$1 == e.weekday && s.$2 == e.from && s.$3 == e.to);
+}
+
 /// One class read out of a cell, before it becomes a line of the paste format.
 class OcrEntry {
   const OcrEntry({
@@ -594,6 +610,64 @@ class TimetableOcr {
           if (e.group != null) e.group!,
       }.toList()
         ..sort();
+
+  /// The group markers this read found, split into the questions they answer.
+  ///
+  /// `B1` and `G2` are answers to two different ones — which lab batch, and
+  /// which tutorial group — and a student is in one of each. Treating them as
+  /// a single list means choosing a batch comments out a class the student
+  /// actually attends, so the letter is what separates them.
+  static Map<String, List<String>> groupAxesIn(List<OcrEntry> entries) {
+    final Map<String, List<String>> axes = <String, List<String>>{};
+    for (final String group in groupsIn(entries)) {
+      axes.putIfAbsent(group.substring(0, 1), () => <String>[]).add(group);
+    }
+    return axes;
+  }
+
+  /// How many different courses have to share one period before it reads as a
+  /// choice between them rather than one class drawn in parts.
+  static const int _basketSize = 3;
+
+  /// The periods that offer a choice of course rather than a split of one.
+  ///
+  /// Printed exactly as a batch split is — several packed rows in one cell —
+  /// but the rows name different courses and carry no marker, so nothing in the
+  /// text says which is the student's. Slots holding the same set of courses
+  /// are one basket however many days they run on, which is what keeps a
+  /// choice that repeats across the week to a single question.
+  static List<ElectiveBasket> basketsIn(List<OcrEntry> entries) {
+    final Map<(int, int, int), Set<String>> bySlot =
+        <(int, int, int), Set<String>>{};
+    for (final OcrEntry e in entries) {
+      if (e.group != null) continue;
+      bySlot
+          .putIfAbsent((e.weekday, e.from, e.to), () => <String>{})
+          .add(e.subject);
+    }
+
+    final Map<String, List<String>> subjects = <String, List<String>>{};
+    final Map<String, List<(int, int, int)>> slots =
+        <String, List<(int, int, int)>>{};
+    for (final MapEntry<(int, int, int), Set<String>> slot in bySlot.entries) {
+      if (slot.value.length < _basketSize) continue;
+      final List<String> named = slot.value.toList()..sort();
+      final String key = named.join(' ');
+      subjects[key] = named;
+      slots.putIfAbsent(key, () => <(int, int, int)>[]).add(slot.key);
+    }
+
+    int earliest((int, int, int) a, (int, int, int) b) =>
+        a.$1 != b.$1 ? a.$1 - b.$1 : a.$2 - b.$2;
+    return <ElectiveBasket>[
+      for (final MapEntry<String, List<String>> e in subjects.entries)
+        ElectiveBasket(
+          subjects: e.value,
+          slots: slots[e.key]!..sort(earliest),
+        ),
+    ]..sort((ElectiveBasket a, ElectiveBasket b) =>
+        earliest(a.slots.first, b.slots.first));
+  }
 
   /// Whether a local reading can be trusted on its own.
   ///

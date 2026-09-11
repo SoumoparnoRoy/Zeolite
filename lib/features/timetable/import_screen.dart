@@ -9,6 +9,7 @@ import '../../core/date_utils.dart';
 import '../../core/words.dart';
 import '../../domain/attendance_totals_ocr.dart';
 import '../../domain/day_grid.dart';
+import '../../domain/timetable_choices.dart';
 import '../../domain/timetable_import.dart';
 import '../../domain/timetable_ocr.dart';
 import '../../services/text_recognition.dart';
@@ -17,6 +18,7 @@ import '../../widgets/common.dart';
 import '../../widgets/gradient_header.dart';
 import '../../widgets/undo_snack.dart';
 import '../subjects/totals_import_screen.dart';
+import 'import_choices_screen.dart';
 
 /// Types a whole timetable in one paste instead of twenty trips through the
 /// class sheet.
@@ -121,33 +123,51 @@ class _ImportTimetableScreenState
         return;
       }
 
-      final List<String> groups = TimetableOcr.groupsIn(entries);
-      String? mine;
-      if (groups.length > 1) {
+      // Only the axes that actually offer a choice: a sheet where every lab
+      // is B1 has nothing to ask about.
+      final Map<String, List<String>> axes = <String, List<String>>{
+        for (final MapEntry<String, List<String>> axis
+            in TimetableOcr.groupAxesIn(entries).entries)
+          if (axis.value.length > 1) axis.key: axis.value,
+      };
+      final List<ElectiveBasket> baskets = TimetableOcr.basketsIn(entries);
+
+      TimetableChoices choices = TimetableChoices(baskets: baskets);
+      if (axes.isNotEmpty || baskets.isNotEmpty) {
         if (!mounted) return;
-        mine = await _askGroup(groups);
+        final TimetableChoices? answered =
+            await Navigator.of(context).push<TimetableChoices>(
+          MaterialPageRoute<TimetableChoices>(
+            settings: const RouteSettings(name: 'import_choices'),
+            builder: (_) => ImportChoicesScreen(
+              entries: entries,
+              axes: axes,
+              baskets: baskets,
+              use24Hour:
+                  ref.read(settingsProvider).value?.use24HourTime ?? false,
+            ),
+          ),
+        );
         if (!mounted) return;
+        if (answered != null) choices = answered;
       }
 
       // Behind a `#`, which the parser already skips, so answering wrong
       // costs a deleted character rather than another read of the image.
       final List<String> read = <String>[
         for (final OcrEntry e in entries)
-          if (mine == null || e.group == null || e.group == mine)
-            e.toLine()
-          else
-            '# ${e.toLine()}',
+          if (choices.keeps(e)) e.toLine() else '# ${e.toLine()}',
       ];
       final int kept = read.where((String l) => !l.startsWith('#')).length;
 
       if (!mounted) return;
       setState(() => _controller.text = read.join('\n'));
       messenger.showSnackBar(SnackBar(
-        content: Text(mine == null
+        content: Text(choices.isEmpty
             ? 'Read ${Words.plural(kept, 'line')} — check them against the '
                 'sheet before importing'
-            : 'Read ${Words.plural(kept, 'line')} for $mine. The other groups '
-                'are commented out.'),
+            : 'Read ${Words.plural(kept, 'line')} of ${entries.length}. The '
+                'rest are commented out.'),
       ));
     } catch (error) {
       messenger.showSnackBar(
@@ -156,41 +176,6 @@ class _ImportTimetableScreenState
     } finally {
       if (mounted) setState(() => _reading = false);
     }
-  }
-
-  /// Which group's classes to keep, or null for all of them. Only asked when
-  /// the sheet actually splits a period, so most timetables never see it.
-  Future<String?> _askGroup(List<String> groups) {
-    return showAppSheet<String>(
-      context: context,
-      title: 'Which group are you in?',
-      child: Column(
-        children: <Widget>[
-          Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.md),
-            child: Text(
-              'Some periods on this sheet are split between groups. The ones '
-              'you do not pick stay in the box, commented out.',
-              style: TextStyle(
-                fontSize: 13,
-                color: context.palette.textSecondary,
-              ),
-            ),
-          ),
-          for (final String group in groups)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(group),
-              onTap: () => Navigator.of(context).pop(group),
-            ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Keep all of them'),
-            onTap: () => Navigator.of(context).pop(),
-          ),
-        ],
-      ),
-    );
   }
 
   @override

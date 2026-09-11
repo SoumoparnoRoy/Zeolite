@@ -483,6 +483,81 @@ void main() {
       expect(TimetableOcr.groupsIn(entries), <String>['B1']);
     });
 
+    // `Honors` fronts three different courses on the same sheet, which is what
+    // separates a category from a code that fronts one teacher.
+    test('a first part shared by several courses is not the subject', () {
+      final Sheet sheet = Sheet()
+        ..build()
+        ..stack(0, 2, <String>['Honors:ABC:DEF:250', 'MNO:PQR:B1:410LAB'])
+        ..stack(1, 2, <String>['Honors:GHI:DEF:250', 'MNO:PQR:B2:410LAB'])
+        ..stack(2, 2, <String>['Honors:JKL:DEF:260LAB']);
+      final List<OcrEntry> entries = TimetableOcr.read(
+          sheet.lines, TimetableGridReader.read(sheet.lines)!);
+
+      expect(
+        entries.map((OcrEntry e) => e.subject).toSet(),
+        containsAll(<String>['ABC', 'GHI', 'JKL']),
+      );
+      final OcrEntry abc =
+          entries.firstWhere((OcrEntry e) => e.subject == 'ABC');
+      expect(abc.teacher, 'DEF');
+      expect(abc.room, '250');
+    });
+
+    test('a code fronting one teacher keeps its batch marker and room', () {
+      final Sheet sheet = Sheet()
+        ..build()
+        ..stack(0, 2, <String>['Honors:ABC:DEF:250', 'MNO:PQR:B1:410LAB'])
+        ..stack(1, 2, <String>['Honors:GHI:DEF:250', 'MNO:PQR:B2:410LAB']);
+      final List<OcrEntry> entries = TimetableOcr.read(
+          sheet.lines, TimetableGridReader.read(sheet.lines)!);
+      final OcrEntry mno =
+          entries.firstWhere((OcrEntry e) => e.subject == 'MNO');
+      expect(mno.teacher, 'PQR');
+      expect(mno.group, 'B1');
+      expect(mno.room, '410LAB');
+    });
+
+    // Three fields are subject, teacher and room whoever teaches it, so a
+    // subject taught by two people must not read as a category.
+    test('a subject taught by two people is still the subject', () {
+      final Sheet sheet = Sheet()
+        ..build()
+        ..stack(0, 2, <String>['AAA:XY:R201', 'BBB:ZW:R202'])
+        ..stack(1, 2, <String>['AAA:PQ:R203', 'BBB:RS:R204']);
+      final List<OcrEntry> entries = TimetableOcr.read(
+          sheet.lines, TimetableGridReader.read(sheet.lines)!);
+      expect(
+        entries.where((OcrEntry e) => e.subject == 'AAA').length,
+        2,
+      );
+    });
+
+    // A sheet with a merged break column draws the word once, in the middle of
+    // the table, so it falls in whichever day row happens to contain it.
+    test('a break column is not a class on whichever day it lands in', () {
+      final Sheet sheet = Sheet()
+        ..build()
+        ..put(0, 0, 'AAA1001', room: 'R101', teacher: 'AB')
+        ..put(0, 5, 'BBB2002', room: 'R102', teacher: 'CD');
+      sheet.lines
+          .add(_at('Lunch', sheet.colX(3), sheet.rowY(2), w: 60, h: 20));
+
+      final List<OcrEntry> entries = TimetableOcr.read(
+          sheet.lines, TimetableGridReader.read(sheet.lines)!);
+      expect(entries.map((OcrEntry e) => e.subject),
+          <String>['AAA1001', 'BBB2002']);
+    });
+
+    test('a code that only reads like a break is still a class', () {
+      final Sheet sheet = Sheet()
+        ..build()
+        ..stack(0, 2, <String>['LUNCH:AB:R101', 'BBB:CD:R102']);
+      final List<OcrEntry> entries = TimetableOcr.read(
+          sheet.lines, TimetableGridReader.read(sheet.lines)!);
+      expect(entries.map((OcrEntry e) => e.subject), contains('LUNCH'));
+    });
+
     test('a line drops the trailing separators it has nothing for', () {
       const OcrEntry bare = OcrEntry(
         subject: 'ABC1234',

@@ -165,6 +165,23 @@ class TimetableGridReader {
     return null;
   }
 
+  static const List<String> _breakWords = <String>[
+    'lunch',
+    'break',
+    'recess',
+    'interval',
+  ];
+
+  /// Whether [text] is a break column's label rather than a class.
+  ///
+  /// A break column is merged down every row, so the word is drawn once in the
+  /// middle of the table and falls in whichever day happens to contain it —
+  /// arriving as a class on an arbitrary day. Matched against the whole
+  /// trimmed line, as [weekdayOf] is, so a packed `LUNCH:AB:R101` and a course
+  /// whose name merely contains the word are both left alone.
+  static bool namesABreak(String text) =>
+      _breakWords.contains(text.trim().toLowerCase());
+
   /// Whether [text] is a period header rather than something inside a cell.
   ///
   /// Matched against the *whole* line, never a substring, because a packed
@@ -717,6 +734,7 @@ class TimetableOcr {
     for (final OcrLine line in lines) {
       if (TimetableGridReader.namesATime(line.text)) continue;
       if (TimetableGridReader.weekdayOf(line.text) != null) continue;
+      if (TimetableGridReader.namesABreak(line.text)) continue;
       final ({GridBand day, GridBand period})? cell = grid.cellFor(line.box);
       if (cell == null || cell.day.weekday == null) continue;
       final String key = '${cell.day.weekday}@${cell.period.start}';
@@ -727,11 +745,12 @@ class TimetableOcr {
     final List<(int, int)?> schedule = _scheduleOf(grid);
 
     final Set<String> rooms = _roomsOf(cells.values);
+    final Set<String> categories = _categoriesIn(cells.values);
 
     final List<OcrEntry> out = <OcrEntry>[];
     for (final MapEntry<String, List<OcrLine>> cell in cells.entries) {
       final int weekday = dayOf[cell.key]!.weekday!;
-      for (final _Candidate c in _candidatesIn(cell.value, rooms)) {
+      for (final _Candidate c in _candidatesIn(cell.value, rooms, categories)) {
         final (int, int)? span = _spanOf(c.box, grid, schedule);
         if (span == null) continue;
         out.add(OcrEntry(
@@ -783,7 +802,40 @@ class TimetableOcr {
     return last.difference(above);
   }
 
-  static List<_Candidate> _candidatesIn(List<OcrLine> cell, Set<String> rooms) {
+  /// First parts that front more than one course on this sheet.
+  ///
+  /// Four colon-separated fields mean one of two things and the row alone
+  /// cannot say which: `MNO:PQR:B1:410LAB` is a code, a teacher, a batch and a
+  /// room, while `Honors:ABC:DEF:250` is a category, a code, a teacher and a
+  /// room. The sheet as a whole settles it — a category fronts several
+  /// different codes, a code fronts one teacher.
+  ///
+  /// Judged only on four-field rows carrying no batch marker, so a subject two
+  /// people teach cannot look like a category.
+  static Set<String> _categoriesIn(Iterable<List<OcrLine>> cells) {
+    final Map<String, Set<String>> seconds = <String, Set<String>>{};
+    for (final List<OcrLine> cell in cells) {
+      for (final List<OcrLine> row in _rowsOf(cell)) {
+        final String text = row.map((OcrLine l) => l.text).join(' ').trim();
+        if (!_isPacked(text)) continue;
+        final List<String> parts =
+            text.split(':').map((String s) => s.trim()).toList();
+        if (parts.length < 4) continue;
+        if (parts.skip(1).any((String p) => _groupOf(p) != null)) continue;
+        seconds.putIfAbsent(parts.first, () => <String>{}).add(parts[1]);
+      }
+    }
+    return <String>{
+      for (final MapEntry<String, Set<String>> e in seconds.entries)
+        if (e.value.length > 1) e.key,
+    };
+  }
+
+  static List<_Candidate> _candidatesIn(
+    List<OcrLine> cell,
+    Set<String> rooms,
+    Set<String> categories,
+  ) {
     final List<List<OcrLine>> rows = _rowsOf(cell);
     final List<({String text, OcrBox box})> lines = <({String text, OcrBox box})>[
       for (final List<OcrLine> row in rows)
@@ -809,16 +861,21 @@ class TimetableOcr {
         }
         final List<String> parts =
             line.text.split(':').map((String s) => s.trim()).toList();
+        // Drop a leading category and what is left reads as any other row.
+        final List<String> fields =
+            parts.length > 3 && categories.contains(parts.first)
+                ? parts.sublist(1)
+                : parts;
         final String? group =
-            parts.skip(1).map(_groupOf).whereType<String>().firstOrNull;
+            fields.skip(1).map(_groupOf).whereType<String>().firstOrNull;
         // The room is whatever the cell ends on. A lab named `410LAB` matches
         // no room pattern, so looking for one left every packed class roomless.
-        final String last = parts.last;
+        final String last = fields.last;
         found.add(_Candidate(
-          subject: parts.first,
+          subject: fields.first,
           box: line.box,
-          teacher: parts.length > 1 ? parts[1] : null,
-          room: parts.length > 2 && last != group ? last : null,
+          teacher: fields.length > 1 ? fields[1] : null,
+          room: fields.length > 2 && last != group ? last : null,
           group: group,
         ));
       }

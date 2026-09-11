@@ -226,10 +226,15 @@ class TimetableGridReader {
     final bool daysVertical = axis == GridAxis.daysAsRows;
 
     // Everything that is not an axis label, so the bands can be pushed off the
-    // labels and onto the gaps the cells themselves leave.
+    // labels and onto the gaps the cells themselves leave. A break label is
+    // left out with them: merged down the whole table, its box straddles a row
+    // border and closes the very gap the split is looking for.
     final List<OcrLine> content = <OcrLine>[
       for (final OcrLine line in lines)
-        if (weekdayOf(line.text) == null && !namesATime(line.text)) line,
+        if (weekdayOf(line.text) == null &&
+            !namesATime(line.text) &&
+            !namesABreak(line.text))
+          line,
     ];
 
     final Map<OcrLine, int> named =

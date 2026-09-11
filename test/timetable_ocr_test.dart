@@ -558,6 +558,33 @@ void main() {
       expect(entries.map((OcrEntry e) => e.subject), contains('LUNCH'));
     });
 
+    // Without this the lower cell's first line arrives on the day above.
+    test('a break label does not drag a row border into the next cell', () {
+      final Sheet sheet = Sheet()
+        ..build()
+        ..put(0, 0, 'AAA1001', room: 'R101', teacher: 'AB')
+        ..put(1, 0, 'BBB2002', room: 'R102', teacher: 'CD')
+        ..put(4, 0, 'CCC3003', room: 'R103', teacher: 'EF');
+      // Two tall cells, one per day, with a wider gap inside the lower one
+      // than the border between them once the label has bridged it.
+      for (final double y in <double>[305, 318, 331, 344, 357]) {
+        sheet.lines.add(_at('DDD:GH:R104', sheet.colX(2), y, w: 110, h: 10));
+      }
+      for (final double y in <double>[378, 396, 409, 422, 435]) {
+        sheet.lines.add(_at('EEE:IJ:R105', sheet.colX(2), y, w: 110, h: 10));
+      }
+      sheet.lines.add(_at('Lunch', sheet.colX(3), 367.5, w: 60, h: 15));
+
+      final List<OcrEntry> entries = TimetableOcr.read(
+          sheet.lines, TimetableGridReader.read(sheet.lines)!);
+      Set<int> daysOf(String code) => entries
+          .where((OcrEntry e) => e.subject == code)
+          .map((OcrEntry e) => e.weekday)
+          .toSet();
+      expect(daysOf('DDD'), <int>{3});
+      expect(daysOf('EEE'), <int>{4});
+    });
+
     test('a line drops the trailing separators it has nothing for', () {
       const OcrEntry bare = OcrEntry(
         subject: 'ABC1234',

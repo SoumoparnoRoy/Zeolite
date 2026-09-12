@@ -80,7 +80,8 @@ class AppSettings {
     this.syncedAccountId,
     this.syncedNotionDatabaseId,
     this.accentColour = AccentColour.violet,
-    this.notionAutoSync = true,
+    this.notionAutoSync = false,
+    this.accountAutoSync = false,
     this.scheduleChangedAt,
     this.backupFolderUri,
     this.backupFolderName,
@@ -181,8 +182,9 @@ class AppSettings {
 
   /// Whether marking also writes to Notion without being asked.
   ///
-  /// On by default, and a switch rather than an assumption because unlike the
-  /// account this writes into a workspace the person also edits by hand.
+  /// Off until it is asked for: this writes into a workspace the person also
+  /// edits by hand, and a wrong mapping there is not something the app can
+  /// take back.
   /// Device-local, like the connection it belongs to, so it stays out of the
   /// synced settings row.
   /// Device-local like [themeMode], and out of the sync hash for the same
@@ -190,6 +192,10 @@ class AppSettings {
   final AccentColour accentColour;
 
   final bool notionAutoSync;
+
+  /// Off for the same reason as [notionAutoSync], and device-local because it
+  /// decides what *this* device uploads.
+  final bool accountAutoSync;
 
   /// When a setting that shapes the timetable was last changed here.
   ///
@@ -237,8 +243,7 @@ class AppSettings {
   bool get classEndRemindersActive => notificationsEnabled && notifyAtClassEnd;
   bool get eveningReminderActive =>
       notificationsEnabled && notifyEveningReminder;
-  bool get dangerAlertsActive =>
-      notificationsEnabled && notifyAttendanceDanger;
+  bool get dangerAlertsActive => notificationsEnabled && notifyAttendanceDanger;
 
   /// Attendance warnings are not reaching the tray, so the app shows them
   /// itself instead of dropping them silently.
@@ -308,6 +313,7 @@ class AppSettings {
     String? syncedNotionDatabaseId,
     AccentColour? accentColour,
     bool? notionAutoSync,
+    bool? accountAutoSync,
     DateTime? scheduleChangedAt,
     String? backupFolderUri,
     String? backupFolderName,
@@ -353,6 +359,7 @@ class AppSettings {
           syncedNotionDatabaseId ?? this.syncedNotionDatabaseId,
       accentColour: accentColour ?? this.accentColour,
       notionAutoSync: notionAutoSync ?? this.notionAutoSync,
+      accountAutoSync: accountAutoSync ?? this.accountAutoSync,
       scheduleChangedAt: scheduleChangedAt ?? this.scheduleChangedAt,
       // Choosing a folder and clearing one both have to be expressible, and
       // `?? this` cannot say "set this back to null".
@@ -444,6 +451,7 @@ class AppSettings {
         lastSyncAt: current.lastSyncAt,
         lastNotionSyncAt: current.lastNotionSyncAt,
         notionAutoSync: current.notionAutoSync,
+        accountAutoSync: current.accountAutoSync,
         backupFolderUri: current.backupFolderUri,
         backupFolderName: current.backupFolderName,
       );
@@ -481,6 +489,7 @@ class SettingsService {
   static const String _kSyncedNotionDatabase = 'ut.syncedNotionDatabase';
   static const String _kAccentColour = 'ut.accentColour';
   static const String _kNotionAutoSync = 'ut.notionAutoSync';
+  static const String _kAccountAutoSync = 'ut.accountAutoSync';
   static const String _kBackupFolderUri = 'ut.backupFolderUri';
   static const String _kBackupFolderName = 'ut.backupFolderName';
   static const String _kOnboarded = 'ut.onboarded';
@@ -500,8 +509,7 @@ class SettingsService {
       semesterStart: start == null ? null : Dates.fromKey(start),
       semesterEnd: end == null ? null : Dates.fromKey(end),
       targetPercent: await prefs.getDouble(_kTarget) ?? 75,
-      defaultClassDurationMinutes:
-          await prefs.getInt(_kDefaultDuration) ?? 60,
+      defaultClassDurationMinutes: await prefs.getInt(_kDefaultDuration) ?? 60,
       dayStartMinutes: await prefs.getInt(_kDayStart) ?? 9 * 60,
       dayEndMinutes: await prefs.getInt(_kDayEnd) ?? 17 * 60,
       blockMinutes: await prefs.getInt(_kBlockMinutes) ?? 0,
@@ -509,8 +517,7 @@ class SettingsService {
       breakMinutes: await prefs.getInt(_kBreakMinutes) ?? 0,
       use24HourTime: await prefs.getBool(_k24h) ?? false,
       themeMode: AppThemeMode.fromName(await prefs.getString(_kThemeMode)),
-      notificationsEnabled:
-          await prefs.getBool(_kNotificationsEnabled) ?? true,
+      notificationsEnabled: await prefs.getBool(_kNotificationsEnabled) ?? true,
       inAppAlerts: await prefs.getBool(_kInAppAlerts) ?? true,
       notifyBeforeClass: await prefs.getBool(_kNotifyBefore) ?? true,
       notifyLeadMinutes: await prefs.getInt(_kLead) ?? 15,
@@ -533,11 +540,11 @@ class SettingsService {
         null => null,
       },
       syncedAccountId: await prefs.getString(_kSyncedAccount),
-      syncedNotionDatabaseId:
-          await prefs.getString(_kSyncedNotionDatabase),
+      syncedNotionDatabaseId: await prefs.getString(_kSyncedNotionDatabase),
       accentColour:
           AccentColour.fromName(await prefs.getString(_kAccentColour)),
-      notionAutoSync: await prefs.getBool(_kNotionAutoSync) ?? true,
+      notionAutoSync: await prefs.getBool(_kNotionAutoSync) ?? false,
+      accountAutoSync: await prefs.getBool(_kAccountAutoSync) ?? false,
       scheduleChangedAt: switch (await prefs.getInt(_kScheduleChangedAt)) {
         final int ms => DateTime.fromMillisecondsSinceEpoch(ms),
         null => null,
@@ -638,6 +645,7 @@ class SettingsService {
     }
     await prefs.setString(_kAccentColour, settings.accentColour.name);
     await prefs.setBool(_kNotionAutoSync, settings.notionAutoSync);
+    await prefs.setBool(_kAccountAutoSync, settings.accountAutoSync);
     if (settings.backupFolderUri == null) {
       await prefs.remove(_kBackupFolderUri);
       await prefs.remove(_kBackupFolderName);

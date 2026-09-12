@@ -58,8 +58,8 @@ class NotionProperty {
         name: (json['name'] as String?) ?? '',
         type: (json['type'] as String?) ?? '',
         options: <String>[
-          for (final Object? o in (json['options'] as List<Object?>?) ??
-              const <Object?>[])
+          for (final Object? o
+              in (json['options'] as List<Object?>?) ?? const <Object?>[])
             if (o is String) o,
         ],
       );
@@ -72,12 +72,27 @@ class NotionProperty {
 enum NotionField {
   course(
     label: 'Course',
+    description: 'Which subject the class belongs to.',
     isRequired: true,
     types: <String>{'select', 'multi_select', 'rich_text', 'title', 'relation'},
   ),
-  date(label: 'Date', isRequired: true, types: <String>{'date'}),
-  status(label: 'Status', isRequired: true, types: <String>{'select', 'status'}),
-  component(label: 'Component', types: <String>{'title', 'rich_text'}),
+  date(
+    label: 'Date',
+    description: 'The day the class was held.',
+    isRequired: true,
+    types: <String>{'date'},
+  ),
+  status(
+    label: 'Status',
+    description: 'Whether you were present, absent or the class was cancelled.',
+    isRequired: true,
+    types: <String>{'select', 'status'},
+  ),
+  component(
+    label: 'Component',
+    description: 'The row title in Notion. Left alone if you do not map it.',
+    types: <String>{'title', 'rich_text'},
+  ),
 
   /// The class's start time as plain `HH:mm`.
   ///
@@ -85,24 +100,57 @@ enum NotionField {
   /// datetime as an instant and shifts it by timezone; `09:00` has no instant
   /// to shift. Optional, and only an import of a database this app did not
   /// write actually needs it — see `NotionImport._place`.
-  time(label: 'Time', types: <String>{'rich_text', 'select'}),
-  kind(label: 'Type', types: <String>{'select'}),
-  held(label: 'Held', types: <String>{'number'}),
-  credit(label: 'Attendance Credit', types: <String>{'number'}),
+  time(
+    label: 'Time',
+    description: 'Start time as 09:00. Needed only to import classes Notion '
+        'already holds.',
+    types: <String>{'rich_text', 'select'},
+  ),
+  kind(
+    label: 'Type',
+    description: 'The category the class sits in, such as Lecture or Lab.',
+    types: <String>{'select'},
+  ),
+  held(
+    label: 'Held',
+    description: 'How many classes this row counts as. Usually 1.',
+    types: <String>{'number'},
+  ),
+  credit(
+    label: 'Attendance Credit',
+    description: 'How much of that you attended, for the Notion rollups.',
+    types: <String>{'number'},
+  ),
 
   /// Holds `SyncItem.localKey` verbatim. Without it a page cannot be
   /// recognised again — Notion has no start time and no subject id, so two
-  /// classes of the same course on one day are the same row — and syncing
-  /// falls back to pushing without ever reading the far side.
-  key(label: 'Zeolite ID', types: <String>{'rich_text'});
+  /// classes of the same course on one day are the same row.
+  ///
+  /// Required, unlike the rest of the optional half, because syncing without
+  /// it writes every class again on every run. It was optional until a
+  /// database built by hand proved what that costs; the mapping screen offers
+  /// to add the column, so requiring it is a tap rather than a dead end.
+  key(
+    label: 'Zeolite ID',
+    description: 'How Zeolite recognises a row it already wrote. Without it '
+        'every sync writes the same class again.',
+    isRequired: true,
+    types: <String>{'rich_text'},
+  );
 
   const NotionField({
     required this.label,
+    required this.description,
     required this.types,
     this.isRequired = false,
   });
 
   final String label;
+
+  /// Shown under the label on the mapping screen. A column name is rarely
+  /// enough on its own to tell someone which of their own columns belongs
+  /// here.
+  final String description;
 
   /// Only a column that could hold the value is offered, or a mapping that
   /// reads fine fails validation on every row it ever pushes.
@@ -321,8 +369,7 @@ class NotionMapping {
           if (!statusValues.containsKey(word)) 'Status: $word',
       if (fields.containsKey(NotionField.kind))
         for (final String name in categoryNames)
-          if (!kindValues.containsKey(name.trim().toLowerCase()))
-            'Type: $name',
+          if (!kindValues.containsKey(name.trim().toLowerCase())) 'Type: $name',
     ];
   }
 
@@ -368,6 +415,19 @@ class NotionMapping {
         if (!field.types.contains(property.type)) continue;
         if (!field.matches(property.name)) continue;
         fields[field] = property;
+        taken.add(property.id);
+        break;
+      }
+    }
+
+    // Every database has exactly one title column, and a page created without
+    // it reads as "New Page" in the table forever. So when nothing matched by
+    // name, the title is claimed anyway rather than left for the user to
+    // notice after the rows are already there.
+    if (!fields.containsKey(NotionField.component)) {
+      for (final NotionProperty property in properties) {
+        if (taken.contains(property.id) || property.type != 'title') continue;
+        fields[NotionField.component] = property;
         taken.add(property.id);
         break;
       }

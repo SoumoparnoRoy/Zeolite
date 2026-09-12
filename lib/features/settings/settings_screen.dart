@@ -568,17 +568,38 @@ class SettingsScreen extends ConsumerWidget {
               const SectionHeader('Account'),
               SurfaceCard(
                 padding: EdgeInsets.zero,
-                child: _Row(
-                  icon: Icons.cloud_outlined,
-                  title: 'Backup and sync',
-                  value: ref.watch(signedInUserProvider).value?.email ??
-                      'Not signed in — nothing is backed up',
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      settings: const RouteSettings(name: 'account'),
-                      builder: (BuildContext context) => const AccountScreen(),
+                child: Column(
+                  children: <Widget>[
+                    _Row(
+                      icon: Icons.cloud_outlined,
+                      title: 'Backup and sync',
+                      value: ref.watch(signedInUserProvider).value?.email ??
+                          'Not signed in — nothing is backed up',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          settings: const RouteSettings(name: 'account'),
+                          builder: (BuildContext context) =>
+                              const AccountScreen(),
+                        ),
+                      ),
                     ),
-                  ),
+                    // Signing in is consent to have an account, not consent to
+                    // upload; nothing leaves the device until this is on.
+                    if (ref.watch(signedInUserProvider).value != null) ...[
+                      const Divider(indent: 58),
+                      _Row(
+                        icon: Icons.schedule_rounded,
+                        title: 'Sync automatically',
+                        value: 'About 15 seconds after you mark a class',
+                        trailing: Switch(
+                          value: settings.accountAutoSync,
+                          onChanged: (bool on) => ref
+                              .read(settingsProvider.notifier)
+                              .save(settings.copyWith(accountAutoSync: on)),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
               const SizedBox(height: AppSpacing.xl),
@@ -618,7 +639,8 @@ class SettingsScreen extends ConsumerWidget {
                             'Not set up',
                         onTap: () => Navigator.of(context).push(
                           MaterialPageRoute<void>(
-                            settings: const RouteSettings(name: 'notion_mapping'),
+                            settings:
+                                const RouteSettings(name: 'notion_mapping'),
                             builder: (BuildContext context) =>
                                 const NotionMappingScreen(),
                           ),
@@ -981,9 +1003,8 @@ class SettingsScreen extends ConsumerWidget {
     ClassCategory category,
     List<Subject> subjects,
   ) {
-    final int held = subjects
-        .where((Subject s) => s.categoryId == category.id)
-        .length;
+    final int held =
+        subjects.where((Subject s) => s.categoryId == category.id).length;
     return <String>[
       held == 1 ? '1 subject' : '$held subjects',
       'defaults to ${category.durationLabel}',
@@ -1044,8 +1065,7 @@ class SettingsScreen extends ConsumerWidget {
     if (uri != null) {
       try {
         await BackupFolder().release(uri);
-      } catch (_) {
-      }
+      } catch (_) {}
     }
     await ref.read(settingsProvider.notifier).clearBackupFolder();
     ref.invalidate(backupFolderUsableProvider);
@@ -1101,9 +1121,9 @@ class SettingsScreen extends ConsumerWidget {
     if (label == null) return;
 
     await ref.read(actionsProvider).addHolidays(<Holiday>[
-          for (int i = 0; i < days; i++)
-            Holiday(date: Dates.addDays(range.start, i), name: label),
-        ]);
+      for (int i = 0; i < days; i++)
+        Holiday(date: Dates.addDays(range.start, i), name: label),
+    ]);
   }
 
   /// A whole break going in one tap is worth naming the count for.
@@ -1745,10 +1765,9 @@ class _AccentOption extends StatelessWidget {
     final AppPalette p = context.palette;
     // The swatch has to show the accent being offered, not the one in force,
     // so it is drawn from that accent's own palette at the current brightness.
-    final AppPalette sample = (p.brightness == Brightness.dark
-            ? AppPalette.dark
-            : AppPalette.light)
-        .withAccent(accent);
+    final AppPalette sample =
+        (p.brightness == Brightness.dark ? AppPalette.dark : AppPalette.light)
+            .withAccent(accent);
 
     return _SegmentedCell(
       selected: selected,

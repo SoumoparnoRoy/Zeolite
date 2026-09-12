@@ -53,6 +53,10 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
   Map<String, String> _kindValues = <String, String>{};
   NotionCourses? _courses;
 
+  /// Shown next to the link. [NotionCourses] holds ids, not a name, and a
+  /// table identified only by an id is not something anyone can check.
+  String? _coursesTitle;
+
   /// Saved from, not rebuilt, so a field this screen does not edit survives.
   NotionMapping? _loaded;
 
@@ -182,6 +186,7 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
       _databaseTitle = choice.title;
       if (moved) {
         _courses = null;
+        _coursesTitle = null;
         _loaded = null;
       }
     });
@@ -222,9 +227,17 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
       // Reopening keeps every answer already given and lets the guess fill
       // only the gaps, so a column added since — to the database or to the
       // app — is offered instead of staying invisible behind an old mapping.
+      // A column deleted in Notion since is dropped rather than kept: a choice
+      // pointing at a property that no longer exists leaves the dropdown with
+      // a value that is not among its items, which throws instead of drawing.
+      final Set<String> live = <String>{
+        for (final NotionProperty p in properties) p.id,
+      };
       _fields = <NotionField, NotionProperty>{
         ...guess.fields,
-        if (keepChoices) ..._fields,
+        if (keepChoices)
+          for (final MapEntry<NotionField, NotionProperty> e in _fields.entries)
+            if (live.contains(e.value.id)) e.key: e.value,
       };
       _statusValues = <String, String>{
         ...guess.statusValues,
@@ -235,6 +248,214 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
         if (keepChoices) ..._kindValues,
       };
       if (widget.onlyUnmapped) _captureGaps();
+    });
+  }
+
+  /// Notion leaves a relation out of the schema altogether when the table it
+  /// points at is not shared with the connection, so the column the person can
+  /// see in their own database is simply not there to map. Without saying so,
+  /// the screen just refuses to finish and never explains why.
+  bool get _hiddenRelation =>
+      _fields[NotionField.course] == null &&
+      !_properties.any((NotionProperty p) => p.type == 'relation');
+
+  Widget _shareCoursesNote(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+        child: Text(
+          'Nothing here can hold a course? If your Course column is a relation, '
+          'Notion hides it until the table it points at is shared too. In '
+          'Notion, open the ••• menu on that table, then Connections, and add '
+          'Zeolite. Come back and reopen this screen.',
+          style: TextStyle(
+            fontSize: 12,
+            height: 1.3,
+            color: context.palette.textTertiary,
+          ),
+        ),
+      );
+
+  /// The column the app cannot work without, and the one a table built by hand
+  /// never has. Offered rather than done quietly: it writes to their schema.
+  Widget _addKeyColumnOffer(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            OutlinedButton.icon(
+              onPressed: _busy ? null : _addKeyColumn,
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: const Text('Add the Zeolite ID column'),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Adds a text column called Zeolite ID to your table. Until it '
+              'exists, syncing is held back rather than writing every class '
+              'again on every run. It shows up as a column; hide it in Notion '
+              'if it is in your way.',
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.3,
+                color: context.palette.textTertiary,
+              ),
+            ),
+          ],
+        ),
+      );
+
+  Future<void> _addKeyColumn() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final NotionResult result = await _client.addProperty(
+      _dataSourceId,
+      name: NotionField.key.label,
+      type: 'rich_text',
+    );
+    if (!mounted) return;
+    if (!result.ok) {
+      setState(() {
+        _busy = false;
+        _error = _messageFor(result);
+      });
+      return;
+    }
+    // Re-read rather than assume: the reload's own guess is what maps the new
+    // column, and it is also what proves Notion made it.
+    await _loadSchema(_dataSourceId, keepChoices: true);
+  }
+
+  /// Where the Course relation points.
+  ///
+  /// Only template adoption used to set this, so anyone who reinstalled and
+  /// reconnected to their own database — or built the two tables by hand —
+  /// had no way to say where their courses live, and the relation was left
+  /// empty on every row.
+  List<Widget> _coursesSection(BuildContext context) {
+    if (_narrowed) return const <Widget>[];
+    final NotionProperty? course = _fields[NotionField.course];
+    if (course?.type != 'relation') return const <Widget>[];
+
+    return <Widget>[
+      const SizedBox(height: AppSpacing.lg),
+      const SectionHeader('Courses table'),
+      Padding(
+        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+        child: Text(
+          'Your Course column is a relation, so Zeolite needs to know which '
+          'table it points at to keep a page per subject there.',
+          style: TextStyle(
+            fontSize: 12,
+            height: 1.3,
+            color: context.palette.textTertiary,
+          ),
+        ),
+      ),
+      SurfaceCard(
+        padding: EdgeInsets.zero,
+        child: AppRow(
+          icon: Icons.table_chart_outlined,
+          title: _coursesTitle ?? (_courses == null ? 'Not linked' : 'Linked'),
+          onTap: _busy ? null : _pickCourses,
+        ),
+      ),
+    ];
+  }
+
+  Future<void> _pickCourses() async {
+    final _Choice? choice = await showModalBottomSheet<_Choice>(
+      context: context,
+      builder: (BuildContext context) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: <Widget>[
+            for (final _Choice option in _sources)
+              if (option.databaseId != _databaseId)
+                ListTile(
+                  leading: const Icon(Icons.table_chart_outlined),
+                  title: Text(option.title),
+                  onTap: () => Navigator.of(context).pop(option),
+                ),
+          ],
+        ),
+      ),
+    );
+    if (choice == null || !mounted) return;
+    await _linkCourses(choice);
+  }
+
+  Future<void> _linkCourses(_Choice choice) async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final NotionResult result = await _client.dataSource(choice.id);
+    if (!mounted) return;
+    if (!result.ok || result.body == null) {
+      setState(() {
+        _busy = false;
+        _error = _messageFor(result);
+      });
+      return;
+    }
+
+    final NotionCourses courses = NotionCourses.match(
+      databaseId: choice.databaseId,
+      dataSourceId: choice.id,
+      properties: notionPropertiesOf(result.body!),
+    );
+    if (!courses.isComplete) {
+      // Almost always the same missing column as on the attendance table, and
+      // the same answer: a page nothing can find again is written twice.
+      final NotionResult added = await _client.addProperty(
+        choice.id,
+        name: NotionField.key.label,
+        type: 'rich_text',
+      );
+      if (!mounted) return;
+      if (!added.ok) {
+        setState(() {
+          _busy = false;
+          _error = _messageFor(added);
+        });
+        return;
+      }
+      await _linkCoursesAgain(choice);
+      return;
+    }
+
+    setState(() {
+      _busy = false;
+      _courses = courses;
+      _coursesTitle = choice.title;
+    });
+  }
+
+  /// One retry only, after the column was added. A table still incomplete has
+  /// no title column either, which is not something this screen can fix.
+  Future<void> _linkCoursesAgain(_Choice choice) async {
+    final NotionResult result = await _client.dataSource(choice.id);
+    if (!mounted) return;
+    final NotionCourses courses = result.body == null
+        ? NotionCourses.match(
+            databaseId: choice.databaseId,
+            dataSourceId: choice.id,
+            properties: const <NotionProperty>[],
+          )
+        : NotionCourses.match(
+            databaseId: choice.databaseId,
+            dataSourceId: choice.id,
+            properties: notionPropertiesOf(result.body!),
+          );
+    setState(() {
+      _busy = false;
+      if (courses.isComplete) {
+        _courses = courses;
+        _coursesTitle = choice.title;
+      } else {
+        _error = 'That table needs a title column and a Zeolite ID column '
+            'before courses can be kept in it.';
+      }
     });
   }
 
@@ -352,7 +573,8 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
           icon: Icons.table_chart_outlined,
           title: 'No tables shared',
           message: 'A database you have just made can take a moment to appear. '
-              'Try again, or open Notion and share one with Zeolite.',
+              'Try again, or share it with Zeolite in Notion — the page '
+              'holding your tables, so every one of them comes along.',
         ),
         const SizedBox(height: AppSpacing.md),
         Center(
@@ -364,6 +586,23 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
       ];
     }
     return <Widget>[
+      // Only the tables actually shared are listed, and a table whose Course
+      // column points at one that is not shared reads as having no Course
+      // column at all. Saying so here is cheaper than the dead end it causes.
+      Padding(
+        padding: const EdgeInsets.only(bottom: AppSpacing.md),
+        child: Text(
+          'Missing one? Zeolite only sees what you shared in Notion. If your '
+          'classes and courses are two tables, share the page holding both — '
+          'or add each table to the connection — or the link between them '
+          'cannot be read.',
+          style: TextStyle(
+            fontSize: 12,
+            height: 1.3,
+            color: context.palette.textTertiary,
+          ),
+        ),
+      ),
       for (final _Choice choice in _sources) ...<Widget>[
         SurfaceCard(
           padding: EdgeInsets.zero,
@@ -417,7 +656,12 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
           }),
         ),
         const SizedBox(height: AppSpacing.sm),
+        if (field == NotionField.key && _fields[field] == null)
+          _addKeyColumnOffer(context),
+        if (field == NotionField.course && _hiddenRelation)
+          _shareCoursesNote(context),
       ],
+      ..._coursesSection(context),
       if (kind != null &&
           kind.options.isNotEmpty &&
           _categories.isNotEmpty &&
@@ -531,19 +775,39 @@ class _PropertyPicker extends StatelessWidget {
         .where((NotionProperty p) => field.types.contains(p.type))
         .toList(growable: false);
 
+    // Belt as well as braces: the saved mapping outlives the schema it was
+    // built against, and a stale choice must read as unmapped, not throw.
+    final bool stillThere =
+        eligible.any((NotionProperty p) => p.id == chosen?.id);
+
     return SurfaceCard(
       child: Row(
         children: <Widget>[
           Expanded(
-            child: Text(
-              field.isRequired ? '${field.label} *' : field.label,
-              style: const TextStyle(fontWeight: FontWeight.w600),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  field.isRequired ? '${field.label} *' : field.label,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  field.description,
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.3,
+                    color: context.palette.textTertiary,
+                  ),
+                ),
+              ],
             ),
           ),
+          const SizedBox(width: AppSpacing.lg),
           Expanded(
             child: DropdownButton<String>(
               isExpanded: true,
-              value: chosen?.id,
+              value: stillThere ? chosen?.id : null,
               hint: Text(
                 eligible.isEmpty ? 'No column fits' : 'Not mapped',
                 style: TextStyle(color: context.palette.textTertiary),

@@ -2,6 +2,25 @@ import 'package:zeolite/data/settings/app_settings.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  group('syncing waits to be asked', () {
+    test('both sync toggles ship off', () {
+      const AppSettings settings = AppSettings();
+      expect(settings.notionAutoSync, isFalse);
+      expect(settings.accountAutoSync, isFalse);
+    });
+
+    test('they are device-local, so a synced row cannot switch them on', () {
+      const AppSettings fromAccount = AppSettings();
+      const AppSettings onThisDevice = AppSettings(
+        notionAutoSync: true,
+        accountAutoSync: true,
+      );
+      final AppSettings merged = fromAccount.onDeviceOf(onThisDevice);
+      expect(merged.notionAutoSync, isTrue);
+      expect(merged.accountAutoSync, isTrue);
+    });
+  });
+
   group('notification gating', () {
     test('existing reminder types are on and the new end reminder is off', () {
       const AppSettings settings = AppSettings();

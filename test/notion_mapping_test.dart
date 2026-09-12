@@ -51,7 +51,73 @@ NotionMapping _match(Map<String, Object?> schema) => NotionMapping.match(
       properties: _properties(schema),
     );
 
+/// A database somebody built themselves, as one real workspace has it: a title
+/// called Name, the class type under L/T/P, the course as a relation, the
+/// counters as formulas, and no Zeolite ID at all.
+Map<String, Object?> _handBuilt() => <String, Object?>{
+      'Name': <String, Object?>{'id': 'title', 'type': 'title'},
+      'L/T/P': <String, Object?>{
+        'id': 'h1',
+        'type': 'select',
+        'select': <String, Object?>{
+          'options': <Object?>[
+            <String, Object?>{'name': 'Lecture'},
+            <String, Object?>{'name': 'Practical'},
+            <String, Object?>{'name': 'Tutorial'},
+          ],
+        },
+      },
+      'Course': <String, Object?>{'id': 'h2', 'type': 'relation'},
+      'Status': <String, Object?>{
+        'id': 'h3',
+        'type': 'status',
+        'status': <String, Object?>{
+          'options': <Object?>[
+            <String, Object?>{'name': 'Present'},
+            <String, Object?>{'name': 'Absent'},
+            <String, Object?>{'name': 'Cancelled'},
+            <String, Object?>{'name': 'Proxy'},
+          ],
+        },
+      },
+      'Date': <String, Object?>{'id': 'h4', 'type': 'date'},
+      'Held?': <String, Object?>{'id': 'h5', 'type': 'formula'},
+      'Held (1/2/0)': <String, Object?>{'id': 'h6', 'type': 'formula'},
+      'Attendance Credit (1/2/0)': <String, Object?>{
+        'id': 'h7',
+        'type': 'formula',
+      },
+    };
+
 void main() {
+  group('a database Zeolite did not author', () {
+    test('the title column is claimed, so no row is written as New Page', () {
+      final NotionMapping mapping = _match(_handBuilt());
+      expect(mapping.fields[NotionField.component]!.id, 'title');
+    });
+
+    test('what can be matched by name is, but it cannot sync yet', () {
+      final NotionMapping mapping = _match(_handBuilt());
+      expect(mapping.fields[NotionField.course]!.id, 'h2');
+      expect(mapping.fields[NotionField.date]!.id, 'h4');
+      expect(mapping.fields[NotionField.kind]!.id, 'h1');
+      // The key column is the one thing missing, and without it a push would
+      // file every class again on every run.
+      expect(mapping.isComplete, isFalse);
+    });
+
+    test('a formula cannot be written to, so the counters stay unmapped', () {
+      final NotionMapping mapping = _match(_handBuilt());
+      expect(mapping.fields.containsKey(NotionField.held), isFalse);
+      expect(mapping.fields.containsKey(NotionField.credit), isFalse);
+    });
+
+    test('and the key it has no column for stays unmapped', () {
+      final NotionMapping mapping = _match(_handBuilt());
+      expect(mapping.fields.containsKey(NotionField.key), isFalse);
+    });
+  });
+
   test('the template it ships with maps with nothing left to correct', () {
     final NotionMapping mapping = _match(_template());
 

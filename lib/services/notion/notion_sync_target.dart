@@ -93,8 +93,27 @@ class NotionSyncTarget implements SyncTarget {
     return found;
   }
 
+  /// Refused rather than pushed when nothing can identify a row again.
+  ///
+  /// Without the key column [fetch] returns null, so the planner never sees
+  /// what the table already holds and every run files the same mark as a new
+  /// page — which is somebody's workspace filling with duplicates the app
+  /// cannot even find to clean up. The mapping screen offers to add the
+  /// column; until it exists, not writing is the only honest answer.
+  bool get _canBeFoundAgain => _mapping.fields.containsKey(NotionField.key);
+
+  static const String _noKeyColumn =
+      'Add the Zeolite ID column before syncing, or every class is written '
+      'again on every run.';
+
   @override
   Future<SyncOutcome> create(SyncItem item) async {
+    if (!_canBeFoundAgain) {
+      return const SyncOutcome.failed(
+        SyncFailure.rejected,
+        message: _noKeyColumn,
+      );
+    }
     final NotionResult result = await _client.createPage(
       dataSourceId: _mapping.dataSourceId,
       properties: await _encode(item),
@@ -109,6 +128,12 @@ class NotionSyncTarget implements SyncTarget {
 
   @override
   Future<SyncOutcome> update(SyncItem item, String remoteId) async {
+    if (!_canBeFoundAgain) {
+      return const SyncOutcome.failed(
+        SyncFailure.rejected,
+        message: _noKeyColumn,
+      );
+    }
     final NotionResult result =
         await _client.updatePage(remoteId, await _encode(item));
     if (!result.ok) return _failure(result);

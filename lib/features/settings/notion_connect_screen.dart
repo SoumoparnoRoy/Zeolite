@@ -238,7 +238,12 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
                       'is until the new one is filled.'
                   : 'You will sign in to Notion in your browser and choose '
                       'which pages Zeolite may write to. Your attendance '
-                      'stays on this device as well.',
+                      'stays on this device as well.\n\n'
+                      'Already have a Zeolite Attendance page? Pick the page '
+                      'itself, not one table inside it — Notion hides the '
+                      'Course link unless both tables come along. Search for '
+                      'it by name; the picker only lists what you opened '
+                      'recently.',
               style: TextStyle(color: context.palette.textSecondary),
             ),
             const SizedBox(height: AppSpacing.md),
@@ -364,14 +369,29 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
-              'Your attendance is synced to this workspace. It stays on this '
-              'device too.',
+              _mapped
+                  ? 'Your attendance is synced to this workspace. It stays on '
+                      'this device too.'
+                  : 'Connected, but nothing is syncing yet: Zeolite still '
+                      'needs to know which columns hold what.',
               style: TextStyle(color: context.palette.textSecondary),
             ),
           ],
         ),
       ),
       const SizedBox(height: AppSpacing.lg),
+      // The only way back in: leaving the mapping half-finished used to strand
+      // the connection here with nothing but Disconnect.
+      OutlinedButton(
+        onPressed: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            settings: const RouteSettings(name: 'notion_mapping'),
+            builder: (BuildContext context) => const NotionMappingScreen(),
+          ),
+        ),
+        child: Text(_mapped ? 'Change the database' : 'Finish setting up'),
+      ),
+      const SizedBox(height: AppSpacing.sm),
       OutlinedButton(
         onPressed: () async {
           await ref.read(notionConnectionProvider.notifier).disconnect();
@@ -381,4 +401,8 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
       ),
     ];
   }
+
+  /// A connection on its own writes nothing; the columns decide that.
+  bool get _mapped =>
+      ref.watch(notionMappingProvider).value?.isComplete ?? false;
 }

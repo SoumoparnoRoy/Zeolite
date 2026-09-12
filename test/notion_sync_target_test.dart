@@ -287,6 +287,28 @@ void main() {
     expect(calls, 0);
   });
 
+  test('without the key column nothing is written at all', () async {
+    int calls = 0;
+    final NotionSyncTarget target = _target(
+      MockClient((http.Request r) async {
+        calls++;
+        return http.Response('{"id":"page-1"}', 200);
+      }),
+      withKey: false,
+    );
+
+    // A row it could never find again is a row it would file afresh on every
+    // run, which is somebody's table filling with duplicates.
+    final SyncOutcome created = await target.create(_mark());
+    final SyncOutcome updated = await target.update(_mark(), 'page-1');
+
+    expect(created.ok, isFalse);
+    expect(updated.ok, isFalse);
+    expect(created.failure, SyncFailure.rejected);
+    expect(created.message, contains('Zeolite ID'));
+    expect(calls, 0);
+  });
+
   test('a page already gone counts the removal as done', () async {
     final NotionSyncTarget target = _target(
       MockClient(

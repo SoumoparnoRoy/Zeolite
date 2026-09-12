@@ -38,9 +38,8 @@ class JoiningScreen extends ConsumerStatefulWidget {
 }
 
 class _JoiningScreenState extends ConsumerState<JoiningScreen> {
-  /// The scheduler starts a run the moment a sign-in lands, and this waits on
-  /// that one: two runs against an unreconciled account is how a row is filed
-  /// twice.
+  /// Whichever run this screen is waiting on — the scheduler's when automatic
+  /// syncing is on, otherwise the one [initState] starts.
   bool _sawRun = false;
   bool _done = false;
 
@@ -50,6 +49,15 @@ class _JoiningScreenState extends ConsumerState<JoiningScreen> {
   void initState() {
     super.initState();
     _cap = Timer(JoiningScreen.wait, _finish);
+    // Signing in is itself the ask, so the first pull happens even with
+    // automatic syncing off. Only then: with it on the scheduler has already
+    // started a run, and two against an unreconciled account is how a row is
+    // filed twice.
+    if (ref.read(settingsProvider).value?.accountAutoSync != true) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) ref.read(syncStatusProvider.notifier).run();
+      });
+    }
   }
 
   @override

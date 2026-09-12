@@ -151,8 +151,7 @@ class NotionClient {
         '/v1/blocks/$blockId/children?page_size=100',
       );
 
-  Future<NotionResult> page(String pageId) =>
-      _send('GET', '/v1/pages/$pageId');
+  Future<NotionResult> page(String pageId) => _send('GET', '/v1/pages/$pageId');
 
   /// One block, for walking up to whatever page holds it.
   Future<NotionResult> block(String blockId) =>
@@ -239,6 +238,29 @@ class NotionClient {
                   'text': <String, Object?>{'content': title},
                 },
               ],
+            },
+          },
+        },
+      );
+
+  /// Adds one column to a data source.
+  ///
+  /// A schema edit is a data source call rather than a database one: the
+  /// database is the container and the data source holds the properties.
+  Future<NotionResult> addProperty(
+    String dataSourceId, {
+    required String name,
+    required String type,
+  }) =>
+      _send(
+        'PATCH',
+        '/v1/data_sources/$dataSourceId',
+        body: <String, Object?>{
+          'properties': <String, Object?>{
+            name: <String, Object?>{
+              'name': name,
+              'type': type,
+              type: <String, Object?>{},
             },
           },
         },

@@ -15,7 +15,7 @@ import 'package:zeolite/state/notion_sync_providers.dart';
 NotionProperty _p(String id, String name, String type) =>
     NotionProperty(id: id, name: name, type: type);
 
-/// A mapping with the three columns a row cannot be read without.
+/// A mapping with every column a row cannot be read or found again without.
 NotionMapping _complete() => NotionMapping(
       databaseId: 'db-1',
       dataSourceId: 'ds-1',
@@ -24,6 +24,7 @@ NotionMapping _complete() => NotionMapping(
         NotionField.course: _p('p1', 'Course', 'select'),
         NotionField.date: _p('p2', 'Date', 'date'),
         NotionField.status: _p('p3', 'Status', 'select'),
+        NotionField.key: _p('p7', 'Zeolite ID', 'rich_text'),
       },
     );
 

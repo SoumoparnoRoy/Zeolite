@@ -162,11 +162,12 @@ void main() {
 
   test('a template that no longer matches names what it left unmapped',
       () async {
-    // Course, Date and Status are all adopting checks, so a template missing
-    // Zeolite ID still saves — and used to do it without saying so.
+    // Everything a mapping needs, and nothing more: what is missing here is
+    // the optional half, which saves and is then named rather than hidden.
     const String thin = '{"properties":{'
         '"Course":{"id":"p1","type":"select"},'
         '"Date":{"id":"p2","type":"date"},'
+        '"Zeolite ID":{"id":"p7","type":"rich_text"},'
         '"Status":{"id":"p3","type":"select","select":{"options":['
         '{"name":"Present"},{"name":"Absent"}]}}}}';
 
@@ -192,7 +193,6 @@ void main() {
         container.read(notionMappingProvider).value!.unmapped(
               categoryNames: <String>['Lab'],
             );
-    expect(missing, contains('Zeolite ID'));
     expect(missing, contains('Attendance Credit'));
     // The two status words the workspace does spell the same way are paired,
     // so only the two it does not are reported.
@@ -243,6 +243,7 @@ void main() {
         '"Course":{"id":"p1","type":"select"},'
         '"Date":{"id":"p2","type":"date"},'
         '"Status":{"id":"p3","type":"select"},'
+        '"Zeolite ID":{"id":"p7","type":"rich_text"},'
         '"Type":{"id":"p6","type":"select","select":{"options":['
         '{"name":"Lab"},{"name":"Theory"}]}}}}';
 

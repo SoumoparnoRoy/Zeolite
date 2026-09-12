@@ -35,6 +35,14 @@ Map<String, Object?> _schema() => <String, Object?>{
       'Date': <String, Object?>{'id': 'p2', 'type': 'date'},
       'Status': _select('p3', <String>['Present', 'Absent', 'Cancelled']),
       'Held': <String, Object?>{'id': 'p5', 'type': 'number'},
+      'Zeolite ID': <String, Object?>{'id': 'p7', 'type': 'rich_text'},
+    };
+
+/// The key column named something the guess cannot place.
+Map<String, Object?> _schemaWithoutKey() => <String, Object?>{
+      for (final MapEntry<String, Object?> e in _schema().entries)
+        if (e.key != 'Zeolite ID') e.key: e.value,
+      'Ref': <String, Object?>{'id': 'p7', 'type': 'rich_text'},
     };
 
 /// Answers the two calls the screen makes. [tables] decides how many tables
@@ -189,10 +197,7 @@ void main() {
       },
     ));
 
-    await tester.pumpWidget(_app(_notion(schema: <String, Object?>{
-      ..._schema(),
-      'Zeolite ID': <String, Object?>{'id': 'p7', 'type': 'rich_text'},
-    })));
+    await tester.pumpWidget(_app(_notion()));
     await tester.pumpAndSettle();
 
     final Finder save = find.widgetWithText(FilledButton, 'Save');
@@ -276,21 +281,18 @@ void main() {
     // Course, Date, Status and Held all match by name; Zeolite ID is in the
     // schema but named nothing like it, so the guess cannot place it.
     await tester.pumpWidget(_app(
-      _notion(schema: <String, Object?>{
-        ..._schema(),
-        'Ref': <String, Object?>{'id': 'p7', 'type': 'rich_text'},
-      }),
+      _notion(schema: _schemaWithoutKey()),
       onlyUnmapped: true,
     ));
     await tester.pumpAndSettle();
 
-    expect(find.text('Zeolite ID'), findsOneWidget);
+    expect(find.text('Zeolite ID *'), findsOneWidget);
     // Matched, so it is not something the user is being asked about.
     expect(find.text('Date'), findsNothing);
     expect(find.text('Held'), findsNothing);
 
-    // Every gap here is optional, so there is a way past the screen.
-    expect(find.widgetWithText(OutlinedButton, 'Skip for now'), findsOneWidget);
+    // Zeolite ID is required, so there is no way past this one.
+    expect(find.widgetWithText(OutlinedButton, 'Skip for now'), findsNothing);
   });
 
   testWidgets('a gap answered does not vanish from under the finger',
@@ -306,10 +308,7 @@ void main() {
     ));
 
     await tester.pumpWidget(_app(
-      _notion(schema: <String, Object?>{
-        ..._schema(),
-        'Ref': <String, Object?>{'id': 'p7', 'type': 'rich_text'},
-      }),
+      _notion(schema: _schemaWithoutKey()),
       onlyUnmapped: true,
     ));
     await tester.pumpAndSettle();
@@ -322,7 +321,7 @@ void main() {
     await tester.tap(find.text('Ref').last);
     await tester.pumpAndSettle();
 
-    expect(find.text('Zeolite ID'), findsOneWidget);
+    expect(find.text('Zeolite ID *'), findsOneWidget);
   });
 
   testWidgets('every shared table is offered, not just the first',

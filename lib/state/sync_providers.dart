@@ -45,12 +45,14 @@ final syncStatusProvider = NotifierProvider<SyncController, SyncStatus>(
 /// is never constructed, and a scheduler nobody constructs never schedules.
 final syncSchedulerProvider = Provider<SyncScheduler?>((ref) {
   if (ref.watch(syncTargetProvider) == null) return null;
-  // Built only once settings have loaded, because the cold-start staleness
-  // check reads `lastSyncAt` the moment the scheduler starts. Watching
-  // whether there is a value rather than the value itself keeps a settings
-  // write from tearing the scheduler down and cancelling a pending run.
-  if (!ref.watch(settingsProvider.select((AsyncValue<AppSettings> s) =>
-      s.hasValue))) {
+  // The one field, not the whole value: watching the value tore the scheduler
+  // down on every settings write and cancelled the run it had pending. Null
+  // while settings are still loading, which also covers the cold-start
+  // staleness check reading `lastSyncAt` the moment the scheduler starts.
+  if (ref.watch(settingsProvider.select(
+        (AsyncValue<AppSettings> s) => s.value?.accountAutoSync,
+      )) !=
+      true) {
     return null;
   }
 
@@ -89,9 +91,8 @@ class SyncController extends Notifier<SyncStatus> {
     if (coordinator == null) return null;
 
     state = coordinator.status.running();
-    final SyncRunResult result = await ref
-        .read(actionsProvider)
-        .applySyncMerge(coordinator, decisions);
+    final SyncRunResult result =
+        await ref.read(actionsProvider).applySyncMerge(coordinator, decisions);
     _last = result;
     state = coordinator.status;
     // `applySyncMerge` has already reloaded, so only the stamp is left.

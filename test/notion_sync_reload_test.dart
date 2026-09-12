@@ -105,7 +105,13 @@ void main() {
 
   test('a settings write leaves the pending run armed', () async {
     final ProviderContainer container = build();
-    final AppSettings settings = await container.read(settingsProvider.future);
+    AppSettings settings = await container.read(settingsProvider.future);
+
+    // Automatic syncing ships off, and the scheduler only exists once it is on.
+    await container
+        .read(settingsProvider.notifier)
+        .save(settings.copyWith(notionAutoSync: true));
+    settings = await container.read(settingsProvider.future);
 
     final SyncScheduler? scheduler = container.read(notionSchedulerProvider);
     scheduler!.onLocalChange();

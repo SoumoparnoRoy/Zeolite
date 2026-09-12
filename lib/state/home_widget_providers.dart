@@ -158,7 +158,7 @@ class ExternalMarkRequest {
 Future<void> handleWidgetTap(Uri? uri) async {
   final ExternalMarkRequest? request = ExternalMarkRequest.fromWidget(uri);
   if (request == null) return;
-  await _handleExternalMark(request, source: 'Widget');
+  await _handleExternalMark(request, source: 'Widget', toggles: true);
 }
 
 /// Handles an action without opening the app, including from a killed process.
@@ -167,12 +167,13 @@ Future<void> handleNotificationAction(NotificationResponse response) async {
   final ExternalMarkRequest? request =
       ExternalMarkRequest.fromNotification(response);
   if (request == null) return;
-  await _handleExternalMark(request, source: 'Notification');
+  await _handleExternalMark(request, source: 'Notification', toggles: false);
 }
 
 Future<void> _handleExternalMark(
   ExternalMarkRequest request, {
   required String source,
+  required bool toggles,
 }) async {
   WidgetsFlutterBinding.ensureInitialized();
   final ProviderContainer container = ProviderContainer();
@@ -202,9 +203,10 @@ Future<void> _handleExternalMark(
     }
     if (session == null) return;
 
-    // An action means "set", not "toggle". A duplicate delivery must not
-    // clear a mark that already has the requested value.
-    if (session.status != request.status) {
+    // A widget tap is a gesture and behaves like the Today screen: tapping the
+    // status a class already has clears it. A notification action is not —
+    // the same action can arrive twice, and the second must not undo the first.
+    if (toggles || session.status != request.status) {
       await container.read(actionsProvider).mark(session, request.status);
     }
     await _pushFromContainer(container);

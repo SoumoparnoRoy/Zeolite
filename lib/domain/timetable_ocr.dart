@@ -743,6 +743,13 @@ class TimetableOcr {
     return (grid: grid, entries: entries);
   }
 
+  /// What each period column runs from and to, in reading order, with a null
+  /// where a header could not be read and could not be rebuilt.
+  ///
+  /// Exposed for the reply shape that names period columns rather than clocks:
+  /// that one places exactly, so it indexes this instead of being snapped.
+  static List<(int, int)?> scheduleOf(TimetableGrid grid) => _scheduleOf(grid);
+
   /// The same classes with their clocks moved onto the periods this sheet
   /// actually prints.
   ///

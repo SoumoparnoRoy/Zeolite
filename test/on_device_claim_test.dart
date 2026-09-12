@@ -77,10 +77,11 @@ void main() {
     // In the pieces the source wraps into: this reads the file, not the
     // rendered string.
     expect(source, contains('stay on this device unless '));
-    expect(source, contains('you sign in or connect Notion.'));
+    expect(source, contains('you sign in, connect Notion, or check a sheet '));
     // Naming only Notion was false for every signed-in user once Firestore
-    // sync landed, and naming only those two was false for everybody once
-    // Analytics did: it reports on every install, account or not.
+    // sync landed, naming only those two was false for everybody once
+    // Analytics did — it reports on every install, account or not — and
+    // leaving the sheet out was false for anyone who accepts an AI check.
     expect(source, contains('counts how the app '));
     expect(source,
         isNot(contains('stays on this device unless you connect Notion')));
@@ -88,13 +89,19 @@ void main() {
     expect(source, isNot(contains('everything stays on this device')));
   });
 
-  test('nothing outside the sync layer can open a socket', () {
+  test('only the layers that are allowed to can open a socket', () {
     // With the permission granted, "no network" is no longer a build property
     // and has to be one of the code instead.
+    //
+    // Every entry here is a way out of the device that the privacy policy has
+    // to describe, so adding one is a decision rather than an oversight to be
+    // fixed by widening the list. `timetable/` is the image a student
+    // explicitly sends to be read when the device could not read it.
     const List<String> allowed = <String>[
       'lib/services/firebase/',
       'lib/services/notion/',
       'lib/services/sync/',
+      'lib/services/timetable/',
     ];
     final RegExp caller = RegExp(r'package:http/|\bHttpClient\b|\bSocket\b');
 

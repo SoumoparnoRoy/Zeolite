@@ -720,8 +720,8 @@ class SettingsScreen extends ConsumerWidget {
                 child: Text(
                   'Zeolite · 1.0.0\n'
                   'Your timetable and attendance stay on this device unless '
-                  'you sign in or connect Notion. Zeolite counts how the app '
-                  'is used either way.',
+                  'you sign in, connect Notion, or check a sheet with AI. '
+                  'Zeolite counts how the app is used either way.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12,

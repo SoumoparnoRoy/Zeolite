@@ -51,6 +51,35 @@ class TextRecognition {
     }
   }
 
+  /// The same image as a PNG no wider than [widest], or unchanged if it
+  /// already is.
+  ///
+  /// For the copy that leaves the device when a read is doubted. A phone
+  /// camera hands over far more pixels than the route's 3MB cap allows, and
+  /// the model tiles what it is given, so sending the original costs tokens
+  /// for detail that is thrown away. Nothing recognised on the device comes
+  /// from this copy — the transcript is read from the full-size bytes and
+  /// rides along with it.
+  static Future<Uint8List> narrowedTo(Uint8List bytes, int widest) async {
+    final ui.Codec codec = await ui.instantiateImageCodec(bytes);
+    final ui.FrameInfo frame = await codec.getNextFrame();
+    final ui.Image source = frame.image;
+    try {
+      if (source.width <= widest) return bytes;
+      final int height = (source.height * widest / source.width).round();
+      final ui.Rect src = ui.Rect.fromLTWH(
+        0,
+        0,
+        source.width.toDouble(),
+        source.height.toDouble(),
+      );
+      return await _draw(source, src, widest, math.max(1, height)) ?? bytes;
+    } finally {
+      source.dispose();
+      codec.dispose();
+    }
+  }
+
   /// Recognised lines of one part of the image, drawn as large as the caps
   /// allow.
   ///

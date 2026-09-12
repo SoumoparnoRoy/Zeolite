@@ -10,7 +10,7 @@
 <header>
   <a href="/">Zeolite</a>
   <h1>Privacy Policy</h1>
-  <p class="updated">Last updated 30 August 2026</p>
+  <p class="updated">Last updated 12 September 2026</p>
 </header>
 
 <p class="lead">Zeolite is an attendance tracker for students, published by
@@ -33,6 +33,11 @@ developer cannot see it.</p>
 <p>Two things still leave the device even without an account, and neither
 carries anything you entered: the usage measurement described below, and the
 ML Kit diagnostics described further down.</p>
+
+<p>One further thing can leave the device, and it does carry what you are
+reading: a timetable image you explicitly choose to have checked with AI. It is
+never sent unless you accept that offer for that image, and it is described in
+full under <em>Reading a timetable from an image</em>.</p>
 
 <p>One more thing can leave, but only if you ask for it. Connecting Notion does
 not require an account either, and once you connect it your attendance is
@@ -101,8 +106,26 @@ console, and does so only where necessary to operate or repair the service.</p>
 
 <p>If you use “Read from an image”, the picture is processed
 <strong>on your device</strong> by Google's ML Kit text recognition, using a
-model bundled inside the app. The image is not uploaded, not kept after the
-read, and not shared.</p>
+model bundled inside the app. By default the image is not uploaded, not kept
+after the read, and not shared.</p>
+
+<p>There is one exception, and it never happens without you saying so.
+When the app cannot read the period times on a sheet with confidence, it
+offers to check that sheet with AI and tells you what that means before you
+choose. <strong>Only if you accept</strong>, a reduced-size copy of the image
+and the text already recognised on your device are sent to Zeolite's own
+server, which passes them to Cloudflare Workers AI to be read.</p>
+
+<p>What happens to that copy: it is held only for as long as the read takes,
+it is not stored by Zeolite and not written to any database, and Cloudflare
+states that input to Workers AI is not used to train models and is not
+retained. Nothing identifying you is sent with it — no account, no email, no
+device identifier, and none of your attendance. The answer is used only to
+suggest classes the device may have missed, and the times shown to you are
+always the ones read from the sheet on your device.</p>
+
+<p>You are asked every time. Declining leaves the read exactly as your device
+made it, and the rest of the import works normally.</p>
 
 <p>One side effect is worth stating plainly. ML Kit ships a component that
 reports usage and performance metrics about the ML Kit APIs to Google, and it
@@ -173,6 +196,11 @@ Zeolite account. If you turn it on:</p>
   <dt>Google — ML Kit</dt>
   <dd>Only if you read from an image. The recognition happens on your device;
       only diagnostics about the API reach Google.</dd>
+
+  <dt>Cloudflare — Workers AI</dt>
+  <dd>Only if you accept the offer to check a sheet with AI. Receives a copy of
+      that one image and the text read from it, to read it and answer. Not used
+      for training, and not retained.</dd>
 
   <dt>Notion</dt>
   <dd>Only if you connect it. Receives the attendance you chose to sync, into

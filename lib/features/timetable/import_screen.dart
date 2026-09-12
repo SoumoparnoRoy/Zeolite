@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
@@ -12,7 +13,10 @@ import '../../domain/day_grid.dart';
 import '../../domain/timetable_choices.dart';
 import '../../domain/timetable_import.dart';
 import '../../domain/timetable_ocr.dart';
+import '../../domain/vision_merge.dart';
+import '../../domain/vision_read.dart';
 import '../../services/text_recognition.dart';
+import '../../services/timetable/vision_client.dart';
 import '../../state/providers.dart';
 import '../../widgets/common.dart';
 import '../../widgets/gradient_header.dart';
@@ -49,6 +53,111 @@ class _ImportTimetableScreenState
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  /// The widest the copy that leaves the device is drawn. Past this is tokens
+  /// spent on detail the model tiles away.
+  static const int _sentWidth = 1600;
+
+  /// Asks a model what it sees, and folds anything new into the local read.
+  ///
+  /// Returns [entries] untouched on every refusal and every failure.
+  Future<List<OcrEntry>> _secondOpinion({
+    required TimetableGrid grid,
+    required List<OcrEntry> entries,
+    required List<OcrLine> lines,
+    required Uint8List bytes,
+    required ScaffoldMessengerState messenger,
+  }) async {
+    if (!await _agreesToSend()) return entries;
+
+    // Blocking and undismissable on purpose: the call runs 45 to 115 seconds
+    // on a dense sheet, and the button behind still reads "Reading...", which
+    // is what the local read says. Without this the wait looks like a hang.
+    if (!mounted) return entries;
+    unawaited(showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const _CheckingDialog(),
+    ));
+
+    final VisionClient client = VisionClient();
+    final VisionRead read;
+    try {
+      read = await client.read(
+        image: await TextRecognition.narrowedTo(bytes, _sentWidth),
+        text: <String>[for (final OcrLine l in lines) l.text].join('\n'),
+      );
+    } finally {
+      client.close();
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+    }
+
+    if (!read.ok) {
+      messenger.showSnackBar(SnackBar(content: Text(_saidAbout(read.failure!))));
+      return entries;
+    }
+
+    final List<OcrEntry> found = VisionMerge.corroboratedBy(
+      grid,
+      lines,
+      VisionMerge.placedOn(grid, read.classes),
+    );
+    final List<OcrEntry> merged = VisionMerge.filling(entries, found);
+    final int added = merged.length - entries.length;
+    messenger.showSnackBar(SnackBar(
+      content: Text(added == 0
+          ? 'The AI check found nothing this device missed.'
+          : 'The AI check added ${Words.plural(added, 'class')}. '
+              'Check them against the sheet.'),
+    ));
+    return merged;
+  }
+
+  /// Per read, never remembered: the policy can only say the image leaves the
+  /// device when the student asked it to if it is asked every time.
+  Future<bool> _agreesToSend() async {
+    final bool? yes = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        title: const Text('Check this sheet with AI?'),
+        content: const Text(
+          'Some of the period times on this sheet could not be read with '
+          'confidence. Zeolite can send a copy of the image to its server, '
+          'which asks an AI to read it and then deletes it.\n\n'
+          'Nothing else about you is sent, and the times stay the ones '
+          'printed on the sheet.',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('No thanks'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Check with AI'),
+          ),
+        ],
+      ),
+    );
+    return yes ?? false;
+  }
+
+  /// Says nothing about the provider or the upstream fault — "try later" is
+  /// the only part of it the student can act on.
+  static String _saidAbout(VisionFailure failure) {
+    switch (failure) {
+      case VisionFailure.unavailable:
+        return 'Checking a sheet with AI is not available in this version.';
+      case VisionFailure.busy:
+        return "Today's AI checks have been used up. Try again tomorrow.";
+      case VisionFailure.offline:
+        return 'Could not reach the server. The read on this device is '
+            'unchanged.';
+      case VisionFailure.failed:
+      case VisionFailure.unreadable:
+        return 'The AI check could not read that sheet either.';
+    }
   }
 
   Future<void> _import(TimetableImportResult result) async {
@@ -112,8 +221,7 @@ class _ImportTimetableScreenState
       // furthest is a property of the sheet, not something decidable upstream.
       final ({TimetableGrid? grid, List<OcrEntry> entries}) best =
           TimetableOcr.bestOf(reads.all);
-      final List<OcrEntry> entries = best.entries;
-      if (entries.isEmpty) {
+      if (best.entries.isEmpty) {
         messenger.showSnackBar(SnackBar(
           content: Text(best.grid == null
               ? 'Could not find a timetable in that image. The weekdays and '
@@ -121,6 +229,22 @@ class _ImportTimetableScreenState
               : 'Found the grid, but no classes in it.'),
         ));
         return;
+      }
+
+      // A doubted read is the only one worth sending anywhere, and even then
+      // only if the student says so.
+      List<OcrEntry> entries = best.entries;
+      final ReadConfidence confidence =
+          TimetableOcr.confidenceOf(best.grid, entries);
+      if (!confidence.isConfident && best.grid != null) {
+        if (!mounted) return;
+        entries = await _secondOpinion(
+          grid: best.grid!,
+          entries: entries,
+          lines: lines,
+          bytes: bytes,
+          messenger: messenger,
+        );
       }
 
       // Only the axes that actually offer a choice: a sheet where every lab
@@ -267,6 +391,52 @@ class _ImportTimetableScreenState
     final Set<int> days =
         result.classes.map((ImportedClass c) => c.weekday).toSet();
     return days.toList()..sort();
+  }
+}
+
+/// Shown for as long as the AI check runs, which is not quick.
+///
+/// It names the wait rather than just spinning: a minute of an unexplained
+/// spinner on a screen that was already saying "Reading..." reads as a hang,
+/// and the one thing the student can usefully know is that it is worth waiting.
+class _CheckingDialog extends StatelessWidget {
+  const _CheckingDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    // The system back gesture would otherwise dismiss this and leave the call
+    // running with nothing on screen.
+    return PopScope(
+      canPop: false,
+      child: AlertDialog(
+        content: Row(
+          children: <Widget>[
+            const SizedBox.square(
+              dimension: 22,
+              child: CircularProgressIndicator(strokeWidth: 2.5),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text(
+                    'Checking with AI',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    'A dense sheet can take a minute or two.',
+                    style: TextStyle(color: context.palette.textSecondary),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

@@ -667,8 +667,7 @@ class _CategoryFormState extends ConsumerState<_CategoryForm> {
     final int? id = widget.category?.id;
     if (id != null) {
       for (final Subject subject
-          in ref.read(timetableProvider).value?.subjects ??
-              const <Subject>[]) {
+          in ref.read(timetableProvider).value?.subjects ?? const <Subject>[]) {
         if (subject.categoryId == id && subject.id != null) {
           _subjectIds.add(subject.id!);
         }
@@ -1333,6 +1332,30 @@ class _SlotFormState extends ConsumerState<_SlotForm> {
     return null;
   }
 
+  /// Subject and start time are two thirds of the key a mark is filed under,
+  /// so only those two can strand anything — a new room or end date cannot.
+  int _strandedMarkCount(ClassSlot previous, ClassSlot updated) {
+    if (previous.subjectId == updated.subjectId &&
+        previous.startMinutes == updated.startMinutes) {
+      return 0;
+    }
+    final List<AttendanceRecord> records =
+        ref.read(timetableProvider).value?.records ?? <AttendanceRecord>[];
+    return records.where(previous.covers).length;
+  }
+
+  String _describe(ClassSlot slot) {
+    final List<Subject> subjects =
+        ref.read(timetableProvider).value?.subjects ?? <Subject>[];
+    String name = 'this class';
+    for (final Subject subject in subjects) {
+      if (subject.id == slot.subjectId) name = subject.name;
+    }
+    final bool use24Hour =
+        ref.read(settingsProvider).value?.use24HourTime ?? false;
+    return '$name at ${Clock.format(slot.startMinutes, use24Hour: use24Hour)}';
+  }
+
   Future<void> _save() async {
     if (_subjectId == null) {
       setState(() => _error = 'Choose a subject.');
@@ -1370,20 +1393,40 @@ class _SlotFormState extends ConsumerState<_SlotForm> {
 
     if (_isEditing) {
       final _ClassTime time = _times.first;
+      final ClassSlot previous = widget.slot!;
       // Rebuilt rather than copyWith so clearing the room actually clears it.
-      await actions.updateSlot(
-        ClassSlot(
-          id: widget.slot!.id,
-          subjectId: _subjectId!,
-          weekday: time.weekday,
-          startMinutes: time.startMinutes,
-          endMinutes: time.endMinutes,
-          room: time.room,
-          weight: _weight,
-          startDate: _startDate,
-          endDate: _endDate,
-        ),
+      final ClassSlot updated = ClassSlot(
+        id: previous.id,
+        subjectId: _subjectId!,
+        weekday: time.weekday,
+        startMinutes: time.startMinutes,
+        endMinutes: time.endMinutes,
+        room: time.room,
+        weight: _weight,
+        startDate: _startDate,
+        endDate: _endDate,
       );
+
+      final int stranded = _strandedMarkCount(previous, updated);
+      _MarkMove? choice;
+      if (stranded > 0) {
+        choice = await _askAboutMarks(
+          context,
+          from: _describe(previous),
+          to: _describe(updated),
+          markCount: stranded,
+        );
+        if (!mounted) return;
+        if (choice == null) {
+          setState(() => _saving = false);
+          return;
+        }
+      }
+      if (choice == _MarkMove.move) {
+        await actions.updateSlotAndMoveMarks(previous, updated);
+      } else {
+        await actions.updateSlot(updated);
+      }
     } else {
       final List<_ClassTime> ordered = <_ClassTime>[..._times]..sort(
           (_ClassTime a, _ClassTime b) {
@@ -1501,9 +1544,8 @@ class _SlotFormState extends ConsumerState<_SlotForm> {
             Expanded(
               child: _FieldButton(
                 label: 'Until',
-                value: _endDate == null
-                    ? 'Term end'
-                    : Dates.formatFull(_endDate!),
+                value:
+                    _endDate == null ? 'Term end' : Dates.formatFull(_endDate!),
                 icon: Icons.stop_rounded,
                 onTap: () => _pickDate(isStart: false),
                 onClear: _endDate == null
@@ -1970,6 +2012,40 @@ class _ExtraClassFormState extends ConsumerState<_ExtraClassForm> {
     setState(() => _date = Dates.dayOf(picked));
   }
 
+  /// A one-off is a single occurrence, so its date is part of the key too:
+  /// moving it to another day strands the mark exactly as changing the subject
+  /// does.
+  bool _rekeys(ExtraClass previous, ExtraClass updated) =>
+      previous.subjectId != updated.subjectId ||
+      previous.startMinutes != updated.startMinutes ||
+      Dates.keyOf(previous.date) != Dates.keyOf(updated.date);
+
+  bool _hasMark(ExtraClass extra) {
+    final List<AttendanceRecord> records =
+        ref.read(timetableProvider).value?.records ?? <AttendanceRecord>[];
+    for (final AttendanceRecord record in records) {
+      if (record.subjectId == extra.subjectId &&
+          record.startMinutes == extra.startMinutes &&
+          Dates.keyOf(record.date) == Dates.keyOf(extra.date)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  String _describeExtra(ExtraClass extra) {
+    final List<Subject> subjects =
+        ref.read(timetableProvider).value?.subjects ?? <Subject>[];
+    String name = 'this class';
+    for (final Subject subject in subjects) {
+      if (subject.id == extra.subjectId) name = subject.name;
+    }
+    final bool use24Hour =
+        ref.read(settingsProvider).value?.use24HourTime ?? false;
+    return '$name on ${Dates.formatDayMonth(extra.date)} at '
+        '${Clock.format(extra.startMinutes, use24Hour: use24Hour)}';
+  }
+
   Future<void> _save() async {
     if (_subjectId == null) {
       setState(() => _error = 'Choose a subject.');
@@ -2015,7 +2091,26 @@ class _ExtraClassFormState extends ConsumerState<_ExtraClassForm> {
 
     final TimetableActions actions = ref.read(actionsProvider);
     if (_isEditing) {
-      await actions.updateExtraClass(value);
+      final ExtraClass previous = widget.extra!;
+      _MarkMove? choice;
+      if (_hasMark(previous) && _rekeys(previous, value)) {
+        choice = await _askAboutMarks(
+          context,
+          from: _describeExtra(previous),
+          to: _describeExtra(value),
+          markCount: 1,
+        );
+        if (!mounted) return;
+        if (choice == null) {
+          setState(() => _saving = false);
+          return;
+        }
+      }
+      if (choice == _MarkMove.move) {
+        await actions.updateExtraClassAndMoveMarks(previous, value);
+      } else {
+        await actions.updateExtraClass(value);
+      }
     } else {
       await actions.addExtraClass(value);
     }
@@ -2783,6 +2878,45 @@ Future<bool> _confirmDeleteWithMarks(
   return confirmed ?? false;
 }
 
+enum _MarkMove { move, keep }
+
+/// Asked when an edit changes the `(subject, start time)` a mark is filed
+/// under. The app cannot tell a correction ("this was always Physics") from a
+/// genuine change ("this slot is Physics from now on"), and the two want
+/// opposite answers, so the student decides.
+Future<_MarkMove?> _askAboutMarks(
+  BuildContext context, {
+  required String from,
+  required String to,
+  required int markCount,
+}) async {
+  return showDialog<_MarkMove>(
+    context: context,
+    builder: (BuildContext context) => AlertDialog(
+      title: const Text('Move the attendance too?'),
+      content: Text(
+        'You have ${Words.plural(markCount, 'mark')} recorded against $from. '
+        'Move them to $to, or leave them where they are?',
+        style: const TextStyle(height: 1.4),
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(_MarkMove.keep),
+          child: const Text('Leave them'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(_MarkMove.move),
+          child: const Text('Move them'),
+        ),
+      ],
+    ),
+  );
+}
+
 /// Long-press menu on a class: edit it, cancel just this one, stop it
 /// repeating, or remove it entirely.
 Future<void> showSessionOptions(
@@ -3041,10 +3175,10 @@ class _CategorySubjects extends ConsumerWidget {
               subject: subject,
               selected: chosen.contains(subject.id),
               // Only when it is somewhere else, and not where it already is.
-              heldBy: subject.categoryId == null ||
-                      subject.categoryId == categoryId
-                  ? null
-                  : categoryNames[subject.categoryId],
+              heldBy:
+                  subject.categoryId == null || subject.categoryId == categoryId
+                      ? null
+                      : categoryNames[subject.categoryId],
               onTap: () => onToggle(subject.id!),
             ),
       ],

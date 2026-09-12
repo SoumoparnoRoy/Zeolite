@@ -190,8 +190,7 @@ class SettingsController extends AsyncNotifier<AppSettings> {
   }
 }
 
-final settingsProvider =
-    AsyncNotifierProvider<SettingsController, AppSettings>(
+final settingsProvider = AsyncNotifierProvider<SettingsController, AppSettings>(
   SettingsController.new,
 );
 
@@ -305,8 +304,7 @@ final scheduleEngineProvider = Provider<ScheduleEngine?>((ref) {
 });
 
 /// The day currently shown on the Today screen.
-final selectedDateProvider =
-    NotifierProvider<SelectedDateController, DateTime>(
+final selectedDateProvider = NotifierProvider<SelectedDateController, DateTime>(
   SelectedDateController.new,
 );
 
@@ -342,8 +340,7 @@ final nextSessionProvider = Provider<ClassSession?>((ref) {
 });
 
 /// The week shown on the timetable screen, keyed by its Monday.
-final visibleWeekProvider =
-    NotifierProvider<VisibleWeekController, DateTime>(
+final visibleWeekProvider = NotifierProvider<VisibleWeekController, DateTime>(
   VisibleWeekController.new,
 );
 
@@ -368,8 +365,7 @@ class HomeViewController extends Notifier<HomeView> {
   @override
   HomeView build() => HomeView.day;
 
-  void toggle() =>
-      state = state == HomeView.day ? HomeView.grid : HomeView.day;
+  void toggle() => state = state == HomeView.day ? HomeView.grid : HomeView.day;
 }
 
 // ------------------------------------------------------------------- stats
@@ -627,8 +623,7 @@ final defaultDurationProvider =
       ref.watch(settingsProvider).value?.defaultClassDurationMinutes ?? 60;
   final TimetableData? data = ref.watch(timetableProvider).value;
   if (data == null || subjectId == null) return fallback;
-  final ClassCategory? category =
-      data.categoryFor(data.subjectById(subjectId));
+  final ClassCategory? category = data.categoryFor(data.subjectById(subjectId));
   return category?.defaultDurationMinutes ?? fallback;
 });
 
@@ -713,8 +708,7 @@ class TimetableActions {
   /// would then delete rows nothing knows how to bring back.
   Future<void> reloadAfterSync({
     String? target,
-    Map<SyncKind, List<String>> pulled =
-        const <SyncKind, List<String>>{},
+    Map<SyncKind, List<String>> pulled = const <SyncKind, List<String>>{},
   }) async {
     if (target == null) {
       _dropUndo();
@@ -760,12 +754,11 @@ class TimetableActions {
 
     _autoBackupRunning = true;
     try {
-      final bool written =
-          await _ref.read(backupServiceProvider).runAutoBackup(
-                enabled: settings.autoBackupEnabled,
-                lastAt: settings.lastAutoBackupAt,
-                folderUri: settings.backupFolderUri,
-              );
+      final bool written = await _ref.read(backupServiceProvider).runAutoBackup(
+            enabled: settings.autoBackupEnabled,
+            lastAt: settings.lastAutoBackupAt,
+            folderUri: settings.backupFolderUri,
+          );
       if (!written) return;
       await _ref
           .read(settingsProvider.notifier)
@@ -831,8 +824,8 @@ class TimetableActions {
 
   void _recordPull(String target, Map<SyncKind, List<String>> pulled) {
     if (_undo.pendingToken == null) return;
-    final Map<SyncKind, List<String>> forTarget = _pulledSinceUndo
-        .putIfAbsent(target, () => <SyncKind, List<String>>{});
+    final Map<SyncKind, List<String>> forTarget =
+        _pulledSinceUndo.putIfAbsent(target, () => <SyncKind, List<String>>{});
     pulled.forEach((SyncKind kind, List<String> keys) {
       forTarget.putIfAbsent(kind, () => <String>[]).addAll(keys);
     });
@@ -1092,9 +1085,8 @@ class TimetableActions {
           settings.semesterEnd ?? DateTime.utc(2999),
         );
       }
-      final Subject? existing = data.subjects
-          .where((Subject s) => s.id == id)
-          .firstOrNull;
+      final Subject? existing =
+          data.subjects.where((Subject s) => s.id == id).firstOrNull;
       // Gone since the preview was built, so there is nothing to write onto.
       if (existing == null) continue;
       await _repo.updateSubject(
@@ -1133,11 +1125,9 @@ class TimetableActions {
         final String? name = placed.row.tagName;
         if (name == null || tagIds.containsKey(name)) continue;
         final Tag? existing = data.tags
-            .where((Tag t) =>
-                t.name.trim().toLowerCase() == name.toLowerCase())
+            .where((Tag t) => t.name.trim().toLowerCase() == name.toLowerCase())
             .firstOrNull;
-        tagIds[name] =
-            existing?.id ?? await _repo.insertTag(Tag(name: name));
+        tagIds[name] = existing?.id ?? await _repo.insertTag(Tag(name: name));
       }
     }
 
@@ -1204,6 +1194,39 @@ class TimetableActions {
     await _refresh();
   }
 
+  /// Edits the rule and carries its marks across to the new
+  /// `(subject, start time)`.
+  ///
+  /// The dates are kept. A mark records that a class happened on a day, and
+  /// re-pointing the rule does not change which days were attended — only
+  /// which class they belonged to. Marks already sitting at the destination
+  /// are overwritten, since one occurrence can only hold one mark.
+  Future<void> updateSlotAndMoveMarks(
+    ClassSlot previous,
+    ClassSlot updated,
+  ) async {
+    final DatabaseSnapshot before = await _repo.snapshot();
+    final List<AttendanceRecord> records =
+        _ref.read(timetableProvider).value?.records ?? <AttendanceRecord>[];
+    for (final AttendanceRecord record in records) {
+      if (!previous.covers(record)) continue;
+      await _repo.clearAttendance(
+        record.subjectId,
+        record.date,
+        record.startMinutes,
+      );
+      await _repo.setAttendance(
+        record.copyWith(
+          subjectId: updated.subjectId,
+          startMinutes: updated.startMinutes,
+        ),
+      );
+    }
+    await _repo.updateSlot(updated);
+    await _refresh();
+    _undo.arm(before);
+  }
+
   /// Deletes the rule and every future week it would have produced.
   ///
   /// Attendance already marked against it survives: marks are keyed by
@@ -1261,6 +1284,39 @@ class TimetableActions {
   Future<void> updateExtraClass(ExtraClass extra) async {
     await _repo.updateExtraClass(extra);
     await _refresh();
+  }
+
+  /// Moves a one-off class and takes its mark with it.
+  ///
+  /// Unlike a weekly rule, a one-off *is* the single occurrence, so the mark
+  /// follows the new date as well as the new subject and time.
+  Future<void> updateExtraClassAndMoveMarks(
+    ExtraClass previous,
+    ExtraClass updated,
+  ) async {
+    final DatabaseSnapshot before = await _repo.snapshot();
+    final AttendanceRecord? record = await _repo.getAttendanceAt(
+      previous.subjectId,
+      previous.date,
+      previous.startMinutes,
+    );
+    if (record != null) {
+      await _repo.clearAttendance(
+        previous.subjectId,
+        previous.date,
+        previous.startMinutes,
+      );
+      await _repo.setAttendance(
+        record.copyWith(
+          subjectId: updated.subjectId,
+          date: updated.date,
+          startMinutes: updated.startMinutes,
+        ),
+      );
+    }
+    await _repo.updateExtraClass(updated);
+    await _refresh();
+    _undo.arm(before);
   }
 
   Future<void> deleteExtraClass(int id) async {

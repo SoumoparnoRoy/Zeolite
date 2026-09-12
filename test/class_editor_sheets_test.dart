@@ -62,6 +62,25 @@ class _RecordingActions extends TimetableActions {
 
 /// Captures a saved subject rather than writing it, so the balance the form
 /// built can be read back.
+/// Tells the two edit paths apart: a plain save and one that carries the
+/// marks across.
+class _EditRecorder extends TimetableActions {
+  _EditRecorder(super.ref);
+
+  final List<ClassSlot> plain = <ClassSlot>[];
+  final List<ClassSlot> moved = <ClassSlot>[];
+
+  @override
+  Future<void> updateSlot(ClassSlot slot) async => plain.add(slot);
+
+  @override
+  Future<void> updateSlotAndMoveMarks(
+    ClassSlot previous,
+    ClassSlot updated,
+  ) async =>
+      moved.add(updated);
+}
+
 class _SubjectRecorder extends TimetableActions {
   _SubjectRecorder(super.ref, {required this.saved});
 
@@ -186,7 +205,8 @@ Future<void> _pickTime(
 
 void main() {
   group('a start time takes its length from the category', () {
-    testWidgets('weekly form, subject chosen first', (WidgetTester tester) async {
+    testWidgets('weekly form, subject chosen first',
+        (WidgetTester tester) async {
       await tester.pumpWidget(_host((c, ref) => showSlotEditor(c, ref)));
       await _openSheet(tester);
 
@@ -275,6 +295,98 @@ void main() {
 
       await _pickTime(tester, find.text('9:00 AM'), 11, 0);
       expect(find.text('1:00 PM'), findsOneWidget);
+    });
+  });
+
+  group('an edit that would strand marks', () {
+    final ClassSlot existing = ClassSlot(
+      id: 9,
+      subjectId: 1,
+      weekday: Dates.today().weekday,
+      startMinutes: 9 * 60,
+      endMinutes: 10 * 60,
+      startDate: Dates.addDays(Dates.today(), -7),
+    );
+    final AttendanceRecord marked = AttendanceRecord(
+      subjectId: 1,
+      date: Dates.today(),
+      startMinutes: 9 * 60,
+      status: AttendanceStatus.present,
+    );
+
+    Future<_EditRecorder> edit(
+      WidgetTester tester, {
+      required List<AttendanceRecord> records,
+      String? pickSubject,
+    }) async {
+      late _EditRecorder recorder;
+      await tester.pumpWidget(
+        _host(
+          (c, ref) => showSlotEditor(c, ref, slot: existing),
+          records: records,
+          slots: <ClassSlot>[existing],
+          actions: (Ref ref) => recorder = _EditRecorder(ref),
+        ),
+      );
+      await _openSheet(tester);
+      if (pickSubject != null) {
+        await tester.tap(find.text(pickSubject));
+        await tester.pumpAndSettle();
+      }
+      await _tapButton(tester, 'Save changes');
+      return recorder;
+    }
+
+    testWidgets('asks before re-pointing a class that has marks',
+        (WidgetTester tester) async {
+      final _EditRecorder recorder = await edit(
+        tester,
+        records: <AttendanceRecord>[marked],
+        pickSubject: 'Maths',
+      );
+
+      expect(find.text('Move the attendance too?'), findsOneWidget);
+      expect(recorder.plain, isEmpty);
+      expect(recorder.moved, isEmpty);
+
+      await _tapButton(tester, 'Move them');
+      expect(recorder.moved.single.subjectId, 2);
+      expect(recorder.plain, isEmpty);
+    });
+
+    testWidgets('leaves them behind when told to', (WidgetTester tester) async {
+      final _EditRecorder recorder = await edit(
+        tester,
+        records: <AttendanceRecord>[marked],
+        pickSubject: 'Maths',
+      );
+      await _tapButton(tester, 'Leave them');
+
+      expect(recorder.plain.single.subjectId, 2);
+      expect(recorder.moved, isEmpty);
+    });
+
+    testWidgets('says nothing when the class has no marks yet',
+        (WidgetTester tester) async {
+      final _EditRecorder recorder = await edit(
+        tester,
+        records: const <AttendanceRecord>[],
+        pickSubject: 'Maths',
+      );
+
+      expect(find.text('Move the attendance too?'), findsNothing);
+      expect(recorder.plain.single.subjectId, 2);
+    });
+
+    testWidgets('says nothing when the key did not change',
+        (WidgetTester tester) async {
+      final _EditRecorder recorder = await edit(
+        tester,
+        records: <AttendanceRecord>[marked],
+      );
+
+      expect(find.text('Move the attendance too?'), findsNothing);
+      expect(recorder.plain, hasLength(1));
     });
   });
 
@@ -396,8 +508,7 @@ void main() {
       final List<ExtraClass> extras = <ExtraClass>[];
       await tester.pumpWidget(
         _host(
-          (c, ref) =>
-              showBlockClassEditor(c, ref, date: monday, blockIndex: 0),
+          (c, ref) => showBlockClassEditor(c, ref, date: monday, blockIndex: 0),
           settings: _blockSettings,
           actions: (Ref ref) =>
               _RecordingActions(ref, slots: written, extras: extras),
@@ -425,15 +536,15 @@ void main() {
       expect(saved.endMinutes, 10 * 60 + 40);
     });
 
-    testWidgets('a one-off on top of a weekly class of the same subject is '
+    testWidgets(
+        'a one-off on top of a weekly class of the same subject is '
         'refused', (WidgetTester tester) async {
       final DateTime monday = Dates.startOfWeek(Dates.today());
       final List<ClassSlot> written = <ClassSlot>[];
       final List<ExtraClass> extras = <ExtraClass>[];
       await tester.pumpWidget(
         _host(
-          (c, ref) =>
-              showBlockClassEditor(c, ref, date: monday, blockIndex: 0),
+          (c, ref) => showBlockClassEditor(c, ref, date: monday, blockIndex: 0),
           settings: _blockSettings,
           slots: <ClassSlot>[
             ClassSlot(
@@ -553,7 +664,8 @@ void main() {
       final List<Subject> saved = <Subject>[];
       await tester.pumpWidget(
         _host(
-          (c, ref) => showSubjectEditor(c, ref, subject: _fixture().subjects[1]),
+          (c, ref) =>
+              showSubjectEditor(c, ref, subject: _fixture().subjects[1]),
           actions: (Ref ref) => _SubjectRecorder(ref, saved: saved),
         ),
       );
@@ -593,8 +705,7 @@ void main() {
 
     testWidgets('refuses to attend more classes than were held',
         (WidgetTester tester) async {
-      final List<Subject> saved =
-          await save(tester, held: '5', attended: '9');
+      final List<Subject> saved = await save(tester, held: '5', attended: '9');
 
       expect(find.text('Attended cannot be more than held.'), findsOneWidget);
       expect(saved, isEmpty);

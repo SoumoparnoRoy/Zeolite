@@ -2,6 +2,19 @@ import 'package:zeolite/data/settings/app_settings.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  group('the cancelled rule', () {
+    test('ships off, so a cancelled class changes nothing', () {
+      const AppSettings settings = AppSettings();
+      expect(settings.cancelledCountsAsAttended, isFalse);
+    });
+
+    test('travels with the account, unlike the sync switches', () {
+      const AppSettings settings = AppSettings(cancelledCountsAsAttended: true);
+      final AppSettings restored = AppSettings.fromJson(settings.toJson());
+      expect(restored.cancelledCountsAsAttended, isTrue);
+    });
+  });
+
   group('syncing waits to be asked', () {
     test('both sync toggles ship off', () {
       const AppSettings settings = AppSettings();

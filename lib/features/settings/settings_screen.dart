@@ -120,6 +120,30 @@ class SettingsScreen extends ConsumerWidget {
                 '"classes left" figures are counted up to the end date.',
               ),
               const SizedBox(height: AppSpacing.xl),
+              const SectionHeader('Counting'),
+              SurfaceCard(
+                padding: EdgeInsets.zero,
+                child: _Row(
+                  icon: Icons.event_busy_outlined,
+                  title: 'Cancelled classes count as attended',
+                  value: 'Some institutions count them, most do not',
+                  trailing: Switch(
+                    value: settings.cancelledCountsAsAttended,
+                    onChanged: (bool on) => controller.save(
+                      settings.copyWith(cancelledCountsAsAttended: on),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              const _Hint(
+                'Off, a cancelled class leaves your percentage alone. On, it '
+                'counts as one held and one attended, which pulls the '
+                'percentage up. Your figures change straight away; rows '
+                'already in Notion keep their old numbers until you rewrite '
+                'them.',
+              ),
+              const SizedBox(height: AppSpacing.xl),
               const SectionHeader('Subjects'),
               SurfaceCard(
                 padding: EdgeInsets.zero,

@@ -282,7 +282,7 @@ class _SubjectFormState extends ConsumerState<_SubjectForm> {
                 controller: _teacher,
                 textCapitalization: TextCapitalization.words,
                 decoration: const InputDecoration(
-                  labelText: 'Teacher',
+                  labelText: 'Professor',
                   hintText: 'Optional',
                 ),
               ),

@@ -67,8 +67,8 @@ class NotionProperty {
 
 /// What Zeolite needs a column for.
 ///
-/// The three required ones are what a row cannot be read without; the rest
-/// refine it, and a database that lacks them still syncs.
+/// The required ones are what a row cannot be read or found again without;
+/// the rest refine it, and a database that lacks them still syncs.
 enum NotionField {
   course(
     label: 'Course',
@@ -89,7 +89,7 @@ enum NotionField {
     types: <String>{'select', 'status'},
   ),
   component(
-    label: 'Component',
+    label: 'Name',
     description: 'The row title in Notion. Left alone if you do not map it.',
     types: <String>{'title', 'rich_text'},
   ),
@@ -190,6 +190,13 @@ enum NotionField {
 enum NotionCourseField {
   name(types: <String>{'title'}),
   key(types: <String>{'rich_text'}),
+
+  /// The university's own code, such as `SUB1`. Optional, so a template
+  /// without the column keeps working exactly as it did.
+  code(types: <String>{'rich_text'}),
+  teacher(types: <String>{'rich_text'}),
+  targetPercent(types: <String>{'number'}),
+  expectedTotal(types: <String>{'number'}),
   priorHeld(types: <String>{'number'}),
   priorAttended(types: <String>{'number'});
 
@@ -202,6 +209,15 @@ enum NotionCourseField {
     return switch (this) {
       NotionCourseField.name => n == 'name' || n == 'course' || n == 'subject',
       NotionCourseField.key => n == 'zeolite id' || n == 'zeolite key',
+      NotionCourseField.code => n == 'code' || n == 'course code',
+      NotionCourseField.teacher => n == 'professor' ||
+          n == 'teacher' ||
+          n == 'instructor' ||
+          n == 'faculty',
+      NotionCourseField.targetPercent =>
+        n == 'target' || n == 'target %' || n == 'target percent',
+      NotionCourseField.expectedTotal =>
+        n == 'classes all term' || n == 'total classes' || n == 'term total',
       NotionCourseField.priorHeld => n == 'prior held',
       NotionCourseField.priorAttended => n == 'prior attended',
     };

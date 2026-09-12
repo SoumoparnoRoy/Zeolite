@@ -29,6 +29,12 @@ final notionSyncTargetProvider = Provider<SyncTarget?>((ref) {
   return NotionSyncTarget(
     client: ref.watch(notionClientProvider),
     mapping: mapping,
+    // Has to match what the app's own percentage does with a cancelled class,
+    // or the Notion rollups and the app disagree about the same term.
+    cancelledCounts: ref.watch(settingsProvider.select(
+          (AsyncValue<AppSettings> s) => s.value?.cancelledCountsAsAttended,
+        )) ??
+        false,
     // Read per call rather than captured, so renaming a course reaches the
     // next run instead of the next restart.
     course: (String uuid) {
@@ -37,6 +43,10 @@ final notionSyncTargetProvider = Provider<SyncTarget?>((ref) {
       return NotionCourse(
         uuid: uuid,
         name: subject.name,
+        code: subject.code,
+        teacher: subject.teacher,
+        targetPercent: subject.targetPercent,
+        expectedTotal: subject.expectedTotal,
         priorHeld: subject.priorHeld,
         priorAttended: subject.priorAttended,
       );

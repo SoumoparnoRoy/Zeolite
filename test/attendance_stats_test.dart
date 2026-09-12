@@ -10,6 +10,7 @@ SubjectStats statsOf({
   int cancelled = 0,
   double target = 0.75,
   int remaining = 0,
+  bool cancelledCounts = false,
 }) {
   return SubjectStats(
     subject: physics,
@@ -18,10 +19,33 @@ SubjectStats statsOf({
     cancelled: cancelled,
     target: target,
     plannedFromSlots: remaining,
+    cancelledCounts: cancelledCounts,
   );
 }
 
 void main() {
+  group('a cancelled class', () {
+    test('leaves the percentage alone by default', () {
+      final SubjectStats stats = statsOf(present: 6, absent: 2, cancelled: 4);
+      expect(stats.held, 8);
+      expect(stats.attended, 6);
+      expect(stats.percent, closeTo(75, 0.01));
+    });
+
+    test('counts on both sides where the institution says so', () {
+      final SubjectStats stats = statsOf(
+        present: 6,
+        absent: 2,
+        cancelled: 4,
+        cancelledCounts: true,
+      );
+      // Both sides gain the four, which is what pulls the percentage up.
+      expect(stats.held, 12);
+      expect(stats.attended, 10);
+      expect(stats.percent, closeTo(83.33, 0.01));
+    });
+  });
+
   group('percentages', () {
     test('cancelled classes are excluded from both sides of the ratio', () {
       final SubjectStats stats = statsOf(present: 8, absent: 2, cancelled: 5);

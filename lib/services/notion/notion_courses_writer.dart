@@ -88,6 +88,30 @@ class NotionCoursesWriter {
                 ),
               ) ??
               '',
+          code: NotionProperties.plainTextOf(
+            NotionProperties.valueOf(
+              properties,
+              _field(NotionCourseField.code),
+            ),
+          ),
+          teacher: NotionProperties.plainTextOf(
+            NotionProperties.valueOf(
+              properties,
+              _field(NotionCourseField.teacher),
+            ),
+          ),
+          targetPercent: NotionProperties.numberOf(
+            NotionProperties.valueOf(
+              properties,
+              _field(NotionCourseField.targetPercent),
+            ),
+          )?.toDouble(),
+          expectedTotal: NotionProperties.numberOf(
+            NotionProperties.valueOf(
+              properties,
+              _field(NotionCourseField.expectedTotal),
+            ),
+          )?.round(),
           priorHeld: _numberOf(properties, NotionCourseField.priorHeld),
           priorAttended:
               _numberOf(properties, NotionCourseField.priorAttended),
@@ -116,6 +140,17 @@ class NotionCoursesWriter {
 
     put(NotionCourseField.name, NotionProperties.titleOf(course.name));
     put(NotionCourseField.key, NotionProperties.textOf(course.uuid));
+    // Written even when empty, so clearing a code in the app clears it there
+    // rather than leaving the old one behind.
+    put(NotionCourseField.code, NotionProperties.textOf(course.code ?? ''));
+    put(NotionCourseField.teacher,
+        NotionProperties.textOf(course.teacher ?? ''));
+    // Null rather than zero where the student has not set one: a target of 0%
+    // and no target at all are different answers.
+    put(NotionCourseField.targetPercent,
+        <String, Object?>{'number': course.targetPercent});
+    put(NotionCourseField.expectedTotal,
+        <String, Object?>{'number': course.expectedTotal});
     // Written even when zero: a page made before the user filled these in
     // would otherwise keep whatever Notion had, and the dashboard's formula
     // adds them to the rollups.

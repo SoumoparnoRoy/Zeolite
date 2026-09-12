@@ -62,6 +62,7 @@ NotionSyncTarget _target(
   MockClient mock, {
   bool withKey = true,
   String? category = 'Lab',
+  bool cancelledCounts = false,
 }) =>
     NotionSyncTarget(
       client: NotionClient(
@@ -76,6 +77,7 @@ NotionSyncTarget _target(
           ? const NotionCourse(uuid: _uuid, name: 'Generic Course')
           : null,
       categoryName: (String uuid) => category,
+      cancelledCounts: cancelledCounts,
     );
 
 /// One page as Notion reports it back, in the shape the reader expects.
@@ -374,5 +376,26 @@ void main() {
     // this column: held 2 would read as two classes you missed.
     expect(props['p5'], <String, Object?>{'number': 0});
     expect(props['p6'], <String, Object?>{'number': 0});
+  });
+
+  test('unless the institution counts a cancelled class as attended',
+      () async {
+    late http.Request sent;
+    final NotionSyncTarget target = _target(
+      MockClient((http.Request r) async {
+        sent = r;
+        return http.Response('{"id":"page-1"}', 200);
+      }),
+      cancelledCounts: true,
+    );
+
+    await target.create(_mark(status: 'cancelled', weight: 2));
+
+    final Map<String, Object?> props =
+        (jsonDecode(sent.body) as Map<String, Object?>)['properties']!
+            as Map<String, Object?>;
+    // Both sides, so the dashboard's fraction moves the way the app's does.
+    expect(props['p5'], <String, Object?>{'number': 2});
+    expect(props['p6'], <String, Object?>{'number': 2});
   });
 }

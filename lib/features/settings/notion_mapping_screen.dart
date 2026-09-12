@@ -363,6 +363,15 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
   }
 
   Future<void> _pickCourses() async {
+    // Reopening an existing mapping lands straight on the fields, so the table
+    // list has never been fetched and the sheet would offer nothing at all.
+    if (_sources.isEmpty) {
+      await _loadSources();
+      if (!mounted) return;
+      setState(() => _stage = _Stage.fields);
+    }
+    if (!mounted) return;
+
     final _Choice? choice = await showModalBottomSheet<_Choice>(
       context: context,
       builder: (BuildContext context) => SafeArea(

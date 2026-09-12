@@ -42,6 +42,7 @@ class SubjectStats {
     required this.target,
     required this.plannedFromSlots,
     this.weighted = false,
+    this.cancelledCounts = false,
   });
 
   final Subject subject;
@@ -65,6 +66,10 @@ class SubjectStats {
   /// and nobody else should have to meet the word.
   final bool weighted;
 
+  /// Whether a cancelled class joins both sides of the fraction instead of
+  /// leaving it alone. The institution's rule, not the app's preference.
+  final bool cancelledCounts;
+
   /// The unit the headlines count in.
   String get _unit => weighted ? 'period' : 'class';
 
@@ -73,11 +78,14 @@ class SubjectStats {
   int get priorHeld => subject.priorHeld;
   int get priorAttended => subject.priorAttended;
 
-  /// Classes that count towards the percentage. Cancelled ones don't.
-  int get held => present + absent + priorHeld;
+  /// Classes that count towards the percentage. Cancelled ones don't, unless
+  /// the institution says otherwise.
+  int get held =>
+      present + absent + priorHeld + (cancelledCounts ? cancelled : 0);
 
   /// [present] stays what was marked here, so the log still reconciles.
-  int get attended => present + priorAttended;
+  int get attended =>
+      present + priorAttended + (cancelledCounts ? cancelled : 0);
 
   /// Derived from the term total when there is one, so nothing has to be kept
   /// up to date: every class marked moves [held] and this follows.

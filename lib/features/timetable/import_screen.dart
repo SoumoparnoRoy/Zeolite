@@ -352,7 +352,7 @@ class _ImportTimetableScreenState
                 ),
                 decoration: const InputDecoration(
                   border: InputBorder.none,
-                  hintText: 'Subject 1, Mo, 1-2, Room 1, Teacher 1',
+                  hintText: 'Subject 1, Mo, 1-2, Room 1, Professor 1',
                 ),
                 onChanged: (_) => setState(() {}),
               ),
@@ -448,8 +448,8 @@ class _FormatHelp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GroupNote(
-      'One class per line: subject, day, blocks, room, teacher. The room and '
-      'teacher can be left off. A lab across two periods is "1-2". '
+      'One class per line: subject, day, blocks, room, professor. The room '
+      'and professor can be left off. A lab across two periods is "1-2". '
       '${grid.isConfigured ? 'Block numbers count against the teaching day you '
           'set up, and a time like "14:20-15:20" works too.' : 'The teaching '
           'day has no blocks yet, so write times like "14:20-15:20".'} '

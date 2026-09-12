@@ -428,6 +428,7 @@ final statsProvider = Provider<OverallStats>((ref) {
             : subject.targetPercent! / 100.0,
         plannedFromSlots: remaining[id] ?? 0,
         weighted: weighted.contains(id),
+        cancelledCounts: settings?.cancelledCountsAsAttended ?? false,
       ),
     );
   }

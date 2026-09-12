@@ -33,6 +33,7 @@ NotionMapping _mapping() => NotionMapping(
         fields: <NotionCourseField, NotionProperty>{
           NotionCourseField.name: _p('c0', 'Name', 'title'),
           NotionCourseField.key: _p('c1', 'Zeolite ID', 'rich_text'),
+          NotionCourseField.code: _p('c4', 'Code', 'rich_text'),
           NotionCourseField.priorHeld: _p('c2', 'Prior Held', 'number'),
           NotionCourseField.priorAttended:
               _p('c3', 'Prior Attended', 'number'),
@@ -62,6 +63,7 @@ NotionSyncTarget _target(MockClient mock, {NotionCourse? course}) =>
           const NotionCourse(
             uuid: _uuid,
             name: 'Thermodynamics',
+            code: 'SUB1',
             priorHeld: 6,
             priorAttended: 5,
           ),
@@ -97,6 +99,13 @@ void main() {
       'rich_text': <Object?>[
         <String, Object?>{
           'text': <String, Object?>{'content': _uuid},
+        },
+      ],
+    });
+    expect(coursePage['c4'], <String, Object?>{
+      'rich_text': <Object?>[
+        <String, Object?>{
+          'text': <String, Object?>{'content': 'SUB1'},
         },
       ],
     });

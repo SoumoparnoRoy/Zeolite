@@ -8,9 +8,15 @@ import 'notion_mapping.dart';
 /// envelope wrong fails every row of a push at once, so it is the part worth
 /// being able to test without a network anywhere near it.
 class NotionProperties {
-  const NotionProperties(this.mapping);
+  const NotionProperties(this.mapping, {this.cancelledCounts = false});
 
   final NotionMapping mapping;
+
+  /// Whether a cancelled class is written as one held and attended, which is
+  /// the institution's rule rather than the app's. It has to agree with
+  /// [SubjectStats.cancelledCounts], or the dashboard and the app disagree
+  /// about the same term.
+  final bool cancelledCounts;
 
   /// What a page needs, keyed by property id.
   ///
@@ -67,13 +73,16 @@ class NotionProperties {
     // makes the column summable — the Courses dashboard totals it, and a
     // cancelled class counted as held would read as one you missed.
     put(NotionField.held, (_) => <String, Object?>{
-          'number': status == 'cancelled' ? 0 : weight,
+          'number': status == 'cancelled' && !cancelledCounts ? 0 : weight,
         });
     // The credit is what decides whether a class counted, and the reader
     // trusts it over the word beside it — so an absence has to say zero
     // rather than leave it unset and read as agreement.
     put(NotionField.credit, (_) => <String, Object?>{
-          'number': status == 'present' ? weight : 0,
+          'number':
+              status == 'present' || (status == 'cancelled' && cancelledCounts)
+                  ? weight
+                  : 0,
         });
 
     return out;
@@ -98,7 +107,7 @@ class NotionProperties {
       // Whatever `encode` puts in Held, because that column is where `decode`
       // reads this back from. Predicting the mark's own weight for a cancelled
       // class made every one of them read as changed on the far side forever.
-      'weight': status == 'cancelled'
+      'weight': status == 'cancelled' && !cancelledCounts
           ? 0
           : (item.fields['weight'] as int?) ?? 1,
     };

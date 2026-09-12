@@ -80,6 +80,7 @@ class AppSettings {
     this.syncedAccountId,
     this.syncedNotionDatabaseId,
     this.accentColour = AccentColour.violet,
+    this.cancelledCountsAsAttended = false,
     this.notionAutoSync = false,
     this.accountAutoSync = false,
     this.scheduleChangedAt,
@@ -190,6 +191,11 @@ class AppSettings {
   /// Device-local like [themeMode], and out of the sync hash for the same
   /// reason: a phone and a tablet can be tinted differently.
   final AccentColour accentColour;
+
+  /// Off, a cancelled class leaves both sides and the percentage is untouched;
+  /// on, it counts as one held *and* attended, which some institutions do.
+  /// Synced rather than device-local: it decides what a percentage means.
+  final bool cancelledCountsAsAttended;
 
   final bool notionAutoSync;
 
@@ -312,6 +318,7 @@ class AppSettings {
     String? syncedAccountId,
     String? syncedNotionDatabaseId,
     AccentColour? accentColour,
+    bool? cancelledCountsAsAttended,
     bool? notionAutoSync,
     bool? accountAutoSync,
     DateTime? scheduleChangedAt,
@@ -358,6 +365,8 @@ class AppSettings {
       syncedNotionDatabaseId:
           syncedNotionDatabaseId ?? this.syncedNotionDatabaseId,
       accentColour: accentColour ?? this.accentColour,
+      cancelledCountsAsAttended:
+          cancelledCountsAsAttended ?? this.cancelledCountsAsAttended,
       notionAutoSync: notionAutoSync ?? this.notionAutoSync,
       accountAutoSync: accountAutoSync ?? this.accountAutoSync,
       scheduleChangedAt: scheduleChangedAt ?? this.scheduleChangedAt,
@@ -394,6 +403,7 @@ class AppSettings {
         'notifyBeforeClass': notifyBeforeClass,
         'notifyLeadMinutes': notifyLeadMinutes,
         'notifyAtClassEnd': notifyAtClassEnd,
+        'cancelledCountsAsAttended': cancelledCountsAsAttended,
         'notifyEveningReminder': notifyEveningReminder,
         'eveningReminderMinutes': eveningReminderMinutes,
         'notifyAttendanceDanger': notifyAttendanceDanger,
@@ -429,6 +439,8 @@ class AppSettings {
       notifyBeforeClass: json['notifyBeforeClass'] as bool? ?? true,
       notifyLeadMinutes: (json['notifyLeadMinutes'] as num?)?.toInt() ?? 15,
       notifyAtClassEnd: json['notifyAtClassEnd'] as bool? ?? false,
+      cancelledCountsAsAttended:
+          json['cancelledCountsAsAttended'] as bool? ?? false,
       notifyEveningReminder: json['notifyEveningReminder'] as bool? ?? true,
       eveningReminderMinutes:
           (json['eveningReminderMinutes'] as num?)?.toInt() ?? 20 * 60,
@@ -477,6 +489,7 @@ class SettingsService {
   static const String _kNotifyBefore = 'ut.notifyBeforeClass';
   static const String _kLead = 'ut.notifyLeadMinutes';
   static const String _kNotifyAtEnd = 'ut.notifyAtClassEnd';
+  static const String _kCancelledCounts = 'ut.cancelledCountsAsAttended';
   static const String _kNotifyEvening = 'ut.notifyEveningReminder';
   static const String _kEveningMinutes = 'ut.eveningReminderMinutes';
   static const String _kNotifyDanger = 'ut.notifyAttendanceDanger';
@@ -522,6 +535,8 @@ class SettingsService {
       notifyBeforeClass: await prefs.getBool(_kNotifyBefore) ?? true,
       notifyLeadMinutes: await prefs.getInt(_kLead) ?? 15,
       notifyAtClassEnd: await prefs.getBool(_kNotifyAtEnd) ?? false,
+      cancelledCountsAsAttended:
+          await prefs.getBool(_kCancelledCounts) ?? false,
       notifyEveningReminder: await prefs.getBool(_kNotifyEvening) ?? true,
       eveningReminderMinutes: await prefs.getInt(_kEveningMinutes) ?? 20 * 60,
       notifyAttendanceDanger: await prefs.getBool(_kNotifyDanger) ?? true,
@@ -593,6 +608,8 @@ class SettingsService {
     await prefs.setBool(_kNotifyBefore, settings.notifyBeforeClass);
     await prefs.setInt(_kLead, settings.notifyLeadMinutes);
     await prefs.setBool(_kNotifyAtEnd, settings.notifyAtClassEnd);
+    await prefs.setBool(
+        _kCancelledCounts, settings.cancelledCountsAsAttended);
     await prefs.setBool(_kNotifyEvening, settings.notifyEveningReminder);
     await prefs.setInt(_kEveningMinutes, settings.eveningReminderMinutes);
     await prefs.setBool(_kNotifyDanger, settings.notifyAttendanceDanger);

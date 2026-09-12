@@ -15,11 +15,13 @@ class NotionSyncTarget implements SyncTarget {
     required NotionMapping mapping,
     required NotionCourse? Function(String subjectUuid) course,
     String? Function(String subjectUuid)? categoryName,
+    bool cancelledCounts = false,
   })  : _client = client,
         _mapping = mapping,
         _course = course,
         _categoryName = categoryName,
-        _properties = NotionProperties(mapping),
+        _properties =
+            NotionProperties(mapping, cancelledCounts: cancelledCounts),
         _courses = mapping.courses == null
             ? null
             : NotionCoursesWriter(

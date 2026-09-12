@@ -439,7 +439,24 @@ class SettingsScreen extends ConsumerWidget {
                                   context, controller, settings, ref)
                               : null,
                         ),
-                        if (settings.classRemindersActive) ...<Widget>[
+                        const Divider(indent: 58),
+                        _SwitchRow(
+                          icon: Icons.task_alt_rounded,
+                          title: 'When each class ends',
+                          subtitle: 'Mark it from the notification',
+                          value: settings.notifyAtClassEnd,
+                          onChanged: (bool v) async {
+                            if (v) {
+                              await NotificationService.instance
+                                  .requestPermissions();
+                            }
+                            await controller
+                                .save(settings.copyWith(notifyAtClassEnd: v));
+                            await ref.read(actionsProvider).reloadAfterImport();
+                          },
+                        ),
+                        if (settings.classRemindersActive ||
+                            settings.classEndRemindersActive) ...<Widget>[
                           const Divider(indent: 58),
                           _Row(
                             icon: Icons.timer_outlined,

@@ -45,6 +45,7 @@ class NotificationService {
 
   /// Notification id ranges, kept apart so one feature never cancels another.
   static const int _classReminderBase = 100000;
+  static const int _classEndReminderBase = 101000;
   static const int _eveningReminderId = 10;
   static const int _dangerAlertId = 2000;
 
@@ -62,6 +63,7 @@ class NotificationService {
   /// Android caps pending alarms (500 on most OEM builds). A week of classes
   /// is well inside that, and we refresh on every data change anyway.
   static const int _maxClassReminders = 60;
+  static const int _maxClassEndReminders = 60;
 
   // The three channel ids keep their pre-Zeolite names for the same reason the
   // database file does — an id is how Android finds an existing channel, and a
@@ -71,7 +73,7 @@ class NotificationService {
       AndroidNotificationChannel(
     'attend_it_classes',
     'Class reminders',
-    description: 'Reminds you shortly before a class starts.',
+    description: 'Reminds you before a class and when it ends.',
     importance: Importance.high,
   );
 
@@ -92,7 +94,9 @@ class NotificationService {
   );
 
   /// Sets up timezone data and notification channels. Safe to call twice.
-  Future<void> init() async {
+  Future<void> init({
+    DidReceiveNotificationResponseCallback? backgroundAction,
+  }) async {
     if (_ready) return;
     try {
       tzdata.initializeTimeZones();
@@ -115,6 +119,7 @@ class NotificationService {
         onDidReceiveNotificationResponse: (NotificationResponse response) {
           tappedPayload.value = response.payload;
         },
+        onDidReceiveBackgroundNotificationResponse: backgroundAction,
       );
 
       // A tap that launched the app from cold does not reach the callback
@@ -222,6 +227,7 @@ class NotificationService {
     if (!_ready) return;
 
     await _cancelRange(_classReminderBase, _maxClassReminders);
+    await _cancelRange(_classEndReminderBase, _maxClassEndReminders);
     await _plugin.cancel(id: _eveningReminderId);
 
     // The master switch short-circuits everything. The cancellations above have
@@ -236,6 +242,9 @@ class NotificationService {
 
     if (settings.notifyBeforeClass) {
       await _scheduleClassReminders(settings, upcoming, stats, mode);
+    }
+    if (settings.notifyAtClassEnd) {
+      await _scheduleClassEndReminders(upcoming, mode);
     }
     if (settings.notifyEveningReminder) {
       await _scheduleEveningReminder(settings, mode);
@@ -393,6 +402,55 @@ class NotificationService {
         scheduled++;
       } catch (error) {
         debugPrint('Zeolite: could not schedule class reminder: $error');
+      }
+    }
+  }
+
+  Future<void> _scheduleClassEndReminders(
+    List<ClassSession> upcoming,
+    AndroidScheduleMode mode,
+  ) async {
+    const List<AndroidNotificationAction> actions = <AndroidNotificationAction>[
+      AndroidNotificationAction('present', '✓'),
+      AndroidNotificationAction('absent', '✕'),
+      AndroidNotificationAction('cancelled', 'O'),
+    ];
+    final NotificationDetails details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        _classChannel.id,
+        _classChannel.name,
+        channelDescription: _classChannel.description,
+        importance: Importance.high,
+        priority: Priority.high,
+        category: AndroidNotificationCategory.reminder,
+        groupKey: _classGroupKey,
+        actions: actions,
+      ),
+    );
+
+    final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
+    int scheduled = 0;
+    for (final ClassSession session in upcoming) {
+      if (scheduled >= _maxClassEndReminders) break;
+      if (session.isMarked) continue;
+
+      final tz.TZDateTime fireAt =
+          tz.TZDateTime.from(session.endDateTime, tz.local);
+      if (!fireAt.isAfter(now)) continue;
+
+      try {
+        await _plugin.zonedSchedule(
+          id: _classEndReminderBase + scheduled,
+          title: '${session.subject.name} just ended',
+          body: 'Mark your attendance',
+          scheduledDate: fireAt,
+          notificationDetails: details,
+          androidScheduleMode: mode,
+          payload: 'class:${session.key}',
+        );
+        scheduled++;
+      } catch (error) {
+        debugPrint('Zeolite: could not schedule class-end reminder: $error');
       }
     }
   }

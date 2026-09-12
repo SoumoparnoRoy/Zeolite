@@ -33,9 +33,9 @@ enum AttendanceStatus {
       };
 
   String get shortLabel => switch (this) {
-        AttendanceStatus.present => 'P',
-        AttendanceStatus.absent => 'A',
-        AttendanceStatus.cancelled => 'C',
+        AttendanceStatus.present => '✓',
+        AttendanceStatus.absent => '✕',
+        AttendanceStatus.cancelled => 'O',
       };
 
   IconData get icon => switch (this) {

@@ -3,11 +3,12 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('notification gating', () {
-    test('everything is on by default', () {
+    test('existing reminder types are on and the new end reminder is off', () {
       const AppSettings settings = AppSettings();
       expect(settings.notificationsEnabled, isTrue);
       expect(settings.inAppAlerts, isTrue);
       expect(settings.classRemindersActive, isTrue);
+      expect(settings.classEndRemindersActive, isFalse);
       expect(settings.eveningReminderActive, isTrue);
       expect(settings.dangerAlertsActive, isTrue);
     });
@@ -15,6 +16,7 @@ void main() {
     test('the master switch overrides every type', () {
       const AppSettings settings = AppSettings(notificationsEnabled: false);
       expect(settings.classRemindersActive, isFalse);
+      expect(settings.classEndRemindersActive, isFalse);
       expect(settings.eveningReminderActive, isFalse);
       expect(settings.dangerAlertsActive, isFalse);
     });
@@ -28,11 +30,13 @@ void main() {
       // round trip; the master switch must not silently re-enable it.
       expect(restored.notifyEveningReminder, isFalse);
       expect(restored.notifyBeforeClass, isTrue);
+      expect(restored.notifyAtClassEnd, isFalse);
     });
 
     test('one type off leaves the others alone', () {
       const AppSettings settings = AppSettings(notifyBeforeClass: false);
       expect(settings.classRemindersActive, isFalse);
+      expect(settings.classEndRemindersActive, isFalse);
       expect(settings.eveningReminderActive, isTrue);
       expect(settings.dangerAlertsActive, isTrue);
     });
@@ -102,10 +106,12 @@ void main() {
       const AppSettings settings = AppSettings(
         notificationsEnabled: false,
         inAppAlerts: false,
+        notifyAtClassEnd: true,
       );
       final AppSettings restored = AppSettings.fromJson(settings.toJson());
       expect(restored.notificationsEnabled, isFalse);
       expect(restored.inAppAlerts, isFalse);
+      expect(restored.notifyAtClassEnd, isTrue);
     });
 
     test('an older backup without the flags restores them as on', () {
@@ -115,6 +121,7 @@ void main() {
       });
       expect(restored.notificationsEnabled, isTrue);
       expect(restored.inAppAlerts, isTrue);
+      expect(restored.notifyAtClassEnd, isFalse);
     });
 
     test('carries the break, and an older backup restores without one', () {

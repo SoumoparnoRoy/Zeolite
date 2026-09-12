@@ -42,7 +42,9 @@ Future<void> main() async {
 
   // Notification setup is best-effort — a failure here must never block
   // launch, so the service swallows and logs its own errors.
-  await NotificationService.instance.init();
+  await NotificationService.instance.init(
+    backgroundAction: handleNotificationAction,
+  );
 
   // Stores the callback handles Android needs to reach Dart from a widget tap.
   // Cheap, and it has to happen before the first tap rather than before the

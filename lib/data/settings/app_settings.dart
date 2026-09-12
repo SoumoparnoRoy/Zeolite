@@ -69,6 +69,7 @@ class AppSettings {
     this.inAppAlerts = true,
     this.notifyBeforeClass = true,
     this.notifyLeadMinutes = 15,
+    this.notifyAtClassEnd = false,
     this.notifyEveningReminder = true,
     this.eveningReminderMinutes = 20 * 60,
     this.notifyAttendanceDanger = true,
@@ -133,6 +134,10 @@ class AppSettings {
 
   final bool notifyBeforeClass;
   final int notifyLeadMinutes;
+
+  /// Offers attendance actions when a class finishes. Off by default because
+  /// it adds a notification the app has never sent before.
+  final bool notifyAtClassEnd;
 
   final bool notifyEveningReminder;
 
@@ -229,6 +234,7 @@ class AppSettings {
   /// A type only reaches the system tray when the master switch and its own
   /// flag are both on.
   bool get classRemindersActive => notificationsEnabled && notifyBeforeClass;
+  bool get classEndRemindersActive => notificationsEnabled && notifyAtClassEnd;
   bool get eveningReminderActive =>
       notificationsEnabled && notifyEveningReminder;
   bool get dangerAlertsActive =>
@@ -290,6 +296,7 @@ class AppSettings {
     bool? inAppAlerts,
     bool? notifyBeforeClass,
     int? notifyLeadMinutes,
+    bool? notifyAtClassEnd,
     bool? notifyEveningReminder,
     int? eveningReminderMinutes,
     bool? notifyAttendanceDanger,
@@ -328,6 +335,7 @@ class AppSettings {
       inAppAlerts: inAppAlerts ?? this.inAppAlerts,
       notifyBeforeClass: notifyBeforeClass ?? this.notifyBeforeClass,
       notifyLeadMinutes: notifyLeadMinutes ?? this.notifyLeadMinutes,
+      notifyAtClassEnd: notifyAtClassEnd ?? this.notifyAtClassEnd,
       notifyEveningReminder:
           notifyEveningReminder ?? this.notifyEveningReminder,
       eveningReminderMinutes:
@@ -378,6 +386,7 @@ class AppSettings {
         'inAppAlerts': inAppAlerts,
         'notifyBeforeClass': notifyBeforeClass,
         'notifyLeadMinutes': notifyLeadMinutes,
+        'notifyAtClassEnd': notifyAtClassEnd,
         'notifyEveningReminder': notifyEveningReminder,
         'eveningReminderMinutes': eveningReminderMinutes,
         'notifyAttendanceDanger': notifyAttendanceDanger,
@@ -412,6 +421,7 @@ class AppSettings {
       inAppAlerts: json['inAppAlerts'] as bool? ?? true,
       notifyBeforeClass: json['notifyBeforeClass'] as bool? ?? true,
       notifyLeadMinutes: (json['notifyLeadMinutes'] as num?)?.toInt() ?? 15,
+      notifyAtClassEnd: json['notifyAtClassEnd'] as bool? ?? false,
       notifyEveningReminder: json['notifyEveningReminder'] as bool? ?? true,
       eveningReminderMinutes:
           (json['eveningReminderMinutes'] as num?)?.toInt() ?? 20 * 60,
@@ -458,6 +468,7 @@ class SettingsService {
   static const String _kInAppAlerts = 'ut.inAppAlerts';
   static const String _kNotifyBefore = 'ut.notifyBeforeClass';
   static const String _kLead = 'ut.notifyLeadMinutes';
+  static const String _kNotifyAtEnd = 'ut.notifyAtClassEnd';
   static const String _kNotifyEvening = 'ut.notifyEveningReminder';
   static const String _kEveningMinutes = 'ut.eveningReminderMinutes';
   static const String _kNotifyDanger = 'ut.notifyAttendanceDanger';
@@ -503,6 +514,7 @@ class SettingsService {
       inAppAlerts: await prefs.getBool(_kInAppAlerts) ?? true,
       notifyBeforeClass: await prefs.getBool(_kNotifyBefore) ?? true,
       notifyLeadMinutes: await prefs.getInt(_kLead) ?? 15,
+      notifyAtClassEnd: await prefs.getBool(_kNotifyAtEnd) ?? false,
       notifyEveningReminder: await prefs.getBool(_kNotifyEvening) ?? true,
       eveningReminderMinutes: await prefs.getInt(_kEveningMinutes) ?? 20 * 60,
       notifyAttendanceDanger: await prefs.getBool(_kNotifyDanger) ?? true,
@@ -573,6 +585,7 @@ class SettingsService {
     await prefs.setBool(_kInAppAlerts, settings.inAppAlerts);
     await prefs.setBool(_kNotifyBefore, settings.notifyBeforeClass);
     await prefs.setInt(_kLead, settings.notifyLeadMinutes);
+    await prefs.setBool(_kNotifyAtEnd, settings.notifyAtClassEnd);
     await prefs.setBool(_kNotifyEvening, settings.notifyEveningReminder);
     await prefs.setInt(_kEveningMinutes, settings.eveningReminderMinutes);
     await prefs.setBool(_kNotifyDanger, settings.notifyAttendanceDanger);

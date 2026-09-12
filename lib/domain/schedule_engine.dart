@@ -208,7 +208,7 @@ class ScheduleEngine {
     return null;
   }
 
-  /// Upcoming sessions used to schedule "class starting soon" notifications.
+  /// Sessions whose end is still ahead, used for both start and end reminders.
   List<ClassSession> upcomingSessions({int withinDays = 7}) {
     final DateTime now = DateTime.now();
     final DateTime today = Dates.dayOf(now);
@@ -216,7 +216,7 @@ class ScheduleEngine {
     for (int i = 0; i <= withinDays; i++) {
       final DateTime day = Dates.addDays(today, i);
       for (final ClassSession session in sessionsOn(day)) {
-        if (session.startDateTime.isAfter(now)) upcoming.add(session);
+        if (session.endDateTime.isAfter(now)) upcoming.add(session);
       }
     }
     return upcoming;

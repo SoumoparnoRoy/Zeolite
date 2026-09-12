@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:home_widget/home_widget.dart';
 
@@ -82,7 +83,71 @@ final homeWidgetMarkWatcherProvider = Provider<void>((Ref ref) {
   unawaited(check());
 });
 
-/// Wakes on a Present/Absent tap in the Today widget, with no app on screen.
+/// A request to mark one occurrence from a surface outside the running app.
+@immutable
+class ExternalMarkRequest {
+  const ExternalMarkRequest({
+    required this.subjectId,
+    required this.dateKey,
+    required this.startMinutes,
+    required this.status,
+  });
+
+  final int subjectId;
+  final int dateKey;
+  final int startMinutes;
+  final AttendanceStatus status;
+
+  static ExternalMarkRequest? fromWidget(Uri? uri) {
+    if (uri == null || uri.host != 'mark') return null;
+    final Map<String, String> q = uri.queryParameters;
+    return _from(
+      subject: q['subject'],
+      date: q['date'],
+      start: q['start'],
+      status: q['status'],
+    );
+  }
+
+  static ExternalMarkRequest? fromNotification(
+    NotificationResponse response,
+  ) {
+    final List<String> parts = response.payload?.split(':') ?? <String>[];
+    if (parts.length != 4 || parts.first != 'class') return null;
+    return _from(
+      subject: parts[1],
+      date: parts[2],
+      start: parts[3],
+      status: response.actionId,
+    );
+  }
+
+  static ExternalMarkRequest? _from({
+    required String? subject,
+    required String? date,
+    required String? start,
+    required String? status,
+  }) {
+    final int? subjectId = int.tryParse(subject ?? '');
+    final int? dateKey = int.tryParse(date ?? '');
+    final int? startMinutes = int.tryParse(start ?? '');
+    final AttendanceStatus? parsedStatus = AttendanceStatus.fromName(status);
+    if (subjectId == null ||
+        dateKey == null ||
+        startMinutes == null ||
+        parsedStatus == null) {
+      return null;
+    }
+    return ExternalMarkRequest(
+      subjectId: subjectId,
+      dateKey: dateKey,
+      startMinutes: startMinutes,
+      status: parsedStatus,
+    );
+  }
+}
+
+/// Wakes on a status tap in the Today widget, with no app on screen.
 ///
 /// The URI is treated as a request, not as fact: it names an occurrence by its
 /// natural key and nothing more, and the session is looked up fresh here. A
@@ -91,26 +156,33 @@ final homeWidgetMarkWatcherProvider = Provider<void>((Ref ref) {
 /// wrong.
 @pragma('vm:entry-point')
 Future<void> handleWidgetTap(Uri? uri) async {
-  if (uri == null || uri.host != 'mark') return;
-  final Map<String, String> q = uri.queryParameters;
-  final int? subjectId = int.tryParse(q['subject'] ?? '');
-  final int? dateKey = int.tryParse(q['date'] ?? '');
-  final int? startMinutes = int.tryParse(q['start'] ?? '');
-  final AttendanceStatus? status = AttendanceStatus.fromName(q['status']);
-  if (subjectId == null ||
-      dateKey == null ||
-      startMinutes == null ||
-      status == null) {
-    return;
-  }
+  final ExternalMarkRequest? request = ExternalMarkRequest.fromWidget(uri);
+  if (request == null) return;
+  await _handleExternalMark(request, source: 'Widget');
+}
 
+/// Handles an action without opening the app, including from a killed process.
+@pragma('vm:entry-point')
+Future<void> handleNotificationAction(NotificationResponse response) async {
+  final ExternalMarkRequest? request =
+      ExternalMarkRequest.fromNotification(response);
+  if (request == null) return;
+  await _handleExternalMark(request, source: 'Notification');
+}
+
+Future<void> _handleExternalMark(
+  ExternalMarkRequest request, {
+  required String source,
+}) async {
   WidgetsFlutterBinding.ensureInitialized();
   final ProviderContainer container = ProviderContainer();
   try {
     // Reminders carry the standing, so a mark made here has to reschedule them
     // the same way one made in the app does. Best-effort: the service logs and
     // swallows its own failures.
-    await NotificationService.instance.init();
+    await NotificationService.instance.init(
+      backgroundAction: handleNotificationAction,
+    );
     // Both, and awaited: the engine and the payload read settings, and an
     // isolate that has only asked for them still holds an unresolved future —
     // which silently skipped the redraw and left the widget on the old status.
@@ -119,25 +191,29 @@ Future<void> handleWidgetTap(Uri? uri) async {
     final ScheduleEngine? engine = container.read(scheduleEngineProvider);
     if (engine == null) return;
 
-    final DateTime date = Dates.fromKey(dateKey);
+    final DateTime date = Dates.fromKey(request.dateKey);
     ClassSession? session;
     for (final ClassSession candidate in engine.sessionsOn(date)) {
-      if (candidate.subject.id == subjectId &&
-          candidate.startMinutes == startMinutes) {
+      if (candidate.subject.id == request.subjectId &&
+          candidate.startMinutes == request.startMinutes) {
         session = candidate;
         break;
       }
     }
     if (session == null) return;
 
-    await container.read(actionsProvider).mark(session, status);
+    // An action means "set", not "toggle". A duplicate delivery must not
+    // clear a mark that already has the requested value.
+    if (session.status != request.status) {
+      await container.read(actionsProvider).mark(session, request.status);
+    }
     await _pushFromContainer(container);
     await HomeWidget.saveWidgetData<String>(
       HomeWidgetService.markEpochKey,
       DateTime.now().microsecondsSinceEpoch.toString(),
     );
   } catch (error) {
-    debugPrint('Widget mark failed: $error');
+    debugPrint('$source mark failed: $error');
   } finally {
     container.dispose();
   }

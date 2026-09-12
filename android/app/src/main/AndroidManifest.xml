@@ -223,7 +223,7 @@
                 android:resource="@xml/widget_stats_info" />
         </receiver>
 
-        <!-- Wakes a background isolate when a Present/Absent button is tapped. -->
+        <!-- Wakes a background isolate when a widget status button is tapped. -->
         <receiver
             android:name="es.antonborri.home_widget.HomeWidgetBackgroundReceiver"
             android:exported="true">
@@ -234,6 +234,9 @@
 
         <!-- flutter_local_notifications: delivers scheduled notifications and
              re-registers them after a reboot or app update. -->
+        <receiver
+            android:exported="false"
+            android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver" />
         <receiver
             android:exported="false"
             android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />

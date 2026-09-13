@@ -92,6 +92,15 @@ class TableLattice {
   /// A cell that runs on into the next row.
   bool mergesBelow(int row, int column) =>
       row < rows - 1 && !dividedBelow[row][column];
+
+  /// The same table in the coordinates of an image [by] times the size, for
+  /// putting a lattice found on a working copy back onto the original.
+  TableLattice scaled(double by) => TableLattice(
+        xs: <int>[for (final int x in xs) (x * by).round()],
+        ys: <int>[for (final int y in ys) (y * by).round()],
+        dividedRight: dividedRight,
+        dividedBelow: dividedBelow,
+      );
 }
 
 /// Reads a table's own ruling off the page.

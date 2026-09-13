@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:zeolite/domain/grid_lines.dart';
 import 'package:zeolite/domain/timetable_ocr.dart';
 
 OcrLine _at(String text, double x, double y, {double w = 60, double h = 20}) =>
@@ -856,6 +857,103 @@ void main() {
           TimetableOcr.bestOf(<List<OcrLine>>[empty]);
       expect(best.grid, isNotNull);
       expect(best.entries, isEmpty);
+    });
+  });
+
+  group('a sheet that rules its own table', () {
+    // Matched to Sheet's geometry: one strip for the labels on each axis, then
+    // a band per day and per period.
+    TableLattice lattice({List<int>? xs, List<int>? ys}) {
+      final List<int> x =
+          xs ?? <int>[0, 146, 294, 442, 590, 738, 886, 1034, 1182, 1330, 1478];
+      final List<int> y = ys ?? <int>[0, 58, 163, 268, 373, 478, 570];
+      return TableLattice(
+        xs: x,
+        ys: y,
+        dividedRight: <List<bool>>[
+          for (int r = 0; r + 1 < y.length; r++)
+            <bool>[for (int c = 1; c + 1 < x.length; c++) true],
+        ],
+        dividedBelow: <List<bool>>[
+          for (int r = 1; r + 1 < y.length; r++)
+            <bool>[for (int c = 0; c + 1 < x.length; c++) true],
+        ],
+      );
+    }
+
+    test(
+        'the table edge ends the last row, so a legend under it is not a class',
+        () {
+      // The band a label alone gives reaches half a pitch past it, far enough
+      // to swallow the first line of whatever is printed below the table.
+      final List<OcrLine> lines = <OcrLine>[
+        ..._weekOfClasses(),
+        // In a column of its own: landing under a class would make it that
+        // cell's last line, which _roomsOf reads as a room rather than a code.
+        _at('ZZZ9009', 960, 578, w: 104, h: 18),
+      ];
+
+      final TimetableGrid loose = TimetableGridReader.read(lines)!;
+      final TimetableGrid ruled =
+          TimetableGridReader.read(lines, lattice: lattice())!;
+
+      expect(
+        TimetableOcr.read(lines, loose).map((OcrEntry e) => e.subject),
+        contains('ZZZ9009'),
+      );
+      final List<OcrEntry> kept = TimetableOcr.read(lines, ruled);
+      expect(kept.map((OcrEntry e) => e.subject), isNot(contains('ZZZ9009')));
+      expect(kept, hasLength(21));
+    });
+
+    test('a period whose header is unreadable keeps its own column', () {
+      final List<OcrLine> lines =
+          _weekOfClasses(headers: <int, String>{3: '2:30 -3:2s'});
+      final TimetableGrid grid =
+          TimetableGridReader.read(lines, lattice: lattice())!;
+
+      expect(grid.periods, hasLength(9));
+      final List<OcrEntry> found = TimetableOcr.read(lines, grid);
+      expect(
+        found.where((OcrEntry e) => e.subject == 'BBB2002' && e.weekday == 1),
+        hasLength(1),
+      );
+    });
+
+    test('a column too thin to hold a cell is the page edge, not a period', () {
+      final List<OcrLine> lines = _weekOfClasses();
+      final TimetableGrid grid = TimetableGridReader.read(
+        lines,
+        lattice: lattice(
+          xs: <int>[
+            0,
+            146,
+            294,
+            442,
+            590,
+            738,
+            886,
+            1034,
+            1182,
+            1330,
+            1448,
+            1478,
+          ],
+        ),
+      )!;
+
+      expect(grid.periods, hasLength(9));
+    });
+
+    test('a lattice carrying no week hands the read back to the labels', () {
+      final List<OcrLine> lines = _weekOfClasses();
+      final TimetableGrid grid = TimetableGridReader.read(
+        lines,
+        lattice: lattice(xs: <int>[0, 40, 80, 120], ys: <int>[0, 10, 20, 30]),
+      )!;
+
+      expect(grid.days, hasLength(5));
+      expect(TimetableOcr.read(lines, grid), hasLength(21));
     });
   });
 }

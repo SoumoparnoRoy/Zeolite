@@ -1,3 +1,5 @@
+import 'grid_lines.dart';
+
 /// A recognised box in image pixels, origin top-left.
 ///
 /// Deliberately not `dart:ui`'s `Rect`: the grid inference below is the part
@@ -210,7 +212,11 @@ class TimetableGridReader {
 
   /// Reads the axes, or null when the image does not look like a timetable —
   /// too few weekdays or no time header to place them against.
-  static TimetableGrid? read(List<OcrLine> lines) {
+  static TimetableGrid? read(List<OcrLine> lines, {TableLattice? lattice}) {
+    if (lattice != null) {
+      final TimetableGrid? ruled = _ruled(lines, lattice);
+      if (ruled != null) return ruled;
+    }
     final List<OcrLine> dayLines = <OcrLine>[
       for (final OcrLine line in lines)
         if (weekdayOf(line.text) != null) line,
@@ -255,6 +261,122 @@ class TimetableGridReader {
     if (days.isEmpty || periods.isEmpty) return null;
 
     return TimetableGrid(axis: axis, days: days, periods: periods);
+  }
+
+  /// The grid a sheet drew for itself.
+  ///
+  /// Bands come from the rules rather than from the gaps between labels, which
+  /// changes three things. A period whose header did not read is still a
+  /// column, so its classes keep their place instead of falling into a
+  /// neighbour. The table's own edge ends the outer bands, so the legend under
+  /// it is outside rather than half a pitch inside. And nothing printed across
+  /// a row border can close the gap [_divide] hunts for, which is what put a
+  /// Thursday class on Wednesday.
+  ///
+  /// Null when the lattice carries no week, which sends the read back to the
+  /// label-driven path below — a sheet that rules nothing still has to import.
+  static TimetableGrid? _ruled(List<OcrLine> lines, TableLattice lattice) {
+    final List<List<OcrLine>> rows = _binned(lines, lattice.ys, vertical: true);
+    final List<List<OcrLine>> columns =
+        _binned(lines, lattice.xs, vertical: false);
+
+    // Orientation is read rather than inferred: the axis whose bands each hold
+    // a weekday is the day axis, and the one holding them all is its labels.
+    final int asRows = rows.where(_holdsADay).length;
+    final int asColumns = columns.where(_holdsADay).length;
+    if (asRows < 3 && asColumns < 3) return null;
+    final bool daysVertical = asRows > asColumns;
+
+    final List<List<OcrLine>> along = daysVertical ? rows : columns;
+    final List<List<OcrLine>> across = daysVertical ? columns : rows;
+    final List<int> dayCuts = daysVertical ? lattice.ys : lattice.xs;
+    final List<int> periodCuts = daysVertical ? lattice.xs : lattice.ys;
+
+    final Map<OcrLine, int> named = _withRecoveredDays(
+      <OcrLine>[
+        for (final OcrLine line in lines)
+          if (weekdayOf(line.text) != null) line,
+      ],
+      lines,
+      vertical: daysVertical,
+    );
+
+    final List<GridBand> days = <GridBand>[];
+    for (int i = 0; i < along.length; i++) {
+      final OcrLine? label = _firstIn(along[i], named.containsKey);
+      if (label == null) continue;
+      days.add(GridBand(
+        label: label.text.trim(),
+        start: dayCuts[i].toDouble(),
+        end: dayCuts[i + 1].toDouble(),
+        weekday: named[label],
+      ));
+    }
+
+    final List<int> widths = <int>[
+      for (int i = 0; i + 1 < periodCuts.length; i++)
+        periodCuts[i + 1] - periodCuts[i],
+    ]..sort();
+    final double slimmest = widths[widths.length ~/ 2] * _narrowest;
+
+    final List<GridBand> periods = <GridBand>[];
+    for (int i = 0; i < across.length; i++) {
+      final bool labels =
+          across[i].where((OcrLine l) => weekdayOf(l.text) != null).length >= 2;
+      if (labels) continue;
+      // A scan border down the edge of the page rules a column too thin to
+      // hold a cell. It reads as a period with no header and no classes.
+      if (periodCuts[i + 1] - periodCuts[i] < slimmest) continue;
+      final OcrLine? label =
+          _firstIn(across[i], (OcrLine l) => namesATime(l.text));
+      periods.add(GridBand(
+        label: label?.text.trim() ?? '',
+        start: periodCuts[i].toDouble(),
+        end: periodCuts[i + 1].toDouble(),
+      ));
+    }
+
+    if (days.length < 3 || periods.length < 2) return null;
+    return TimetableGrid(
+      axis: daysVertical ? GridAxis.daysAsRows : GridAxis.daysAsColumns,
+      days: days,
+      periods: periods,
+    );
+  }
+
+  /// How thin a band can be, against the usual one, before it is the page edge
+  /// rather than a period. The packed sheet's narrowest real column is a
+  /// quarter wider than this; its scan border is a sixth of it.
+  static const double _narrowest = 0.40;
+
+  static bool _holdsADay(List<OcrLine> band) =>
+      band.any((OcrLine l) => weekdayOf(l.text) != null);
+
+  static OcrLine? _firstIn(List<OcrLine> band, bool Function(OcrLine) test) {
+    for (final OcrLine line in band) {
+      if (test(line)) return line;
+    }
+    return null;
+  }
+
+  static List<List<OcrLine>> _binned(
+    List<OcrLine> lines,
+    List<int> cuts, {
+    required bool vertical,
+  }) {
+    final List<List<OcrLine>> out = <List<OcrLine>>[
+      for (int i = 0; i + 1 < cuts.length; i++) <OcrLine>[],
+    ];
+    for (final OcrLine line in lines) {
+      final double at = vertical ? line.box.centreY : line.box.centreX;
+      for (int i = 0; i + 1 < cuts.length; i++) {
+        if (at >= cuts[i] && at < cuts[i + 1]) {
+          out[i].add(line);
+          break;
+        }
+      }
+    }
+    return out;
   }
 
   /// Puts back a period column whose header the recogniser lost.
@@ -727,12 +849,14 @@ class TimetableOcr {
   /// [grid] comes back even when no classes did — "no timetable here" and "a
   /// timetable with nothing in it" are different things to be told.
   static ({TimetableGrid? grid, List<OcrEntry> entries}) bestOf(
-    Iterable<List<OcrLine>> reads,
-  ) {
+    Iterable<List<OcrLine>> reads, {
+    TableLattice? lattice,
+  }) {
     TimetableGrid? grid;
     List<OcrEntry> entries = const <OcrEntry>[];
     for (final List<OcrLine> lines in reads) {
-      final TimetableGrid? candidate = TimetableGridReader.read(lines);
+      final TimetableGrid? candidate =
+          TimetableGridReader.read(lines, lattice: lattice);
       if (candidate == null) continue;
       final List<OcrEntry> found = read(lines, candidate);
       if (grid == null || found.length > entries.length) {

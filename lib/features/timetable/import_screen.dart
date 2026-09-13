@@ -10,11 +10,13 @@ import '../../core/date_utils.dart';
 import '../../core/words.dart';
 import '../../domain/attendance_totals_ocr.dart';
 import '../../domain/day_grid.dart';
+import '../../domain/grid_lines.dart';
 import '../../domain/timetable_choices.dart';
 import '../../domain/timetable_import.dart';
 import '../../domain/timetable_ocr.dart';
 import '../../domain/vision_merge.dart';
 import '../../domain/vision_read.dart';
+import '../../services/image_edges.dart';
 import '../../services/text_recognition.dart';
 import '../../services/timetable/vision_client.dart';
 import '../../state/providers.dart';
@@ -217,10 +219,14 @@ class _ImportTimetableScreenState
         return;
       }
 
+      // The table's own ruling, read off the pixels rather than off the text.
+      // Both reads get the same one, so they differ only in what they say.
+      final TableLattice? lattice = await ImageEdges.rulesOf(bytes);
+
       // Every read, not just the best one: which of them reads this sheet
       // furthest is a property of the sheet, not something decidable upstream.
       final ({TimetableGrid? grid, List<OcrEntry> entries}) best =
-          TimetableOcr.bestOf(reads.all);
+          TimetableOcr.bestOf(reads.all, lattice: lattice);
       if (best.entries.isEmpty) {
         messenger.showSnackBar(SnackBar(
           content: Text(best.grid == null

@@ -98,6 +98,7 @@ class TimetableGrid {
     required this.axis,
     required this.days,
     required this.periods,
+    this.spans,
   });
 
   final GridAxis axis;
@@ -107,6 +108,17 @@ class TimetableGrid {
 
   /// Bands in reading order, each labelled with the header text found in it.
   final List<GridBand> periods;
+
+  /// Per day, per period, whether the divider on that cell's right is missing
+  /// from the sheet. Null when the grid came from the labels, which cannot see
+  /// it either way.
+  final List<List<bool>>? spans;
+
+  bool spansOn(int day, int period) =>
+      spans != null &&
+      period + 1 < periods.length &&
+      period < spans![day].length &&
+      spans![day][period];
 
   /// The weekday and period a box sits in, or null when it sits outside the
   /// table — a title, a legend, a footer.
@@ -302,9 +314,11 @@ class TimetableGridReader {
     );
 
     final List<GridBand> days = <GridBand>[];
+    final List<int> dayAt = <int>[];
     for (int i = 0; i < along.length; i++) {
       final OcrLine? label = _firstIn(along[i], named.containsKey);
       if (label == null) continue;
+      dayAt.add(i);
       days.add(GridBand(
         label: label.text.trim(),
         start: dayCuts[i].toDouble(),
@@ -320,6 +334,7 @@ class TimetableGridReader {
     final double slimmest = widths[widths.length ~/ 2] * _narrowest;
 
     final List<GridBand> periods = <GridBand>[];
+    final List<int> periodAt = <int>[];
     for (int i = 0; i < across.length; i++) {
       final bool labels =
           across[i].where((OcrLine l) => weekdayOf(l.text) != null).length >= 2;
@@ -329,6 +344,7 @@ class TimetableGridReader {
       if (periodCuts[i + 1] - periodCuts[i] < slimmest) continue;
       final OcrLine? label =
           _firstIn(across[i], (OcrLine l) => namesATime(l.text));
+      periodAt.add(i);
       periods.add(GridBand(
         label: label?.text.trim() ?? '',
         start: periodCuts[i].toDouble(),
@@ -341,6 +357,19 @@ class TimetableGridReader {
       axis: daysVertical ? GridAxis.daysAsRows : GridAxis.daysAsColumns,
       days: days,
       periods: periods,
+      spans: <List<bool>>[
+        for (final int d in dayAt)
+          <bool>[
+            for (int p = 0; p + 1 < periodAt.length; p++)
+              // Neighbours in the lattice as well as in the grid: where a
+              // sliver was dropped between two periods, the divider that would
+              // have separated them is not the one being asked about.
+              periodAt[p + 1] == periodAt[p] + 1 &&
+                  (daysVertical
+                      ? lattice.mergesRight(d, periodAt[p])
+                      : lattice.mergesBelow(periodAt[p], d)),
+          ],
+      ],
     );
   }
 
@@ -943,13 +972,25 @@ class TimetableOcr {
     final Map<String, List<OcrLine>> cells = <String, List<OcrLine>>{};
     final Map<String, GridBand> dayOf = <String, GridBand>{};
 
+    final List<List<int>> opens = _opensAt(grid, lines);
+    final Map<GridBand, int> dayAt = <GridBand, int>{
+      for (int i = 0; i < grid.days.length; i++) grid.days[i]: i,
+    };
+    final Map<GridBand, int> periodAt = <GridBand, int>{
+      for (int i = 0; i < grid.periods.length; i++) grid.periods[i]: i,
+    };
+
     for (final OcrLine line in lines) {
       if (TimetableGridReader.namesATime(line.text)) continue;
       if (TimetableGridReader.weekdayOf(line.text) != null) continue;
       if (TimetableGridReader.namesABreak(line.text)) continue;
       final ({GridBand day, GridBand period})? cell = grid.cellFor(line.box);
       if (cell == null || cell.day.weekday == null) continue;
-      final String key = '${cell.day.weekday}@${cell.period.start}';
+      // A lab across two periods is one cell, so its room and its code file
+      // together even though their boxes sit either side of the join.
+      final GridBand at = grid
+          .periods[opens[dayAt[cell.day]!][periodAt[cell.period]!]];
+      final String key = '${cell.day.weekday}@${at.start}';
       cells.putIfAbsent(key, () => <OcrLine>[]).add(line);
       dayOf[key] = cell.day;
     }
@@ -980,6 +1021,56 @@ class TimetableOcr {
         a.weekday != b.weekday ? a.weekday - b.weekday : a.from - b.from);
     return out;
   }
+
+  /// Which period each cell actually begins in — itself, unless it runs on
+  /// from the one before.
+  static List<List<int>> _opensAt(TimetableGrid grid, List<OcrLine> lines) {
+    final List<List<int>> out = <List<int>>[];
+    for (int d = 0; d < grid.days.length; d++) {
+      final List<int> row = <int>[];
+      for (int p = 0; p < grid.periods.length; p++) {
+        final bool joined = p > 0 &&
+            grid.spansOn(d, p - 1) &&
+            _crosses(grid, lines, d, p - 1);
+        row.add(joined ? row[p - 1] : p);
+      }
+      out.add(row);
+    }
+    return out;
+  }
+
+  /// Whether anything is actually written across a missing divider.
+  ///
+  /// Its absence is not enough on its own, and that is what separates the two
+  /// kinds of sheet. One drawing its classes as cards rules nothing between
+  /// two of them and they are still two classes. Fusing two real classes is
+  /// worse than missing a merge, so the text has the last word over geometry.
+  static bool _crosses(
+    TimetableGrid grid,
+    List<OcrLine> lines,
+    int day,
+    int period,
+  ) {
+    final bool rows = grid.axis == GridAxis.daysAsRows;
+    final double at = grid.periods[period].end;
+    final GridBand band = grid.days[day];
+    for (final OcrLine line in lines) {
+      if (!band.contains(rows ? line.box.centreY : line.box.centreX)) continue;
+      final double from = rows ? line.box.left : line.box.top;
+      final double to = rows ? line.box.right : line.box.bottom;
+      final double least = (to - from) * _astride;
+      if (at - from >= least && to - at >= least) return true;
+    }
+    return false;
+  }
+
+  /// How much of a line has to fall either side of a missing divider before it
+  /// counts as written across it.
+  ///
+  /// A room code printed hard against the edge of its own cell overlaps the
+  /// next one by a pixel, which is not a merged cell. Text that really does
+  /// span two periods is centred over the divider and sits near half and half.
+  static const double _astride = 0.25;
 
   /// Splits one cell into the classes it offers.
   ///

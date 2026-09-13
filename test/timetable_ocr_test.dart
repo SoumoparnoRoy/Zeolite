@@ -863,7 +863,11 @@ void main() {
   group('a sheet that rules its own table', () {
     // Matched to Sheet's geometry: one strip for the labels on each axis, then
     // a band per day and per period.
-    TableLattice lattice({List<int>? xs, List<int>? ys}) {
+    TableLattice lattice({
+      List<int>? xs,
+      List<int>? ys,
+      Set<(int, int)> undrawn = const <(int, int)>{},
+    }) {
       final List<int> x =
           xs ?? <int>[0, 146, 294, 442, 590, 738, 886, 1034, 1182, 1330, 1478];
       final List<int> y = ys ?? <int>[0, 58, 163, 268, 373, 478, 570];
@@ -872,7 +876,10 @@ void main() {
         ys: y,
         dividedRight: <List<bool>>[
           for (int r = 0; r + 1 < y.length; r++)
-            <bool>[for (int c = 1; c + 1 < x.length; c++) true],
+            <bool>[
+              for (int c = 1; c + 1 < x.length; c++)
+                !undrawn.contains((r, c)),
+            ],
         ],
         dividedBelow: <List<bool>>[
           for (int r = 1; r + 1 < y.length; r++)
@@ -943,6 +950,45 @@ void main() {
       )!;
 
       expect(grid.periods, hasLength(9));
+    });
+
+    test('a lab drawn across two periods keeps the room under its left half',
+        () {
+      // The code straddles the join, so its box lands in the second period
+      // while the room stays in the first. Two cells, one class.
+      final List<OcrLine> lines = _weekOfClasses();
+
+      final TimetableGrid split =
+          TimetableGridReader.read(lines, lattice: lattice())!;
+      final TimetableGrid joined = TimetableGridReader.read(
+        lines,
+        lattice: lattice(undrawn: <(int, int)>{(1, 2)}),
+      )!;
+
+      OcrEntry lab(TimetableGrid g) => TimetableOcr.read(lines, g)
+          .firstWhere((OcrEntry e) => e.subject == 'AAA1001');
+
+      expect(lab(split).room, isNull);
+      expect(lab(joined).room, 'R101');
+      expect(TimetableOcr.read(lines, joined), hasLength(21));
+    });
+
+    test('a divider left out with nothing written across it is not a merge',
+        () {
+      // The card-style sheet's shape: a gap where no divider was ever drawn.
+      final List<OcrLine> lines = _weekOfClasses();
+      final TimetableGrid grid = TimetableGridReader.read(
+        lines,
+        lattice: lattice(undrawn: <(int, int)>{(1, 5)}),
+      )!;
+
+      final List<OcrEntry> monday =
+          TimetableOcr.read(lines, grid).where((OcrEntry e) => e.weekday == 1)
+              .toList();
+      expect(monday.map((OcrEntry e) => e.subject),
+          containsAll(<String>['BBB2002', 'CCC3003']));
+      expect(monday.firstWhere((OcrEntry e) => e.subject == 'CCC3003').room,
+          'R103');
     });
 
     test('a lattice carrying no week hands the read back to the labels', () {

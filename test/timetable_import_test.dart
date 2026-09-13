@@ -169,4 +169,34 @@ void main() {
     });
   });
 
+  group('names the recogniser may have read two ways', () {
+    test('a letter read for the digit it looks like is reported, once', () {
+      final TimetableImportResult result = _parse('''
+GEN201, Mo, 1, R2O1
+GEN201, Tu, 2, R201
+GEN2O1, We, 3, R205
+GEN301, Th, 4, R301
+''');
+
+      expect(result.hasProblems, isFalse);
+      expect(
+        result.lookalikes,
+        containsAll(<Matcher>[
+          containsAll(<String>['GEN201', 'GEN2O1']),
+          containsAll(<String>['R2O1', 'R201']),
+        ]),
+      );
+      // GEN301, R205 and R301 look like nothing else on the sheet.
+      expect(result.lookalikes, hasLength(2));
+    });
+
+    test('names that are plainly different are left alone', () {
+      final TimetableImportResult result = _parse('''
+GEN201, Mo, 1, R201
+GEN202, Tu, 2, R202
+''');
+
+      expect(result.lookalikes, isEmpty);
+    });
+  });
 }

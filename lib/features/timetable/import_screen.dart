@@ -178,6 +178,31 @@ class _ImportTimetableScreenState
     );
   }
 
+  /// Reads each doubted period header again on its own, magnified far past
+  /// anything the whole page would fit into, and puts back any clock that
+  /// comes out of it.
+  ///
+  /// Doubted rather than blank: `11:40- 12:30` losing its leading digit reads
+  /// as a valid 1:40 that the schedule then has to overrule.
+  static Future<TimetableGrid> _namedHeaders(
+    TimetableGrid grid,
+    TableLattice lattice,
+    Uint8List bytes,
+  ) async {
+    TimetableGrid out = grid;
+    for (final int p in TimetableOcr.doubtedPeriods(grid)) {
+      final OcrBox? box = TimetableGridReader.headerBoxOf(grid, lattice, p);
+      if (box == null) continue;
+      final List<OcrLine> read = await TextRecognition.readRegion(bytes, box);
+      for (final OcrLine line in read) {
+        if (!TimetableGridReader.namesATime(line.text)) continue;
+        out = out.withPeriodLabel(p, line.text.trim());
+        break;
+      }
+    }
+    return out;
+  }
+
   /// What lands is a first draft: a cell holding parallel electives becomes one
   /// line per elective, because only the student knows which is theirs.
   Future<void> _readImage() async {
@@ -225,8 +250,23 @@ class _ImportTimetableScreenState
 
       // Every read, not just the best one: which of them reads this sheet
       // furthest is a property of the sheet, not something decidable upstream.
-      final ({TimetableGrid? grid, List<OcrEntry> entries}) best =
+      ({TimetableGrid? grid, List<OcrEntry> entries, List<OcrLine> lines}) best =
           TimetableOcr.bestOf(reads.all, lattice: lattice);
+
+      if (lattice != null && best.grid != null) {
+        final TimetableGrid named = await _namedHeaders(
+          best.grid!,
+          lattice,
+          bytes,
+        );
+        if (!identical(named, best.grid)) {
+          best = (
+            grid: named,
+            entries: TimetableOcr.read(best.lines, named),
+            lines: best.lines,
+          );
+        }
+      }
       if (best.entries.isEmpty) {
         messenger.showSnackBar(SnackBar(
           content: Text(best.grid == null
@@ -369,6 +409,12 @@ class _ImportTimetableScreenState
               for (final ImportLine line in result.problems)
                 _ProblemRow(line: line),
             ],
+            if (result.lookalikes.isNotEmpty) ...<Widget>[
+              const SizedBox(height: AppSpacing.xl),
+              const SectionHeader('These may be the same'),
+              for (final List<String> group in result.lookalikes)
+                _LookalikeRow(names: group),
+            ],
             if (result.classes.isNotEmpty &&
                 result.classes.any((ImportedClass c) => c.blocks > 1)) ...<Widget>[
               const SizedBox(height: AppSpacing.xl),
@@ -510,6 +556,29 @@ class _BlockWeightChoice extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Names the recogniser may have read two ways. A warning, not a problem: two
+/// rooms really can be a digit apart, so it never blocks the import.
+class _LookalikeRow extends StatelessWidget {
+  const _LookalikeRow({required this.names});
+
+  final List<String> names;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Text(
+        names.join('  ·  '),
+        style: TextStyle(
+          fontSize: 13,
+          fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
+          color: context.palette.cancelled,
+        ),
       ),
     );
   }

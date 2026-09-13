@@ -120,6 +120,25 @@ class TimetableGrid {
       period < spans![day].length &&
       spans![day][period];
 
+  /// The same grid with one period's header replaced, for a label recovered by
+  /// reading that cell again on its own.
+  TimetableGrid withPeriodLabel(int period, String label) => TimetableGrid(
+        axis: axis,
+        days: days,
+        periods: <GridBand>[
+          for (int i = 0; i < periods.length; i++)
+            if (i == period)
+              GridBand(
+                label: label,
+                start: periods[i].start,
+                end: periods[i].end,
+              )
+            else
+              periods[i],
+        ],
+        spans: spans,
+      );
+
   /// The weekday and period a box sits in, or null when it sits outside the
   /// table — a title, a legend, a footer.
   ({GridBand day, GridBand period})? cellFor(OcrBox box) {
@@ -406,6 +425,38 @@ class TimetableGridReader {
       }
     }
     return out;
+  }
+
+  /// Where a period prints its header, so it can be read again on its own.
+  ///
+  /// A whole page can only be magnified so far, and one header in one cell is
+  /// exactly the case [TextRecognition.readRegion] exists for: the crop is
+  /// small enough to spend the entire budget on, which is an order of
+  /// magnitude more than the page gets.
+  ///
+  /// Null when the sheet prints no header strip — the labels sit in the first
+  /// band of the day axis, and a table with nothing above its first day has
+  /// nowhere for them to be.
+  static OcrBox? headerBoxOf(
+    TimetableGrid grid,
+    TableLattice lattice,
+    int period,
+  ) {
+    if (period < 0 || period >= grid.periods.length) return null;
+    final bool rows = grid.axis == GridAxis.daysAsRows;
+    final List<int> cuts = rows ? lattice.ys : lattice.xs;
+    final double first = grid.days.first.start;
+
+    double? from;
+    for (final int cut in cuts) {
+      if (cut < first && (from == null || cut > from)) from = cut.toDouble();
+    }
+    if (from == null || first - from < 1) return null;
+
+    final GridBand band = grid.periods[period];
+    return rows
+        ? OcrBox(band.start, from, band.end, first)
+        : OcrBox(from, band.start, first, band.end);
   }
 
   /// Puts back a period column whose header the recogniser lost.
@@ -854,20 +905,19 @@ class TimetableOcr {
 
   /// Period columns whose clock is not the one printed on them — a header that
   /// would not parse, or one [_scheduleOf] rejected and interpolated over.
-  static int _guessedPeriods(TimetableGrid grid) {
+  static List<int> doubtedPeriods(TimetableGrid grid) {
     final List<(int, int)?> settled = _scheduleOf(grid);
-    int guessed = 0;
-    for (int i = 0; i < grid.periods.length; i++) {
-      final int? raw = _startOf(grid.periods[i]);
-      final (int, int)? got = settled[i];
-      if (got == null || raw == null) {
-        guessed++;
-      } else if (got.$1 != raw && got.$1 != raw + 720) {
-        guessed++;
-      }
-    }
-    return guessed;
+    return <int>[
+      for (int i = 0; i < grid.periods.length; i++)
+        if (_isGuessed(_startOf(grid.periods[i]), settled[i])) i,
+    ];
   }
+
+  static bool _isGuessed(int? raw, (int, int)? got) =>
+      got == null || raw == null || (got.$1 != raw && got.$1 != raw + 720);
+
+  static int _guessedPeriods(TimetableGrid grid) =>
+      doubtedPeriods(grid).length;
 
   /// The fullest reading of one sheet across several reads of its image.
   ///
@@ -877,12 +927,17 @@ class TimetableOcr {
   ///
   /// [grid] comes back even when no classes did — "no timetable here" and "a
   /// timetable with nothing in it" are different things to be told.
-  static ({TimetableGrid? grid, List<OcrEntry> entries}) bestOf(
+  static ({
+    TimetableGrid? grid,
+    List<OcrEntry> entries,
+    List<OcrLine> lines,
+  }) bestOf(
     Iterable<List<OcrLine>> reads, {
     TableLattice? lattice,
   }) {
     TimetableGrid? grid;
     List<OcrEntry> entries = const <OcrEntry>[];
+    List<OcrLine> won = const <OcrLine>[];
     for (final List<OcrLine> lines in reads) {
       final TimetableGrid? candidate =
           TimetableGridReader.read(lines, lattice: lattice);
@@ -891,9 +946,10 @@ class TimetableOcr {
       if (grid == null || found.length > entries.length) {
         grid = candidate;
         entries = found;
+        won = lines;
       }
     }
-    return (grid: grid, entries: entries);
+    return (grid: grid, entries: entries, lines: won);
   }
 
   /// What each period column runs from and to, in reading order, with a null
@@ -1173,7 +1229,7 @@ class TimetableOcr {
             fields.skip(1).map(_groupOf).whereType<String>().firstOrNull;
         // The room is whatever the cell ends on. A lab named `410LAB` matches
         // no room pattern, so looking for one left every packed class roomless.
-        final String last = fields.last;
+        final String last = _tidyRoom(fields.last);
         found.add(_Candidate(
           subject: fields.first,
           box: line.box,
@@ -1268,8 +1324,9 @@ class TimetableOcr {
       }
       for (final String part in cleaned.split(RegExp(r'\s+'))) {
         if (part.isEmpty) continue;
-        if (_looksLikeRoom(part)) {
-          c.room ??= part;
+        final String? named = _roomFrom(part);
+        if (named != null) {
+          c.room ??= named;
         } else if (_initials.hasMatch(part)) {
           c.teacher ??= part;
         }
@@ -1279,7 +1336,30 @@ class TimetableOcr {
 
   /// A room needs a digit in it, so a bare word never becomes one — but a bare
   /// number that reads as a clock is a stray header, not room 930.
-  static bool _looksLikeRoom(String raw) {
+  ///
+  /// A class running in two rooms prints both against a slash, and the pair is
+  /// kept whole: a slot holds one room, so the alternative is dropping half of
+  /// what the sheet says.
+  static bool _looksLikeRoom(String raw) => _roomFrom(raw) != null;
+
+  /// A room with an empty half of a slash pair dropped.
+  ///
+  /// A packed sheet prints one course as `GEN201:AB:R205/`, and that trailing
+  /// mark kept made a second room standing beside the ten classes already in
+  /// R205. A real pair like `LT201/LT202` is left alone.
+  static String _tidyRoom(String raw) => <String>[
+        for (final String part in raw.split('/'))
+          if (part.trim().isNotEmpty) part.trim(),
+      ].join('/');
+
+  /// The room a token names, or null if it names none.
+  static String? _roomFrom(String raw) {
+    final String tidy = _tidyRoom(raw);
+    if (tidy.isEmpty || !tidy.split('/').every(_namesOneRoom)) return null;
+    return tidy;
+  }
+
+  static bool _namesOneRoom(String raw) {
     final String t = raw.trim();
     if (!_room.hasMatch(t) || !_digit.hasMatch(t)) return false;
     return !_bareClock.hasMatch(t) || !TimetableGridReader.namesATime(t);

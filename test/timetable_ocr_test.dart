@@ -348,6 +348,45 @@ void main() {
       expect(single.teacher, 'CD');
     });
 
+    test('a class held in two rooms keeps both', () {
+      // A slot carries one room, so the printed pair is the room rather than
+      // whichever half comes first.
+      final Sheet s = Sheet()..build();
+      final List<OcrLine> lines = (s
+            ..put(0, 0, 'AAA1001', room: 'LT201/LT202', teacher: 'AB')
+            ..put(1, 0, 'BBB2002', room: 'R102/', teacher: 'CD'))
+          .lines;
+
+      final OcrEntry split =
+          TimetableOcr.read(lines, TimetableGridReader.read(lines)!)
+              .firstWhere((OcrEntry e) => e.subject == 'AAA1001');
+      expect(split.room, 'LT201/LT202');
+      expect(split.teacher, 'AB');
+
+      // A stray trailing mark is not a second room.
+      expect(
+        TimetableOcr.read(lines, TimetableGridReader.read(lines)!)
+            .firstWhere((OcrEntry e) => e.subject == 'BBB2002')
+            .room,
+        'R102',
+      );
+    });
+
+    test('a colon-packed cell drops a stray mark on its room too', () {
+      // A different path to the room, and where the mark actually survived.
+      final Sheet s = Sheet()..build();
+      final List<OcrLine> lines = (s
+            ..stack(0, 0, <String>['AAA1001:AB:R101/', 'BBB2002:CD:R102']))
+          .lines;
+
+      final List<OcrEntry> found =
+          TimetableOcr.read(lines, TimetableGridReader.read(lines)!);
+      expect(
+        found.firstWhere((OcrEntry e) => e.subject == 'AAA1001').room,
+        'R101',
+      );
+    });
+
     // A lab drawn as one wide cell has to keep its real length.
     test('a class across two periods keeps both', () {
       final List<OcrLine> lines = _weekOfClasses();
@@ -842,7 +881,11 @@ void main() {
       final List<OcrLine> noise = <OcrLine>[
         OcrLine('nothing here', const OcrBox(0, 0, 90, 14)),
       ];
-      final ({TimetableGrid? grid, List<OcrEntry> entries}) best =
+      final ({
+        TimetableGrid? grid,
+        List<OcrEntry> entries,
+        List<OcrLine> lines,
+      }) best =
           TimetableOcr.bestOf(<List<OcrLine>>[noise, _weekOfClasses()]);
       expect(best.grid, isNotNull);
       expect(best.entries, hasLength(21));
@@ -853,7 +896,11 @@ void main() {
     // survive a read that found one and no classes under it.
     test('an empty grid is still a grid', () {
       final List<OcrLine> empty = (Sheet()..build()).lines;
-      final ({TimetableGrid? grid, List<OcrEntry> entries}) best =
+      final ({
+        TimetableGrid? grid,
+        List<OcrEntry> entries,
+        List<OcrLine> lines,
+      }) best =
           TimetableOcr.bestOf(<List<OcrLine>>[empty]);
       expect(best.grid, isNotNull);
       expect(best.entries, isEmpty);
@@ -989,6 +1036,25 @@ void main() {
           containsAll(<String>['BBB2002', 'CCC3003']));
       expect(monday.firstWhere((OcrEntry e) => e.subject == 'CCC3003').room,
           'R103');
+    });
+
+    test('an unreadable header is found, located, and can be put back', () {
+      final List<OcrLine> lines =
+          _weekOfClasses(headers: <int, String>{3: '1:40- 2:3s'});
+      final TableLattice ruling = lattice();
+      final TimetableGrid grid =
+          TimetableGridReader.read(lines, lattice: ruling)!;
+
+      expect(TimetableOcr.doubtedPeriods(grid), <int>[3]);
+
+      final OcrBox box = TimetableGridReader.headerBoxOf(grid, ruling, 3)!;
+      expect(box.left, grid.periods[3].start);
+      expect(box.right, grid.periods[3].end);
+      expect(box.bottom, grid.days.first.start);
+
+      final TimetableGrid named = grid.withPeriodLabel(3, '11:00-11:50');
+      expect(TimetableOcr.doubtedPeriods(named), isEmpty);
+      expect(TimetableOcr.scheduleOf(named)[3], (11 * 60, 11 * 60 + 50));
     });
 
     test('a lattice carrying no week hands the read back to the labels', () {

@@ -239,6 +239,43 @@ class TimetableImportResult {
     return seen.values.toList();
   }
 
+  /// Subjects, then rooms, whose names differ only by characters the
+  /// recogniser mixes up — it reads `5R201` and `SR201` off one room, and two
+  /// of them split a subject's attendance without saying so. Folding them
+  /// would overrule the recogniser on a character it already got wrong, so
+  /// this reports the pair and leaves it to the text above.
+  List<List<String>> get lookalikes => <List<String>>[
+        ..._groupedByLook(subjectNames),
+        ..._groupedByLook(roomNames),
+      ];
+
+  static List<List<String>> _groupedByLook(List<String> names) {
+    final Map<String, List<String>> seen = <String, List<String>>{};
+    for (final String name in names) {
+      seen.putIfAbsent(_confusable(name), () => <String>[]).add(name);
+    }
+    return <List<String>>[
+      for (final List<String> group in seen.values)
+        if (group.length > 1) group,
+    ];
+  }
+
+  static String _confusable(String name) {
+    const Map<String, String> alike = <String, String>{
+      'o': '0',
+      'i': '1',
+      'l': '1',
+      's': '5',
+      'b': '8',
+      'z': '2',
+    };
+    final StringBuffer out = StringBuffer();
+    for (final String ch in name.toLowerCase().split('')) {
+      out.write(alike[ch] ?? ch);
+    }
+    return out.toString();
+  }
+
   List<String> get roomNames {
     final Map<String, String> seen = <String, String>{};
     for (final ImportedClass c in classes) {

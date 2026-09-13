@@ -6,11 +6,11 @@ import 'package:zeolite/data/models/subject.dart';
 import 'package:zeolite/domain/attendance_stats.dart';
 import 'package:zeolite/services/notification_service.dart';
 
-ClassSession _session({String? room, String? teacher}) {
+ClassSession _session({String? room, String? teacher, String name = 'Physics'}) {
   return ClassSession(
     subject: Subject(
       id: 1,
-      name: 'Physics',
+      name: name,
       teacher: teacher,
       colorValue: AppColors.defaultSubjectColor,
     ),
@@ -134,6 +134,28 @@ void main() {
       );
       expect(stats.held, 4);
       expect(NotificationService.reminderStandingLine(stats), stats.headline);
+    });
+  });
+
+  group('the class-end title', () {
+    test('leads with the percentage, then the subject', () {
+      expect(
+        NotificationService.classEndTitle(_session(), _stats(present: 8, absent: 1)),
+        '89% Physics',
+      );
+    });
+
+    test('is the subject alone when nothing has been marked yet', () {
+      expect(NotificationService.classEndTitle(_session(), _stats()), 'Physics');
+      expect(NotificationService.classEndTitle(_session(), null), 'Physics');
+    });
+
+    test('leaves a subject name exactly as the student typed it', () {
+      // It reaches the tray unparsed, so punctuation must survive untouched.
+      expect(
+        NotificationService.classEndTitle(_session(name: 'Maths & Stats (B2)'), null),
+        'Maths & Stats (B2)',
+      );
     });
   });
 }

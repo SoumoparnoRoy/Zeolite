@@ -1,9 +1,10 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 
+import '../core/app_theme.dart';
 import '../core/date_utils.dart';
 import '../data/models/class_session.dart';
 import '../data/settings/app_settings.dart';
@@ -64,6 +65,14 @@ class NotificationService {
   /// is well inside that, and we refresh on every data change anyway.
   static const int _maxClassReminders = 60;
   static const int _maxClassEndReminders = 60;
+
+  /// The accent the tray tints the icon and app name with.
+  ///
+  /// Fixed when the reminder is scheduled, and the tray follows the *system*
+  /// theme, so neither palette can be picked with confidence — the midpoint
+  /// of the two reads on a white tray and on a dark one.
+  static final Color _trayAccent =
+      AppPalette.light.lerp(AppPalette.dark, 0.5).accent;
 
   // The three channel ids keep their pre-Zeolite names for the same reason the
   // database file does — an id is how Android finds an existing channel, and a
@@ -244,7 +253,7 @@ class NotificationService {
       await _scheduleClassReminders(settings, upcoming, stats, mode);
     }
     if (settings.notifyAtClassEnd) {
-      await _scheduleClassEndReminders(upcoming, mode);
+      await _scheduleClassEndReminders(settings, upcoming, stats, mode);
     }
     if (settings.notifyEveningReminder) {
       await _scheduleEveningReminder(settings, mode);
@@ -341,6 +350,25 @@ class NotificationService {
     return subjectStats.headline;
   }
 
+  /// The class-end title: the subject, led by how it currently stands.
+  ///
+  /// The percentage goes first because it is the reason to read the
+  /// notification rather than swipe it away.
+  ///
+  /// Plain text: Android 12 strips size and colour spans from notification
+  /// text, so setting the figure apart is not available to us.
+  ///
+  /// A subject with nothing marked gets its name alone, the rule
+  /// [reminderStandingLine] already follows.
+  static String classEndTitle(
+    ClassSession session,
+    SubjectStats? subjectStats,
+  ) {
+    final String name = session.subject.name;
+    if (subjectStats == null || !subjectStats.hasData) return name;
+    return '${subjectStats.percent.toStringAsFixed(0)}% $name';
+  }
+
   Future<void> _scheduleClassReminders(
     AppSettings settings,
     List<ClassSession> upcoming,
@@ -407,26 +435,23 @@ class NotificationService {
   }
 
   Future<void> _scheduleClassEndReminders(
+    AppSettings settings,
     List<ClassSession> upcoming,
+    OverallStats stats,
     AndroidScheduleMode mode,
   ) async {
+    final Map<int, SubjectStats> statsBySubject = <int, SubjectStats>{
+      for (final SubjectStats s in stats.subjects)
+        if (s.subject.id != null) s.subject.id!: s,
+    };
+
+    // Android drops action icons from the standard template on 7 and above,
+    // so the glyph has to be the label.
     const List<AndroidNotificationAction> actions = <AndroidNotificationAction>[
       AndroidNotificationAction('present', '✓'),
       AndroidNotificationAction('absent', '✕'),
       AndroidNotificationAction('cancelled', 'O'),
     ];
-    final NotificationDetails details = NotificationDetails(
-      android: AndroidNotificationDetails(
-        _classChannel.id,
-        _classChannel.name,
-        channelDescription: _classChannel.description,
-        importance: Importance.high,
-        priority: Priority.high,
-        category: AndroidNotificationCategory.reminder,
-        groupKey: _classGroupKey,
-        actions: actions,
-      ),
-    );
 
     final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
     int scheduled = 0;
@@ -438,11 +463,43 @@ class NotificationService {
           tz.TZDateTime.from(session.endDateTime, tz.local);
       if (!fireAt.isAfter(now)) continue;
 
+      final SubjectStats? subjectStats = statsBySubject[session.subject.id];
+      final String detail = reminderDetailLine(
+        session,
+        use24Hour: settings.use24HourTime,
+      );
+      final String? standing = reminderStandingLine(subjectStats);
+      final String body =
+          standing == null ? detail : '$detail\n$standing';
+
+      // Per notification: the title carries this subject's standing, and the
+      // style has to repeat it for the expanded form.
+      final NotificationDetails details = NotificationDetails(
+        android: AndroidNotificationDetails(
+          _classChannel.id,
+          _classChannel.name,
+          channelDescription: _classChannel.description,
+          importance: Importance.high,
+          priority: Priority.high,
+          category: AndroidNotificationCategory.reminder,
+          groupKey: _classGroupKey,
+          color: _trayAccent,
+          // In the header rather than the title: it dates the notification
+          // rather than describing the class.
+          subText: 'Just ended',
+          actions: actions,
+          styleInformation: BigTextStyleInformation(
+            body,
+            contentTitle: classEndTitle(session, subjectStats),
+          ),
+        ),
+      );
+
       try {
         await _plugin.zonedSchedule(
           id: _classEndReminderBase + scheduled,
-          title: '${session.subject.name} just ended',
-          body: 'Mark your attendance',
+          title: classEndTitle(session, subjectStats),
+          body: body,
           scheduledDate: fireAt,
           notificationDetails: details,
           androidScheduleMode: mode,

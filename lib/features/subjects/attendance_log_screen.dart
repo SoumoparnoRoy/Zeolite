@@ -281,9 +281,9 @@ class _LogTile extends ConsumerWidget {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    'No class on your timetable sits here — the rule was '
-                    'removed, or this mark was brought in from elsewhere. It '
-                    'still counts towards your percentage.',
+                    'No class on your timetable sits here — the class moved '
+                    'to another day, or this mark was brought in from '
+                    'elsewhere. It still counts towards your percentage.',
                     style: TextStyle(
                       fontSize: 10.5,
                       height: 1.4,

@@ -1344,18 +1344,6 @@ class _SlotFormState extends ConsumerState<_SlotForm> {
     return records.where(previous.covers).length;
   }
 
-  String _describe(ClassSlot slot) {
-    final List<Subject> subjects =
-        ref.read(timetableProvider).value?.subjects ?? <Subject>[];
-    String name = 'this class';
-    for (final Subject subject in subjects) {
-      if (subject.id == slot.subjectId) name = subject.name;
-    }
-    final bool use24Hour =
-        ref.read(settingsProvider).value?.use24HourTime ?? false;
-    return '$name at ${Clock.format(slot.startMinutes, use24Hour: use24Hour)}';
-  }
-
   Future<void> _save() async {
     if (_subjectId == null) {
       setState(() => _error = 'Choose a subject.');
@@ -1407,22 +1395,9 @@ class _SlotFormState extends ConsumerState<_SlotForm> {
         endDate: _endDate,
       );
 
-      final int stranded = _strandedMarkCount(previous, updated);
-      _MarkMove? choice;
-      if (stranded > 0) {
-        choice = await _askAboutMarks(
-          context,
-          from: _describe(previous),
-          to: _describe(updated),
-          markCount: stranded,
-        );
-        if (!mounted) return;
-        if (choice == null) {
-          setState(() => _saving = false);
-          return;
-        }
-      }
-      if (choice == _MarkMove.move) {
+      // The date is deliberately left alone: the student did attend that
+      // subject on that day, and rewriting it invents one they missed.
+      if (_strandedMarkCount(previous, updated) > 0) {
         await actions.updateSlotAndMoveMarks(previous, updated);
       } else {
         await actions.updateSlot(updated);
@@ -2033,19 +2008,6 @@ class _ExtraClassFormState extends ConsumerState<_ExtraClassForm> {
     return false;
   }
 
-  String _describeExtra(ExtraClass extra) {
-    final List<Subject> subjects =
-        ref.read(timetableProvider).value?.subjects ?? <Subject>[];
-    String name = 'this class';
-    for (final Subject subject in subjects) {
-      if (subject.id == extra.subjectId) name = subject.name;
-    }
-    final bool use24Hour =
-        ref.read(settingsProvider).value?.use24HourTime ?? false;
-    return '$name on ${Dates.formatDayMonth(extra.date)} at '
-        '${Clock.format(extra.startMinutes, use24Hour: use24Hour)}';
-  }
-
   Future<void> _save() async {
     if (_subjectId == null) {
       setState(() => _error = 'Choose a subject.');
@@ -2092,21 +2054,7 @@ class _ExtraClassFormState extends ConsumerState<_ExtraClassForm> {
     final TimetableActions actions = ref.read(actionsProvider);
     if (_isEditing) {
       final ExtraClass previous = widget.extra!;
-      _MarkMove? choice;
       if (_hasMark(previous) && _rekeys(previous, value)) {
-        choice = await _askAboutMarks(
-          context,
-          from: _describeExtra(previous),
-          to: _describeExtra(value),
-          markCount: 1,
-        );
-        if (!mounted) return;
-        if (choice == null) {
-          setState(() => _saving = false);
-          return;
-        }
-      }
-      if (choice == _MarkMove.move) {
         await actions.updateExtraClassAndMoveMarks(previous, value);
       } else {
         await actions.updateExtraClass(value);
@@ -2848,6 +2796,38 @@ Future<void> showSessionEditor(
 
 /// The count is the part worth reading, so the dialog names it rather than
 /// asking "are you sure".
+Future<bool> _confirmEndWithMarks(
+  BuildContext context,
+  String subjectName,
+  String from,
+  int markCount,
+) async {
+  final bool? confirmed = await showDialog<bool>(
+    context: context,
+    builder: (BuildContext context) => AlertDialog(
+      title: const Text('Stop repeating and remove its attendance?'),
+      content: Text(
+        '$subjectName stops repeating from $from, and the '
+        '${Words.plural(markCount, 'mark')} recorded from then on go with it. '
+        'Earlier weeks keep theirs.',
+        style: const TextStyle(height: 1.4),
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          style: TextButton.styleFrom(foregroundColor: context.palette.absent),
+          child: const Text('Stop and remove'),
+        ),
+      ],
+    ),
+  );
+  return confirmed ?? false;
+}
+
 Future<bool> _confirmDeleteWithMarks(
   BuildContext context,
   String subjectName,
@@ -2858,8 +2838,8 @@ Future<bool> _confirmDeleteWithMarks(
     builder: (BuildContext context) => AlertDialog(
       title: const Text('Delete the class and its attendance?'),
       content: Text(
-        '$subjectName loses this weekly class and the '
-        '${Words.plural(markCount, 'mark')} recorded against it.',
+        '$subjectName loses this class from every week, past ones included, '
+        'and the ${Words.plural(markCount, 'mark')} recorded against it.',
         style: const TextStyle(height: 1.4),
       ),
       actions: <Widget>[
@@ -2878,57 +2858,33 @@ Future<bool> _confirmDeleteWithMarks(
   return confirmed ?? false;
 }
 
-enum _MarkMove { move, keep }
-
-/// Asked when an edit changes the `(subject, start time)` a mark is filed
-/// under. The app cannot tell a correction ("this was always Physics") from a
-/// genuine change ("this slot is Physics from now on"), and the two want
-/// opposite answers, so the student decides.
-Future<_MarkMove?> _askAboutMarks(
-  BuildContext context, {
-  required String from,
-  required String to,
-  required int markCount,
-}) async {
-  return showDialog<_MarkMove>(
-    context: context,
-    builder: (BuildContext context) => AlertDialog(
-      title: const Text('Move the attendance too?'),
-      content: Text(
-        'You have ${Words.plural(markCount, 'mark')} recorded against $from. '
-        'Move them to $to, or leave them where they are?',
-        style: const TextStyle(height: 1.4),
-      ),
-      actions: <Widget>[
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(_MarkMove.keep),
-          child: const Text('Leave them'),
-        ),
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(_MarkMove.move),
-          child: const Text('Move them'),
-        ),
-      ],
-    ),
-  );
-}
-
 /// Long-press menu on a class: edit it, cancel just this one, stop it
 /// repeating, or remove it entirely.
 Future<void> showSessionOptions(
   BuildContext context,
   WidgetRef ref,
-  ClassSession session,
-) async {
+  ClassSession session, {
+  /// The screen behind already opens the editor on a tap.
+  bool tapOpensEditor = false,
+
+  /// The screen behind already carries the status buttons.
+  bool marksInline = false,
+}) async {
   final TimetableData? data = ref.read(timetableProvider).value;
   ClassSlot? slot;
   for (final ClassSlot candidate in data?.slots ?? <ClassSlot>[]) {
     if (candidate.id == session.slotId) slot = candidate;
   }
+  // Only the marks from the long-pressed date on: the weeks before the cut
+  // keep theirs, so they are not what the warning is about.
+  final int endingMarkCount = slot == null
+      ? 0
+      : (data?.records ?? <AttendanceRecord>[])
+          .where((AttendanceRecord r) =>
+              slot!.covers(r) &&
+              Dates.keyOf(r.date) >= Dates.keyOf(session.date))
+          .length;
+
   // With nothing marked the two deletes would do the same thing.
   final int markCount = slot == null
       ? 0
@@ -2945,14 +2901,16 @@ Future<void> showSessionOptions(
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
+        if (!tapOpensEditor)
         _OptionTile(
           icon: Icons.edit_outlined,
-          title: 'Edit this class',
+          title: session.slotId != null
+              ? 'Edit the weekly class'
+              : 'Edit this class',
           subtitle: session.slotId != null
-              // Editing the rule, not the occurrence — worth saying, because
-              // the two options below act on this day alone.
-              ? 'Change the day, time, room or subject of the weekly class.'
-              : 'Change the date, time, room or subject.',
+              ? 'Changes the day, time, room or subject for every week, '
+                  'including the ones already past.'
+              : 'Changes the date, time, room or subject.',
           onTap: () async {
             Navigator.of(context).pop();
             await showSessionEditor(context, ref, session);
@@ -2976,16 +2934,42 @@ Future<void> showSessionOptions(
           _OptionTile(
             icon: Icons.event_busy_rounded,
             title: 'Stop repeating from this date',
-            subtitle:
-                'Keeps everything already recorded, but the class no longer appears from ${Dates.formatDayMonth(session.date)} onwards.',
+            subtitle: endingMarkCount > 0
+                ? 'Stops the class from '
+                    '${Dates.formatDayMonth(session.date)}, this one included, '
+                    'along with the '
+                    '${Words.plural(endingMarkCount, 'mark')} recorded from '
+                    'then on. Earlier weeks keep theirs.'
+                : 'Stops the class from '
+                    '${Dates.formatDayMonth(session.date)}, this one included. '
+                    'Earlier weeks are kept, and so is everything already '
+                    'recorded.',
             onTap: () async {
+              if (endingMarkCount > 0) {
+                final bool confirmed = await _confirmEndWithMarks(
+                  context,
+                  session.subject.name,
+                  Dates.formatDayMonth(session.date),
+                  endingMarkCount,
+                );
+                if (!confirmed || !context.mounted) return;
+              }
               Navigator.of(context).pop();
-              await actions.endSlotFrom(session.slotId!, session.date);
+              if (slot != null && endingMarkCount > 0) {
+                await actions.endSlotFromAndClearMarks(slot, session.date);
+              } else {
+                await actions.endSlotFrom(session.slotId!, session.date);
+              }
               showUndoSnack(
                 messenger,
                 actions,
-                '${session.subject.name} stops repeating from '
-                '${Dates.formatDayMonth(session.date)}',
+                endingMarkCount > 0
+                    ? '${session.subject.name} stops repeating from '
+                        '${Dates.formatDayMonth(session.date)}, and its '
+                        '${Words.plural(endingMarkCount, 'mark')} from then '
+                        'on are gone'
+                    : '${session.subject.name} stops repeating from '
+                        '${Dates.formatDayMonth(session.date)}',
               );
             },
           ),
@@ -2993,49 +2977,37 @@ Future<void> showSessionOptions(
           _OptionTile(
             icon: Icons.delete_outline_rounded,
             title: 'Delete this weekly class',
-            // Marks are keyed by (subject, date, start time), not by slot id,
-            // so deleting the rule does not delete them. Saying otherwise here
-            // would be a lie told at the moment of a destructive action.
-            subtitle: 'Removes the rule and its future weeks. Attendance you '
-                'already marked is kept and still counts.',
+            subtitle: markCount > 0
+                ? 'Removes the class from every week, past ones included, '
+                    'along with the ${Words.plural(markCount, 'mark')} '
+                    'recorded against it. Your percentage will change.'
+                : 'Removes the class from every week, past ones included.',
             danger: true,
             onTap: () async {
-              Navigator.of(context).pop();
-              await actions.deleteSlot(session.slotId!);
-              showUndoSnack(
-                messenger,
-                actions,
-                'Weekly ${session.subject.name} deleted',
-              );
-            },
-          ),
-          if (markCount > 0) ...<Widget>[
-            const SizedBox(height: AppSpacing.md),
-            _OptionTile(
-              icon: Icons.delete_forever_outlined,
-              title: 'Delete it and its attendance',
-              subtitle: 'Also removes the '
-                  '${Words.plural(markCount, 'mark')} recorded against this '
-                  'class. Your percentage will change.',
-              danger: true,
-              onTap: () async {
+              if (markCount > 0) {
                 final bool confirmed = await _confirmDeleteWithMarks(
                   context,
                   session.subject.name,
                   markCount,
                 );
                 if (!confirmed || !context.mounted) return;
-                Navigator.of(context).pop();
-                await actions.deleteSlotAndMarks(slot!);
-                showUndoSnack(
-                  messenger,
-                  actions,
-                  'Weekly ${session.subject.name} and its '
-                  '${Words.plural(markCount, 'mark')} deleted',
-                );
-              },
-            ),
-          ],
+              }
+              Navigator.of(context).pop();
+              if (slot != null) {
+                await actions.deleteSlotAndMarks(slot);
+              } else {
+                await actions.deleteSlot(session.slotId!);
+              }
+              showUndoSnack(
+                messenger,
+                actions,
+                markCount > 0
+                    ? 'Weekly ${session.subject.name} and its '
+                        '${Words.plural(markCount, 'mark')} deleted'
+                    : 'Weekly ${session.subject.name} deleted',
+              );
+            },
+          ),
         ],
         if (session.extraClassId != null) ...<Widget>[
           const SizedBox(height: AppSpacing.md),
@@ -3055,7 +3027,7 @@ Future<void> showSessionOptions(
             },
           ),
         ],
-        if (session.isMarked) ...<Widget>[
+        if (session.isMarked && !marksInline) ...<Widget>[
           const SizedBox(height: AppSpacing.md),
           _OptionTile(
             icon: Icons.undo_rounded,

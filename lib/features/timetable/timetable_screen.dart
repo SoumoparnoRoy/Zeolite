@@ -116,7 +116,7 @@ class TimetableScreen extends ConsumerWidget {
                   onTapSession: (ClassSession session) =>
                       showSessionEditor(context, ref, session),
                   onLongPressSession: (ClassSession session) =>
-                      showSessionOptions(context, ref, session),
+                      showSessionOptions(context, ref, session, tapOpensEditor: true),
                 );
               },
             ),

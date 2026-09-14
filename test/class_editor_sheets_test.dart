@@ -337,7 +337,7 @@ void main() {
       return recorder;
     }
 
-    testWidgets('asks before re-pointing a class that has marks',
+    testWidgets('re-pointing a marked class takes its marks with it',
         (WidgetTester tester) async {
       final _EditRecorder recorder = await edit(
         tester,
@@ -345,28 +345,12 @@ void main() {
         pickSubject: 'Maths',
       );
 
-      expect(find.text('Move the attendance too?'), findsOneWidget);
-      expect(recorder.plain, isEmpty);
-      expect(recorder.moved, isEmpty);
-
-      await _tapButton(tester, 'Move them');
+      expect(find.text('Move the attendance too?'), findsNothing);
       expect(recorder.moved.single.subjectId, 2);
       expect(recorder.plain, isEmpty);
     });
 
-    testWidgets('leaves them behind when told to', (WidgetTester tester) async {
-      final _EditRecorder recorder = await edit(
-        tester,
-        records: <AttendanceRecord>[marked],
-        pickSubject: 'Maths',
-      );
-      await _tapButton(tester, 'Leave them');
-
-      expect(recorder.plain.single.subjectId, 2);
-      expect(recorder.moved, isEmpty);
-    });
-
-    testWidgets('says nothing when the class has no marks yet',
+    testWidgets('a class with no marks yet is a plain update',
         (WidgetTester tester) async {
       final _EditRecorder recorder = await edit(
         tester,
@@ -374,19 +358,19 @@ void main() {
         pickSubject: 'Maths',
       );
 
-      expect(find.text('Move the attendance too?'), findsNothing);
       expect(recorder.plain.single.subjectId, 2);
+      expect(recorder.moved, isEmpty);
     });
 
-    testWidgets('says nothing when the key did not change',
+    testWidgets('an edit that does not move the key leaves marks alone',
         (WidgetTester tester) async {
       final _EditRecorder recorder = await edit(
         tester,
         records: <AttendanceRecord>[marked],
       );
 
-      expect(find.text('Move the attendance too?'), findsNothing);
       expect(recorder.plain, hasLength(1));
+      expect(recorder.moved, isEmpty);
     });
   });
 
@@ -606,7 +590,8 @@ void main() {
           status: AttendanceStatus.present,
         );
 
-    testWidgets('the destructive pair is offered', (WidgetTester tester) async {
+    testWidgets('one delete, and it names what the marks cost',
+        (WidgetTester tester) async {
       await tester.pumpWidget(
         _host(
           (c, ref) => showSessionOptions(c, ref, sessionOn(monday)),
@@ -617,12 +602,12 @@ void main() {
       await _openSheet(tester);
 
       expect(find.text('Delete this weekly class'), findsOneWidget);
-      expect(find.text('Delete it and its attendance'), findsOneWidget);
+      expect(find.text('Delete it and its attendance'), findsNothing);
       // A warning without the number is just a shrug.
       expect(find.textContaining('1 mark'), findsOneWidget);
     });
 
-    testWidgets('with nothing recorded there is only one delete',
+    testWidgets('with nothing recorded the marks are not mentioned',
         (WidgetTester tester) async {
       await tester.pumpWidget(
         _host(
@@ -633,7 +618,7 @@ void main() {
       await _openSheet(tester);
 
       expect(find.text('Delete this weekly class'), findsOneWidget);
-      expect(find.text('Delete it and its attendance'), findsNothing);
+      expect(find.textContaining('mark'), findsNothing);
     });
 
     testWidgets('a mark at another time belongs to another class',
@@ -650,7 +635,100 @@ void main() {
       );
       await _openSheet(tester);
 
-      expect(find.text('Delete it and its attendance'), findsNothing);
+      expect(find.textContaining('mark'), findsNothing);
+    });
+
+    testWidgets('the edit tile goes where a tap already opens the editor',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        _host(
+          (c, ref) => showSessionOptions(c, ref, sessionOn(monday),
+              tapOpensEditor: true),
+          slots: <ClassSlot>[weekly],
+        ),
+      );
+      await _openSheet(tester);
+
+      expect(find.text('Edit the weekly class'), findsNothing);
+      expect(find.text('Delete this weekly class'), findsOneWidget);
+    });
+
+    testWidgets('clearing the mark goes where the buttons already do it',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        _host(
+          (c, ref) => showSessionOptions(c, ref, sessionOn(monday),
+              marksInline: true),
+          slots: <ClassSlot>[weekly],
+          records: <AttendanceRecord>[markOn(monday)],
+        ),
+      );
+      await _openSheet(tester);
+
+      expect(find.text('Clear the mark'), findsNothing);
+      expect(find.text('Edit the weekly class'), findsOneWidget);
+    });
+
+    testWidgets('stopping it warns only about marks from the cut on',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        _host(
+          (c, ref) => showSessionOptions(c, ref, sessionOn(monday)),
+          slots: <ClassSlot>[weekly],
+          records: <AttendanceRecord>[
+            markOn(Dates.addDays(monday, -7)),
+            markOn(monday),
+          ],
+        ),
+      );
+      await _openSheet(tester);
+      await tester.tap(find.text('Stop repeating from this date'));
+      await tester.pumpAndSettle();
+
+      // The earlier Monday is not counted: its week survives the cut.
+      expect(
+        find.text('Stop repeating and remove its attendance?'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('1 mark'), findsWidgets);
+    });
+
+    testWidgets('stopping it says nothing when only earlier weeks are marked',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        _host(
+          (c, ref) => showSessionOptions(c, ref, sessionOn(monday)),
+          slots: <ClassSlot>[weekly],
+          records: <AttendanceRecord>[markOn(Dates.addDays(monday, -7))],
+        ),
+      );
+      await _openSheet(tester);
+
+      expect(
+        find.textContaining('Earlier weeks are kept, and so is everything'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('cancelling the confirm deletes nothing at all',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        _host(
+          (c, ref) => showSessionOptions(c, ref, sessionOn(monday)),
+          slots: <ClassSlot>[weekly],
+          records: <AttendanceRecord>[markOn(Dates.addDays(monday, -7))],
+        ),
+      );
+      await _openSheet(tester);
+      await tester.tap(find.text('Delete this weekly class'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Delete the class and its attendance?'), findsOneWidget);
+      await _tapButton(tester, 'Cancel');
+
+      // The sheet is still open: cancel abandons the whole thing rather than
+      // falling back to a delete that keeps the marks.
+      expect(find.text('Delete this weekly class'), findsOneWidget);
     });
   });
 

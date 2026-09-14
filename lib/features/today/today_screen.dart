@@ -407,7 +407,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                               ? null
                               : () => _pickTag(context, ref, session, tags),
                           onLongPress: () =>
-                              showSessionOptions(context, ref, session),
+                              showSessionOptions(context, ref, session, marksInline: true),
                         );
                       },
                     ),

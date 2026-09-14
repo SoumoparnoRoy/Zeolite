@@ -444,7 +444,7 @@ class _DayColumn extends ConsumerWidget {
                       use24Hour: use24Hour,
                       onTap: () => showSessionEditor(context, ref, session),
                       onLongPress: () =>
-                          showSessionOptions(context, ref, session),
+                          showSessionOptions(context, ref, session, tapOpensEditor: true),
                     ),
                   ),
                 ),

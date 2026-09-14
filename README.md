@@ -126,8 +126,8 @@ to your history:
 | Action | Effect |
 |---|---|
 | Cancel just this class | One occurrence marked cancelled. Excluded from both sides of the percentage. |
-| Stop repeating from this date | Sets the rule's end date. History is kept, future weeks disappear. |
-| Delete this weekly class | Removes the rule and its future weeks. Attendance you already marked is kept and still counts. |
+| Stop repeating from this date | Sets the rule's end date, this date included. Earlier weeks and their attendance are kept; anything recorded from this date on goes, confirmed first. |
+| Delete this weekly class | Removes the class from every week, past ones included, and the attendance recorded against it. Confirmed first, and undoable. |
 
 ## How it works
 

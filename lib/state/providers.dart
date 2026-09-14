@@ -1271,6 +1271,31 @@ class TimetableActions {
     _undo.arm(before);
   }
 
+  /// Ends the rule at [date] and clears what was recorded from that date on.
+  ///
+  /// The weeks before the cut keep their attendance, which is what this action
+  /// has always been for. A mark on or after it belongs to an occurrence that
+  /// is being removed, and follows its class out.
+  Future<void> endSlotFromAndClearMarks(ClassSlot slot, DateTime date) async {
+    final int? id = slot.id;
+    if (id == null) return;
+    final DatabaseSnapshot before = await _repo.snapshot();
+    final List<AttendanceRecord> records =
+        _ref.read(timetableProvider).value?.records ?? <AttendanceRecord>[];
+    final int cut = Dates.keyOf(date);
+    for (final AttendanceRecord record in records) {
+      if (!slot.covers(record) || Dates.keyOf(record.date) < cut) continue;
+      await _repo.clearAttendance(
+        record.subjectId,
+        record.date,
+        record.startMinutes,
+      );
+    }
+    await _repo.endSlotBefore(id, date);
+    await _refresh();
+    _undo.arm(before);
+  }
+
   // one-off classes --------------------------------------------------------
 
   Future<void> addExtraClass(ExtraClass extra) async {

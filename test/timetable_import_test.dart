@@ -199,4 +199,38 @@ GEN202, Tu, 2, R202
       expect(result.lookalikes, isEmpty);
     });
   });
+
+  group('a name unlike the rest of the sheet', () {
+    test('a course that lost its code is listed beside the codes', () {
+      final TimetableImportResult result = _parse('''
+GEN201, Mo, 1, R201
+GEN202, Tu, 2, R202
+GEN203, We, 3, R203
+GEN204, Th, 4, R204
+Example Course, Fr, 5, R205
+''');
+
+      expect(result.oddlyNamed, <String>['Example Course']);
+    });
+
+    test('a room that lost its block letter is listed beside the rooms', () {
+      final TimetableImportResult result = _parse('''
+GEN201, Mo, 1, R201
+GEN202, Tu, 2, R202
+GEN203, We, 3, R203
+GEN204, Th, 4, 8218
+''');
+
+      expect(result.oddlyNamed, <String>['8218']);
+    });
+
+    test('a sheet with too few names has no convention to break', () {
+      final TimetableImportResult result = _parse('''
+GEN201, Mo, 1, R201
+Example Course, Tu, 2, R202
+''');
+
+      expect(result.oddlyNamed, isEmpty);
+    });
+  });
 }

@@ -1068,4 +1068,82 @@ void main() {
       expect(TimetableOcr.read(lines, grid), hasLength(21));
     });
   });
+
+  group('a name unlike the rest of its sheet', () {
+    List<OcrEntry> entriesOf(List<OcrLine> lines) =>
+        TimetableOcr.read(lines, TimetableGridReader.read(lines)!);
+
+    /// Eight coded courses in lettered rooms, so one of either can be spoiled
+    /// and the sheet still has a convention to break.
+    List<OcrLine> sheet({String? subject, String? room}) => (Sheet()
+          ..build()
+          ..put(0, 0, subject ?? 'AAA1001', room: room ?? 'R101', teacher: 'AB')
+          ..put(0, 2, 'BBB2002', room: 'R102', teacher: 'CD')
+          ..put(1, 0, 'CCC3003', room: 'R103', teacher: 'EF')
+          ..put(1, 2, 'DDD4004', room: 'R104', teacher: 'GH')
+          ..put(2, 0, 'EEE5005', room: 'R105', teacher: 'IJ')
+          ..put(2, 2, 'FFF6006', room: 'R106', teacher: 'KL')
+          ..put(3, 0, 'GGG7007', room: 'R107', teacher: 'MN')
+          ..put(3, 2, 'HHH8008', room: 'R108', teacher: 'OP'))
+        .lines;
+
+    test('a course that lost its code falls back to words and is flagged', () {
+      final List<({OcrEntry entry, bool room, String text})> odd =
+          TimetableOcr.oddlyNamed(entriesOf(sheet(subject: 'Example Course')));
+
+      expect(odd, hasLength(1));
+      expect(odd.single.room, isFalse);
+      expect(odd.single.text, 'Example Course');
+    });
+
+    test('a room that lost its block letter is flagged', () {
+      final List<({OcrEntry entry, bool room, String text})> odd =
+          TimetableOcr.oddlyNamed(entriesOf(sheet(room: '8204')));
+
+      expect(odd, hasLength(1));
+      expect(odd.single.room, isTrue);
+      expect(odd.single.text, '8204');
+    });
+
+    test('nothing is odd on a sheet that reads cleanly', () {
+      expect(TimetableOcr.oddlyNamed(entriesOf(sheet())), isEmpty);
+    });
+
+    test('a sheet naming everything in words has no convention to break', () {
+      final List<OcrLine> lines = (Sheet()
+            ..build()
+            ..put(0, 0, 'Course One', room: 'R101')
+            ..put(0, 2, 'Course Two', room: 'R102')
+            ..put(1, 0, 'Course Three', room: 'R103')
+            ..put(1, 2, 'Course Four', room: 'R104'))
+          .lines;
+
+      expect(TimetableOcr.oddlyNamed(entriesOf(lines)), isEmpty);
+    });
+
+    test('the cell to read again is where the day crosses the period', () {
+      final List<OcrLine> lines = sheet(room: '8204');
+      final TimetableGrid grid = TimetableGridReader.read(lines)!;
+      final OcrEntry first = TimetableOcr.read(lines, grid).first;
+      final OcrBox box = TimetableOcr.cellBoxOf(grid, first)!;
+
+      expect(box.left, lessThan(grid.periods[1].start));
+      expect(box.right, greaterThan(grid.periods[0].start));
+      expect(box.top, closeTo(grid.days.first.start, 0.01));
+      expect(box.bottom, closeTo(grid.days.first.end, 0.01));
+    });
+
+    test('a second reading counts only in the shape the sheet uses', () {
+      List<OcrLine> read(String text) =>
+          <OcrLine>[OcrLine(text, const OcrBox(0, 0, 10, 10))];
+
+      expect(TimetableOcr.namedInShape(read('B204'), room: true), 'B204');
+      expect(TimetableOcr.namedInShape(read('8204'), room: true), isNull);
+      expect(TimetableOcr.namedInShape(read('AAA1001'), room: false), 'AAA1001');
+      expect(
+        TimetableOcr.namedInShape(read('Example Course'), room: false),
+        isNull,
+      );
+    });
+  });
 }

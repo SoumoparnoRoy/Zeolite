@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import 'day_grid.dart';
+import 'timetable_ocr.dart';
 
 /// Turns a pasted timetable into weekly classes.
 ///
@@ -274,6 +275,22 @@ class TimetableImportResult {
       out.write(alike[ch] ?? ch);
     }
     return out.toString();
+  }
+
+  /// Subjects and rooms named unlike the rest of the sheet: a course that lost
+  /// its code and fell back to its printed name, a room that lost its block
+  /// letter. [lookalikes] reaches neither — each leaves one reading, not a pair.
+  List<String> get oddlyNamed {
+    final List<String> subjects = subjectNames;
+    final List<String> rooms = roomNames;
+    return <String>[
+      if (TimetableOcr.isConvention(subjects.toSet(), TimetableOcr.isCode))
+        for (final String name in subjects)
+          if (!TimetableOcr.isCode(name)) name,
+      if (TimetableOcr.isConvention(rooms.toSet(), TimetableOcr.namesBlockFirst))
+        for (final String name in rooms)
+          if (!TimetableOcr.namesBlockFirst(name)) name,
+    ];
   }
 
   List<String> get roomNames {

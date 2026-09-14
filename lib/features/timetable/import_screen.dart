@@ -203,6 +203,33 @@ class _ImportTimetableScreenState
     return out;
   }
 
+  /// Reads the cell behind each oddly-named class again on its own, and keeps
+  /// the second reading only when it comes back in the shape the sheet uses.
+  ///
+  /// The same magnification the headers get, for the same reason: a lost block
+  /// letter and a lost code are each one character on a page scaled to fit.
+  static Future<List<OcrEntry>> _namedOddCells(
+    TimetableGrid grid,
+    List<OcrEntry> entries,
+    Uint8List bytes,
+  ) async {
+    final List<OcrEntry> out = List<OcrEntry>.of(entries);
+    for (final ({OcrEntry entry, bool room, String text}) odd
+        in TimetableOcr.oddlyNamed(entries)) {
+      final OcrBox? box = TimetableOcr.cellBoxOf(grid, odd.entry);
+      if (box == null) continue;
+      final int at = out.indexOf(odd.entry);
+      if (at < 0) continue;
+      final List<OcrLine> read = await TextRecognition.readRegion(bytes, box);
+      final String? named = TimetableOcr.namedInShape(read, room: odd.room);
+      if (named == null || named == odd.text) continue;
+      out[at] = odd.room
+          ? out[at].withName(room: named)
+          : out[at].withName(subject: named);
+    }
+    return out;
+  }
+
   /// What lands is a first draft: a cell holding parallel electives becomes one
   /// line per elective, because only the student knows which is theirs.
   Future<void> _readImage() async {
@@ -267,6 +294,16 @@ class _ImportTimetableScreenState
           );
         }
       }
+      // After the headers, because a class whose clock moved is a different
+      // cell to go back to.
+      if (lattice != null && best.grid != null && best.entries.isNotEmpty) {
+        best = (
+          grid: best.grid,
+          entries: await _namedOddCells(best.grid!, best.entries, bytes),
+          lines: best.lines,
+        );
+      }
+
       if (best.entries.isEmpty) {
         messenger.showSnackBar(SnackBar(
           content: Text(best.grid == null
@@ -414,6 +451,12 @@ class _ImportTimetableScreenState
               const SectionHeader('These may be the same'),
               for (final List<String> group in result.lookalikes)
                 _LookalikeRow(names: group),
+            ],
+            if (result.oddlyNamed.isNotEmpty) ...<Widget>[
+              const SizedBox(height: AppSpacing.xl),
+              const SectionHeader('Named unlike the rest'),
+              for (final String name in result.oddlyNamed)
+                _OddNameRow(name: name),
             ],
             if (result.classes.isNotEmpty &&
                 result.classes.any((ImportedClass c) => c.blocks > 1)) ...<Widget>[
@@ -563,6 +606,26 @@ class _BlockWeightChoice extends StatelessWidget {
 
 /// Names the recogniser may have read two ways. A warning, not a problem: two
 /// rooms really can be a digit apart, so it never blocks the import.
+class _OddNameRow extends StatelessWidget {
+  const _OddNameRow({required this.name});
+
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+      child: Text(
+        name,
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+}
+
 class _LookalikeRow extends StatelessWidget {
   const _LookalikeRow({required this.names});
 

@@ -750,6 +750,18 @@ class OcrEntry {
   /// decides which lines get written and is then dropped.
   final String? group;
 
+  /// The same class under a name read again. Subject and room only: those are
+  /// the two a magnified second reading can improve.
+  OcrEntry withName({String? subject, String? room}) => OcrEntry(
+        subject: subject ?? this.subject,
+        weekday: weekday,
+        from: from,
+        to: to,
+        room: room ?? this.room,
+        teacher: teacher,
+        group: group,
+      );
+
   /// The line the paste format already parses.
   String toLine() {
     const List<String> days = <String>['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
@@ -784,6 +796,10 @@ class TimetableOcr {
 
   /// A room: `B101`, `B101A`, `250`, `LT201`, `L101`.
   static final RegExp _room = RegExp(r'^[A-Z]{0,3}-?\d{2,4}[A-Z]?$');
+
+  /// A room that names its block before its number, which is how every sheet
+  /// so far prints one. A bare `8204` is the `B204` whose letter was lost.
+  static final RegExp _blockThenNumber = RegExp(r'^[A-Z]');
 
   /// Initials, as the teacher column and the legend both print them.
   static final RegExp _initials = RegExp(r'^[A-Z]{2,4}$');
@@ -918,6 +934,107 @@ class TimetableOcr {
 
   static int _guessedPeriods(TimetableGrid grid) =>
       doubtedPeriods(grid).length;
+
+  /// How many names must carry a shape before it is the sheet's own, and how
+  /// much of a minority may break it.
+  static const int _shapeFloor = 4;
+  static const double _shapeShare = 0.75;
+
+  /// Entries whose subject or room is named unlike everything around it.
+  ///
+  /// Two real misreads live here that [TimetableImportResult.lookalikes] cannot
+  /// reach, because each leaves one reading rather than a pair to compare: a
+  /// card whose course code was missed falls back to its printed name and then
+  /// stands beside the code it duplicates, and a room that reads `8204` every
+  /// time never meets the `B204` it should have been. What gives both away is
+  /// the rest of the sheet — ten codes and one prose name, twenty rooms with a
+  /// block letter and one without.
+  ///
+  /// This says a cell is worth reading again. It does not say what the cell
+  /// holds, and nothing here rewrites a name on the strength of the shape.
+  static List<({OcrEntry entry, bool room, String text})> oddlyNamed(
+    List<OcrEntry> entries,
+  ) {
+    final Set<String> subjects = <String>{
+      for (final OcrEntry e in entries) e.subject,
+    };
+    final Set<String> rooms = <String>{
+      for (final OcrEntry e in entries)
+        if (e.room != null) e.room!,
+    };
+    final bool coded = isConvention(subjects, isCode);
+    final bool blocked =
+        isConvention(rooms, namesBlockFirst);
+
+    return <({OcrEntry entry, bool room, String text})>[
+      for (final OcrEntry e in entries) ...<({OcrEntry entry, bool room, String text})>[
+        if (coded && !_code.hasMatch(e.subject))
+          (entry: e, room: false, text: e.subject),
+        if (blocked && e.room != null && !_blockThenNumber.hasMatch(e.room!))
+          (entry: e, room: true, text: e.room!),
+      ],
+    ];
+  }
+
+  /// The two shapes a name is tested against. Public because the preview tests
+  /// the same two against what it has parsed, and one home for the rule beats
+  /// two regexes drifting apart.
+  static bool isCode(String name) => _code.hasMatch(name);
+  static bool namesBlockFirst(String room) => _blockThenNumber.hasMatch(room);
+
+  /// Whether [holds] is this sheet's convention rather than one of two kinds it
+  /// happens to mix. Under the floor there is no convention to break; under the
+  /// share the sheet simply prints both, and neither kind is the odd one.
+  static bool isConvention(Set<String> names, bool Function(String) holds) {
+    if (names.length < _shapeFloor) return false;
+    return names.where(holds).length >= names.length * _shapeShare;
+  }
+
+  /// The cell an entry came out of, for a second look at just that cell.
+  ///
+  /// Derived from the bands rather than carried on [OcrEntry]: a cell is where
+  /// its day crosses its periods, and the entry already names both. A lab
+  /// spanning two periods gets the pair, which is the cell it was printed in.
+  static OcrBox? cellBoxOf(TimetableGrid grid, OcrEntry entry) {
+    GridBand? day;
+    for (final GridBand b in grid.days) {
+      if (b.weekday == entry.weekday) day = b;
+    }
+    if (day == null) return null;
+
+    final List<(int, int)?> schedule = scheduleOf(grid);
+    double? from;
+    double? to;
+    for (int i = 0; i < grid.periods.length; i++) {
+      final (int, int)? at = schedule[i];
+      if (at == null || at.$1 < entry.from || at.$2 > entry.to) continue;
+      final GridBand band = grid.periods[i];
+      if (from == null || band.start < from) from = band.start;
+      if (to == null || band.end > to) to = band.end;
+    }
+    if (from == null || to == null) return null;
+
+    return grid.axis == GridAxis.daysAsRows
+        ? OcrBox(from, day.start, to, day.end)
+        : OcrBox(day.start, from, day.end, to);
+  }
+
+  /// The first token of a second reading that carries the shape the sheet uses,
+  /// or null when the re-read is no better than what it was asked about.
+  static String? namedInShape(List<OcrLine> read, {required bool room}) {
+    for (final OcrLine line in read) {
+      for (final String t in line.text.split(_splitTokens)) {
+        if (t.isEmpty) continue;
+        if (!room) {
+          if (_code.hasMatch(t)) return t;
+          continue;
+        }
+        final String? named = _roomFrom(t);
+        if (named != null && _blockThenNumber.hasMatch(named)) return named;
+      }
+    }
+    return null;
+  }
 
   /// The fullest reading of one sheet across several reads of its image.
   ///

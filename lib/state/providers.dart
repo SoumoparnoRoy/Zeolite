@@ -16,6 +16,7 @@ import '../data/models/class_slot.dart';
 import '../data/models/extra_class.dart';
 import '../data/models/holiday.dart';
 import '../data/models/room.dart';
+import '../data/models/slot_override.dart';
 import '../data/models/subject.dart';
 import '../data/models/tag.dart';
 import '../data/settings/app_settings.dart';
@@ -205,6 +206,7 @@ class TimetableData {
     required this.extras,
     required this.holidays,
     required this.records,
+    this.overrides = const <SlotOverride>[],
     this.rooms = const <Room>[],
     this.tags = const <Tag>[],
   });
@@ -226,7 +228,27 @@ class TimetableData {
   final List<Holiday> holidays;
   final List<AttendanceRecord> records;
 
+  /// The weeks that depart from their rule. Defaulted because a timetable with
+  /// none is the normal case and every pre-v13 install has exactly that.
+  final List<SlotOverride> overrides;
+
   bool get isEmpty => subjects.isEmpty;
+
+  /// The exception this rule carries on [date], or null when the week follows
+  /// the rule like every other.
+  SlotOverride? overrideOn(int? slotId, DateTime date) {
+    if (slotId == null) return null;
+    final int key = Dates.keyOf(date);
+    for (final SlotOverride override in overrides) {
+      if (override.slotId == slotId && Dates.keyOf(override.date) == key) {
+        return override;
+      }
+    }
+    return null;
+  }
+
+  bool hasOverridesFor(int? slotId) =>
+      slotId != null && overrides.any((SlotOverride o) => o.slotId == slotId);
 
   ClassCategory? categoryFor(Subject? subject) {
     final int? id = subject?.categoryId;
@@ -273,6 +295,7 @@ final timetableProvider = FutureProvider<TimetableData>((ref) async {
   final List<ExtraClass> extras = await repo.getExtraClasses();
   final List<Holiday> holidays = await repo.getHolidays();
   final List<AttendanceRecord> records = await repo.getAttendance();
+  final List<SlotOverride> overrides = await repo.getSlotOverrides();
   final List<Room> rooms = await repo.getRooms();
   final List<Tag> tags = await repo.getTags();
   return TimetableData(
@@ -282,6 +305,7 @@ final timetableProvider = FutureProvider<TimetableData>((ref) async {
     extras: extras,
     holidays: holidays,
     records: records,
+    overrides: overrides,
     rooms: rooms,
     tags: tags,
   );
@@ -298,6 +322,7 @@ final scheduleEngineProvider = Provider<ScheduleEngine?>((ref) {
     extras: data.extras,
     holidays: data.holidays,
     records: data.records,
+    overrides: data.overrides,
     semesterStart: settings?.semesterStart,
     semesterEnd: settings?.semesterEnd,
   );
@@ -1269,6 +1294,77 @@ class TimetableActions {
     await _repo.endSlotBefore(slotId, date);
     await _refresh();
     _undo.arm(before);
+  }
+
+  /// Makes one week of [slot] differ from its rule, and moves that
+  /// occurrence's mark if the change moved the attendance key.
+  ///
+  /// Empty fields inherit, so this writes only what actually changed. The
+  /// override outlives a later edit to the rule on purpose: a day singled out
+  /// by hand is a more specific statement than a bulk edit.
+  Future<void> setSlotOverride(
+    ClassSlot slot,
+    DateTime date,
+    SlotOverride override,
+  ) async {
+    final int? slotId = slot.id;
+    if (slotId == null) return;
+    final DatabaseSnapshot before = await _repo.snapshot();
+
+    final ClassSlot was =
+        _ref.read(timetableProvider).value?.overrideOn(slotId, date)?.applyTo(slot) ??
+            slot;
+    final ClassSlot now = override.applyTo(slot) ?? slot;
+    await _moveMarkOn(date, was, now);
+
+    await _repo.setSlotOverride(override);
+    await _refresh();
+    _undo.arm(before);
+  }
+
+  /// Removes one occurrence of [slot] and the mark recorded against it.
+  Future<void> skipSlotOn(ClassSlot slot, DateTime date) async {
+    final int? slotId = slot.id;
+    if (slotId == null) return;
+    final DatabaseSnapshot before = await _repo.snapshot();
+
+    final ClassSlot shown =
+        _ref.read(timetableProvider).value?.overrideOn(slotId, date)?.applyTo(slot) ??
+            slot;
+    await _repo.clearAttendance(shown.subjectId, date, shown.startMinutes);
+    await _repo.setSlotOverride(
+      SlotOverride(slotId: slotId, date: date, skipped: true),
+    );
+    await _refresh();
+    _undo.arm(before);
+  }
+
+  /// Carries a single occurrence's mark from one attendance key to another.
+  ///
+  /// Nothing happens when the key did not move, which is the common case: a
+  /// room change leaves the mark exactly where it was filed.
+  Future<void> _moveMarkOn(
+    DateTime date,
+    ClassSlot was,
+    ClassSlot now,
+  ) async {
+    if (was.subjectId == now.subjectId &&
+        was.startMinutes == now.startMinutes) {
+      return;
+    }
+    final AttendanceRecord? mark = await _repo.getAttendanceAt(
+      was.subjectId,
+      date,
+      was.startMinutes,
+    );
+    if (mark == null) return;
+    await _repo.clearAttendance(was.subjectId, date, was.startMinutes);
+    await _repo.setAttendance(
+      mark.copyWith(
+        subjectId: now.subjectId,
+        startMinutes: now.startMinutes,
+      ),
+    );
   }
 
   /// Ends the rule at [date] and clears what was recorded from that date on.

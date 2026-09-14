@@ -12,6 +12,7 @@ import '../data/models/class_slot.dart';
 import '../data/models/extra_class.dart';
 import '../data/models/holiday.dart';
 import '../data/models/room.dart';
+import '../data/models/slot_override.dart';
 import '../data/models/subject.dart';
 import '../data/models/tag.dart';
 import '../data/settings/app_settings.dart';
@@ -85,6 +86,7 @@ class BackupService {
     final List<Tag> tags = await _repo.getTags();
     final List<Subject> subjects = await _repo.getSubjects();
     final List<ClassSlot> slots = await _repo.getSlots();
+    final List<SlotOverride> overrides = await _repo.getSlotOverrides();
     final List<ExtraClass> extras = await _repo.getExtraClasses();
     final List<AttendanceRecord> records = await _repo.getAttendance();
     final List<Holiday> holidays = await _repo.getHolidays();
@@ -101,6 +103,8 @@ class BackupService {
       'tags': tags.map((Tag t) => t.toMap()).toList(),
       'subjects': subjects.map((Subject s) => s.toMap()).toList(),
       'slots': slots.map((ClassSlot s) => s.toMap()).toList(),
+      'slotOverrides':
+          overrides.map((SlotOverride o) => o.toMap()).toList(),
       'extraClasses': extras.map((ExtraClass e) => e.toMap()).toList(),
       'attendance': records.map((AttendanceRecord r) => r.toMap()).toList(),
       'holidays': holidays.map((Holiday h) => h.toMap()).toList(),
@@ -441,12 +445,15 @@ class BackupService {
         ],
       );
 
+      // The backup's slot ids mean nothing here — SQLite assigns new ones — so
+      // the overrides that point at them are remapped through this.
+      final Map<int, int> slotIdMap = <int, int>{};
       for (int i = 0; i < restoredSlots.length; i++) {
         final ClassSlot slot = restoredSlots[i];
         // Rebuilt without an id so SQLite assigns a fresh primary key. The
         // uuid is not an id in that sense and has to survive, or the rule
         // comes back as a second class beside the one the account holds.
-        await _repo.insertSlot(
+        final int newSlotId = await _repo.insertSlot(
           ClassSlot(
             uuid: slot.uuid ?? adoptedSlots[i],
             subjectId: subjectIdMap[slot.subjectId]!,
@@ -459,7 +466,30 @@ class BackupService {
             endDate: slot.endDate,
           ),
         );
+        if (slot.id != null) slotIdMap[slot.id!] = newSlotId;
       }
+
+      final List<SlotOverride> restoredOverrides = <SlotOverride>[];
+      for (final Object? raw in (data['slotOverrides'] as List<Object?>?) ??
+          const <Object?>[]) {
+        if (raw is! Map) continue;
+        final SlotOverride override =
+            SlotOverride.fromMap(Map<String, Object?>.from(raw));
+        final int? slotId = slotIdMap[override.slotId];
+        // A rule the restore dropped takes its exceptions with it: an override
+        // with no slot is a foreign key pointing nowhere.
+        if (slotId == null) continue;
+        restoredOverrides.add(
+          override.copyWith(
+            id: null,
+            slotId: slotId,
+            subjectId: override.subjectId == null
+                ? null
+                : subjectIdMap[override.subjectId!],
+          ),
+        );
+      }
+      await _repo.insertSlotOverrides(restoredOverrides);
 
       final List<ExtraClass> restoredExtras = <ExtraClass>[];
       for (final Object? raw in (data['extraClasses'] as List<Object?>?) ??

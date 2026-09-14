@@ -12,6 +12,7 @@ import 'package:zeolite/data/models/class_slot.dart';
 import 'package:zeolite/data/models/extra_class.dart';
 import 'package:zeolite/data/models/holiday.dart';
 import 'package:zeolite/data/models/room.dart';
+import 'package:zeolite/data/models/slot_override.dart';
 import 'package:zeolite/data/models/subject.dart';
 import 'package:zeolite/data/settings/app_settings.dart';
 import 'package:zeolite/features/subjects/class_editor_sheets.dart';
@@ -104,6 +105,7 @@ class _SubjectRecorder extends TimetableActions {
 TimetableData _fixture({
   List<ClassSlot> slots = const <ClassSlot>[],
   List<AttendanceRecord> records = const <AttendanceRecord>[],
+  List<SlotOverride> overrides = const <SlotOverride>[],
 }) =>
     TimetableData(
       categories: const <ClassCategory>[
@@ -127,6 +129,7 @@ TimetableData _fixture({
       extras: <ExtraClass>[],
       holidays: const <Holiday>[],
       records: records,
+      overrides: overrides,
     );
 
 Widget _host(
@@ -134,12 +137,17 @@ Widget _host(
   AppSettings settings = _plainSettings,
   List<ClassSlot> slots = const <ClassSlot>[],
   List<AttendanceRecord> records = const <AttendanceRecord>[],
+  List<SlotOverride> slotOverrides = const <SlotOverride>[],
   TimetableActions Function(Ref)? actions,
 }) {
   return ProviderScope(
     overrides: [
       timetableProvider.overrideWith(
-        (Ref ref) async => _fixture(slots: slots, records: records),
+        (Ref ref) async => _fixture(
+          slots: slots,
+          records: records,
+          overrides: slotOverrides,
+        ),
       ),
       settingsProvider.overrideWith(() => _StaticSettings(settings)),
       if (actions != null) actionsProvider.overrideWith(actions),
@@ -667,6 +675,59 @@ void main() {
 
       expect(find.text('Clear the mark'), findsNothing);
       expect(find.text('Edit the weekly class'), findsOneWidget);
+    });
+
+    testWidgets('a weekly class offers both scopes, and no cancel tile',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        _host(
+          (c, ref) => showSessionOptions(c, ref, sessionOn(monday)),
+          slots: <ClassSlot>[weekly],
+        ),
+      );
+      await _openSheet(tester);
+
+      expect(find.text('Edit just this class'), findsOneWidget);
+      expect(find.text('Edit the weekly class'), findsOneWidget);
+      expect(find.text('Delete just this class'), findsOneWidget);
+      // Cancelling is a status, and every date is reachable on Today.
+      expect(find.text('Cancel just this class'), findsNothing);
+    });
+
+    testWidgets('the rule tile owns up to weeks that were set by hand',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        _host(
+          (c, ref) => showSessionOptions(c, ref, sessionOn(monday)),
+          slots: <ClassSlot>[weekly],
+          slotOverrides: <SlotOverride>[
+            SlotOverride(
+              slotId: 7,
+              date: Dates.addDays(monday, 7),
+              room: 'R204',
+            ),
+          ],
+        ),
+      );
+      await _openSheet(tester);
+
+      expect(
+        find.textContaining('Weeks you edited on their own keep what you set'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('with no exceptions the rule tile promises every week plainly',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        _host(
+          (c, ref) => showSessionOptions(c, ref, sessionOn(monday)),
+          slots: <ClassSlot>[weekly],
+        ),
+      );
+      await _openSheet(tester);
+
+      expect(find.textContaining('Weeks you edited on their own'), findsNothing);
     });
 
     testWidgets('stopping it warns only about marks from the cut on',

@@ -9,6 +9,7 @@ import '../models/class_category.dart';
 import '../models/class_slot.dart';
 import '../models/extra_class.dart';
 import '../models/holiday.dart';
+import '../models/slot_override.dart';
 import '../models/room.dart';
 import '../models/subject.dart';
 import '../models/tag.dart';
@@ -304,6 +305,57 @@ class ZeoliteRepository {
   Future<void> deleteSlot(int id) async {
     final Database db = await _db;
     await db.delete('class_slots', where: 'id = ?', whereArgs: <Object?>[id]);
+  }
+
+  // --------------------------------------------------------- slot overrides
+
+  Future<List<SlotOverride>> getSlotOverrides() async {
+    final Database db = await _db;
+    final List<Map<String, Object?>> rows =
+        await db.query('slot_overrides', orderBy: 'date ASC');
+    return rows.map(SlotOverride.fromMap).toList();
+  }
+
+  /// Writes the exception for one rule on one date, replacing whatever was
+  /// there. An override that changes nothing is deleted instead of stored, so
+  /// undoing an exception by hand leaves no row behind to puzzle over later.
+  Future<void> setSlotOverride(SlotOverride override) async {
+    final Database db = await _db;
+    if (override.isEmpty) {
+      await clearSlotOverride(override.slotId, override.date);
+      return;
+    }
+    final SlotOverride row =
+        override.uuid == null ? override.copyWith(uuid: newId()) : override;
+    await db.insert(
+      'slot_overrides',
+      row.toMap()..remove('id'),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> clearSlotOverride(int slotId, DateTime date) async {
+    final Database db = await _db;
+    await db.delete(
+      'slot_overrides',
+      where: 'slot_id = ? AND date = ?',
+      whereArgs: <Object?>[slotId, Dates.keyOf(date)],
+    );
+  }
+
+  Future<void> insertSlotOverrides(List<SlotOverride> overrides) async {
+    if (overrides.isEmpty) return;
+    final Database db = await _db;
+    final Batch batch = db.batch();
+    for (final SlotOverride override in overrides) {
+      batch.insert(
+        'slot_overrides',
+        (override.uuid == null ? override.copyWith(uuid: newId()) : override)
+            .toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+    await batch.commit(noResult: true);
   }
 
   /// Stops a recurring class from [date] onwards without destroying the history

@@ -28,7 +28,7 @@ class AppDatabase {
   // install finds its data, so renaming it would strand every database in
   // place and read as a wipe. It is never shown to the user.
   static const String fileName = 'attend_it.db';
-  static const int schemaVersion = 12;
+  static const int schemaVersion = 13;
 
   Database? _db;
 
@@ -177,6 +177,14 @@ class AppDatabase {
               await db.execute(column);
             }
           }
+          if (oldVersion < 13) {
+            // v13 lets one week of a rule differ without becoming a rule of
+            // its own. Nothing is backfilled: no override means every week
+            // still follows the rule, which is what every existing install
+            // already does.
+            await db.execute(_slotOverridesTable);
+          }
+          await db.execute(_slotOverrideIndex);
           await db.execute(_subjectUuidIndex);
           await db.execute(_slotUuidIndex);
           await db.execute(_extraUuidIndex);
@@ -188,6 +196,28 @@ class AppDatabase {
   /// Uniqueness lives in an index rather than a column constraint so the
   /// create path and the v8 migration can run the exact same statement —
   /// `ALTER TABLE ... ADD COLUMN` cannot carry `UNIQUE`.
+  /// One row per rule per date, so the create path and the v13 migration run
+  /// the same statement — the reason every other index here is separate too.
+  static const String _slotOverridesTable = '''
+    CREATE TABLE IF NOT EXISTS slot_overrides (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid          TEXT,
+      slot_id       INTEGER NOT NULL,
+      date          INTEGER NOT NULL,
+      skipped       INTEGER NOT NULL DEFAULT 0,
+      subject_id    INTEGER,
+      start_minutes INTEGER,
+      end_minutes   INTEGER,
+      room          TEXT,
+      FOREIGN KEY (slot_id) REFERENCES class_slots (id) ON DELETE CASCADE,
+      FOREIGN KEY (subject_id) REFERENCES subjects (id) ON DELETE CASCADE
+    )
+  ''';
+
+  static const String _slotOverrideIndex =
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_slot_overrides_slot_date '
+      'ON slot_overrides (slot_id, date)';
+
   static const String _subjectUuidIndex =
       'CREATE UNIQUE INDEX IF NOT EXISTS idx_subjects_uuid ON subjects (uuid)';
 
@@ -311,6 +341,8 @@ class AppDatabase {
         FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE SET NULL
       )
     ''');
+    batch.execute(_slotOverridesTable);
+    batch.execute(_slotOverrideIndex);
     batch.execute(_subjectUuidIndex);
 
     // A recurring weekly rule. Dates are stored as yyyymmdd integers.
@@ -401,6 +433,7 @@ class AppDatabase {
     final Batch batch = db.batch();
     batch.delete('attendance');
     batch.delete('extra_classes');
+    batch.delete('slot_overrides');
     batch.delete('class_slots');
     batch.delete('holidays');
     batch.delete('subjects');

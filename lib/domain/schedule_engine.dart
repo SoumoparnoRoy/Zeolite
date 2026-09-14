@@ -4,6 +4,7 @@ import '../data/models/class_session.dart';
 import '../data/models/class_slot.dart';
 import '../data/models/extra_class.dart';
 import '../data/models/holiday.dart';
+import '../data/models/slot_override.dart';
 import '../data/models/subject.dart';
 
 /// Turns recurrence *rules* into concrete class occurrences.
@@ -22,6 +23,7 @@ class ScheduleEngine {
     required List<ExtraClass> extras,
     required List<Holiday> holidays,
     required List<AttendanceRecord> records,
+    List<SlotOverride> overrides = const <SlotOverride>[],
     this.semesterStart,
     this.semesterEnd,
   })  : _subjectsById = <int, Subject>{
@@ -35,6 +37,10 @@ class ScheduleEngine {
         },
         _recordsByKey = <String, AttendanceRecord>{
           for (final AttendanceRecord r in records) r.key: r,
+        },
+        _overrides = <({int slot, int date}), SlotOverride>{
+          for (final SlotOverride o in overrides)
+            (slot: o.slotId, date: Dates.keyOf(o.date)): o,
         };
 
   final Map<int, Subject> _subjectsById;
@@ -42,6 +48,7 @@ class ScheduleEngine {
   final List<ExtraClass> _extras;
   final Map<int, Holiday> _holidayKeys;
   final Map<String, AttendanceRecord> _recordsByKey;
+  final Map<({int slot, int date}), SlotOverride> _overrides;
 
   /// Classes are only generated inside the semester. Null means unbounded.
   final DateTime? semesterStart;
@@ -69,8 +76,17 @@ class ScheduleEngine {
     final bool blocked = isOutsideSemester(day) || holidayOn(day) != null;
 
     if (!blocked) {
-      for (final ClassSlot slot in _slots) {
-        if (!slot.appliesOn(day)) continue;
+      for (final ClassSlot rule in _slots) {
+        if (!rule.appliesOn(day)) continue;
+        // Applied before anything is read off the slot: an override can move
+        // the subject or the start time, and those two are most of the
+        // attendance key, so reading first would fetch another mark entirely.
+        final SlotOverride? exception = _overrideOn(rule, day);
+        final ClassSlot? slot =
+            exception == null ? rule : exception.applyTo(rule);
+        // Null means the date was skipped, which is how an override removes a
+        // single occurrence.
+        if (slot == null) continue;
         final Subject? subject = _subjectsById[slot.subjectId];
         if (subject == null) continue;
         sessions.add(
@@ -110,6 +126,14 @@ class ScheduleEngine {
     sessions.sort(ClassSession.compare);
     return sessions;
   }
+
+  /// The exception this rule carries on [day], if any.
+  SlotOverride? overrideOn(ClassSlot slot, DateTime day) =>
+      _overrideOn(slot, day);
+
+  SlotOverride? _overrideOn(ClassSlot slot, DateTime day) => slot.id == null
+      ? null
+      : _overrides[(slot: slot.id!, date: Dates.keyOf(day))];
 
   AttendanceRecord? _lookupRecord(int? subjectId, DateTime date, int start) {
     if (subjectId == null) return null;

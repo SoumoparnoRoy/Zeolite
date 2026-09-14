@@ -6,6 +6,7 @@ import 'package:zeolite/data/models/class_session.dart';
 import 'package:zeolite/data/models/class_slot.dart';
 import 'package:zeolite/data/models/extra_class.dart';
 import 'package:zeolite/data/models/holiday.dart';
+import 'package:zeolite/data/models/slot_override.dart';
 import 'package:zeolite/data/models/subject.dart';
 import 'package:zeolite/domain/schedule_engine.dart';
 
@@ -43,6 +44,7 @@ ScheduleEngine buildEngine({
   List<ExtraClass>? extras,
   List<Holiday>? holidays,
   List<AttendanceRecord>? records,
+  List<SlotOverride>? overrides,
   DateTime? semesterStart,
   DateTime? semesterEnd,
 }) {
@@ -52,6 +54,7 @@ ScheduleEngine buildEngine({
     extras: extras ?? <ExtraClass>[],
     holidays: holidays ?? <Holiday>[],
     records: records ?? <AttendanceRecord>[],
+    overrides: overrides ?? <SlotOverride>[],
     semesterStart: semesterStart,
     semesterEnd: semesterEnd,
   );
@@ -319,6 +322,69 @@ void main() {
         semesterEnd: Dates.addDays(monday, 21),
       );
       expect(engine.remainingSessionsFor(1, from: monday), 2);
+    });
+  });
+
+  group('one week of a rule differing from it', () {
+    final DateTime second = Dates.addDays(monday, 7);
+
+    test('a skipped date drops that occurrence and no other', () {
+      final ScheduleEngine engine = buildEngine(
+        overrides: <SlotOverride>[
+          SlotOverride(slotId: 1, date: second, skipped: true),
+        ],
+      );
+
+      expect(engine.sessionsOn(monday), hasLength(1));
+      expect(engine.sessionsOn(second), isEmpty);
+      expect(engine.sessionsOn(Dates.addDays(monday, 14)), hasLength(1));
+    });
+
+    test('a room override touches one week and leaves the rule alone', () {
+      final ScheduleEngine engine = buildEngine(
+        slots: <ClassSlot>[slotFixture(id: 1)],
+        overrides: <SlotOverride>[
+          SlotOverride(slotId: 1, date: second, room: 'R204'),
+        ],
+      );
+
+      expect(engine.sessionsOn(second).single.room, 'R204');
+      expect(engine.sessionsOn(monday).single.room, isNull);
+    });
+
+    test('a moved start time reads the mark filed under the new one', () {
+      final ScheduleEngine engine = buildEngine(
+        overrides: <SlotOverride>[
+          SlotOverride(slotId: 1, date: second, startMinutes: 11 * 60),
+        ],
+        records: <AttendanceRecord>[
+          AttendanceRecord(
+            subjectId: 1,
+            date: second,
+            startMinutes: 11 * 60,
+            status: AttendanceStatus.present,
+          ),
+        ],
+      );
+
+      final ClassSession moved = engine.sessionsOn(second).single;
+      expect(moved.startMinutes, 11 * 60);
+      expect(moved.status, AttendanceStatus.present);
+    });
+
+    test('an override on another subject renames only that week', () {
+      final ScheduleEngine engine = buildEngine(
+        subjects: <Subject>[
+          subjectFixture(),
+          subjectFixture(id: 2, name: 'Chemistry'),
+        ],
+        overrides: <SlotOverride>[
+          SlotOverride(slotId: 1, date: second, subjectId: 2),
+        ],
+      );
+
+      expect(engine.sessionsOn(second).single.subject.name, 'Chemistry');
+      expect(engine.sessionsOn(monday).single.subject.name, 'Physics');
     });
   });
 }

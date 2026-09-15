@@ -30,8 +30,9 @@ class SlotOverride {
 
   final int? id;
 
-  /// See [ClassSlot.uuid]. Carried for the same reason and unused until
-  /// overrides are synced.
+  /// Local only: sync keys an exception on its rule and its date instead, so
+  /// two devices never have to agree on an issued id. Kept because dropping a
+  /// v13 column would be a migration bought nothing.
   final String? uuid;
 
   final int slotId;

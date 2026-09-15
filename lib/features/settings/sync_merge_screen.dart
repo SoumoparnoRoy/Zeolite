@@ -154,6 +154,10 @@ String _titleOf(SyncMergeRow row, Map<String, String> names) {
     SyncKind.subject => names[row.localKey] ?? 'A subject',
     SyncKind.slot || SyncKind.extraClass =>
       names[row.fields['subject'] as String? ?? ''] ?? 'A class',
+    // Keyed on the rule rather than the subject, so there is no name to look
+    // up — the date is what tells the two apart anyway.
+    SyncKind.slotOverride =>
+      'Just this class · ${_day(row.localKey.split(':').last)}',
     SyncKind.attendance =>
       names[row.localKey.split(':').first] ?? 'A subject',
   };
@@ -357,6 +361,11 @@ String _describe(SyncMergeRow row, SyncSide side) {
     case SyncKind.extraClass:
       final Object? from = fields['startMinutes'];
       return from is int ? Clock.format(from) : '—';
+    case SyncKind.slotOverride:
+      if (fields['skipped'] == true) return 'Removed';
+      final Object? moved = fields['startMinutes'];
+      if (moved is int) return Clock.format(moved);
+      return (fields['room'] as String?) ?? '—';
     case SyncKind.attendance:
       break;
   }

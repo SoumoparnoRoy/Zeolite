@@ -7,6 +7,7 @@ import '../../data/models/class_slot.dart';
 import '../../data/models/extra_class.dart';
 import '../../data/models/holiday.dart';
 import '../../data/models/room.dart';
+import '../../data/models/slot_override.dart';
 import '../../data/models/subject.dart';
 import '../../data/models/tag.dart';
 import '../../data/settings/app_settings.dart';
@@ -15,7 +16,8 @@ import '../../data/settings/app_settings.dart';
 ///
 /// Only [slot] and [extraClass] carry a uuid. The rest key on something the
 /// data already has — a holiday on its date, a tag, room or category on its
-/// name — which is both smaller and better: two devices set up separately
+/// name, an override on the rule and the week it changes — which is both
+/// smaller and better: two devices set up separately
 /// still agree that "Proxy" is "Proxy", where two issued ids never would.
 enum SyncKind {
   attendance,
@@ -26,6 +28,7 @@ enum SyncKind {
   holiday,
   slot,
   extraClass,
+  slotOverride,
 
   /// The handful of settings that decide which occurrences exist at all.
   /// One row, because they are one document and not a table.
@@ -183,6 +186,33 @@ class SyncItem {
           'note': extra.note,
         },
       );
+
+  /// The rule and the date are the key, so neither is repeated in the fields.
+  ///
+  /// Keyed that way rather than on `uuid` because the unique index on
+  /// `(slot_id, date)` already makes the pair this row's identity: under a
+  /// uuid key two devices
+  /// could each file an exception for the same Tuesday, and only one of them
+  /// could survive the index on arrival.
+  factory SyncItem.slotOverride(
+    SlotOverride override,
+    String slotUuid, {
+    String? subjectUuid,
+  }) =>
+      SyncItem(
+        kind: SyncKind.slotOverride,
+        localKey: overrideKeyFor(slotUuid, override.date),
+        fields: <String, Object?>{
+          'skipped': override.skipped,
+          'subject': subjectUuid,
+          'startMinutes': override.startMinutes,
+          'endMinutes': override.endMinutes,
+          'room': override.room,
+        },
+      );
+
+  static String overrideKeyFor(String slotUuid, DateTime date) =>
+      '$slotUuid:${Dates.keyOf(date)}';
 
   /// Only what shapes the timetable. Theme, notifications and the backup
   /// folder stay on the device that set them: they describe the device, not

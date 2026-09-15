@@ -87,6 +87,7 @@ class FirestoreSyncTarget implements SyncTarget {
     SyncKind.holiday: 'holidays',
     SyncKind.slot: 'slots',
     SyncKind.extraClass: 'extraClasses',
+    SyncKind.slotOverride: 'slotOverrides',
     // The one settings row lives under its own collection so it cannot
     // collide with anything and reads as one document, which is what it is.
     SyncKind.settings: 'meta',

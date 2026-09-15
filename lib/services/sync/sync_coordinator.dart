@@ -9,6 +9,7 @@ import '../../data/models/class_slot.dart';
 import '../../data/models/extra_class.dart';
 import '../../data/models/holiday.dart';
 import '../../data/models/room.dart';
+import '../../data/models/slot_override.dart';
 import '../../data/models/subject.dart';
 import '../../data/models/tag.dart';
 import '../../data/settings/app_settings.dart';
@@ -126,6 +127,7 @@ class SyncCoordinator {
     SyncKind.subject,
     SyncKind.slot,
     SyncKind.extraClass,
+    SyncKind.slotOverride,
     SyncKind.attendance,
   ];
 
@@ -338,10 +340,15 @@ class SyncCoordinator {
     final List<Holiday> holidays = await _repository.getHolidays();
     final List<ClassSlot> slots = await _repository.getSlots();
     final List<ExtraClass> extras = await _repository.getExtraClasses();
+    final List<SlotOverride> overrides = await _repository.getSlotOverrides();
     final AppSettings settings = await _settings.load();
 
     final Map<int, String> uuidById = <int, String>{
       for (final Subject s in subjects)
+        if (s.id != null && s.uuid != null) s.id!: s.uuid!,
+    };
+    final Map<int, String> slotUuidById = <int, String>{
+      for (final ClassSlot s in slots)
         if (s.id != null && s.uuid != null) s.id!: s.uuid!,
     };
     final Map<int, String> categoryNameById = <int, String>{
@@ -373,6 +380,11 @@ class SyncCoordinator {
       extraByUuid: <String, ExtraClass>{
         for (final ExtraClass e in extras)
           if (e.uuid != null) e.uuid!: e,
+      },
+      overrideByKey: <String, SlotOverride>{
+        for (final SlotOverride o in overrides)
+          if (slotUuidById[o.slotId] != null)
+            SyncItem.overrideKeyFor(slotUuidById[o.slotId]!, o.date): o,
       },
     );
 
@@ -406,6 +418,16 @@ class SyncCoordinator {
         for (final ExtraClass e in extras)
           if (e.uuid != null && uuidById[e.subjectId] != null)
             SyncItem.extraClass(e, uuidById[e.subjectId]!),
+      ],
+      SyncKind.slotOverride: <SyncItem>[
+        for (final SlotOverride o in overrides)
+          if (slotUuidById[o.slotId] != null)
+            SyncItem.slotOverride(
+              o,
+              slotUuidById[o.slotId]!,
+              subjectUuid:
+                  o.subjectId == null ? null : uuidById[o.subjectId],
+            ),
       ],
       SyncKind.attendance: <SyncItem>[
         for (final AttendanceRecord r in await _repository.getAttendance())
@@ -667,6 +689,7 @@ class SyncCoordinator {
       SyncKind.subject => await _applySubject(state, local),
       SyncKind.slot => await _applySlot(state, local),
       SyncKind.extraClass => await _applyExtraClass(state, local),
+      SyncKind.slotOverride => await _applySlotOverride(state, local),
       SyncKind.attendance => await _applyAttendance(state, local),
     };
     if (applied == null) return null;
@@ -898,6 +921,49 @@ class SyncCoordinator {
     return SyncItem.extraClass(extra, subjectUuid!);
   }
 
+  /// The rule has to be on this device already, which [_order] guarantees by
+  /// pulling slots first: an exception to a rule nothing here holds has no id
+  /// to store against and no occurrence to change.
+  Future<SyncItem?> _applySlotOverride(RemoteState state, _Local local) async {
+    final _OverrideKey? key = _OverrideKey.parse(state.localKey);
+    final ClassSlot? slot = key == null ? null : local.slotByUuid[key.slotUuid];
+    if (key == null || slot?.id == null) return null;
+
+    final Map<String, Object?> f = state.fields;
+    final String? subjectUuid = f['subject'] as String?;
+    final int? subjectId =
+        subjectUuid == null ? null : local.subjectByUuid[subjectUuid]?.id;
+
+    final SlotOverride override = SlotOverride(
+      uuid: local.overrideByKey[state.localKey]?.uuid,
+      slotId: slot!.id!,
+      date: key.date,
+      skipped: f['skipped'] == true,
+      subjectId: subjectId,
+      startMinutes: _int(f['startMinutes']),
+      endMinutes: _int(f['endMinutes']),
+      room: f['room'] as String?,
+    );
+
+    // A row that changes nothing is not stored, so there is no link to keep
+    // either — returning null drops it rather than pointing it at an absence.
+    if (override.isEmpty) {
+      await _repository.clearSlotOverride(slot.id!, key.date);
+      local.overrideByKey.remove(state.localKey);
+      return null;
+    }
+
+    await _repository.setSlotOverride(override);
+    local.overrideByKey[state.localKey] = override;
+    return SyncItem.slotOverride(
+      override,
+      key.slotUuid,
+      // Only when it resolved: a subject this device does not have was not
+      // written, and the hash has to say so or the difference never resurfaces.
+      subjectUuid: subjectId == null ? null : subjectUuid,
+    );
+  }
+
   Future<SyncItem?> _applyAttendance(RemoteState state, _Local local) async {
     final _MarkKey? key = _MarkKey.parse(state.localKey);
     final Subject? subject = key == null ? null : local.subjectByUuid[key.uuid];
@@ -960,6 +1026,13 @@ class SyncCoordinator {
       case SyncKind.extraClass:
         final ExtraClass? extra = local.extraByUuid.remove(localKey);
         if (extra?.id != null) await _repository.deleteExtraClass(extra!.id!);
+      case SyncKind.slotOverride:
+        final _OverrideKey? key = _OverrideKey.parse(localKey);
+        final ClassSlot? slot =
+            key == null ? null : local.slotByUuid[key.slotUuid];
+        if (key == null || slot?.id == null) return;
+        local.overrideByKey.remove(localKey);
+        await _repository.clearSlotOverride(slot!.id!, key.date);
       case SyncKind.attendance:
         final _MarkKey? key = _MarkKey.parse(localKey);
         final Subject? subject =
@@ -1192,6 +1265,7 @@ class _Local {
     required this.holidayByKey,
     required this.slotByUuid,
     required this.extraByUuid,
+    required this.overrideByKey,
   });
 
   final Map<String, Subject> subjectByUuid;
@@ -1201,6 +1275,7 @@ class _Local {
   final Map<String, Holiday> holidayByKey;
   final Map<String, ClassSlot> slotByUuid;
   final Map<String, ExtraClass> extraByUuid;
+  final Map<String, SlotOverride> overrideByKey;
 
   final Map<SyncKind, List<SyncItem>> items = <SyncKind, List<SyncItem>>{};
 }
@@ -1223,6 +1298,21 @@ class _Tally {
 
 /// The three parts of an attendance sync key, back out of the string.
 @immutable
+class _OverrideKey {
+  const _OverrideKey(this.slotUuid, this.date);
+
+  final String slotUuid;
+  final DateTime date;
+
+  static _OverrideKey? parse(String key) {
+    final List<String> parts = key.split(':');
+    if (parts.length != 2) return null;
+    final int? dateKey = int.tryParse(parts[1]);
+    if (parts[0].isEmpty || dateKey == null) return null;
+    return _OverrideKey(parts[0], Dates.fromKey(dateKey));
+  }
+}
+
 class _MarkKey {
   const _MarkKey(this.uuid, this.date, this.startMinutes);
 

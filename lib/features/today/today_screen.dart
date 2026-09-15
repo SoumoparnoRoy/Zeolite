@@ -16,6 +16,7 @@ import '../../services/notification_service.dart';
 import '../../state/providers.dart';
 import '../../widgets/common.dart';
 import '../../widgets/gradient_header.dart';
+import '../../widgets/nav_bar_scroll.dart';
 import '../../widgets/tag_picker.dart';
 import '../../widgets/undo_snack.dart';
 import '../subjects/class_editor_sheets.dart';
@@ -148,6 +149,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
     final TimetableData? data = ref.watch(timetableProvider).value;
     final HomeView view = ref.watch(homeViewProvider);
     final bool isToday = Dates.isSameDay(selected, Dates.today());
+    final NavBarScroll? navBar = NavBarScroll.of(context);
     // The grid follows whichever day you were looking at, so switching views
     // does not lose your place and needs no state of its own.
     final DateTime gridWeek = Dates.startOfWeek(selected);
@@ -211,9 +213,14 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
       ),
       body: PageView.builder(
         controller: _pagesFor(view),
-        onPageChanged: (int page) => ref
-            .read(selectedDateProvider.notifier)
-            .select(TodayScreen.dateForPage(view, _origin, page)),
+        onPageChanged: (int page) {
+          // A day whose classes fit the screen has nothing to scroll back up,
+          // so arriving on one with the bar already gone would strand it.
+          navBar?.show();
+          ref
+              .read(selectedDateProvider.notifier)
+              .select(TodayScreen.dateForPage(view, _origin, page));
+        },
         itemBuilder: (BuildContext context, int page) {
           final DateTime date = TodayScreen.dateForPage(view, _origin, page);
           final DateTime weekStart = Dates.startOfWeek(date);
@@ -228,191 +235,197 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
           final int unmarkedToday =
               sessions.where((ClassSession s) => s.needsMarking).length;
 
-          return RefreshIndicator(
-            color: p.accent,
-            backgroundColor: p.surface,
-            onRefresh: () async => ref.invalidate(timetableProvider),
-            child: CustomScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              slivers: view == HomeView.grid
-              ? <Widget>[
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(14, 0, 14, _gridBottomPad),
-                    // The viewport, not what is left to paint — that shrinks as
-                    // you scroll and would resize the blocks under your finger.
-                    sliver: SliverLayoutBuilder(
-                      builder: (BuildContext context, SliverConstraints c) =>
-                          SliverToBoxAdapter(
-                        child: WeekGridView(
-                          weekStart: weekStart,
-                          // Less this sliver's own padding, which the viewport
-                          // extent does not know about.
-                          availableHeight: c.viewportMainAxisExtent -
-                              c.precedingScrollExtent -
-                              _gridBottomPad,
-                        ),
-                      ),
-                    ),
-                  ),
-                ]
-              : <Widget>[
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(_pad, 0, _pad, 0),
-                    sliver: SliverToBoxAdapter(
-                      child: Row(
-                        children: <Widget>[
-                          Expanded(
-                            child: Text(
-                              isToday
-                                  ? "Today's classes"
-                                  : Dates.formatDayMonth(date),
-                              style: TextStyle(
-                                fontSize: 13,
-                                height: 1,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -0.2,
-                                color: p.textPrimary,
-                              ),
-                            ),
+          // Reported from inside the date pager, which the shell's own listener
+          // sits outside of: from there this list is one viewport too deep for
+          // [RootShell.navVisibleFor] to act on.
+          return NotificationListener<UserScrollNotification>(
+            onNotification: navBar?.report ?? (_) => false,
+            child: RefreshIndicator(
+              color: p.accent,
+              backgroundColor: p.surface,
+              onRefresh: () async => ref.invalidate(timetableProvider),
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: view == HomeView.grid
+                ? <Widget>[
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(14, 0, 14, _gridBottomPad),
+                      // The viewport, not what is left to paint — that shrinks as
+                      // you scroll and would resize the blocks under your finger.
+                      sliver: SliverLayoutBuilder(
+                        builder: (BuildContext context, SliverConstraints c) =>
+                            SliverToBoxAdapter(
+                          child: WeekGridView(
+                            weekStart: weekStart,
+                            // Less this sliver's own padding, which the viewport
+                            // extent does not know about.
+                            availableHeight: c.viewportMainAxisExtent -
+                                c.precedingScrollExtent -
+                                _gridBottomPad,
                           ),
-                          if (unmarkedToday > 1)
-                            InkWell(
-                              onTap: () => _markAllPresent(context, ref, sessions),
-                              borderRadius: BorderRadius.circular(8),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 4,
-                                  vertical: 2,
-                                ),
-                                child: Text(
-                                  'All present',
-                                  style: TextStyle(
-                                    fontSize: 10.5,
-                                    height: 1,
-                                    fontWeight: FontWeight.w700,
-                                    color: p.accent,
-                                  ),
+                        ),
+                      ),
+                    ),
+                  ]
+                : <Widget>[
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(_pad, 0, _pad, 0),
+                      sliver: SliverToBoxAdapter(
+                        child: Row(
+                          children: <Widget>[
+                            Expanded(
+                              child: Text(
+                                isToday
+                                    ? "Today's classes"
+                                    : Dates.formatDayMonth(date),
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  height: 1,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.2,
+                                  color: p.textPrimary,
                                 ),
                               ),
                             ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 14)),
-                  if (unmarked.isNotEmpty)
-                    SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(_pad, 0, _pad, 12),
-                      sliver: SliverToBoxAdapter(
-                        child: _UnmarkedBanner(
-                          count: unmarked.length,
-                          onJump: () => ref
-                              .read(selectedDateProvider.notifier)
-                              .select(unmarked.first.date),
-                        ),
-                      ),
-                    ),
-                  if (holiday != null)
-                    SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(_pad, 0, _pad, 12),
-                      sliver: SliverToBoxAdapter(
-                        child: _NoticeCard(
-                          icon: Icons.celebration_rounded,
-                          title: holiday.name,
-                          message:
-                              'Marked as a holiday — no recurring classes today.',
-                          color: p.cyan,
-                        ),
-                      ),
-                    )
-                  else if (outsideSemester)
-                    SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(_pad, 0, _pad, 12),
-                      sliver: SliverToBoxAdapter(
-                        child: _NoticeCard(
-                          icon: Icons.event_busy_rounded,
-                          title: 'Outside the term',
-                          message: settings.hasSemester
-                              ? 'Your term runs '
-                                  '${Dates.formatFull(settings.semesterStart!)} – '
-                                  '${Dates.formatFull(settings.semesterEnd!)}.'
-                              : 'Set your term dates in Settings.',
-                          color: p.textTertiary,
-                        ),
-                      ),
-                    ),
-                  if (sessions.isEmpty && holiday == null && !outsideSemester)
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 36),
-                        // A timetable with nothing in it at all is a first
-                        // run, not a free day — "enjoy the free day" told
-                        // someone who had just finished setting up that the
-                        // schedule they have not made yet is clear.
-                        child: nothingScheduled
-                            ? EmptyState(
-                                icon: Icons.event_note_outlined,
-                                title: 'No classes yet',
-                                message: 'Add your first class and Zeolite '
-                                    'starts tracking attendance for it.',
-                                action: FilledButton.icon(
-                                  onPressed: () => showAddClassSheet(
-                                    context,
-                                    ref,
-                                    initialDate: date,
+                            if (unmarkedToday > 1)
+                              InkWell(
+                                onTap: () => _markAllPresent(context, ref, sessions),
+                                borderRadius: BorderRadius.circular(8),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 4,
+                                    vertical: 2,
                                   ),
-                                  icon: const Icon(Icons.add_rounded),
-                                  label: const Text('Add your first class'),
+                                  child: Text(
+                                    'All present',
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      height: 1,
+                                      fontWeight: FontWeight.w700,
+                                      color: p.accent,
+                                    ),
+                                  ),
                                 ),
-                              )
-                            : EmptyState(
-                                icon: Icons.wb_sunny_outlined,
-                                title:
-                                    isToday ? 'Nothing on today' : 'No classes',
-                                message: isToday
-                                    ? 'Enjoy the free day. Add classes from '
-                                        'the Timetable tab.'
-                                    : 'There are no classes scheduled for '
-                                        'this day.',
                               ),
+                          ],
+                        ),
                       ),
                     ),
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(_pad, 0, _pad, 96),
-                    sliver: SliverList.separated(
-                      itemCount: sessions.length,
-                      separatorBuilder: (_, __) =>
-                          const SizedBox(height: SessionCard.gap),
-                      itemBuilder: (BuildContext context, int index) {
-                        final ClassSession session = sessions[index];
-                        final List<Tag> tags = data?.tags ?? const <Tag>[];
-                        return SessionCard(
-                          session: session,
-                          use24Hour: settings.use24HourTime,
-                          nextColor: index + 1 < sessions.length
-                              ? SessionCard.spineColorOf(
-                                  sessions[index + 1],
-                                  context.palette,
+                    const SliverToBoxAdapter(child: SizedBox(height: 14)),
+                    if (unmarked.isNotEmpty)
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(_pad, 0, _pad, 12),
+                        sliver: SliverToBoxAdapter(
+                          child: _UnmarkedBanner(
+                            count: unmarked.length,
+                            onJump: () => ref
+                                .read(selectedDateProvider.notifier)
+                                .select(unmarked.first.date),
+                          ),
+                        ),
+                      ),
+                    if (holiday != null)
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(_pad, 0, _pad, 12),
+                        sliver: SliverToBoxAdapter(
+                          child: _NoticeCard(
+                            icon: Icons.celebration_rounded,
+                            title: holiday.name,
+                            message:
+                                'Marked as a holiday — no recurring classes today.',
+                            color: p.cyan,
+                          ),
+                        ),
+                      )
+                    else if (outsideSemester)
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(_pad, 0, _pad, 12),
+                        sliver: SliverToBoxAdapter(
+                          child: _NoticeCard(
+                            icon: Icons.event_busy_rounded,
+                            title: 'Outside the term',
+                            message: settings.hasSemester
+                                ? 'Your term runs '
+                                    '${Dates.formatFull(settings.semesterStart!)} – '
+                                    '${Dates.formatFull(settings.semesterEnd!)}.'
+                                : 'Set your term dates in Settings.',
+                            color: p.textTertiary,
+                          ),
+                        ),
+                      ),
+                    if (sessions.isEmpty && holiday == null && !outsideSemester)
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 36),
+                          // A timetable with nothing in it at all is a first
+                          // run, not a free day — "enjoy the free day" told
+                          // someone who had just finished setting up that the
+                          // schedule they have not made yet is clear.
+                          child: nothingScheduled
+                              ? EmptyState(
+                                  icon: Icons.event_note_outlined,
+                                  title: 'No classes yet',
+                                  message: 'Add your first class and Zeolite '
+                                      'starts tracking attendance for it.',
+                                  action: FilledButton.icon(
+                                    onPressed: () => showAddClassSheet(
+                                      context,
+                                      ref,
+                                      initialDate: date,
+                                    ),
+                                    icon: const Icon(Icons.add_rounded),
+                                    label: const Text('Add your first class'),
+                                  ),
                                 )
-                              : null,
-                          categoryName: data?.categoryFor(session.subject)?.name,
-                          tagName: data?.tagById(session.record?.tagId)?.name,
-                          isNext: next != null &&
-                              next.date == session.date &&
-                              next.startMinutes == session.startMinutes &&
-                              next.subject.id == session.subject.id,
-                          onMark: (AttendanceStatus status) =>
-                              ref.read(actionsProvider).mark(session, status),
-                          onTag: tags.isEmpty
-                              ? null
-                              : () => _pickTag(context, ref, session, tags),
-                          onLongPress: () =>
-                              showSessionOptions(context, ref, session, marksInline: true),
-                        );
-                      },
+                              : EmptyState(
+                                  icon: Icons.wb_sunny_outlined,
+                                  title:
+                                      isToday ? 'Nothing on today' : 'No classes',
+                                  message: isToday
+                                      ? 'Enjoy the free day. Add classes from '
+                                          'the Timetable tab.'
+                                      : 'There are no classes scheduled for '
+                                          'this day.',
+                                ),
+                        ),
+                      ),
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(_pad, 0, _pad, 96),
+                      sliver: SliverList.separated(
+                        itemCount: sessions.length,
+                        separatorBuilder: (_, __) =>
+                            const SizedBox(height: SessionCard.gap),
+                        itemBuilder: (BuildContext context, int index) {
+                          final ClassSession session = sessions[index];
+                          final List<Tag> tags = data?.tags ?? const <Tag>[];
+                          return SessionCard(
+                            session: session,
+                            use24Hour: settings.use24HourTime,
+                            nextColor: index + 1 < sessions.length
+                                ? SessionCard.spineColorOf(
+                                    sessions[index + 1],
+                                    context.palette,
+                                  )
+                                : null,
+                            categoryName: data?.categoryFor(session.subject)?.name,
+                            tagName: data?.tagById(session.record?.tagId)?.name,
+                            isNext: next != null &&
+                                next.date == session.date &&
+                                next.startMinutes == session.startMinutes &&
+                                next.subject.id == session.subject.id,
+                            onMark: (AttendanceStatus status) =>
+                                ref.read(actionsProvider).mark(session, status),
+                            onTag: tags.isEmpty
+                                ? null
+                                : () => _pickTag(context, ref, session, tags),
+                            onLongPress: () =>
+                                showSessionOptions(context, ref, session, marksInline: true),
+                          );
+                        },
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+              ),
             ),
           );
         },

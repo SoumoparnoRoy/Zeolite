@@ -19,6 +19,7 @@ import 'state/home_widget_providers.dart';
 import 'state/providers.dart';
 import 'state/notion_sync_providers.dart';
 import 'state/sync_providers.dart';
+import 'widgets/nav_bar_scroll.dart';
 
 class ZeoliteApp extends ConsumerWidget {
   const ZeoliteApp({super.key});
@@ -266,6 +267,7 @@ class _RootShellState extends ConsumerState<RootShell> {
     setState(() => _navVisible = visible);
   }
 
+  /// Also reached from [TodayScreen], whose list sits a level deeper.
   bool _onScroll(UserScrollNotification notification) {
     final bool? visible = RootShell.navVisibleFor(
       notification.direction,
@@ -287,21 +289,25 @@ class _RootShellState extends ConsumerState<RootShell> {
     return Scaffold(
       // The day pills, Home's date pager and the settings sliders are deeper
       // in the tree, so they take a sideways drag before this pager sees it.
-      body: PageView(
-        controller: _pages,
-        onPageChanged: _onPageChanged,
-        children: <Widget>[
-          for (final Widget screen in _screens)
-            // Listened per page rather than around the pager, which would
-            // otherwise count as a level and hide every screen's own scroll
-            // from [RootShell.navVisibleFor].
-            _KeptAlive(
-              child: NotificationListener<UserScrollNotification>(
-                onNotification: _onScroll,
-                child: screen,
+      body: NavBarScroll(
+        report: _onScroll,
+        show: () => _showNav(true),
+        child: PageView(
+          controller: _pages,
+          onPageChanged: _onPageChanged,
+          children: <Widget>[
+            for (final Widget screen in _screens)
+              // Listened per page rather than around the pager, which would
+              // otherwise count as a level and hide every screen's own scroll
+              // from [RootShell.navVisibleFor].
+              _KeptAlive(
+                child: NotificationListener<UserScrollNotification>(
+                  onNotification: _onScroll,
+                  child: screen,
+                ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
       // A shadow rather than a rule: the tab row is the one piece of chrome
       // that has to stay above the sheet, and a hairline read as one more

@@ -762,6 +762,22 @@ class OcrEntry {
         group: group,
       );
 
+  OcrEntry spanning(int from, int to) => OcrEntry(
+        subject: subject,
+        weekday: weekday,
+        from: from,
+        to: to,
+        room: room,
+        teacher: teacher,
+        group: group,
+      );
+
+  bool _sameSitting(OcrEntry other) =>
+      other.weekday == weekday &&
+      other.subject == subject &&
+      other.room == room &&
+      other.group == group;
+
   /// The line the paste format already parses.
   String toLine() {
     const List<String> days = <String>['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
@@ -974,6 +990,77 @@ class TimetableOcr {
           (entry: e, room: true, text: e.room!),
       ],
     ];
+  }
+
+  /// Course codes with an `O` read where the sheet's own codes have a zero.
+  ///
+  /// The one place a name is rewritten on its shape, and only on the whole
+  /// sheet's say-so: most codes share one run of letters and digits, and a
+  /// zero read as a letter moves a digit into the letters — `ABCO12L` beside
+  /// `DEF034L`. A letter the recogniser read is never touched unless swapping
+  /// that `O` lands exactly on the majority shape.
+  static List<OcrEntry> withCodesMended(List<OcrEntry> entries) {
+    final Set<String> subjects = <String>{
+      for (final OcrEntry e in entries) e.subject,
+    };
+    final Map<(int, int), int> shapes = <(int, int), int>{};
+    for (final String s in subjects) {
+      final (int, int)? shape = _shapeOf(s);
+      if (shape != null) shapes[shape] = (shapes[shape] ?? 0) + 1;
+    }
+    if (subjects.length < _shapeFloor || shapes.isEmpty) return entries;
+    final MapEntry<(int, int), int> usual = shapes.entries
+        .reduce((MapEntry<(int, int), int> a, MapEntry<(int, int), int> b) =>
+            b.value > a.value ? b : a);
+    if (usual.value * 2 <= subjects.length) return entries;
+
+    final Map<String, String> mended = <String, String>{
+      for (final String s in subjects)
+        if (_shapeOf(s) != usual.key && s.contains('O'))
+          if (s.replaceAllMapped(RegExp(r'O(?=\d)|(?<=\d)O'), (_) => '0')
+              case final String fixed
+              when fixed != s && _shapeOf(fixed) == usual.key)
+            s: fixed,
+    };
+    if (mended.isEmpty) return entries;
+    return <OcrEntry>[
+      for (final OcrEntry e in entries)
+        mended.containsKey(e.subject)
+            ? e.withName(subject: mended[e.subject])
+            : e,
+    ];
+  }
+
+  /// Letters, then digits, of a course code.
+  static (int, int)? _shapeOf(String name) {
+    if (!_code.hasMatch(name)) return null;
+    final RegExpMatch m = RegExp(r'^([A-Z]+)-?(\d+)').firstMatch(name)!;
+    return (m.group(1)!.length, m.group(2)!.length);
+  }
+
+  /// Back-to-back boxes of one class, joined into the class they are.
+  ///
+  /// A sheet that rules off every period prints a two-period lab as two boxes,
+  /// and two classes would want two marks for one sitting. Only boxes that meet
+  /// to the minute are joined: a break between them may be two sittings.
+  static List<OcrEntry> joinedRuns(List<OcrEntry> entries) {
+    final List<OcrEntry> out = <OcrEntry>[];
+    for (final OcrEntry e in entries) {
+      final int before = out.lastIndexWhere(
+        (OcrEntry o) => o._sameSitting(e) && o.to == e.from,
+      );
+      final int after = out.lastIndexWhere(
+        (OcrEntry o) => o._sameSitting(e) && o.from == e.to,
+      );
+      if (before >= 0) {
+        out[before] = out[before].spanning(out[before].from, e.to);
+      } else if (after >= 0) {
+        out[after] = out[after].spanning(e.from, out[after].to);
+      } else {
+        out.add(e);
+      }
+    }
+    return out;
   }
 
   /// The two shapes a name is tested against. Public because the preview tests

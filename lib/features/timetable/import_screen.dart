@@ -21,6 +21,7 @@ import '../../services/text_recognition.dart';
 import '../../services/timetable/vision_client.dart';
 import '../../state/providers.dart';
 import '../../widgets/common.dart';
+import '../../widgets/course_split_choice.dart';
 import '../../widgets/gradient_header.dart';
 import '../../widgets/undo_snack.dart';
 import '../subjects/totals_import_screen.dart';
@@ -50,6 +51,10 @@ class _ImportTimetableScreenState
   /// Off unless asked for: most timetables count every class once, and turning
   /// this on by default would silently double every lab already being pasted.
   bool _weighByBlocks = false;
+
+  /// A lab kept inside its course is what the choice exists for, so a sheet
+  /// that names both starts that way.
+  bool _byCourse = true;
 
   @override
   void dispose() {
@@ -330,6 +335,13 @@ class _ImportTimetableScreenState
         );
       }
 
+      entries = TimetableOcr.withCodesMended(entries);
+      final int boxes = entries.length;
+      entries = TimetableOcr.joinedRuns(entries);
+      // Two boxes were two classes before they were joined, so the joined one
+      // keeps counting as two unless the student says otherwise.
+      if (entries.length < boxes) setState(() => _weighByBlocks = true);
+
       // Only the axes that actually offer a choice: a sheet where every lab
       // is B1 has nothing to ask about.
       final Map<String, List<String>> axes = <String, List<String>>{
@@ -390,8 +402,15 @@ class _ImportTimetableScreenState
     final DayGrid grid = ref.watch(dayGridProvider);
     final bool use24Hour =
         ref.watch(settingsProvider).value?.use24HourTime ?? false;
-    final TimetableImportResult result =
-        TimetableImport.parse(_controller.text, grid: grid);
+    final TimetableImportResult result = TimetableImport.parse(
+      _controller.text,
+      grid: grid,
+      byCourse: _byCourse,
+    );
+    final bool splits = result.subjectNames.length !=
+        TimetableImport.parse(_controller.text, grid: grid, byCourse: !_byCourse)
+            .subjectNames
+            .length;
     final bool ready =
         !result.isEmpty && !result.hasProblems && !_saving;
 
@@ -457,6 +476,18 @@ class _ImportTimetableScreenState
               const SectionHeader('Named unlike the rest'),
               for (final String name in result.oddlyNamed)
                 _OddNameRow(name: name),
+            ],
+            if (splits) ...<Widget>[
+              const SizedBox(height: AppSpacing.xl),
+              const SectionHeader('How the courses split'),
+              CourseSplitChoice(
+                grouped: _byCourse,
+                source: 'sheet',
+                onChanged: (bool grouped) => setState(() {
+                  _byCourse = grouped;
+                  _weighByBlocks = grouped;
+                }),
+              ),
             ],
             if (result.classes.isNotEmpty &&
                 result.classes.any((ImportedClass c) => c.blocks > 1)) ...<Widget>[

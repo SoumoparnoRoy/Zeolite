@@ -1146,4 +1146,54 @@ void main() {
       );
     });
   });
+  group('tidying what was read', () {
+    OcrEntry entry(String subject, int from, int to, {String room = 'R101'}) =>
+        OcrEntry(
+          subject: subject,
+          weekday: 1,
+          from: from,
+          to: to,
+          room: room,
+        );
+
+    test('a zero read as O is mended when the sheet agrees on the shape', () {
+      final List<OcrEntry> mended = TimetableOcr.withCodesMended(<OcrEntry>[
+        entry('AAA101L', 480, 530),
+        entry('BBB102L', 530, 580),
+        entry('CCC103P', 580, 630),
+        entry('DDDO04L', 630, 680),
+      ]);
+      expect(mended.last.subject, 'DDD004L');
+      expect(mended.first.subject, 'AAA101L');
+    });
+
+    test('a sheet whose codes really have four letters is left alone', () {
+      final List<OcrEntry> read = <OcrEntry>[
+        entry('AAAO10', 480, 530),
+        entry('BBBO20', 530, 580),
+        entry('CCCO30', 580, 630),
+        entry('DDD104', 630, 680),
+      ];
+      expect(TimetableOcr.withCodesMended(read), same(read));
+    });
+
+    test('two boxes that meet become one class', () {
+      final List<OcrEntry> joined = TimetableOcr.joinedRuns(<OcrEntry>[
+        entry('AAA101P', 480, 530),
+        entry('AAA101P', 530, 580),
+        entry('AAA101L', 580, 630),
+      ]);
+      expect(joined.map((OcrEntry e) => (e.subject, e.from, e.to)),
+          <(String, int, int)>[('AAA101P', 480, 580), ('AAA101L', 580, 630)]);
+    });
+
+    test('a break or another room keeps them apart', () {
+      final List<OcrEntry> read = <OcrEntry>[
+        entry('AAA101P', 480, 530),
+        entry('AAA101P', 540, 590),
+        entry('AAA101P', 590, 640, room: 'R102'),
+      ];
+      expect(TimetableOcr.joinedRuns(read), hasLength(3));
+    });
+  });
 }

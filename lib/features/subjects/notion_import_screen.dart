@@ -13,6 +13,7 @@ import '../../domain/notion_export.dart';
 import '../../domain/notion_import.dart';
 import '../../state/providers.dart';
 import '../../widgets/common.dart';
+import '../../widgets/course_split_choice.dart';
 import '../../widgets/gradient_header.dart';
 import '../../widgets/undo_snack.dart';
 
@@ -131,9 +132,11 @@ class _NotionImportScreenState extends ConsumerState<NotionImportScreen> {
                 _Problems(problems: widget.export.problems),
               _OutsideTermWarning(export: widget.export, settings: settings),
               const SectionHeader('How the courses split'),
-              _GroupingChoice(
-                value: grouping,
-                onChanged: (NotionGrouping g) => setState(() => _chosen = g),
+              CourseSplitChoice(
+                grouped: grouping == NotionGrouping.grouped,
+                source: 'file',
+                onChanged: (bool g) => setState(() => _chosen =
+                    g ? NotionGrouping.grouped : NotionGrouping.separate),
               ),
               const SizedBox(height: AppSpacing.xl),
               SectionHeader(
@@ -174,72 +177,6 @@ class _NotionImportScreenState extends ConsumerState<NotionImportScreen> {
     final DateTime? to = export.lastDate;
     if (from == null || to == null) return '';
     return '${Dates.formatDayMonth(from)} – ${Dates.formatDayMonth(to)}';
-  }
-}
-
-/// The one thing the file cannot say for itself.
-class _GroupingChoice extends StatelessWidget {
-  const _GroupingChoice({required this.value, required this.onChanged});
-
-  final NotionGrouping value;
-  final ValueChanged<NotionGrouping> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final AppPalette p = context.palette;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        for (final NotionGrouping option in NotionGrouping.values) ...<Widget>[
-          SurfaceCard(
-            onTap: () => onChanged(option),
-            child: Row(
-              children: <Widget>[
-                Icon(
-                  option == value
-                      ? Icons.radio_button_checked_rounded
-                      : Icons.radio_button_unchecked_rounded,
-                  size: 20,
-                  color: option == value ? p.accent : p.textFaint,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        option == NotionGrouping.grouped
-                            ? 'One subject per course'
-                            : 'Lecture and lab kept apart',
-                        style: const TextStyle(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        option == NotionGrouping.grouped
-                            ? 'The lab sits inside its course and counts for '
-                                'as much as the file says — a two-period lab '
-                                'twice.'
-                            : 'The lab becomes its own subject with its own '
-                                'target, and every class counts once.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          height: 1.4,
-                          color: p.textTertiary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
-        ],
-      ],
-    );
   }
 }
 

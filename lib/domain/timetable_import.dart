@@ -16,8 +16,13 @@ import 'timetable_ocr.dart';
 class TimetableImport {
   const TimetableImport._();
 
-  static TimetableImportResult parse(String text, {required DayGrid grid}) {
-    final List<ImportLine> lines = <ImportLine>[];
+  /// [byCourse] files `ABC101L` and `ABC101P` under `ABC101`.
+  static TimetableImportResult parse(
+    String text, {
+    required DayGrid grid,
+    bool byCourse = false,
+  }) {
+    List<ImportLine> lines = <ImportLine>[];
     final List<String> raw = text.split('\n');
 
     for (int i = 0; i < raw.length; i++) {
@@ -26,7 +31,68 @@ class TimetableImport {
       lines.add(_parseLine(line, i + 1, grid));
     }
 
+    if (byCourse) lines = _underCourses(lines);
+    if (!grid.isConfigured) lines = _blocksFromSheet(lines);
     return TimetableImportResult(_withClashesFlagged(lines));
+  }
+
+  /// A code and a one-letter component: `L`ecture, `P`ractical, `T`utorial.
+  static final RegExp _component =
+      RegExp(r'^([A-Za-z]{2,5}-?\d{2,5})([LPTlpt])?$');
+
+  /// Only a code that really has components moves. A lone `ABC101L` has
+  /// nothing to share a subject with, and renaming it would just lose the
+  /// letter.
+  static List<ImportLine> _underCourses(List<ImportLine> lines) {
+    String? courseOf(ImportedClass c) => _component
+        .firstMatch(c.subjectName.trim())
+        ?.group(1)
+        ?.toUpperCase();
+
+    final Map<String, Set<String>> spellings = <String, Set<String>>{};
+    for (final ImportedClass c in lines.map((ImportLine l) => l.parsed).nonNulls) {
+      final String? course = courseOf(c);
+      if (course == null) continue;
+      spellings.putIfAbsent(course, () => <String>{}).add(c.subjectKey);
+    }
+
+    final List<ImportLine> out = <ImportLine>[];
+    for (final ImportLine line in lines) {
+      final ImportedClass? c = line.parsed;
+      final String? course = c == null ? null : courseOf(c);
+      out.add(course != null && spellings[course]!.length > 1
+          ? line.withClass(c!.copyWith(subjectName: course))
+          : line);
+    }
+    return out;
+  }
+
+  /// With no grid to count against, the sheet's own commonest class length is
+  /// one block, so a lab twice that long still offers to count twice.
+  static List<ImportLine> _blocksFromSheet(List<ImportLine> lines) {
+    final Map<int, int> lengths = <int, int>{};
+    for (final ImportLine line in lines) {
+      final ImportedClass? c = line.parsed;
+      if (c == null) continue;
+      final int length = c.endMinutes - c.startMinutes;
+      lengths[length] = (lengths[length] ?? 0) + 1;
+    }
+    if (lengths.isEmpty) return lines;
+    final int block = lengths.entries
+        .reduce((MapEntry<int, int> a, MapEntry<int, int> b) =>
+            b.value > a.value ? b : a)
+        .key;
+    return <ImportLine>[
+      for (final ImportLine line in lines)
+        if (line.parsed case final ImportedClass c?
+            when c.endMinutes - c.startMinutes > block &&
+                (c.endMinutes - c.startMinutes) % block == 0)
+          line.withClass(c.copyWith(
+            blocks: (c.endMinutes - c.startMinutes) ~/ block,
+          ))
+        else
+          line,
+    ];
   }
 
   static ImportLine _parseLine(String line, int number, DayGrid grid) {
@@ -188,6 +254,16 @@ class ImportedClass {
   /// code typed twice attaches to one subject rather than making two.
   String get subjectKey => subjectName.trim().toLowerCase();
 
+  ImportedClass copyWith({String? subjectName, int? blocks}) => ImportedClass(
+        subjectName: subjectName ?? this.subjectName,
+        weekday: weekday,
+        startMinutes: startMinutes,
+        endMinutes: endMinutes,
+        room: room,
+        teacher: teacher,
+        blocks: blocks ?? this.blocks,
+      );
+
   bool sharesKeyWith(ImportedClass other) =>
       other.subjectKey == subjectKey &&
       other.weekday == weekday &&
@@ -210,6 +286,9 @@ class ImportLine {
   final String text;
   final ImportedClass? parsed;
   final String? error;
+
+  ImportLine withClass(ImportedClass parsed) =>
+      ImportLine(number: number, text: text, parsed: parsed);
 }
 
 @immutable

@@ -233,4 +233,33 @@ Example Course, Tu, 2, R202
       expect(result.oddlyNamed, isEmpty);
     });
   });
+  group('a course printed as its components', () {
+    const String sheet = '''
+GEN201L, Mo, 1
+GEN201P, Tu, 1-2
+GEN202L, We, 3
+''';
+
+    test('shares one subject when asked to', () {
+      final TimetableImportResult result =
+          TimetableImport.parse(sheet, grid: _grid, byCourse: true);
+      // GEN202L has no lab beside it, so there is nothing to join it to.
+      expect(result.subjectNames, <String>['GEN201', 'GEN202L']);
+    });
+
+    test('keeps each component apart otherwise', () {
+      expect(_parse(sheet).subjectNames,
+          <String>['GEN201L', 'GEN201P', 'GEN202L']);
+    });
+  });
+
+  test('with no grid, a class twice the usual length is two blocks', () {
+    final TimetableImportResult result = TimetableImport.parse('''
+GEN201, Mo, 08:00-08:50
+GEN202, Mo, 08:50-09:40
+GEN203, Tu, 08:00-09:40
+''', grid: DayGrid.none);
+
+    expect(result.classes.map((ImportedClass c) => c.blocks), <int>[1, 1, 2]);
+  });
 }

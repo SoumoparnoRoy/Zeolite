@@ -36,7 +36,9 @@ class NotionProperties {
     final Map<String, Object?> out = <String, Object?>{};
     void put(NotionField field, Object? Function(NotionProperty) value) {
       final NotionProperty? property = mapping.fields[field];
-      if (property == null) return;
+      // Notion refuses a value for a formula, and one refused property fails
+      // the whole page.
+      if (property == null || property.type == 'formula') return;
       final Object? encoded = value(property);
       if (encoded != null) out[property.id] = encoded;
     }
@@ -107,11 +109,16 @@ class NotionProperties {
       // Whatever `encode` puts in Held, because that column is where `decode`
       // reads this back from. Predicting the mark's own weight for a cancelled
       // class made every one of them read as changed on the far side forever.
-      'weight': status == 'cancelled' && !cancelledCounts
-          ? 0
-          : (item.fields['weight'] as int?) ?? 1,
+      if (!_heldIsFormula)
+        'weight': status == 'cancelled' && !cancelledCounts
+            ? 0
+            : (item.fields['weight'] as int?) ?? 1,
     };
   }
+
+  /// Held is then the workspace's own sum, which this app never wrote and so
+  /// cannot predict; comparing it would flag every row as changed.
+  bool get _heldIsFormula => mapping.fields[NotionField.held]?.type == 'formula';
 
   /// The far side's word for this mark.
   ///
@@ -150,7 +157,8 @@ class NotionProperties {
     // identical to what the device would produce.
     final Map<String, Object?> fields = <String, Object?>{
       'status': wordFor(word) ?? 'present',
-      'weight': (held is Map<String, Object?> ? held['number'] : null) ?? 1,
+      if (!_heldIsFormula)
+        'weight': (held is Map<String, Object?> ? held['number'] : null) ?? 1,
     };
 
     return RemoteState(
@@ -292,8 +300,17 @@ class NotionProperties {
     ];
   }
 
-  static num? numberOf(Object? value) =>
-      value is Map<String, Object?> ? value['number'] as num? : null;
+  /// A formula answers inside its own envelope, and one written to show
+  /// `1/2/0` may answer as text.
+  static num? numberOf(Object? value) {
+    if (value is! Map<String, Object?>) return null;
+    final Object? formula = value['formula'];
+    if (formula is Map<String, Object?>) {
+      final Object? result = formula['number'] ?? formula['string'];
+      return result is num ? result : num.tryParse('${result ?? ''}'.trim());
+    }
+    return value['number'] as num?;
+  }
 
   /// A range's start, which is the day a class was on. An end is ignored: a
   /// mark belongs to one day, and a row spanning two is one class either way.

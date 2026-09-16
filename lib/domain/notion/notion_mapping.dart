@@ -111,15 +111,18 @@ enum NotionField {
     description: 'The category the class sits in, such as Lecture or Lab.',
     types: <String>{'select'},
   ),
+  /// A formula is offered too: a tracker built by hand works its weight out
+  /// from the class type, and importing it at 1 counts every lab once. Sync
+  /// only reads one, never writes it.
   held(
     label: 'Held',
     description: 'How many classes this row counts as. Usually 1.',
-    types: <String>{'number'},
+    types: <String>{'number', 'formula'},
   ),
   credit(
     label: 'Attendance Credit',
     description: 'How much of that you attended, for the Notion rollups.',
-    types: <String>{'number'},
+    types: <String>{'number', 'formula'},
   ),
 
   /// Holds `SyncItem.localKey` verbatim. Without it a page cannot be
@@ -175,7 +178,9 @@ enum NotionField {
       // Plain `held` counts, unlike the CSV reader's rule: that one guards
       // against a database carrying both a `Held?` flag and a counter, which
       // is one real workspace rather than the shape this app authors.
-      NotionField.held => n == 'held' || n.startsWith('held'),
+      // `Held?` is a yes/no flag beside the counter, not the counter.
+      NotionField.held =>
+        n == 'held' || (n.startsWith('held') && !n.endsWith('?')),
       NotionField.credit => n.contains('credit'),
       NotionField.key => n == 'zeolite id' || n == 'zeolite key',
     };

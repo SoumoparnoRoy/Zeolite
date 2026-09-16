@@ -127,6 +127,41 @@ void main() {
     expect(row.weight, 2);
   });
 
+  test('a lab weighted by a formula imports at that weight', () {
+    final NotionMapping base = _mapping();
+    final NotionMapping mapping = NotionMapping(
+      databaseId: base.databaseId,
+      dataSourceId: base.dataSourceId,
+      title: base.title,
+      fields: <NotionField, NotionProperty>{
+        ...base.fields,
+        NotionField.held: _p('p6', 'Held (1/2/0)', 'formula'),
+        NotionField.credit: _p('p7', 'Attendance Credit (1/2/0)', 'formula'),
+      },
+      statusValues: base.statusValues,
+    );
+    final Map<String, Object?> page = _page(kind: 'Practical', status: 'Absent');
+    final Map<String, Object?> cells =
+        page['properties']! as Map<String, Object?>;
+    cells['Held (1/2/0)'] = <String, Object?>{
+      'id': 'p6',
+      'formula': <String, Object?>{'type': 'number', 'number': 2},
+    };
+    // Some trackers format the answer as text.
+    cells['Attendance Credit (1/2/0)'] = <String, Object?>{
+      'id': 'p7',
+      'formula': <String, Object?>{'type': 'string', 'string': '0'},
+    };
+
+    final NotionRow row = NotionPageRows(mapping).read(
+      <Map<String, Object?>>[page],
+    ).rows.single;
+
+    expect(row.weight, 2);
+    expect(row.status, AttendanceStatus.absent);
+    expect(row.creditDisagrees, isFalse);
+  });
+
   test("the workspace's own status words read back as ours", () {
     final NotionPageRows rows = NotionPageRows(
       _mapping(statusValues: const <String, String>{

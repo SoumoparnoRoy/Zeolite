@@ -6,7 +6,7 @@ import 'package:zeolite/domain/sync/sync_target.dart';
 NotionProperty _p(String id, String name, String type) =>
     NotionProperty(id: id, name: name, type: type);
 
-NotionMapping _mapping() => NotionMapping(
+NotionMapping _mapping({String counters = 'number'}) => NotionMapping(
       databaseId: 'db-1',
       dataSourceId: 'ds-1',
       title: 'Zeolite Attendance',
@@ -14,8 +14,8 @@ NotionMapping _mapping() => NotionMapping(
         NotionField.course: _p('p1', 'Course', 'select'),
         NotionField.date: _p('p2', 'Date', 'date'),
         NotionField.status: _p('p3', 'Status', 'select'),
-        NotionField.held: _p('p5', 'Held', 'number'),
-        NotionField.credit: _p('p6', 'Attendance Credit', 'number'),
+        NotionField.held: _p('p5', 'Held', counters),
+        NotionField.credit: _p('p6', 'Attendance Credit', counters),
         NotionField.key: _p('p7', 'Zeolite ID', 'rich_text'),
         NotionField.time: _p('p8', 'Time', 'rich_text'),
       },
@@ -93,5 +93,25 @@ void main() {
         reason: '${item.fields['status']} weight ${item.fields['weight']}',
       );
     }
+  });
+
+  test('formula counters are left alone and do not read as a change', () {
+    final NotionProperties formulas =
+        NotionProperties(_mapping(counters: 'formula'));
+    final SyncItem item = _mark(status: 'present', weight: 2);
+    final Map<String, Object?> written =
+        formulas.encode(item, courseName: 'Thermodynamics');
+
+    expect(written.containsKey('p5'), isFalse);
+    expect(written.containsKey('p6'), isFalse);
+
+    // The workspace works its own Held out, and it need not agree with ours.
+    final Map<String, Object?> page = _pageFrom(written);
+    (page['properties']! as Map<String, Object?>)['Held'] = <String, Object?>{
+      'id': 'p5',
+      'type': 'formula',
+      'formula': <String, Object?>{'type': 'number', 'number': 1},
+    };
+    expect(formulas.decode(page)?.hash, formulas.remoteHashFor(item));
   });
 }

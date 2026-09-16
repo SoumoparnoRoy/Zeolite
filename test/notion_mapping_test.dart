@@ -106,10 +106,10 @@ void main() {
       expect(mapping.isComplete, isFalse);
     });
 
-    test('a formula cannot be written to, so the counters stay unmapped', () {
+    test('the formula counters are read, and the Held? flag is not one', () {
       final NotionMapping mapping = _match(_handBuilt());
-      expect(mapping.fields.containsKey(NotionField.held), isFalse);
-      expect(mapping.fields.containsKey(NotionField.credit), isFalse);
+      expect(mapping.fields[NotionField.held]!.id, 'h6');
+      expect(mapping.fields[NotionField.credit]!.id, 'h7');
     });
 
     test('and the key it has no column for stays unmapped', () {

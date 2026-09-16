@@ -24,29 +24,47 @@ typedef DatabaseSnapshot = Map<String, List<Map<String, Object?>>>;
 /// The UI never touches SQL — it asks the repository for typed models, which
 /// keeps the widget layer testable and the schema replaceable.
 class ZeoliteRepository {
-  ZeoliteRepository({AppDatabase? db}) : _appDb = db ?? AppDatabase.instance;
+  ZeoliteRepository({AppDatabase? db})
+      : _appDb = db ?? AppDatabase.instance,
+        _executor = null;
+
+  ZeoliteRepository._(this._appDb, this._executor);
 
   final AppDatabase _appDb;
+  final DatabaseExecutor? _executor;
 
-  Future<Database> get _db => _appDb.database;
+  Future<DatabaseExecutor> get _db async => _executor ?? await _appDb.database;
+
+  /// Runs all repository calls made through [action] in one SQLite
+  /// transaction. Nested callers reuse the active transaction.
+  Future<T> transaction<T>(
+    Future<T> Function(ZeoliteRepository repository) action,
+  ) async {
+    if (_executor != null) return action(this);
+    final Database db = await _appDb.database;
+    return db.transaction(
+      (Transaction transaction) =>
+          action(ZeoliteRepository._(_appDb, transaction)),
+    );
+  }
 
   // -------------------------------------------------------------- categories
 
   Future<List<ClassCategory>> getCategories() async {
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     final List<Map<String, Object?>> rows =
         await db.query('categories', orderBy: 'name COLLATE NOCASE ASC');
     return rows.map(ClassCategory.fromMap).toList();
   }
 
   Future<int> insertCategory(ClassCategory category) async {
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     return db.insert('categories', category.toMap());
   }
 
   Future<void> updateCategory(ClassCategory category) async {
     if (category.id == null) return;
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     await db.update(
       'categories',
       category.toMap(),
@@ -58,21 +76,23 @@ class ZeoliteRepository {
   /// Deleting a category leaves its subjects intact — they simply fall back to
   /// the global default length (`ON DELETE SET NULL`).
   Future<void> deleteCategory(int id) async {
-    final Database db = await _db;
-    await db.delete('categories', where: 'id = ?', whereArgs: <Object?>[id]);
-    // Older rows created before foreign keys were enforced may still point at
-    // the deleted row, so clear them explicitly.
-    await db.update(
-      'subjects',
-      <String, Object?>{'category_id': null},
-      where: 'category_id = ?',
-      whereArgs: <Object?>[id],
-    );
+    await transaction((ZeoliteRepository repository) async {
+      final DatabaseExecutor db = await repository._db;
+      await db.delete('categories', where: 'id = ?', whereArgs: <Object?>[id]);
+      // Older rows created before foreign keys were enforced may still point
+      // at the deleted row, so clear them explicitly.
+      await db.update(
+        'subjects',
+        <String, Object?>{'category_id': null},
+        where: 'category_id = ?',
+        whereArgs: <Object?>[id],
+      );
+    });
   }
 
   /// How many subjects sit in a category, used before offering to delete it.
   Future<int> countSubjectsInCategory(int categoryId) async {
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     final List<Map<String, Object?>> rows = await db.rawQuery(
       'SELECT COUNT(*) AS c FROM subjects WHERE category_id = ?',
       <Object?>[categoryId],
@@ -84,7 +104,7 @@ class ZeoliteRepository {
   // ------------------------------------------------------------------- rooms
 
   Future<List<Room>> getRooms() async {
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     final List<Map<String, Object?>> rows = await db.query(
       'rooms',
       orderBy: 'position ASC, name COLLATE NOCASE ASC',
@@ -95,7 +115,7 @@ class ZeoliteRepository {
   /// Appends a room at the end of the list, which is where someone adding one
   /// expects it to land.
   Future<int> insertRoom(Room room) async {
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     final List<Map<String, Object?>> rows =
         await db.rawQuery('SELECT MAX(position) AS m FROM rooms');
     final int next = ((rows.first['m'] as int?) ?? -1) + 1;
@@ -111,7 +131,7 @@ class ZeoliteRepository {
 
   Future<void> updateRoom(Room room) async {
     if (room.id == null) return;
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     await db.update(
       'rooms',
       room.toMap(),
@@ -123,14 +143,14 @@ class ZeoliteRepository {
   /// Classes keep whatever room text they were given — the list is only the set
   /// of suggestions, so removing an entry never edits a class.
   Future<void> deleteRoom(int id) async {
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     await db.delete('rooms', where: 'id = ?', whereArgs: <Object?>[id]);
   }
 
   // -------------------------------------------------------------------- tags
 
   Future<List<Tag>> getTags() async {
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     final List<Map<String, Object?>> rows = await db.query(
       'tags',
       orderBy: 'position ASC, name COLLATE NOCASE ASC',
@@ -139,7 +159,7 @@ class ZeoliteRepository {
   }
 
   Future<int> insertTag(Tag tag) async {
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     final List<Map<String, Object?>> rows =
         await db.rawQuery('SELECT MAX(position) AS m FROM tags');
     final int next = ((rows.first['m'] as int?) ?? -1) + 1;
@@ -155,7 +175,7 @@ class ZeoliteRepository {
   /// store a tag id rather than a copy of its name.
   Future<void> updateTag(Tag tag) async {
     if (tag.id == null) return;
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     await db.update(
       'tags',
       tag.toMap(),
@@ -170,14 +190,14 @@ class ZeoliteRepository {
   /// class was still attended, and removing a label is not a reason to forget
   /// that.
   Future<void> deleteTag(int id) async {
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     await db.delete('tags', where: 'id = ?', whereArgs: <Object?>[id]);
   }
 
   /// How many marks carry [tagId]. The Settings delete prompt says this out
   /// loud, so removing a tag in use is a decision rather than a surprise.
   Future<int> countMarksWithTag(int tagId) async {
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     final List<Map<String, Object?>> rows = await db.rawQuery(
       'SELECT COUNT(*) AS c FROM attendance WHERE tag_id = ?',
       <Object?>[tagId],
@@ -188,14 +208,14 @@ class ZeoliteRepository {
   // ---------------------------------------------------------------- subjects
 
   Future<List<Subject>> getSubjects() async {
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     final List<Map<String, Object?>> rows =
         await db.query('subjects', orderBy: 'name COLLATE NOCASE ASC');
     return rows.map(Subject.fromMap).toList();
   }
 
   Future<Subject?> getSubject(int id) async {
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     final List<Map<String, Object?>> rows =
         await db.query('subjects', where: 'id = ?', whereArgs: <Object?>[id]);
     if (rows.isEmpty) return null;
@@ -203,7 +223,7 @@ class ZeoliteRepository {
   }
 
   Future<int> insertSubject(Subject subject) async {
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     return db.insert('subjects', _withUuid(subject).toMap());
   }
 
@@ -226,7 +246,7 @@ class ZeoliteRepository {
   /// device never made, and it would win a later conflict it should have lost.
   Future<void> updateSubject(Subject subject, {bool touch = true}) async {
     if (subject.id == null) return;
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     await db.update(
       'subjects',
       (touch ? subject.copyWith(updatedAt: DateTime.now()) : subject).toMap(),
@@ -238,21 +258,21 @@ class ZeoliteRepository {
   /// Removes a subject and, via `ON DELETE CASCADE`, all of its slots, extra
   /// classes and attendance history.
   Future<void> deleteSubject(int id) async {
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     await db.delete('subjects', where: 'id = ?', whereArgs: <Object?>[id]);
   }
 
   // ------------------------------------------------------------------- slots
 
   Future<List<ClassSlot>> getSlots() async {
-    final Database db = await _db;
-    final List<Map<String, Object?>> rows =
-        await db.query('class_slots', orderBy: 'weekday ASC, start_minutes ASC');
+    final DatabaseExecutor db = await _db;
+    final List<Map<String, Object?>> rows = await db.query('class_slots',
+        orderBy: 'weekday ASC, start_minutes ASC');
     return rows.map(ClassSlot.fromMap).toList();
   }
 
   Future<List<ClassSlot>> getSlotsForSubject(int subjectId) async {
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     final List<Map<String, Object?>> rows = await db.query(
       'class_slots',
       where: 'subject_id = ?',
@@ -266,19 +286,19 @@ class ZeoliteRepository {
   /// slots back to the subjects it just created.
   Future<List<int>> insertSubjects(List<Subject> subjects) async {
     if (subjects.isEmpty) return <int>[];
-    final Database db = await _db;
-    final List<int> ids = <int>[];
-    await db.transaction((Transaction txn) async {
+    return transaction((ZeoliteRepository repository) async {
+      final DatabaseExecutor db = await repository._db;
+      final List<int> ids = <int>[];
       for (final Subject subject in subjects) {
-        ids.add(await txn.insert('subjects', _withUuid(subject).toMap()));
+        ids.add(await db.insert('subjects', _withUuid(subject).toMap()));
       }
+      return ids;
     });
-    return ids;
   }
 
   Future<void> insertSlots(List<ClassSlot> slots) async {
     if (slots.isEmpty) return;
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     final Batch batch = db.batch();
     for (final ClassSlot slot in slots) {
       batch.insert('class_slots', _slotWithUuid(slot).toMap());
@@ -287,13 +307,13 @@ class ZeoliteRepository {
   }
 
   Future<int> insertSlot(ClassSlot slot) async {
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     return db.insert('class_slots', _slotWithUuid(slot).toMap());
   }
 
   Future<void> updateSlot(ClassSlot slot) async {
     if (slot.id == null) return;
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     await db.update(
       'class_slots',
       slot.toMap(),
@@ -303,14 +323,14 @@ class ZeoliteRepository {
   }
 
   Future<void> deleteSlot(int id) async {
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     await db.delete('class_slots', where: 'id = ?', whereArgs: <Object?>[id]);
   }
 
   // --------------------------------------------------------- slot overrides
 
   Future<List<SlotOverride>> getSlotOverrides() async {
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     final List<Map<String, Object?>> rows =
         await db.query('slot_overrides', orderBy: 'date ASC');
     return rows.map(SlotOverride.fromMap).toList();
@@ -320,7 +340,7 @@ class ZeoliteRepository {
   /// there. An override that changes nothing is deleted instead of stored, so
   /// undoing an exception by hand leaves no row behind to puzzle over later.
   Future<void> setSlotOverride(SlotOverride override) async {
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     if (override.isEmpty) {
       await clearSlotOverride(override.slotId, override.date);
       return;
@@ -335,7 +355,7 @@ class ZeoliteRepository {
   }
 
   Future<void> clearSlotOverride(int slotId, DateTime date) async {
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     await db.delete(
       'slot_overrides',
       where: 'slot_id = ? AND date = ?',
@@ -345,7 +365,7 @@ class ZeoliteRepository {
 
   Future<void> insertSlotOverrides(List<SlotOverride> overrides) async {
     if (overrides.isEmpty) return;
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     final Batch batch = db.batch();
     for (final SlotOverride override in overrides) {
       batch.insert(
@@ -361,7 +381,7 @@ class ZeoliteRepository {
   /// Stops a recurring class from [date] onwards without destroying the history
   /// already recorded against it. This is the "remove from now on" action.
   Future<void> endSlotBefore(int slotId, DateTime date) async {
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     await db.update(
       'class_slots',
       <String, Object?>{'end_date': Dates.keyOf(Dates.addDays(date, -1))},
@@ -373,20 +393,20 @@ class ZeoliteRepository {
   // ----------------------------------------------------------- extra classes
 
   Future<List<ExtraClass>> getExtraClasses() async {
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     final List<Map<String, Object?>> rows =
         await db.query('extra_classes', orderBy: 'date ASC, start_minutes ASC');
     return rows.map(ExtraClass.fromMap).toList();
   }
 
   Future<int> insertExtraClass(ExtraClass extra) async {
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     return db.insert('extra_classes', _extraWithUuid(extra).toMap());
   }
 
   Future<void> updateExtraClass(ExtraClass extra) async {
     if (extra.id == null) return;
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     await db.update(
       'extra_classes',
       extra.toMap(),
@@ -396,14 +416,14 @@ class ZeoliteRepository {
   }
 
   Future<void> deleteExtraClass(int id) async {
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     await db.delete('extra_classes', where: 'id = ?', whereArgs: <Object?>[id]);
   }
 
   // -------------------------------------------------------------- attendance
 
   Future<List<AttendanceRecord>> getAttendance() async {
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     final List<Map<String, Object?>> rows = await db.query('attendance');
     return rows.map(AttendanceRecord.fromMap).toList();
   }
@@ -412,7 +432,7 @@ class ZeoliteRepository {
     DateTime from,
     DateTime to,
   ) async {
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     final List<Map<String, Object?>> rows = await db.query(
       'attendance',
       where: 'date >= ? AND date <= ?',
@@ -430,7 +450,7 @@ class ZeoliteRepository {
     DateTime date,
     int startMinutes,
   ) async {
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     final List<Map<String, Object?>> rows = await db.query(
       'attendance',
       where: 'subject_id = ? AND date = ? AND start_minutes = ?',
@@ -444,7 +464,7 @@ class ZeoliteRepository {
   /// Inserts or replaces the mark for one occurrence. The unique index on
   /// `(subject_id, date, start_minutes)` makes re-marking idempotent.
   Future<void> setAttendance(AttendanceRecord record) async {
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     final Map<String, Object?> values = record.toMap()..remove('id');
     await db.insert(
       'attendance',
@@ -459,7 +479,7 @@ class ZeoliteRepository {
     DateTime date,
     int startMinutes,
   ) async {
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     await db.delete(
       'attendance',
       where: 'subject_id = ? AND date = ? AND start_minutes = ?',
@@ -473,7 +493,7 @@ class ZeoliteRepository {
     DateTime from,
     DateTime to,
   ) async {
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     return db.delete(
       'attendance',
       where: 'subject_id = ? AND date >= ? AND date <= ?',
@@ -484,7 +504,7 @@ class ZeoliteRepository {
   /// Marks every unmarked occurrence in one shot — used by "mark all present".
   Future<void> setManyAttendance(List<AttendanceRecord> records) async {
     if (records.isEmpty) return;
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     final Batch batch = db.batch();
     for (final AttendanceRecord record in records) {
       batch.insert(
@@ -499,7 +519,7 @@ class ZeoliteRepository {
   /// Aggregated present/absent counts per subject, computed in SQL so the app
   /// never has to load the whole history into memory.
   Future<Map<int, Map<AttendanceStatus, int>>> getStatusCounts() async {
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     final List<Map<String, Object?>> rows = await db.rawQuery(
       'SELECT subject_id, status, COUNT(*) AS c '
       'FROM attendance GROUP BY subject_id, status',
@@ -521,14 +541,14 @@ class ZeoliteRepository {
   // ---------------------------------------------------------------- holidays
 
   Future<List<Holiday>> getHolidays() async {
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     final List<Map<String, Object?>> rows =
         await db.query('holidays', orderBy: 'date ASC');
     return rows.map(Holiday.fromMap).toList();
   }
 
   Future<int> insertHoliday(Holiday holiday) async {
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     return db.insert(
       'holidays',
       holiday.copyWith(createdAt: holiday.createdAt ?? DateTime.now()).toMap(),
@@ -538,7 +558,7 @@ class ZeoliteRepository {
 
   Future<void> insertHolidays(List<Holiday> holidays) async {
     if (holidays.isEmpty) return;
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     final DateTime now = DateTime.now();
     final Batch batch = db.batch();
     for (final Holiday holiday in holidays) {
@@ -552,13 +572,13 @@ class ZeoliteRepository {
   }
 
   Future<void> deleteHoliday(int id) async {
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     await db.delete('holidays', where: 'id = ?', whereArgs: <Object?>[id]);
   }
 
   Future<void> deleteHolidays(List<int> ids) async {
     if (ids.isEmpty) return;
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     final String placeholders = List<String>.filled(ids.length, '?').join(', ');
     await db.delete(
       'holidays',
@@ -570,7 +590,7 @@ class ZeoliteRepository {
   // ------------------------------------------------------------ sync ledger
 
   Future<List<RemoteLink>> getRemoteLinks(String target, SyncKind kind) async {
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     final List<Map<String, Object?>> rows = await db.query(
       'remote_links',
       where: 'target = ? AND kind = ?',
@@ -583,7 +603,7 @@ class ZeoliteRepository {
   /// re-recording a link after a push is the same call as recording it.
   Future<void> setRemoteLinks(List<RemoteLink> links) async {
     if (links.isEmpty) return;
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     final Batch batch = db.batch();
     for (final RemoteLink link in links) {
       batch.insert(
@@ -601,7 +621,7 @@ class ZeoliteRepository {
     List<String> localKeys,
   ) async {
     if (localKeys.isEmpty) return;
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     final String placeholders =
         List<String>.filled(localKeys.length, '?').join(', ');
     await db.delete(
@@ -614,7 +634,7 @@ class ZeoliteRepository {
   /// Disconnecting a target forgets its ledger and nothing else — the marks
   /// stay, and so do the pages.
   Future<void> deleteRemoteLinksFor(String target) async {
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     await db.delete(
       'remote_links',
       where: 'target = ?',
@@ -624,7 +644,21 @@ class ZeoliteRepository {
 
   // ------------------------------------------------------------------- admin
 
-  Future<void> clearAll() => _appDb.clearAll();
+  Future<void> clearAll() async {
+    final DatabaseExecutor db = await _db;
+    final Batch batch = db.batch();
+    batch.delete('attendance');
+    batch.delete('extra_classes');
+    batch.delete('slot_overrides');
+    batch.delete('class_slots');
+    batch.delete('holidays');
+    batch.delete('subjects');
+    batch.delete('categories');
+    batch.delete('rooms');
+    batch.delete('tags');
+    batch.delete('remote_links');
+    await batch.commit(noResult: true);
+  }
 
   /// Every table undo and its restore cover, parents before children — the
   /// order rows have to go back in while foreign keys are on.
@@ -640,13 +674,14 @@ class ZeoliteRepository {
     'tags',
     'subjects',
     'class_slots',
+    'slot_overrides',
     'extra_classes',
     'attendance',
     'holidays',
   ];
 
   Future<DatabaseSnapshot> snapshot() async {
-    final Database db = await _db;
+    final DatabaseExecutor db = await _db;
     final DatabaseSnapshot snapshot = <String, List<Map<String, Object?>>>{};
     for (final String table in snapshotTables) {
       snapshot[table] = await db.query(table);
@@ -661,7 +696,7 @@ class ZeoliteRepository {
   /// tables are empty, and a screen still holding an id keeps working. The
   /// transaction is so a failure cannot leave the database half restored.
   Future<void> restore(DatabaseSnapshot snapshot) async {
-    final Database db = await _db;
+    final Database db = await _appDb.database;
     await db.transaction((Transaction txn) async {
       for (final String table in snapshotTables.reversed) {
         await txn.delete(table);

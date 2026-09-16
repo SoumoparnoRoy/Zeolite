@@ -24,6 +24,12 @@ class _Recording extends ZeoliteRepository {
   AttendanceRecord? existing;
 
   @override
+  Future<T> transaction<T>(
+    Future<T> Function(ZeoliteRepository repository) action,
+  ) =>
+      action(this);
+
+  @override
   Future<DatabaseSnapshot> snapshot() async =>
       <String, List<Map<String, Object?>>>{};
 

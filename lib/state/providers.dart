@@ -978,42 +978,44 @@ class TimetableActions {
         .where((String name) => !idByName.containsKey(name.toLowerCase()))
         .toList();
 
-    final List<int> palette = AppColors.subjectPalette;
-    final List<int> ids = await _repo.insertSubjects(<Subject>[
-      for (int i = 0; i < fresh.length; i++)
-        Subject(
-          name: fresh[i],
-          teacher: _teacherFor(result, fresh[i]),
-          colorValue: palette[(data.subjects.length + i) % palette.length],
-        ),
-    ]);
-    for (int i = 0; i < fresh.length; i++) {
-      idByName[fresh[i].toLowerCase()] = ids[i];
-    }
-
     final DateTime start =
         _ref.read(settingsProvider).value?.semesterStart ?? Dates.today();
-
-    await _repo.insertSlots(<ClassSlot>[
-      for (final ImportedClass c in result.classes)
-        ClassSlot(
-          subjectId: idByName[c.subjectKey]!,
-          weekday: c.weekday,
-          startMinutes: c.startMinutes,
-          endMinutes: c.endMinutes,
-          room: c.room,
-          weight: weighByBlocks ? c.blocks : 1,
-          startDate: start,
-        ),
-    ]);
-
     final Set<String> known =
         data.rooms.map((Room room) => room.name.toLowerCase()).toSet();
-    for (final String room in result.roomNames) {
-      if (known.add(room.toLowerCase())) {
-        await _repo.insertRoom(Room(name: room));
+
+    await _repo.transaction((ZeoliteRepository repository) async {
+      final List<int> palette = AppColors.subjectPalette;
+      final List<int> ids = await repository.insertSubjects(<Subject>[
+        for (int i = 0; i < fresh.length; i++)
+          Subject(
+            name: fresh[i],
+            teacher: _teacherFor(result, fresh[i]),
+            colorValue: palette[(data.subjects.length + i) % palette.length],
+          ),
+      ]);
+      for (int i = 0; i < fresh.length; i++) {
+        idByName[fresh[i].toLowerCase()] = ids[i];
       }
-    }
+
+      await repository.insertSlots(<ClassSlot>[
+        for (final ImportedClass c in result.classes)
+          ClassSlot(
+            subjectId: idByName[c.subjectKey]!,
+            weekday: c.weekday,
+            startMinutes: c.startMinutes,
+            endMinutes: c.endMinutes,
+            room: c.room,
+            weight: weighByBlocks ? c.blocks : 1,
+            startDate: start,
+          ),
+      ]);
+
+      for (final String room in result.roomNames) {
+        if (known.add(room.toLowerCase())) {
+          await repository.insertRoom(Room(name: room));
+        }
+      }
+    });
 
     await _refresh();
     _undo.arm(before);
@@ -1038,33 +1040,38 @@ class TimetableActions {
     int weightOf(int subjectId) =>
         weightFor(data.categoryFor(data.subjectById(subjectId)));
 
-    for (final ClassSlot slot in data.slots) {
-      final int weight = weightOf(slot.subjectId);
-      if (slot.weight != weight) {
-        await _repo.updateSlot(slot.copyWith(weight: weight));
-      }
-    }
-    for (final ExtraClass extra in data.extras) {
-      final int weight = weightOf(extra.subjectId);
-      if (extra.weight != weight) {
-        await _repo.updateExtraClass(extra.copyWith(weight: weight));
-      }
-    }
+    final int changedCount = await _repo.transaction(
+      (ZeoliteRepository repository) async {
+        for (final ClassSlot slot in data.slots) {
+          final int weight = weightOf(slot.subjectId);
+          if (slot.weight != weight) {
+            await repository.updateSlot(slot.copyWith(weight: weight));
+          }
+        }
+        for (final ExtraClass extra in data.extras) {
+          final int weight = weightOf(extra.subjectId);
+          if (extra.weight != weight) {
+            await repository.updateExtraClass(extra.copyWith(weight: weight));
+          }
+        }
 
-    // Read fresh rather than off [TimetableData]: a mark outside the term
-    // window is still a mark, and leaving it on the old rule would make the
-    // figures disagree the moment the window moved.
-    final List<AttendanceRecord> stored = await _repo.getAttendance();
-    final List<AttendanceRecord> changed = <AttendanceRecord>[
-      for (final AttendanceRecord record in stored)
-        if (record.weight != weightOf(record.subjectId))
-          record.copyWith(weight: weightOf(record.subjectId)),
-    ];
-    await _repo.setManyAttendance(changed);
+        // Read fresh rather than off [TimetableData]: a mark outside the term
+        // window is still a mark, and leaving it on the old rule would make
+        // the figures disagree the moment the window moved.
+        final List<AttendanceRecord> stored = await repository.getAttendance();
+        final List<AttendanceRecord> changed = <AttendanceRecord>[
+          for (final AttendanceRecord record in stored)
+            if (record.weight != weightOf(record.subjectId))
+              record.copyWith(weight: weightOf(record.subjectId)),
+        ];
+        await repository.setManyAttendance(changed);
+        return changed.length;
+      },
+    );
 
     await _refresh();
     _undo.arm(before);
-    return changed.length;
+    return changedCount;
   }
 
   /// Writes a portal's per-subject figures onto the subjects they name.
@@ -1082,47 +1089,49 @@ class TimetableActions {
         _ref.read(settingsProvider).value ?? const AppSettings();
     final List<int> palette = AppColors.subjectPalette;
 
-    int created = 0;
-    for (final TotalsDecision decision in decisions) {
-      final TotalsRow row = decision.row;
-      final int? id = decision.subjectId;
-      if (id == null) {
-        await _repo.insertSubject(
-          Subject(
-            name: row.subject,
-            colorValue:
-                palette[(data.subjects.length + created) % palette.length],
+    await _repo.transaction((ZeoliteRepository repository) async {
+      int created = 0;
+      for (final TotalsDecision decision in decisions) {
+        final TotalsRow row = decision.row;
+        final int? id = decision.subjectId;
+        if (id == null) {
+          await repository.insertSubject(
+            Subject(
+              name: row.subject,
+              colorValue:
+                  palette[(data.subjects.length + created) % palette.length],
+              priorHeld: row.held,
+              priorAttended: row.attended,
+              expectedTotal: row.expectedTotal,
+            ),
+          );
+          created++;
+          continue;
+        }
+
+        if (decision.clearMarks) {
+          // The window has to match what [AppSettings.countsInTerm] counts, or
+          // the marks the preview weighed are not the marks that go: with no
+          // dates set everything counts, so everything goes.
+          await repository.clearAttendanceBetween(
+            id,
+            settings.semesterStart ?? DateTime.utc(1970),
+            settings.semesterEnd ?? DateTime.utc(2999),
+          );
+        }
+        final Subject? existing =
+            data.subjects.where((Subject s) => s.id == id).firstOrNull;
+        // Gone since the preview was built, so there is nothing to write onto.
+        if (existing == null) continue;
+        await repository.updateSubject(
+          existing.copyWith(
             priorHeld: row.held,
             priorAttended: row.attended,
             expectedTotal: row.expectedTotal,
           ),
         );
-        created++;
-        continue;
       }
-
-      if (decision.clearMarks) {
-        // The window has to match what [AppSettings.countsInTerm] counts, or
-        // the marks the preview weighed are not the marks that go: with no
-        // dates set everything counts, so everything goes.
-        await _repo.clearAttendanceBetween(
-          id,
-          settings.semesterStart ?? DateTime.utc(1970),
-          settings.semesterEnd ?? DateTime.utc(2999),
-        );
-      }
-      final Subject? existing =
-          data.subjects.where((Subject s) => s.id == id).firstOrNull;
-      // Gone since the preview was built, so there is nothing to write onto.
-      if (existing == null) continue;
-      await _repo.updateSubject(
-        existing.copyWith(
-          priorHeld: row.held,
-          priorAttended: row.attended,
-          expectedTotal: row.expectedTotal,
-        ),
-      );
-    }
+    });
 
     await _refresh();
     _undo.arm(before);
@@ -1146,58 +1155,63 @@ class TimetableActions {
     // A tag per label the file actually uses, matched against the user's own
     // list first so an import never makes a second "Proxy".
     final Map<String, int> tagIds = <String, int>{};
-    for (final NotionPlanSubject planned in chosen) {
-      for (final NotionPlacement placed in planned.placements) {
-        final String? name = placed.row.tagName;
-        if (name == null || tagIds.containsKey(name)) continue;
-        final Tag? existing = data.tags
-            .where((Tag t) => t.name.trim().toLowerCase() == name.toLowerCase())
-            .firstOrNull;
-        tagIds[name] = existing?.id ?? await _repo.insertTag(Tag(name: name));
-      }
-    }
-
     final List<AttendanceRecord> records = <AttendanceRecord>[];
-    int created = 0;
-
-    for (final NotionPlanSubject planned in chosen) {
-      if (planned.placements.isEmpty) continue;
-
-      int? id = planned.subject?.id;
-      if (id == null) {
-        id = await _repo.insertSubject(
-          Subject(
-            name: planned.name,
-            code: planned.code,
-            colorValue:
-                palette[(data.subjects.length + created) % palette.length],
-          ),
-        );
-        created++;
-      } else if (planned.match == NotionMatch.overlap) {
-        final List<DateTime> dates = planned.placements
-            .map((NotionPlacement p) => p.row.date)
-            .toList()
-          ..sort();
-        await _repo.clearAttendanceBetween(id, dates.first, dates.last);
+    await _repo.transaction((ZeoliteRepository repository) async {
+      for (final NotionPlanSubject planned in chosen) {
+        for (final NotionPlacement placed in planned.placements) {
+          final String? name = placed.row.tagName;
+          if (name == null || tagIds.containsKey(name)) continue;
+          final Tag? existing = data.tags
+              .where(
+                (Tag tag) =>
+                    tag.name.trim().toLowerCase() == name.toLowerCase(),
+              )
+              .firstOrNull;
+          tagIds[name] =
+              existing?.id ?? await repository.insertTag(Tag(name: name));
+        }
       }
 
-      for (final NotionPlacement placed in planned.placements) {
-        records.add(
-          AttendanceRecord(
-            subjectId: id,
-            date: placed.row.date,
-            startMinutes: placed.startMinutes,
-            status: placed.row.status,
-            weight: placed.weight,
-            tagId: tagIds[placed.row.tagName],
-            markedAt: DateTime.now(),
-          ),
-        );
-      }
-    }
+      int created = 0;
+      for (final NotionPlanSubject planned in chosen) {
+        if (planned.placements.isEmpty) continue;
 
-    await _repo.setManyAttendance(records);
+        int? id = planned.subject?.id;
+        if (id == null) {
+          id = await repository.insertSubject(
+            Subject(
+              name: planned.name,
+              code: planned.code,
+              colorValue:
+                  palette[(data.subjects.length + created) % palette.length],
+            ),
+          );
+          created++;
+        } else if (planned.match == NotionMatch.overlap) {
+          final List<DateTime> dates = planned.placements
+              .map((NotionPlacement placement) => placement.row.date)
+              .toList()
+            ..sort();
+          await repository.clearAttendanceBetween(id, dates.first, dates.last);
+        }
+
+        for (final NotionPlacement placed in planned.placements) {
+          records.add(
+            AttendanceRecord(
+              subjectId: id,
+              date: placed.row.date,
+              startMinutes: placed.startMinutes,
+              status: placed.row.status,
+              weight: placed.weight,
+              tagId: tagIds[placed.row.tagName],
+              markedAt: DateTime.now(),
+            ),
+          );
+        }
+      }
+
+      await repository.setManyAttendance(records);
+    });
     await _refresh();
     _undo.arm(before);
     unawaited(_analytics.timetableImported('notion'));
@@ -1234,21 +1248,23 @@ class TimetableActions {
     final DatabaseSnapshot before = await _repo.snapshot();
     final List<AttendanceRecord> records =
         _ref.read(timetableProvider).value?.records ?? <AttendanceRecord>[];
-    for (final AttendanceRecord record in records) {
-      if (!previous.covers(record)) continue;
-      await _repo.clearAttendance(
-        record.subjectId,
-        record.date,
-        record.startMinutes,
-      );
-      await _repo.setAttendance(
-        record.copyWith(
-          subjectId: updated.subjectId,
-          startMinutes: updated.startMinutes,
-        ),
-      );
-    }
-    await _repo.updateSlot(updated);
+    await _repo.transaction((ZeoliteRepository repository) async {
+      for (final AttendanceRecord record in records) {
+        if (!previous.covers(record)) continue;
+        await repository.clearAttendance(
+          record.subjectId,
+          record.date,
+          record.startMinutes,
+        );
+        await repository.setAttendance(
+          record.copyWith(
+            subjectId: updated.subjectId,
+            startMinutes: updated.startMinutes,
+          ),
+        );
+      }
+      await repository.updateSlot(updated);
+    });
     await _refresh();
     _undo.arm(before);
   }
@@ -1275,15 +1291,17 @@ class TimetableActions {
     final DatabaseSnapshot before = await _repo.snapshot();
     final List<AttendanceRecord> records =
         _ref.read(timetableProvider).value?.records ?? <AttendanceRecord>[];
-    for (final AttendanceRecord record in records) {
-      if (!slot.covers(record)) continue;
-      await _repo.clearAttendance(
-        record.subjectId,
-        record.date,
-        record.startMinutes,
-      );
-    }
-    await _repo.deleteSlot(id);
+    await _repo.transaction((ZeoliteRepository repository) async {
+      for (final AttendanceRecord record in records) {
+        if (!slot.covers(record)) continue;
+        await repository.clearAttendance(
+          record.subjectId,
+          record.date,
+          record.startMinutes,
+        );
+      }
+      await repository.deleteSlot(id);
+    });
     await _refresh();
     _undo.arm(before);
   }
@@ -1311,13 +1329,17 @@ class TimetableActions {
     if (slotId == null) return;
     final DatabaseSnapshot before = await _repo.snapshot();
 
-    final ClassSlot was =
-        _ref.read(timetableProvider).value?.overrideOn(slotId, date)?.applyTo(slot) ??
-            slot;
+    final ClassSlot was = _ref
+            .read(timetableProvider)
+            .value
+            ?.overrideOn(slotId, date)
+            ?.applyTo(slot) ??
+        slot;
     final ClassSlot now = override.applyTo(slot) ?? slot;
-    await _moveMarkOn(date, was, now);
-
-    await _repo.setSlotOverride(override);
+    await _repo.transaction((ZeoliteRepository repository) async {
+      await _moveMarkOn(date, was, now, repository);
+      await repository.setSlotOverride(override);
+    });
     await _refresh();
     _undo.arm(before);
   }
@@ -1328,13 +1350,22 @@ class TimetableActions {
     if (slotId == null) return;
     final DatabaseSnapshot before = await _repo.snapshot();
 
-    final ClassSlot shown =
-        _ref.read(timetableProvider).value?.overrideOn(slotId, date)?.applyTo(slot) ??
-            slot;
-    await _repo.clearAttendance(shown.subjectId, date, shown.startMinutes);
-    await _repo.setSlotOverride(
-      SlotOverride(slotId: slotId, date: date, skipped: true),
-    );
+    final ClassSlot shown = _ref
+            .read(timetableProvider)
+            .value
+            ?.overrideOn(slotId, date)
+            ?.applyTo(slot) ??
+        slot;
+    await _repo.transaction((ZeoliteRepository repository) async {
+      await repository.clearAttendance(
+        shown.subjectId,
+        date,
+        shown.startMinutes,
+      );
+      await repository.setSlotOverride(
+        SlotOverride(slotId: slotId, date: date, skipped: true),
+      );
+    });
     await _refresh();
     _undo.arm(before);
   }
@@ -1347,19 +1378,20 @@ class TimetableActions {
     DateTime date,
     ClassSlot was,
     ClassSlot now,
+    ZeoliteRepository repository,
   ) async {
     if (was.subjectId == now.subjectId &&
         was.startMinutes == now.startMinutes) {
       return;
     }
-    final AttendanceRecord? mark = await _repo.getAttendanceAt(
+    final AttendanceRecord? mark = await repository.getAttendanceAt(
       was.subjectId,
       date,
       was.startMinutes,
     );
     if (mark == null) return;
-    await _repo.clearAttendance(was.subjectId, date, was.startMinutes);
-    await _repo.setAttendance(
+    await repository.clearAttendance(was.subjectId, date, was.startMinutes);
+    await repository.setAttendance(
       mark.copyWith(
         subjectId: now.subjectId,
         startMinutes: now.startMinutes,
@@ -1379,15 +1411,17 @@ class TimetableActions {
     final List<AttendanceRecord> records =
         _ref.read(timetableProvider).value?.records ?? <AttendanceRecord>[];
     final int cut = Dates.keyOf(date);
-    for (final AttendanceRecord record in records) {
-      if (!slot.covers(record) || Dates.keyOf(record.date) < cut) continue;
-      await _repo.clearAttendance(
-        record.subjectId,
-        record.date,
-        record.startMinutes,
-      );
-    }
-    await _repo.endSlotBefore(id, date);
+    await _repo.transaction((ZeoliteRepository repository) async {
+      for (final AttendanceRecord record in records) {
+        if (!slot.covers(record) || Dates.keyOf(record.date) < cut) continue;
+        await repository.clearAttendance(
+          record.subjectId,
+          record.date,
+          record.startMinutes,
+        );
+      }
+      await repository.endSlotBefore(id, date);
+    });
     await _refresh();
     _undo.arm(before);
   }
@@ -1417,26 +1451,28 @@ class TimetableActions {
     ExtraClass updated,
   ) async {
     final DatabaseSnapshot before = await _repo.snapshot();
-    final AttendanceRecord? record = await _repo.getAttendanceAt(
-      previous.subjectId,
-      previous.date,
-      previous.startMinutes,
-    );
-    if (record != null) {
-      await _repo.clearAttendance(
+    await _repo.transaction((ZeoliteRepository repository) async {
+      final AttendanceRecord? record = await repository.getAttendanceAt(
         previous.subjectId,
         previous.date,
         previous.startMinutes,
       );
-      await _repo.setAttendance(
-        record.copyWith(
-          subjectId: updated.subjectId,
-          date: updated.date,
-          startMinutes: updated.startMinutes,
-        ),
-      );
-    }
-    await _repo.updateExtraClass(updated);
+      if (record != null) {
+        await repository.clearAttendance(
+          previous.subjectId,
+          previous.date,
+          previous.startMinutes,
+        );
+        await repository.setAttendance(
+          record.copyWith(
+            subjectId: updated.subjectId,
+            date: updated.date,
+            startMinutes: updated.startMinutes,
+          ),
+        );
+      }
+      await repository.updateExtraClass(updated);
+    });
     await _refresh();
     _undo.arm(before);
   }

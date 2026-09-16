@@ -54,8 +54,8 @@ void main() {
     final String issued = before.single.uuid!;
     expect(issued, isNotEmpty);
 
-    final String json = await BackupService(source, SettingsService())
-        .exportToJsonString();
+    final String json =
+        await BackupService(source, SettingsService()).exportToJsonString();
     expect(json, contains(issued));
 
     // A different database entirely, which is the case that was broken: the
@@ -69,11 +69,10 @@ void main() {
 
   test('a backup written before v8 is given a uuid on the way in', () async {
     final ZeoliteRepository source = await repoAt('source');
-    final String json = await BackupService(source, SettingsService())
-        .exportToJsonString();
+    final String json =
+        await BackupService(source, SettingsService()).exportToJsonString();
 
-    final Map<String, Object?> data =
-        jsonDecode(json) as Map<String, Object?>;
+    final Map<String, Object?> data = jsonDecode(json) as Map<String, Object?>;
     data['subjects'] = <Object?>[
       <String, Object?>{
         'id': 1,
@@ -90,5 +89,41 @@ void main() {
     final List<Subject> after = await target.getSubjects();
     expect(after.single.uuid, isNotNull);
     expect(after.single.uuid, isNotEmpty);
+  });
+
+  test('a malformed backup leaves the current database untouched', () async {
+    final ZeoliteRepository repository = await repoAt('target');
+    await repository.insertSubject(
+      const Subject(name: 'Keep me', colorValue: 0xFF336699),
+    );
+    final Map<String, Object?> data = <String, Object?>{
+      'app': BackupService.appTag,
+      'formatVersion': BackupService.formatVersion,
+      'subjects': <Object?>[
+        <String, Object?>{
+          'id': 1,
+          'name': 'Partially restored',
+          'color': 0xFF112233,
+        },
+        <String, Object?>{
+          'id': 2,
+          'name': 'Invalid row',
+          'color': 0xFF445566,
+          'created_at': 'not a timestamp',
+        },
+      ],
+    };
+
+    final ImportResult result = await BackupService(
+      repository,
+      SettingsService(),
+    ).importFromJsonString(jsonEncode(data));
+
+    expect(result.success, isFalse);
+    expect(result.message, 'Could not restore this backup.');
+    expect(
+      (await repository.getSubjects()).map((Subject subject) => subject.name),
+      <String>['Keep me'],
+    );
   });
 }

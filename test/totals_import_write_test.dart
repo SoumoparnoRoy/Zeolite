@@ -22,6 +22,12 @@ class _Recording extends ZeoliteRepository {
   int snapshots = 0;
 
   @override
+  Future<T> transaction<T>(
+    Future<T> Function(ZeoliteRepository repository) action,
+  ) =>
+      action(this);
+
+  @override
   Future<DatabaseSnapshot> snapshot() async {
     snapshots++;
     return <String, List<Map<String, Object?>>>{};
@@ -146,14 +152,16 @@ void main() {
     await container
         .read(actionsProvider)
         .importAttendanceTotals(<TotalsDecision>[
-      TotalsDecision(row: _row('Signal Theory'), subjectId: 1, clearMarks: true),
+      TotalsDecision(
+          row: _row('Signal Theory'), subjectId: 1, clearMarks: true),
     ]);
 
     expect(repo.clearedFor, <int>[1]);
     expect(repo.updated.single.priorHeld, 16);
   });
 
-  test('the whole import is one undo snapshot, taken before anything is written',
+  test(
+      'the whole import is one undo snapshot, taken before anything is written',
       () async {
     final (ProviderContainer container, _Recording repo) = await _harness();
 
@@ -179,7 +187,8 @@ void main() {
     await container
         .read(actionsProvider)
         .importAttendanceTotals(<TotalsDecision>[
-      TotalsDecision(row: _row('Signal Theory'), subjectId: 1, clearMarks: true),
+      TotalsDecision(
+          row: _row('Signal Theory'), subjectId: 1, clearMarks: true),
     ]);
 
     expect(repo.clearedFor, <int>[1]);

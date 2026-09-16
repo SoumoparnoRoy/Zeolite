@@ -24,6 +24,12 @@ class _Recording extends ZeoliteRepository {
   int snapshots = 0;
 
   @override
+  Future<T> transaction<T>(
+    Future<T> Function(ZeoliteRepository repository) action,
+  ) =>
+      action(this);
+
+  @override
   Future<DatabaseSnapshot> snapshot() async {
     snapshots++;
     return <String, List<Map<String, Object?>>>{};
@@ -57,9 +63,8 @@ ClassCategory _labWorth(int weight) => ClassCategory(
       weight: weight,
     );
 
-const Subject _practical =
-    Subject(id: 1, name: 'Generic Practical', colorValue: 0xFF7C6BFF,
-        categoryId: 7);
+const Subject _practical = Subject(
+    id: 1, name: 'Generic Practical', colorValue: 0xFF7C6BFF, categoryId: 7);
 
 const Subject _lecture =
     Subject(id: 2, name: 'Generic Lecture', colorValue: 0xFF33CC88);
@@ -112,7 +117,8 @@ Future<(ProviderContainer, _Recording)> _harness({
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('a slot takes the weight its category says, and one out of a category '
+  test(
+      'a slot takes the weight its category says, and one out of a category '
       'is left worth one', () async {
     final (ProviderContainer container, _Recording repo) = await _harness();
 
@@ -131,9 +137,8 @@ void main() {
 
     // The lecture is already worth one, so it is left alone; rewriting every
     // row would make the returned count meaningless.
-    final int changed = await container
-        .read(actionsProvider)
-        .applyClassWeights();
+    final int changed =
+        await container.read(actionsProvider).applyClassWeights();
 
     expect(changed, 1);
     expect(repo.written.single.subjectId, 1);

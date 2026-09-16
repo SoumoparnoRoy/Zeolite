@@ -208,7 +208,8 @@ class SyncCoordinator {
 
     // Only a run started with the answer can apply it.
     if (merge != null || rewrite) {
-      return _queueAfter(inFlight, force: force, merge: merge, rewrite: rewrite);
+      return _queueAfter(inFlight,
+          force: force, merge: merge, rewrite: rewrite);
     }
 
     // Local rows may have moved since the running one read them.
@@ -425,8 +426,7 @@ class SyncCoordinator {
             SyncItem.slotOverride(
               o,
               slotUuidById[o.slotId]!,
-              subjectUuid:
-                  o.subjectId == null ? null : uuidById[o.subjectId],
+              subjectUuid: o.subjectId == null ? null : uuidById[o.subjectId],
             ),
       ],
       SyncKind.attendance: <SyncItem>[
@@ -647,8 +647,10 @@ class SyncCoordinator {
     List<RemoteLink> write,
     List<String> forget,
   ) async {
-    await _repository.deleteRemoteLinks(target.id, kind, forget);
-    await _repository.setRemoteLinks(write);
+    await _repository.transaction((ZeoliteRepository repository) async {
+      await repository.deleteRemoteLinks(target.id, kind, forget);
+      await repository.setRemoteLinks(write);
+    });
   }
 
   /// A row changed on both sides. "The app wins" was reasoned for a target
@@ -1084,8 +1086,8 @@ class SyncCoordinator {
       for (final Subject s in await _repository.getSubjects())
         if (s.id != null && s.uuid != null) s.id!: s.uuid!,
     };
-    await _adoptClasses(remote[SyncKind.slot], remote[SyncKind.extraClass],
-        subjectUuid);
+    await _adoptClasses(
+        remote[SyncKind.slot], remote[SyncKind.extraClass], subjectUuid);
   }
 
   Future<void> _adoptSubjects(List<RemoteState>? theirs) async {
@@ -1227,7 +1229,9 @@ class SyncCoordinator {
     if (linked) return _Merge.proceed;
 
     final bool hasLocal = _content.any((SyncKind k) => local[k]!.isNotEmpty);
-    return hasLocal && _remoteHasContent(remote) ? _Merge.review : _Merge.proceed;
+    return hasLocal && _remoteHasContent(remote)
+        ? _Merge.review
+        : _Merge.proceed;
   }
 
   /// A device signing in to an account that already holds a term, carrying no

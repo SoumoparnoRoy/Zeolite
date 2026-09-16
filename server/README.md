@@ -41,7 +41,8 @@ npm install
 npm start
 ```
 
-Run the tests with `npm test`.
+Run the tests with `npm test`, lint with `npm run lint`, and check formatting
+with `npm run format:check` (`npm run format` fixes it).
 
 To run it against the real upstreams, put the values in a local `.env` — which
 is gitignored — and use `npm run dev`. Node reads the file itself, so there is

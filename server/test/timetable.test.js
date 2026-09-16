@@ -36,11 +36,20 @@ function attestation(key, { project = projectNumber, expiresIn = "1h" } = {}) {
 
 let upstreamReply = "Monday\n* 09:10-10:00: ABC1234 (R101)";
 let upstreamOk = true;
+let upstreamStalled = false;
 let lastRequest;
 let currentTime = 1_760_000_000_000;
 
+function stalled(options) {
+  return new Promise((_resolve, reject) => {
+    options.signal.addEventListener("abort", () => reject(options.signal.reason));
+  });
+}
 async function fetchStub(url, options) {
   lastRequest = { url, options };
+  if (upstreamStalled) {
+    return stalled(options);
+  }
   if (!upstreamOk) {
     return new Response("provider-private-error: token test-cloudflare-token", { status: 429 });
   }
@@ -86,7 +95,12 @@ before(async () => {
   appCheckKeys = createLocalJWKSet({ keys: [publicJwk] });
   token = await attestation(signingKey);
 
-  const options = { fetchImpl: fetchStub, now: () => currentTime, appCheckKeys };
+  const options = {
+    fetchImpl: fetchStub,
+    now: () => currentTime,
+    appCheckKeys,
+    timeouts: { vision: 50 },
+  };
   process.env.CLOUDFLARE_ACCOUNT_ID = accountId;
   process.env.CLOUDFLARE_API_TOKEN = apiToken;
   process.env.FIREBASE_PROJECT_NUMBER = projectNumber;
@@ -167,7 +181,10 @@ test("prose around the list is not mistaken for classes", async () => {
     "Let me know if you would like it in another format.",
   ].join("\n");
   const body = await read(configured, { image }).then((r) => r.json());
-  assert.deepEqual(body.classes.map((c) => c.subject), ["ABC1234"]);
+  assert.deepEqual(
+    body.classes.map((c) => c.subject),
+    ["ABC1234"],
+  );
 });
 
 test("a line that cannot be a class is dropped", async () => {
@@ -181,7 +198,10 @@ test("a line that cannot be a class is dropped", async () => {
     "*   12:00-13:00: ",
   ].join("\n");
   const body = await read(configured, { image }).then((r) => r.json());
-  assert.deepEqual(body.classes.map((c) => c.subject), ["ABC1234"]);
+  assert.deepEqual(
+    body.classes.map((c) => c.subject),
+    ["ABC1234"],
+  );
 });
 
 test("an upstream failure says nothing about the upstream", async () => {
@@ -204,6 +224,18 @@ test("an upstream failure says nothing about the upstream", async () => {
   assert.doesNotMatch(stderr, /test-cloudflare-token/);
   assert.doesNotMatch(stderr, /provider-private-error/);
   assert.match(stderr, /Workers AI request failed \(429\)/);
+});
+
+test("a stalled model gives up before the app does", async () => {
+  upstreamOk = true;
+  upstreamStalled = true;
+  const response = await read(configured, { image }).finally(() => {
+    upstreamStalled = false;
+  });
+
+  assert.equal(response.status, 502);
+  assert.deepEqual(await response.json(), { error: "Unable to read that image." });
+  assert.ok(lastRequest.options.signal instanceof AbortSignal);
 });
 
 test("something that is not an image is refused before the upstream", async () => {

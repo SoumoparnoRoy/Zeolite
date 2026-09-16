@@ -14,6 +14,8 @@ import 'package:zeolite/domain/attendance_totals_import.dart';
 import 'package:zeolite/domain/attendance_totals_ocr.dart';
 import 'package:zeolite/state/providers.dart';
 
+import 'fake_notifications.dart';
+
 /// Records what the import asked the database to do instead of doing it.
 class _Recording extends ZeoliteRepository {
   final List<Subject> inserted = <Subject>[];
@@ -91,6 +93,7 @@ Future<(ProviderContainer, _Recording)> _harness({bool dated = true}) async {
   final _Recording repo = _Recording();
   final ProviderContainer container = ProviderContainer(
     overrides: [
+      notificationsProvider.overrideWithValue(QuietNotifications()),
       repositoryProvider.overrideWithValue(repo),
       timetableProvider.overrideWith((Ref ref) async => _data()),
       settingsProvider.overrideWith(() => _StaticSettings(dated: dated)),

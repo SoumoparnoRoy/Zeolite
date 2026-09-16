@@ -77,10 +77,7 @@ export function createTimetableRouter({ config, limit, budget, verifyAppCheck, f
     }
 
     try {
-      const classes = await readTimetable(
-        { image, text, ...config.vision },
-        fetchImpl,
-      );
+      const classes = await readTimetable({ image, text, ...config.vision }, fetchImpl);
       response.status(200).json({ classes });
     } catch (error) {
       // Covers the paths that reach here without having said anything — a

@@ -54,9 +54,18 @@ function readConfig() {
   };
 }
 
-export function createApp({ fetchImpl = globalThis.fetch, now = Date.now, appCheckKeys } = {}) {
+export function createApp({
+  fetchImpl = globalThis.fetch,
+  now = Date.now,
+  appCheckKeys,
+  timeouts = {},
+} = {}) {
   const app = express();
   const config = readConfig();
+  config.notionTimeoutMs = timeouts.notion;
+  if (config.vision) {
+    config.vision.timeoutMs = timeouts.vision;
+  }
   const sessions = createSessionStore({ now });
   const limit = createRateLimiter({ now });
   const budget = createDailyBudget({ maximum: config.dailyCalls, now });

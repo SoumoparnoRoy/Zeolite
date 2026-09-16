@@ -13,6 +13,8 @@ import 'package:zeolite/data/models/subject.dart';
 import 'package:zeolite/data/settings/app_settings.dart';
 import 'package:zeolite/state/providers.dart';
 
+import 'fake_notifications.dart';
+
 /// Records what the action asked the database to do instead of doing it.
 class _Recording extends ZeoliteRepository {
   _Recording(this.stored);
@@ -96,6 +98,7 @@ Future<(ProviderContainer, _Recording)> _harness({
   final _Recording repo = _Recording(stored);
   final ProviderContainer container = ProviderContainer(
     overrides: [
+      notificationsProvider.overrideWithValue(QuietNotifications()),
       repositoryProvider.overrideWithValue(repo),
       timetableProvider.overrideWith((Ref ref) async => TimetableData(
             categories: <ClassCategory>[_labWorth(labWeight)],

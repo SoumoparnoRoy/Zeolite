@@ -32,6 +32,9 @@ class DangerDecision {
 class NotificationService {
   NotificationService._();
 
+  @visibleForTesting
+  NotificationService.forTesting();
+
   static final NotificationService instance = NotificationService._();
 
   final FlutterLocalNotificationsPlugin _plugin =
@@ -397,8 +400,7 @@ class NotificationService {
       );
       final String? standing =
           reminderStandingLine(statsBySubject[session.subject.id]);
-      final String body =
-          standing == null ? detail : '$detail\n$standing';
+      final String body = standing == null ? detail : '$detail\n$standing';
 
       // Built per notification rather than once outside the loop, because the
       // big-text style carries the text itself. It is what keeps the second
@@ -469,8 +471,7 @@ class NotificationService {
         use24Hour: settings.use24HourTime,
       );
       final String? standing = reminderStandingLine(subjectStats);
-      final String body =
-          standing == null ? detail : '$detail\n$standing';
+      final String body = standing == null ? detail : '$detail\n$standing';
 
       // Per notification: the title carries this subject's standing, and the
       // style has to repeat it for the expanded form.

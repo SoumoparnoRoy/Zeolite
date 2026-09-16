@@ -12,6 +12,7 @@ import 'package:zeolite/data/models/subject.dart';
 import 'package:zeolite/state/providers.dart';
 
 import 'fake_analytics.dart';
+import 'fake_notifications.dart';
 
 /// What the app reports about itself is a promise the privacy policy makes, so
 /// what matters is both that the events fire and that they carry nothing
@@ -40,6 +41,7 @@ void main() {
     analytics = FakeAnalytics();
     container = ProviderContainer(
       overrides: [
+        notificationsProvider.overrideWithValue(QuietNotifications()),
         repositoryProvider.overrideWithValue(repo),
         analyticsProvider.overrideWithValue(analytics),
       ],

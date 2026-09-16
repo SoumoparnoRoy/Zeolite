@@ -85,10 +85,16 @@ final backupFolderUsableProvider = FutureProvider<bool>((ref) async {
   return BackupFolder().isUsable(uri);
 });
 
+/// The notification plugin only exists on a device, so tests swap this for one
+/// that schedules nothing.
+final notificationsProvider = Provider<NotificationService>(
+  (ref) => NotificationService.instance,
+);
+
 /// Whether class reminders can fire to the minute. Asked when Settings draws,
 /// since the permission is granted on a system screen the app cannot watch.
 final exactAlarmsProvider = FutureProvider<bool>(
-  (ref) => NotificationService.instance.canScheduleExactly(),
+  (ref) => ref.watch(notificationsProvider).canScheduleExactly(),
 );
 
 final backupServiceProvider = Provider<BackupService>(
@@ -754,11 +760,11 @@ class TimetableActions {
     final AppSettings? settings = _ref.read(settingsProvider).value;
     final ScheduleEngine? engine = _ref.read(scheduleEngineProvider);
     if (settings == null || engine == null) return;
-    await NotificationService.instance.rescheduleAll(
-      settings: settings,
-      upcoming: engine.upcomingSessions(),
-      stats: _ref.read(statsProvider),
-    );
+    await _ref.read(notificationsProvider).rescheduleAll(
+          settings: settings,
+          upcoming: engine.upcomingSessions(),
+          stats: _ref.read(statsProvider),
+        );
   }
 
   // backup -------------------------------------------------------------------
@@ -1684,7 +1690,7 @@ class TimetableActions {
   Future<void> resetEverything() async {
     final DatabaseSnapshot before = await _repo.snapshot();
     await _repo.clearAll();
-    await NotificationService.instance.cancelAll();
+    await _ref.read(notificationsProvider).cancelAll();
     await _refresh();
     _undo.arm(before);
   }

@@ -12,6 +12,7 @@ import 'package:zeolite/domain/sync/sync_target.dart';
 import 'package:zeolite/state/providers.dart';
 import 'package:zeolite/state/sync_providers.dart';
 
+import 'fake_notifications.dart';
 import 'fake_sync_target.dart';
 
 /// Pins the bug this file exists for: a tablet that had just pulled its whole
@@ -32,13 +33,15 @@ void main() {
     SharedPreferencesAsyncPlatform.instance =
         InMemorySharedPreferencesAsync.empty();
     dir = await Directory.systemTemp.createTemp('zeolite_reload');
-    appDb = AppDatabase.at('${dir.path}/reload.db', factory: databaseFactoryFfi);
+    appDb =
+        AppDatabase.at('${dir.path}/reload.db', factory: databaseFactoryFfi);
     await appDb!.database;
     repo = ZeoliteRepository(db: appDb!);
     target = FakeSyncTarget()..trustsPulls = true;
 
     container = ProviderContainer(
       overrides: [
+        notificationsProvider.overrideWithValue(QuietNotifications()),
         repositoryProvider.overrideWithValue(repo),
         syncTargetProvider.overrideWithValue(target),
       ],

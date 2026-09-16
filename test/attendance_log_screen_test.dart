@@ -16,6 +16,8 @@ import 'package:zeolite/data/settings/app_settings.dart';
 import 'package:zeolite/features/subjects/attendance_log_screen.dart';
 import 'package:zeolite/state/providers.dart';
 
+import 'fake_notifications.dart';
+
 const Subject _physics = Subject(
   id: 1,
   name: 'Physics',
@@ -95,6 +97,7 @@ Widget _app(TimetableData data, {_FakeRepository? repo}) {
   final DateTime today = Dates.today();
   return ProviderScope(
     overrides: [
+      notificationsProvider.overrideWithValue(QuietNotifications()),
       timetableProvider.overrideWith((Ref ref) async => data),
       settingsProvider.overrideWith(
         () => _StaticSettings(
@@ -127,10 +130,13 @@ void main() {
     expect(find.text('2 of 4 marked'), findsOneWidget);
 
     expect(find.text(Dates.formatFull(today)), findsOneWidget);
-    expect(find.text(Dates.formatFull(Dates.addDays(today, -7))), findsOneWidget);
-    expect(find.text(Dates.formatFull(Dates.addDays(today, -14))), findsOneWidget);
+    expect(
+        find.text(Dates.formatFull(Dates.addDays(today, -7))), findsOneWidget);
+    expect(
+        find.text(Dates.formatFull(Dates.addDays(today, -14))), findsOneWidget);
     // The stray mark's day has no scheduled class, but must still be reachable.
-    expect(find.text(Dates.formatFull(Dates.addDays(today, -3))), findsOneWidget);
+    expect(
+        find.text(Dates.formatFull(Dates.addDays(today, -3))), findsOneWidget);
   });
 
   testWidgets('explains a mark with no class sitting under it',

@@ -14,7 +14,6 @@ import 'features/settings/settings_screen.dart';
 import 'features/stats/stats_screen.dart';
 import 'features/timetable/timetable_screen.dart';
 import 'features/today/today_screen.dart';
-import 'services/notification_service.dart';
 import 'state/home_widget_providers.dart';
 import 'state/providers.dart';
 import 'state/notion_sync_providers.dart';
@@ -93,18 +92,21 @@ class _BootstrapState extends ConsumerState<_Bootstrap> {
       // The sequence draws in the chosen accent, so it waits for the stored
       // choice rather than starting violet and changing colour part way.
       loading: () => ColoredBox(color: context.palette.canvas),
-      error: (Object error, StackTrace stack) => Scaffold(
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.xl),
-            child: Text(
-              'Could not load your settings.\n$error',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: context.palette.textSecondary),
+      error: (Object error, StackTrace stack) {
+        debugPrint('Zeolite: settings failed to load: $error');
+        return Scaffold(
+          body: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.xl),
+              child: Text(
+                'Could not load your settings.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: context.palette.textSecondary),
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
       data: (AppSettings value) {
         if (!_launched) {
           return LaunchScreen(
@@ -195,8 +197,9 @@ class _RootShellState extends ConsumerState<RootShell> {
   late final PageController _pages =
       PageController(initialPage: ref.read(selectedTabProvider));
 
-  ValueNotifier<String?> get _tapped =>
-      NotificationService.instance.tappedPayload;
+  // Held rather than read each time: dispose needs it, and ref is gone by then.
+  late final ValueNotifier<String?> _tapped =
+      ref.read(notificationsProvider).tappedPayload;
 
   StreamSubscription<Uri?>? _linkSub;
 
@@ -322,43 +325,43 @@ class _RootShellState extends ConsumerState<RootShell> {
           alignment: Alignment.topCenter,
           heightFactor: _navVisible ? 1 : 0,
           child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: context.palette.navSurface,
-          boxShadow: <BoxShadow>[
-            BoxShadow(
-              color: context.palette.isDark
-                  ? Colors.black.withValues(alpha: 0.5)
-                  : const Color(0x174C4696),
-              blurRadius: 16,
-              offset: const Offset(0, -2),
+            decoration: BoxDecoration(
+              color: context.palette.navSurface,
+              boxShadow: <BoxShadow>[
+                BoxShadow(
+                  color: context.palette.isDark
+                      ? Colors.black.withValues(alpha: 0.5)
+                      : const Color(0x174C4696),
+                  blurRadius: 16,
+                  offset: const Offset(0, -2),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: NavigationBar(
-          selectedIndex: index,
-          onDestinationSelected: _select,
-          destinations: const <NavigationDestination>[
-            NavigationDestination(
-              icon: Icon(Icons.today_outlined),
-              selectedIcon: Icon(Icons.today_rounded),
-              label: 'Today',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.view_week_outlined),
-              selectedIcon: Icon(Icons.view_week_rounded),
-              label: 'Timetable',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.insights_outlined),
-              selectedIcon: Icon(Icons.insights_rounded),
-              label: 'Stats',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.settings_outlined),
-              selectedIcon: Icon(Icons.settings_rounded),
-              label: 'Settings',
-            ),
-          ],
+            child: NavigationBar(
+              selectedIndex: index,
+              onDestinationSelected: _select,
+              destinations: const <NavigationDestination>[
+                NavigationDestination(
+                  icon: Icon(Icons.today_outlined),
+                  selectedIcon: Icon(Icons.today_rounded),
+                  label: 'Today',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.view_week_outlined),
+                  selectedIcon: Icon(Icons.view_week_rounded),
+                  label: 'Timetable',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.insights_outlined),
+                  selectedIcon: Icon(Icons.insights_rounded),
+                  label: 'Stats',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.settings_outlined),
+                  selectedIcon: Icon(Icons.settings_rounded),
+                  label: 'Settings',
+                ),
+              ],
             ),
           ),
         ),

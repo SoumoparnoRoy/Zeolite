@@ -13,6 +13,8 @@ import 'package:zeolite/data/models/subject.dart';
 import 'package:zeolite/data/settings/app_settings.dart';
 import 'package:zeolite/state/providers.dart';
 
+import 'fake_notifications.dart';
+
 /// Marks are filed under `(subject, date, start time)` and have no link to the
 /// class they came from, so re-pointing a class leaves them behind. These
 /// cover the half of the fix that touches the database.
@@ -111,6 +113,7 @@ Future<(ProviderContainer, _Recording)> _harness({
   final _Recording repo = _Recording();
   final ProviderContainer container = ProviderContainer(
     overrides: [
+      notificationsProvider.overrideWithValue(QuietNotifications()),
       repositoryProvider.overrideWithValue(repo),
       timetableProvider.overrideWith((Ref ref) async => TimetableData(
             categories: const <ClassCategory>[],

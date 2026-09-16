@@ -128,9 +128,7 @@ function weekdayIn(line) {
 const MOST_PERIODS = 20;
 
 function periodOf(value) {
-  return Number.isInteger(value) && value >= 1 && value <= MOST_PERIODS
-    ? value
-    : undefined;
+  return Number.isInteger(value) && value >= 1 && value <= MOST_PERIODS ? value : undefined;
 }
 
 // A class arrives either as the two column numbers asked for or, when the model
@@ -228,7 +226,10 @@ function fromLines(text) {
   let day;
 
   for (const raw of text.split("\n")) {
-    const line = raw.replace(/[*#_`]/g, "").replace(/^[\s\-•]+/, "").trim();
+    const line = raw
+      .replace(/[*#_`]/g, "")
+      .replace(/^[\s\-•]+/, "")
+      .trim();
     if (line.length === 0) {
       continue;
     }
@@ -254,9 +255,7 @@ function fromLines(text) {
       .replace(/^[\s:,\-–—]+/, "")
       .trim();
     const subject = leadingName.length > 0 ? leadingName : trailingName;
-    const room = leadingName.length > 0 && trailingRoom.length === 0
-      ? trailingName
-      : trailingRoom;
+    const room = leadingName.length > 0 && trailingRoom.length === 0 ? trailingName : trailingRoom;
 
     const one = classOf(
       subject,
@@ -285,21 +284,24 @@ export function classesIn(reply) {
   return lines.length > 0 ? lines : undefined;
 }
 
+// The app waits 120 seconds and a dense sheet takes up to about 115, so this
+// sits just under the app's limit: the student gets the server's answer rather
+// than a timeout of their own while the model is still working.
+export const VISION_TIMEOUT_MS = 110_000;
+
 export async function readTimetable(
-  { image, text, accountId, apiToken, model },
+  { image, text, accountId, apiToken, model, timeoutMs = VISION_TIMEOUT_MS },
   fetchImpl = globalThis.fetch,
 ) {
-  const response = await fetchImpl(
-    `${RUN_URL}/${encodeURIComponent(accountId)}/ai/run/${model}`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(requestBody(image, text)),
+  const response = await fetchImpl(`${RUN_URL}/${encodeURIComponent(accountId)}/ai/run/${model}`, {
+    method: "POST",
+    signal: AbortSignal.timeout(timeoutMs),
+    headers: {
+      Authorization: `Bearer ${apiToken}`,
+      "Content-Type": "application/json",
     },
-  );
+    body: JSON.stringify(requestBody(image, text)),
+  });
 
   if (!response.ok) {
     process.stderr.write(`Workers AI request failed (${response.status})\n`);
@@ -310,11 +312,8 @@ export async function readTimetable(
   const reply = body?.result?.response ?? "";
   const classes = classesIn(reply);
   if (!classes) {
-    const length =
-      typeof reply === "string" ? reply.length : JSON.stringify(reply).length;
-    process.stderr.write(
-      `Workers AI reply unparseable (${length} chars)\n`,
-    );
+    const length = typeof reply === "string" ? reply.length : JSON.stringify(reply).length;
+    process.stderr.write(`Workers AI reply unparseable (${length} chars)\n`);
     throw new Error("Workers AI returned no readable timetable");
   }
   return classes;

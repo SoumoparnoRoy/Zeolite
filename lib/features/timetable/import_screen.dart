@@ -42,8 +42,7 @@ class ImportTimetableScreen extends ConsumerStatefulWidget {
       _ImportTimetableScreenState();
 }
 
-class _ImportTimetableScreenState
-    extends ConsumerState<ImportTimetableScreen> {
+class _ImportTimetableScreenState extends ConsumerState<ImportTimetableScreen> {
   final TextEditingController _controller = TextEditingController();
   bool _saving = false;
   bool _reading = false;
@@ -101,7 +100,8 @@ class _ImportTimetableScreenState
     }
 
     if (!read.ok) {
-      messenger.showSnackBar(SnackBar(content: Text(_saidAbout(read.failure!))));
+      messenger
+          .showSnackBar(SnackBar(content: Text(_saidAbout(read.failure!))));
       return entries;
     }
 
@@ -282,8 +282,11 @@ class _ImportTimetableScreenState
 
       // Every read, not just the best one: which of them reads this sheet
       // furthest is a property of the sheet, not something decidable upstream.
-      ({TimetableGrid? grid, List<OcrEntry> entries, List<OcrLine> lines}) best =
-          TimetableOcr.bestOf(reads.all, lattice: lattice);
+      ({
+        TimetableGrid? grid,
+        List<OcrEntry> entries,
+        List<OcrLine> lines
+      }) best = TimetableOcr.bestOf(reads.all, lattice: lattice);
 
       if (lattice != null && best.grid != null) {
         final TimetableGrid named = await _namedHeaders(
@@ -389,8 +392,9 @@ class _ImportTimetableScreenState
                 'rest are commented out.'),
       ));
     } catch (error) {
+      debugPrint('Zeolite: timetable image read failed: $error');
       messenger.showSnackBar(
-        SnackBar(content: Text('Could not read that image: $error')),
+        const SnackBar(content: Text('Could not read that image.')),
       );
     } finally {
       if (mounted) setState(() => _reading = false);
@@ -408,11 +412,11 @@ class _ImportTimetableScreenState
       byCourse: _byCourse,
     );
     final bool splits = result.subjectNames.length !=
-        TimetableImport.parse(_controller.text, grid: grid, byCourse: !_byCourse)
+        TimetableImport.parse(_controller.text,
+                grid: grid, byCourse: !_byCourse)
             .subjectNames
             .length;
-    final bool ready =
-        !result.isEmpty && !result.hasProblems && !_saving;
+    final bool ready = !result.isEmpty && !result.hasProblems && !_saving;
 
     return PushScaffold(
       title: 'Import timetable',
@@ -490,7 +494,8 @@ class _ImportTimetableScreenState
               ),
             ],
             if (result.classes.isNotEmpty &&
-                result.classes.any((ImportedClass c) => c.blocks > 1)) ...<Widget>[
+                result.classes
+                    .any((ImportedClass c) => c.blocks > 1)) ...<Widget>[
               const SizedBox(height: AppSpacing.xl),
               _BlockWeightChoice(
                 value: _weighByBlocks,

@@ -21,7 +21,6 @@ import '../../domain/notion_export.dart';
 import '../../services/backup_folder.dart';
 import '../../services/backup_service.dart';
 import '../../services/launcher_icon_service.dart';
-import '../../services/notification_service.dart';
 import '../../services/notion/notion_connection_store.dart';
 import '../../services/notion/notion_database_reader.dart';
 import '../../state/notion_providers.dart';
@@ -408,7 +407,8 @@ class SettingsScreen extends ConsumerWidget {
                       value: settings.notificationsEnabled,
                       onChanged: (bool v) async {
                         if (v) {
-                          await NotificationService.instance
+                          await ref
+                              .read(notificationsProvider)
                               .requestPermissions();
                         }
                         await controller
@@ -451,7 +451,8 @@ class SettingsScreen extends ConsumerWidget {
                           value: settings.notifyBeforeClass,
                           onChanged: (bool v) async {
                             if (v) {
-                              await NotificationService.instance
+                              await ref
+                                  .read(notificationsProvider)
                                   .requestPermissions();
                             }
                             await controller
@@ -471,7 +472,8 @@ class SettingsScreen extends ConsumerWidget {
                           value: settings.notifyAtClassEnd,
                           onChanged: (bool v) async {
                             if (v) {
-                              await NotificationService.instance
+                              await ref
+                                  .read(notificationsProvider)
                                   .requestPermissions();
                             }
                             await controller
@@ -500,7 +502,8 @@ class SettingsScreen extends ConsumerWidget {
                           value: settings.notifyEveningReminder,
                           onChanged: (bool v) async {
                             if (v) {
-                              await NotificationService.instance
+                              await ref
+                                  .read(notificationsProvider)
                                   .requestPermissions();
                             }
                             await controller.save(
@@ -522,7 +525,8 @@ class SettingsScreen extends ConsumerWidget {
                           value: settings.notifyAttendanceDanger,
                           onChanged: (bool v) async {
                             if (v) {
-                              await NotificationService.instance
+                              await ref
+                                  .read(notificationsProvider)
                                   .requestPermissions();
                             }
                             await controller.save(
@@ -1104,7 +1108,7 @@ class SettingsScreen extends ConsumerWidget {
   /// Android owns the decision, so the app opens the screen and re-reads the
   /// answer once it closes.
   Future<void> _requestExactAlarms(BuildContext context, WidgetRef ref) async {
-    await NotificationService.instance.requestExactAlarms();
+    await ref.read(notificationsProvider).requestExactAlarms();
     ref.invalidate(exactAlarmsProvider);
     await ref.read(actionsProvider).refreshNotifications();
   }
@@ -1231,14 +1235,15 @@ class SettingsScreen extends ConsumerWidget {
         const SnackBar(content: Text('Backup saved')),
       );
     } catch (error) {
+      debugPrint('Zeolite: save dialog failed: $error');
       final String json = await backup.exportToJsonString();
       await Clipboard.setData(ClipboardData(text: json));
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Could not open the save dialog ($error). '
+        const SnackBar(
+          content: Text('Could not open the save dialog. '
               'The backup is on your clipboard instead.'),
-          duration: const Duration(seconds: 6),
+          duration: Duration(seconds: 6),
         ),
       );
     }
@@ -1418,9 +1423,10 @@ class SettingsScreen extends ConsumerWidget {
       final String json = utf8.decode(await folder.readBytes(picked.uri));
       result = await ref.read(backupServiceProvider).importFromJsonString(json);
     } catch (error) {
+      debugPrint('Zeolite: backup file unreadable: $error');
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not read that file: $error')),
+        const SnackBar(content: Text('Could not read that file.')),
       );
       return;
     }

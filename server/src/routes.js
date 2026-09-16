@@ -55,7 +55,10 @@ export function createNotionRouter({ config, sessions, limit, fetchImpl }) {
     const { code, state, error } = request.query;
     const session = typeof state === "string" ? sessions.getByState(state) : undefined;
     if (error !== undefined || typeof code !== "string" || !session) {
-      response.status(400).type("html").send(callbackFailure("This link expired. Try connecting again."));
+      response
+        .status(400)
+        .type("html")
+        .send(callbackFailure("This link expired. Try connecting again."));
       return;
     }
 
@@ -66,6 +69,7 @@ export function createNotionRouter({ config, sessions, limit, fetchImpl }) {
           redirectUri: config.redirectUri,
           clientId: config.clientId,
           clientSecret: config.clientSecret,
+          timeoutMs: config.notionTimeoutMs,
         },
         fetchImpl,
       );
@@ -73,17 +77,25 @@ export function createNotionRouter({ config, sessions, limit, fetchImpl }) {
       session.status = "ready";
       response.status(200).type("html").send(callbackSuccess(session, config.appScheme));
     } catch {
-      response.status(502).type("html").send(callbackFailure("Unable to complete the connection. Try again."));
+      response
+        .status(502)
+        .type("html")
+        .send(callbackFailure("Unable to complete the connection. Try again."));
     }
   });
 
   router.post("/claim", limit("/notion/claim", 20), (request, response) => {
     const body = request.body ?? {};
-    const session = typeof body.session === "string"
-      ? sessions.getById(body.session)
-      : sessions.getByPairingCode(body.code);
+    const session =
+      typeof body.session === "string"
+        ? sessions.getById(body.session)
+        : sessions.getByPairingCode(body.code);
 
-    if (!session || session.status !== "ready" || !verifierMatches(body.verifier, session.challenge)) {
+    if (
+      !session ||
+      session.status !== "ready" ||
+      !verifierMatches(body.verifier, session.challenge)
+    ) {
       response.status(400).json(INVALID_CLAIM);
       return;
     }
@@ -103,7 +115,12 @@ export function createNotionRouter({ config, sessions, limit, fetchImpl }) {
 
     try {
       const tokenPayload = await refreshToken(
-        { refreshToken: value, clientId: config.clientId, clientSecret: config.clientSecret },
+        {
+          refreshToken: value,
+          clientId: config.clientId,
+          clientSecret: config.clientSecret,
+          timeoutMs: config.notionTimeoutMs,
+        },
         fetchImpl,
       );
       response.status(200).json(tokenPayload);

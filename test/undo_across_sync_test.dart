@@ -13,6 +13,7 @@ import 'package:zeolite/services/sync/sync_coordinator.dart';
 import 'package:zeolite/state/providers.dart';
 import 'package:zeolite/state/sync_providers.dart';
 
+import 'fake_notifications.dart';
 import 'fake_sync_target.dart';
 
 /// Pins the bug this file exists for: an Undo offer died about fifteen seconds
@@ -43,6 +44,7 @@ void main() {
 
     container = ProviderContainer(
       overrides: [
+        notificationsProvider.overrideWithValue(QuietNotifications()),
         repositoryProvider.overrideWithValue(repo),
         syncTargetProvider.overrideWithValue(target),
       ],

@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../data/settings/app_settings.dart';
-import '../../services/notification_service.dart';
 import '../../state/providers.dart';
 import '../../widgets/common.dart';
 import '../../widgets/gradient_header.dart';
@@ -63,7 +62,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     setState(() => _saving = true);
 
     if (_notifications) {
-      await NotificationService.instance.requestPermissions();
+      await ref.read(notificationsProvider).requestPermissions();
     }
 
     // Merged, not a fresh object: the welcome screen has already run, and a

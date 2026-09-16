@@ -16,14 +16,24 @@ let currentTime = 1_000_000;
 let server;
 let baseUrl;
 
+// Never answers, and gives up only when the caller's deadline aborts it.
+function stalled(options) {
+  return new Promise((_resolve, reject) => {
+    options.signal.addEventListener("abort", () => reject(options.signal.reason));
+  });
+}
 async function fetchStub(_url, options) {
+  if (upstreamMode === "stalled") {
+    return stalled(options);
+  }
   if (upstreamMode === "failure") {
     return new Response("provider-private-error", { status: 400 });
   }
   const body = JSON.parse(options.body);
-  const payload = body.grant_type === "refresh_token"
-    ? { access_token: "refreshed-access-token", refresh_token: body.refresh_token }
-    : tokenPayload;
+  const payload =
+    body.grant_type === "refresh_token"
+      ? { access_token: "refreshed-access-token", refresh_token: body.refresh_token }
+      : tokenPayload;
   return new Response(JSON.stringify(payload), {
     status: 200,
     headers: { "Content-Type": "application/json" },
@@ -52,7 +62,11 @@ async function readySession(sessionVerifier = verifier) {
 }
 
 before(async () => {
-  const app = createApp({ fetchImpl: fetchStub, now: () => currentTime });
+  const app = createApp({
+    fetchImpl: fetchStub,
+    now: () => currentTime,
+    timeouts: { notion: 50 },
+  });
   server = app.listen(0);
   await new Promise((resolve) => server.once("listening", resolve));
   const address = server.address();
@@ -108,6 +122,27 @@ test("callback hides an upstream failure", async () => {
   upstreamMode = "success";
 });
 
+test("a stalled Notion gives up instead of holding the request open", async () => {
+  upstreamMode = "stalled";
+  const started = await startSession();
+  const callback = await fetch(
+    `${baseUrl}/notion/callback?code=generic-code&state=${encodeURIComponent(started.state)}`,
+  );
+  assert.equal(callback.status, 502);
+
+  const refresh = await fetch(`${baseUrl}/notion/refresh`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refresh_token: "generic-refresh-token" }),
+  });
+  assert.equal(refresh.status, 502);
+  assert.deepEqual(await refresh.json(), { error: "Unable to refresh the connection." });
+  upstreamMode = "success";
+  // The extra session spends a start from the per-minute allowance the later
+  // tests are counting on.
+  currentTime += 61_000;
+});
+
 test("claim rejects the wrong verifier", async () => {
   const ready = await readySession();
   const response = await fetch(`${baseUrl}/notion/claim`, {
@@ -131,11 +166,12 @@ test("claim returns the token payload", async () => {
 
 test("claim prevents a second claim", async () => {
   const ready = await readySession();
-  const request = () => fetch(`${baseUrl}/notion/claim`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ session: ready.session, verifier }),
-  });
+  const request = () =>
+    fetch(`${baseUrl}/notion/claim`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session: ready.session, verifier }),
+    });
   assert.equal((await request()).status, 200);
   assert.equal((await request()).status, 400);
 });

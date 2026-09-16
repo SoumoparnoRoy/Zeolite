@@ -15,6 +15,7 @@ import 'package:zeolite/services/sync/sync_scheduler.dart';
 import 'package:zeolite/state/notion_sync_providers.dart';
 import 'package:zeolite/state/providers.dart';
 
+import 'fake_notifications.dart';
 import 'fake_sync_target.dart';
 
 /// The Notion half of the sync wiring, which had two gaps the account half
@@ -55,6 +56,7 @@ void main() {
   ProviderContainer build() {
     final ProviderContainer container = ProviderContainer(
       overrides: [
+        notificationsProvider.overrideWithValue(QuietNotifications()),
         repositoryProvider.overrideWithValue(repo),
         notionSyncTargetProvider.overrideWithValue(target),
         notionCoordinatorProvider.overrideWith(

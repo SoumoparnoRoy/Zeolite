@@ -68,7 +68,7 @@ MockClient _notion({
                 ],
                 'parent': <String, Object?>{
                   'type': 'database_id',
-                  'database_id': 'db-1',
+                  'database_id': 'db-$i',
                 },
               },
           ],
@@ -333,6 +333,44 @@ void main() {
     // nothing says so until they open Notion.
     expect(find.text('Table 1'), findsOneWidget);
     expect(find.text('Table 2'), findsOneWidget);
+  });
+
+  testWidgets('a saved mapping can be moved to another table',
+      (WidgetTester tester) async {
+    final NotionConnectionStore store =
+        NotionConnectionStore(storage: const FlutterSecureStorage());
+    await store.write(const NotionTokens(accessToken: 'a-token'));
+    await store.writeMapping(const NotionMapping(
+      databaseId: 'db-1',
+      dataSourceId: 'ds-1',
+      title: 'Table 1',
+      fields: <NotionField, NotionProperty>{
+        NotionField.course:
+            NotionProperty(id: 'title', name: 'Name', type: 'title'),
+      },
+    ));
+
+    await tester.pumpWidget(_app(_notion(tables: 2)));
+    await tester.pumpAndSettle();
+
+    // Reopening lands on the columns; this is the only way back to the list
+    // short of disconnecting.
+    await tester.tap(find.text('Use a different table'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Table 2'));
+    await tester.pumpAndSettle();
+
+    final Finder save = find.widgetWithText(FilledButton, 'Save');
+    await tester.ensureVisible(save);
+    await tester.pumpAndSettle();
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+
+    final NotionMapping? saved = await store.readMapping();
+    expect(saved!.databaseId, 'db-2');
+    expect(saved.dataSourceId, 'ds-2');
+    // A choice made against the old table's columns does not carry over.
+    expect(saved.fields[NotionField.course]!.id, 'p1');
   });
 
   testWidgets('search asks for tables, which is what the API now answers',

@@ -190,7 +190,14 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
         _loaded = null;
       }
     });
-    await _loadSchema(choice.id);
+    // Re-picking the open table is backing out, so its answers stay.
+    await _loadSchema(choice.id, keepChoices: !moved);
+  }
+
+  /// Otherwise a saved mapping could only move by disconnecting Notion.
+  Future<void> _showSources() async {
+    setState(() => _stage = _Stage.sources);
+    if (_sources.isEmpty) await _loadSources();
   }
 
   Future<void> _loadSchema(String dataSourceId, {bool keepChoices = false}) async {
@@ -645,6 +652,14 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
                 'it guessed wrong.',
         style: TextStyle(color: context.palette.textSecondary),
       ),
+      if (!_narrowed)
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton(
+            onPressed: _busy ? null : _showSources,
+            child: const Text('Use a different table'),
+          ),
+        ),
       const SizedBox(height: AppSpacing.lg),
       for (final NotionField field in NotionField.values)
         if (!_narrowed || _gapFields!.contains(field)) ...<Widget>[

@@ -301,11 +301,8 @@ export async function readTimetable(
     },
   );
 
-  // Details stay server-side rather than being discarded: the caller learns
-  // nothing, and whoever is holding the logs learns why.
   if (!response.ok) {
-    const detail = await response.text().catch(() => "");
-    process.stderr.write(`Workers AI ${response.status}: ${detail.slice(0, 400)}\n`);
+    process.stderr.write(`Workers AI request failed (${response.status})\n`);
     throw new Error("Workers AI request failed");
   }
 
@@ -313,12 +310,10 @@ export async function readTimetable(
   const reply = body?.result?.response ?? "";
   const classes = classesIn(reply);
   if (!classes) {
-    // Bounded on purpose. A reply that failed to parse is usually prose about
-    // the image, and the opening of it is enough to see why — but it is read
-    // off someone's timetable, so only the opening goes anywhere.
-    const shown = typeof reply === "string" ? reply : JSON.stringify(reply);
+    const length =
+      typeof reply === "string" ? reply.length : JSON.stringify(reply).length;
     process.stderr.write(
-      `Workers AI reply unparseable (${shown.length} chars): ${shown.slice(0, 300)}\n`,
+      `Workers AI reply unparseable (${length} chars)\n`,
     );
     throw new Error("Workers AI returned no readable timetable");
   }

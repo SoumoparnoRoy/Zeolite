@@ -54,6 +54,9 @@ dependencies:
   # is switched off in the manifest, so this reports usage without an
   # advertising identifier.
   firebase_analytics: ^12.5.0
+  # The AI timetable check sends a token from this, and the server refuses
+  # reads without one. BSD-3-Clause.
+  firebase_app_check: ^0.4.8
   # Held below 11, which requires compileSdk 37 while AGP 9.0.1 tops out at a
   # recommended 36. The Keystore defaults are identical either way, so the only
   # thing 11 would buy is a toolchain bump for one dependency.

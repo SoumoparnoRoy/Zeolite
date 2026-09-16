@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
+import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair } from "jose";
 import { createApp } from "../src/index.js";
 
 process.env.NOTION_CLIENT_ID = "test-client";
@@ -13,6 +14,25 @@ const image =
 
 const accountId = "test-account";
 const apiToken = "test-cloudflare-token";
+
+const projectNumber = "123456789";
+
+let signingKey;
+let appCheckKeys;
+let token;
+
+// Shaped like a Firebase App Check token: the issuer and audience both name
+// the project, and it is signed by whichever key is passed.
+function attestation(key, { project = projectNumber, expiresIn = "1h" } = {}) {
+  return new SignJWT({})
+    .setProtectedHeader({ alg: "RS256", typ: "JWT", kid: "test-key" })
+    .setIssuer(`https://firebaseappcheck.googleapis.com/${project}`)
+    .setAudience([`projects/${project}`])
+    .setSubject("1:123456789:android:abc")
+    .setIssuedAt()
+    .setExpirationTime(expiresIn)
+    .sign(key);
+}
 
 let upstreamReply = "Monday\n* 09:10-10:00: ABC1234 (R101)";
 let upstreamOk = true;
@@ -41,11 +61,15 @@ async function listen(app) {
 
 // Each call moves past the per-caller window, so the limiter does not decide
 // the outcome of a test that is about something else.
-function read(baseUrl, body) {
+function read(baseUrl, body, attested = token) {
   currentTime += 61_000;
+  const headers = { "Content-Type": "application/json" };
+  if (attested !== null) {
+    headers["X-Firebase-AppCheck"] = attested;
+  }
   return fetch(`${baseUrl}/timetable/read`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(body),
   });
 }
@@ -53,15 +77,28 @@ function read(baseUrl, body) {
 let configured;
 let unconfigured;
 let stingy;
+let unattested;
 
 before(async () => {
+  const pair = await generateKeyPair("RS256");
+  signingKey = pair.privateKey;
+  const publicJwk = { ...(await exportJWK(pair.publicKey)), kid: "test-key", alg: "RS256" };
+  appCheckKeys = createLocalJWKSet({ keys: [publicJwk] });
+  token = await attestation(signingKey);
+
+  const options = { fetchImpl: fetchStub, now: () => currentTime, appCheckKeys };
   process.env.CLOUDFLARE_ACCOUNT_ID = accountId;
   process.env.CLOUDFLARE_API_TOKEN = apiToken;
+  process.env.FIREBASE_PROJECT_NUMBER = projectNumber;
   process.env.AI_DAILY_CALLS = "180";
-  configured = await listen(createApp({ fetchImpl: fetchStub, now: () => currentTime }));
+  configured = await listen(createApp(options));
 
   process.env.AI_DAILY_CALLS = "1";
-  stingy = await listen(createApp({ fetchImpl: fetchStub, now: () => currentTime }));
+  stingy = await listen(createApp(options));
+
+  delete process.env.AI_DAILY_CALLS;
+  delete process.env.FIREBASE_PROJECT_NUMBER;
+  unattested = await listen(createApp(options));
 
   delete process.env.CLOUDFLARE_ACCOUNT_ID;
   delete process.env.CLOUDFLARE_API_TOKEN;
@@ -149,13 +186,24 @@ test("a line that cannot be a class is dropped", async () => {
 
 test("an upstream failure says nothing about the upstream", async () => {
   upstreamOk = false;
-  const response = await read(configured, { image });
+  let stderr = "";
+  const originalWrite = process.stderr.write;
+  process.stderr.write = (chunk) => {
+    stderr += String(chunk);
+    return true;
+  };
+  const response = await read(configured, { image }).finally(() => {
+    process.stderr.write = originalWrite;
+  });
   const text = await response.text();
 
   assert.equal(response.status, 502);
   assert.doesNotMatch(text, /test-cloudflare-token/);
   assert.doesNotMatch(text, /provider-private-error/);
   assert.doesNotMatch(text, /429/);
+  assert.doesNotMatch(stderr, /test-cloudflare-token/);
+  assert.doesNotMatch(stderr, /provider-private-error/);
+  assert.match(stderr, /Workers AI request failed \(429\)/);
 });
 
 test("something that is not an image is refused before the upstream", async () => {
@@ -169,14 +217,44 @@ test("something that is not an image is refused before the upstream", async () =
   assert.equal(lastRequest, undefined);
 });
 
+test("only a read attested for this project reaches the upstream", async () => {
+  upstreamOk = true;
+  lastRequest = undefined;
+  const forged = await attestation((await generateKeyPair("RS256")).privateKey);
+  const otherProject = await attestation(signingKey, { project: "987654321" });
+  const expired = await attestation(signingKey, { expiresIn: "-1m" });
+
+  for (const attested of [null, "", "not.a.token", forged, otherProject, expired]) {
+    const response = await read(configured, { image }, attested);
+    assert.equal(response.status, 401);
+    assert.deepEqual(await response.json(), { error: "Invalid request." });
+  }
+  assert.equal(lastRequest, undefined);
+});
+
+test("a refused attestation leaves the day's allowance alone", async () => {
+  upstreamOk = true;
+  upstreamReply = "**Monday**\n*   09:10-10:00: ABC1234";
+  assert.equal((await read(stingy, { image }, "not.a.token")).status, 401);
+  assert.equal((await read(stingy, { image })).status, 200);
+});
+
 test("the day's allowance runs out, and says so", async () => {
   upstreamOk = true;
   upstreamReply = "**Monday**\n*   09:10-10:00: ABC1234";
-  assert.equal((await read(stingy, { image })).status, 200);
+
+  const forged = await attestation((await generateKeyPair("RS256")).privateKey);
+  assert.equal((await read(stingy, { image }, forged)).status, 401);
 
   const spent = await read(stingy, { image });
   assert.equal(spent.status, 429);
   assert.match((await spent.json()).error, /midnight UTC/);
+});
+
+test("without a Firebase project image reading stays off", async () => {
+  lastRequest = undefined;
+  assert.equal((await read(unattested, { image })).status, 503);
+  assert.equal(lastRequest, undefined);
 });
 
 test("without a Cloudflare token the rest of the service is unaffected", async () => {

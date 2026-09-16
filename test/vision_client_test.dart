@@ -11,8 +11,12 @@ final Uri _base = Uri.parse('https://example.test');
 
 final Uint8List _image = Uint8List.fromList(<int>[1, 2, 3, 4]);
 
-VisionClient _client(MockClient mock) =>
-    VisionClient(httpClient: mock, baseUri: _base);
+VisionClient _client(MockClient mock, {String? token = 'attest-1'}) =>
+    VisionClient(
+      httpClient: mock,
+      baseUri: _base,
+      appCheckToken: () async => token,
+    );
 
 Future<VisionRead> _answering(String body, int status) => _client(
       MockClient((_) async => http.Response(body, status)),
@@ -27,10 +31,25 @@ void main() {
     })).read(image: _image, text: 'AAA1001 R101');
 
     expect(sent.url.path, '/timetable/read');
+    expect(sent.headers['X-Firebase-AppCheck'], 'attest-1');
     expect(jsonDecode(sent.body), <String, String>{
       'image': base64Encode(_image),
       'text': 'AAA1001 R101',
     });
+  });
+
+  test('without an attestation the image never leaves the device', () async {
+    bool called = false;
+    final VisionRead read = await _client(
+      MockClient((_) async {
+        called = true;
+        return http.Response('{"classes":[]}', 200);
+      }),
+      token: null,
+    ).read(image: _image, text: '');
+
+    expect(called, isFalse);
+    expect(read.failure, VisionFailure.failed);
   });
 
   test('both reply shapes survive the trip', () async {

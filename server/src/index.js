@@ -1,5 +1,6 @@
 import { pathToFileURL } from "node:url";
 import express from "express";
+import { createAppCheckVerifier } from "./appcheck.js";
 import { createDailyBudget } from "./budget.js";
 import { createRateLimiter } from "./limit.js";
 import { createNotionRouter } from "./routes.js";
@@ -14,14 +15,22 @@ const VISION_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct";
 const DAILY_CALLS = 180;
 
 // Optional on purpose: the service exists for the Notion handshake, and a
-// deployment without a Cloudflare token still does that job in full.
+// deployment without a Cloudflare token still does that job in full. The
+// project number is required alongside it, so a deployment that forgot App
+// Check stays switched off rather than open to anyone with the URL.
 function readVisionConfig() {
   const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
   const apiToken = process.env.CLOUDFLARE_API_TOKEN;
-  if (!accountId || !apiToken) {
+  const projectNumber = process.env.FIREBASE_PROJECT_NUMBER;
+  if (!accountId || !apiToken || !projectNumber) {
     return null;
   }
-  return { accountId, apiToken, model: process.env.CLOUDFLARE_MODEL || VISION_MODEL };
+  return {
+    accountId,
+    apiToken,
+    projectNumber,
+    model: process.env.CLOUDFLARE_MODEL || VISION_MODEL,
+  };
 }
 
 function readConfig() {
@@ -45,12 +54,15 @@ function readConfig() {
   };
 }
 
-export function createApp({ fetchImpl = globalThis.fetch, now = Date.now } = {}) {
+export function createApp({ fetchImpl = globalThis.fetch, now = Date.now, appCheckKeys } = {}) {
   const app = express();
   const config = readConfig();
   const sessions = createSessionStore({ now });
   const limit = createRateLimiter({ now });
   const budget = createDailyBudget({ maximum: config.dailyCalls, now });
+  const verifyAppCheck = config.vision
+    ? createAppCheckVerifier({ projectNumber: config.vision.projectNumber, keys: appCheckKeys })
+    : null;
 
   app.set("trust proxy", config.trustProxy);
 
@@ -68,7 +80,7 @@ export function createApp({ fetchImpl = globalThis.fetch, now = Date.now } = {})
   app.use(
     "/timetable",
     express.json({ limit: "6mb" }),
-    createTimetableRouter({ config, limit, budget, fetchImpl }),
+    createTimetableRouter({ config, limit, budget, verifyAppCheck, fetchImpl }),
   );
   return app;
 }

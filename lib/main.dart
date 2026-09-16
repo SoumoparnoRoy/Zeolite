@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -22,6 +23,14 @@ Future<void> main() async {
   // everything except sync works with no Firebase at all.
   try {
     await Firebase.initializeApp();
+    // Play Integrity only vouches for a build Play would recognise, so the
+    // debug and profile builds sideloaded for testing use a registered debug
+    // token instead.
+    await FirebaseAppCheck.instance.activate(
+      providerAndroid: kReleaseMode
+          ? const AndroidPlayIntegrityProvider()
+          : const AndroidDebugProvider(),
+    );
   } catch (error) {
     debugPrint('Firebase unavailable, continuing offline: $error');
   }

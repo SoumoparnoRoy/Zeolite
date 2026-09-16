@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:http/http.dart' as http;
 
 import '../../domain/vision_read.dart';
@@ -12,9 +13,14 @@ import '../../domain/vision_read.dart';
 /// read and the student has agreed to that read leaving the device. Nothing
 /// here decides either of those things.
 class VisionClient {
-  VisionClient({http.Client? httpClient, Uri? baseUri})
-      : _http = httpClient ?? http.Client(),
-        _base = baseUri ?? Uri.parse(defaultBaseUrl);
+  VisionClient({
+    http.Client? httpClient,
+    Uri? baseUri,
+    Future<String?> Function()? appCheckToken,
+  })  : _http = httpClient ?? http.Client(),
+        _base = baseUri ?? Uri.parse(defaultBaseUrl),
+        _appCheckToken =
+            appCheckToken ?? (() => FirebaseAppCheck.instance.getToken());
 
   static const String defaultBaseUrl = 'https://zeolite.onrender.com';
 
@@ -25,17 +31,25 @@ class VisionClient {
 
   final http.Client _http;
   final Uri _base;
+  final Future<String?> Function() _appCheckToken;
 
   Future<VisionRead> read({
     required Uint8List image,
     required String text,
   }) async {
     try {
+      // The service refuses a read without one, so there is no point sending
+      // the image when the device could not get a token.
+      final String? token = await _appCheckToken();
+      if (token == null || token.isEmpty) {
+        return const VisionRead.failed(VisionFailure.failed);
+      }
       final http.Response response = await _http
           .post(
             _base.resolve('/timetable/read'),
-            headers: const <String, String>{
+            headers: <String, String>{
               'Content-Type': 'application/json',
+              'X-Firebase-AppCheck': token,
             },
             body: jsonEncode(<String, Object?>{
               'image': base64Encode(image),

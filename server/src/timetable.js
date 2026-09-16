@@ -41,7 +41,7 @@ function imageIn(value) {
   return type ? `data:${type};base64,${cleaned}` : undefined;
 }
 
-export function createTimetableRouter({ config, limit, budget, fetchImpl }) {
+export function createTimetableRouter({ config, limit, budget, verifyAppCheck, fetchImpl }) {
   const router = Router();
 
   // Three a minute per caller. Reading a timetable is something a person does
@@ -52,6 +52,12 @@ export function createTimetableRouter({ config, limit, budget, fetchImpl }) {
     // upstream call with something that reads like an outage.
     if (!config.vision) {
       response.status(503).json({ error: "Image reading is not available." });
+      return;
+    }
+
+    // Before the budget, so a caller that is not the app cannot spend it.
+    if (!(await verifyAppCheck(request.get("X-Firebase-AppCheck")))) {
+      response.status(401).json(INVALID);
       return;
     }
 

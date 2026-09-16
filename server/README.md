@@ -12,7 +12,7 @@ This standalone service holds the secrets Zeolite cannot ship inside the mobile 
 | `GET /notion/callback` | Exchanges Notion's authorization code and returns to the app. |
 | `POST /notion/claim` | Releases the token payload after verifier proof. |
 | `POST /notion/refresh` | Exchanges a refresh token for a fresh token payload. |
-| `POST /timetable/read` | Sends an image, and the text recognition already done on it, to Workers AI and returns the classes it found. Answers `503` when no Cloudflare token is configured. |
+| `POST /timetable/read` | Sends an image, and the text recognition already done on it, to Workers AI and returns the classes it found. Needs a Firebase App Check token in `X-Firebase-AppCheck` and answers `401` without one. Answers `503` when image reading is not configured. |
 | `GET /health` | Returns `ok`. The app calls it when the connect screen opens, so a host that has spun the service down is awake before anyone taps Connect. |
 
 ## Environment variables
@@ -25,8 +25,10 @@ This standalone service holds the secrets Zeolite cannot ship inside the mobile 
 - `TRUST_PROXY` — number of proxies in front of the service, default `0`. Set
   it to `1` behind a single load balancer, or rate limiting counts every
   caller as the balancer and throttles them as one.
-- `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` — optional. Without both,
-  `/timetable/read` answers `503` and everything else runs as usual.
+- `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` and `FIREBASE_PROJECT_NUMBER` —
+  optional. Without all three, `/timetable/read` answers `503` and everything
+  else runs as usual. The project number is what App Check tokens are checked
+  against.
 - `CLOUDFLARE_MODEL` — optional, defaults to the Llama 3.2 vision model.
 - `AI_DAILY_CALLS` — optional, default `180`. Workers AI allows 10,000 neurons
   a day on the free plan and stops rather than bills; a read costs roughly

@@ -45,11 +45,11 @@ const AppSettings _blockSettings = AppSettings(
 
 /// Captures what a form saved instead of writing it, so a test can tell a
 /// weekly rule from a one-off rather than inferring it from the sheet.
-/// The lists are owned by the test rather than by the fake, so a form that refuses
-/// to save — and so never reads [actionsProvider] at all — can still be checked
-/// for having written nothing.
-class _RecordingActions extends TimetableActions {
-  _RecordingActions(super.ref, {required this.slots, required this.extras});
+/// The lists are owned by the test rather than by the fake, so a form that
+/// refuses to save — and so never reads the action providers at all — can
+/// still be checked for having written nothing.
+class _RecordingActions extends ScheduleActions {
+  _RecordingActions(super.core, {required this.slots, required this.extras});
 
   final List<ClassSlot> slots;
   final List<ExtraClass> extras;
@@ -65,8 +65,8 @@ class _RecordingActions extends TimetableActions {
 /// built can be read back.
 /// Tells the two edit paths apart: a plain save and one that carries the
 /// marks across.
-class _EditRecorder extends TimetableActions {
-  _EditRecorder(super.ref);
+class _EditRecorder extends ScheduleActions {
+  _EditRecorder(super.core);
 
   final List<ClassSlot> plain = <ClassSlot>[];
   final List<ClassSlot> moved = <ClassSlot>[];
@@ -82,8 +82,8 @@ class _EditRecorder extends TimetableActions {
       moved.add(updated);
 }
 
-class _SubjectRecorder extends TimetableActions {
-  _SubjectRecorder(super.ref, {required this.saved});
+class _SubjectRecorder extends SubjectActions {
+  _SubjectRecorder(super.core, {required this.saved});
 
   final List<Subject> saved;
 
@@ -138,7 +138,8 @@ Widget _host(
   List<ClassSlot> slots = const <ClassSlot>[],
   List<AttendanceRecord> records = const <AttendanceRecord>[],
   List<SlotOverride> slotOverrides = const <SlotOverride>[],
-  TimetableActions Function(Ref)? actions,
+  ScheduleActions Function(Ref)? schedule,
+  SubjectActions Function(Ref)? subjects,
 }) {
   return ProviderScope(
     overrides: [
@@ -150,7 +151,8 @@ Widget _host(
         ),
       ),
       settingsProvider.overrideWith(() => _StaticSettings(settings)),
-      if (actions != null) actionsProvider.overrideWith(actions),
+      if (schedule != null) scheduleActionsProvider.overrideWith(schedule),
+      if (subjects != null) subjectActionsProvider.overrideWith(subjects),
     ],
     child: MaterialApp(
       theme: AppTheme.dark(),
@@ -333,7 +335,7 @@ void main() {
           (c, ref) => showSlotEditor(c, ref, slot: existing),
           records: records,
           slots: <ClassSlot>[existing],
-          actions: (Ref ref) => recorder = _EditRecorder(ref),
+          schedule: (Ref ref) => recorder = _EditRecorder(ActionCore(ref)),
         ),
       );
       await _openSheet(tester);
@@ -476,8 +478,8 @@ void main() {
             blockIndex: 0,
           ),
           settings: _blockSettings,
-          actions: (Ref ref) =>
-              _RecordingActions(ref, slots: written, extras: extras),
+          schedule: (Ref ref) => _RecordingActions(ActionCore(ref),
+              slots: written, extras: extras),
         ),
       );
       await _openSheet(tester);
@@ -502,8 +504,8 @@ void main() {
         _host(
           (c, ref) => showBlockClassEditor(c, ref, date: monday, blockIndex: 0),
           settings: _blockSettings,
-          actions: (Ref ref) =>
-              _RecordingActions(ref, slots: written, extras: extras),
+          schedule: (Ref ref) => _RecordingActions(ActionCore(ref),
+              slots: written, extras: extras),
         ),
       );
       await _openSheet(tester);
@@ -548,8 +550,8 @@ void main() {
               startDate: monday,
             ),
           ],
-          actions: (Ref ref) =>
-              _RecordingActions(ref, slots: written, extras: extras),
+          schedule: (Ref ref) => _RecordingActions(ActionCore(ref),
+              slots: written, extras: extras),
         ),
       );
       await _openSheet(tester);
@@ -665,8 +667,8 @@ void main() {
         (WidgetTester tester) async {
       await tester.pumpWidget(
         _host(
-          (c, ref) => showSessionOptions(c, ref, sessionOn(monday),
-              marksInline: true),
+          (c, ref) =>
+              showSessionOptions(c, ref, sessionOn(monday), marksInline: true),
           slots: <ClassSlot>[weekly],
           records: <AttendanceRecord>[markOn(monday)],
         ),
@@ -727,7 +729,8 @@ void main() {
       );
       await _openSheet(tester);
 
-      expect(find.textContaining('Weeks you edited on their own'), findsNothing);
+      expect(
+          find.textContaining('Weeks you edited on their own'), findsNothing);
     });
 
     testWidgets('stopping it warns only about marks from the cut on',
@@ -805,7 +808,8 @@ void main() {
         _host(
           (c, ref) =>
               showSubjectEditor(c, ref, subject: _fixture().subjects[1]),
-          actions: (Ref ref) => _SubjectRecorder(ref, saved: saved),
+          subjects: (Ref ref) =>
+              _SubjectRecorder(ActionCore(ref), saved: saved),
         ),
       );
       await _openSheet(tester);
@@ -876,7 +880,7 @@ void main() {
           defaultDurationMinutes: 120,
         ),
       ),
-      actions: (Ref ref) => _SubjectRecorder(ref, saved: saved),
+      subjects: (Ref ref) => _SubjectRecorder(ActionCore(ref), saved: saved),
     ));
     await tester.pumpAndSettle();
     await tester.tap(find.text('open'));

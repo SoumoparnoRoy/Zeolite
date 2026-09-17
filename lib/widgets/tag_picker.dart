@@ -9,7 +9,7 @@ import 'common.dart';
 ///
 /// There is deliberately no "No tag" row: tapping the tag a mark already has
 /// clears it, which is the rule the three status buttons already taught. The
-/// caller passes the result to `TimetableActions.setTagAt`, which does the
+/// caller passes the result to `AttendanceActions.setTagAt`, which does the
 /// toggling — so the rule has one implementation rather than one per surface.
 Future<int?> showTagPicker(
   BuildContext context, {

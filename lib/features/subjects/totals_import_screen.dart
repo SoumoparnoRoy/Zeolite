@@ -63,13 +63,14 @@ class _TotalsImportScreenState extends ConsumerState<TotalsImportScreen> {
           ),
     ];
 
-    final TimetableActions actions = ref.read(actionsProvider);
-    final int count = await actions.importAttendanceTotals(decisions);
+    final ActionCore core = ref.read(actionCoreProvider);
+    final ImportActions imports = ref.read(importActionsProvider);
+    final int count = await imports.importAttendanceTotals(decisions);
     if (!mounted) return;
     navigator.pop();
     showUndoSnack(
       messenger,
-      actions,
+      core,
       'Brought in ${Words.plural(count, 'subject')}',
     );
   }
@@ -82,7 +83,8 @@ class _TotalsImportScreenState extends ConsumerState<TotalsImportScreen> {
         ref.watch(settingsProvider).value ?? const AppSettings();
 
     final Map<int, int> marks = <int, int>{};
-    for (final AttendanceRecord record in data?.records ?? const <AttendanceRecord>[]) {
+    for (final AttendanceRecord record
+        in data?.records ?? const <AttendanceRecord>[]) {
       if (!settings.countsInTerm(record.date)) continue;
       marks[record.subjectId] = (marks[record.subjectId] ?? 0) + 1;
     }
@@ -111,7 +113,8 @@ class _TotalsImportScreenState extends ConsumerState<TotalsImportScreen> {
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 96),
           sliver: SliverList.list(
             children: <Widget>[
-              if (!widget.totals.addsUp) _ChecksumWarning(totals: widget.totals),
+              if (!widget.totals.addsUp)
+                _ChecksumWarning(totals: widget.totals),
               const SectionHeader('What was read'),
               for (int i = 0; i < plan.rows.length; i++) ...<Widget>[
                 _RowCard(
@@ -126,7 +129,8 @@ class _TotalsImportScreenState extends ConsumerState<TotalsImportScreen> {
               Text(
                 'Held and attended replace what the subject carries; the term '
                 'total is what "still to come" counts down from.',
-                style: TextStyle(fontSize: 12, height: 1.45, color: p.textFaint),
+                style:
+                    TextStyle(fontSize: 12, height: 1.45, color: p.textFaint),
               ),
             ],
           ),
@@ -148,8 +152,7 @@ class _ChecksumWarning extends StatelessWidget {
   Widget build(BuildContext context) {
     final AppPalette p = context.palette;
     final List<String> parts = <String>[
-      if (totals.printedTotal != null &&
-          totals.printedTotal != totals.totalSum)
+      if (totals.printedTotal != null && totals.printedTotal != totals.totalSum)
         'sessions add to ${totals.totalSum}, the page says '
             '${totals.printedTotal}',
       if (totals.printedAttended != null &&
@@ -209,19 +212,19 @@ class _RowCard extends StatelessWidget {
         ? 'Two courses ran together here, so one of them lost its numbers. '
             'Read the page again from a larger image.'
         : refused
-        ? 'The numbers beside this course could not be read, so there is '
-            'nothing to bring in. Read the page again from a larger image.'
-        : !figures.isOrdered
-        ? 'More attended than held — one of the three was misread.'
-        : !figures.percentAgrees
-            ? 'The page prints ${figures.printedPercent}% here, which these '
-                'numbers do not give. Something was misread.'
-            : row.match == TotalsMatch.overlap
-                ? 'You have marked '
-                    '${Words.plural(row.marksInTerm, 'class', 'classes')} '
-                    'here. The page counts those too, so bringing this row in '
-                    'replaces them rather than adding to them.'
-                : null;
+            ? 'The numbers beside this course could not be read, so there is '
+                'nothing to bring in. Read the page again from a larger image.'
+            : !figures.isOrdered
+                ? 'More attended than held — one of the three was misread.'
+                : !figures.percentAgrees
+                    ? 'The page prints ${figures.printedPercent}% here, which these '
+                        'numbers do not give. Something was misread.'
+                    : row.match == TotalsMatch.overlap
+                        ? 'You have marked '
+                            '${Words.plural(row.marksInTerm, 'class', 'classes')} '
+                            'here. The page counts those too, so bringing this row in '
+                            'replaces them rather than adding to them.'
+                        : null;
 
     return SurfaceCard(
       onTap: refused ? null : onToggle,

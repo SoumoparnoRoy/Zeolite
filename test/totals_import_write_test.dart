@@ -113,7 +113,7 @@ void main() {
     final (ProviderContainer container, _Recording repo) = await _harness();
 
     final int count = await container
-        .read(actionsProvider)
+        .read(importActionsProvider)
         .importAttendanceTotals(<TotalsDecision>[
       TotalsDecision(row: _row('Control Systems')),
     ]);
@@ -133,7 +133,7 @@ void main() {
     final (ProviderContainer container, _Recording repo) = await _harness();
 
     await container
-        .read(actionsProvider)
+        .read(importActionsProvider)
         .importAttendanceTotals(<TotalsDecision>[
       TotalsDecision(row: _row('Signal Theory'), subjectId: 1),
     ]);
@@ -153,7 +153,7 @@ void main() {
     final (ProviderContainer container, _Recording repo) = await _harness();
 
     await container
-        .read(actionsProvider)
+        .read(importActionsProvider)
         .importAttendanceTotals(<TotalsDecision>[
       TotalsDecision(
           row: _row('Signal Theory'), subjectId: 1, clearMarks: true),
@@ -169,7 +169,7 @@ void main() {
     final (ProviderContainer container, _Recording repo) = await _harness();
 
     await container
-        .read(actionsProvider)
+        .read(importActionsProvider)
         .importAttendanceTotals(<TotalsDecision>[
       TotalsDecision(row: _row('Control Systems')),
       TotalsDecision(row: _row('Imaging Lab')),
@@ -177,7 +177,7 @@ void main() {
     ]);
 
     expect(repo.snapshots, 1);
-    expect(container.read(actionsProvider).pendingUndoToken, isNotNull);
+    expect(container.read(actionCoreProvider).pendingUndoToken, isNotNull);
   });
 
   test('clearing still happens when no semester dates are set', () async {
@@ -188,7 +188,7 @@ void main() {
         await _harness(dated: false);
 
     await container
-        .read(actionsProvider)
+        .read(importActionsProvider)
         .importAttendanceTotals(<TotalsDecision>[
       TotalsDecision(
           row: _row('Signal Theory'), subjectId: 1, clearMarks: true),
@@ -202,7 +202,7 @@ void main() {
     final (ProviderContainer container, _Recording repo) = await _harness();
 
     final int count = await container
-        .read(actionsProvider)
+        .read(importActionsProvider)
         .importAttendanceTotals(<TotalsDecision>[
       TotalsDecision(row: _row('Gone'), subjectId: 404),
       TotalsDecision(row: _row('Control Systems')),
@@ -217,12 +217,12 @@ void main() {
     final (ProviderContainer container, _Recording repo) = await _harness();
 
     final int count = await container
-        .read(actionsProvider)
+        .read(importActionsProvider)
         .importAttendanceTotals(const <TotalsDecision>[]);
 
     expect(count, 0);
     expect(repo.snapshots, 0);
     expect(repo.inserted, isEmpty);
-    expect(container.read(actionsProvider).pendingUndoToken, isNull);
+    expect(container.read(actionCoreProvider).pendingUndoToken, isNull);
   });
 }

@@ -93,10 +93,10 @@ class _CategoryFormState extends ConsumerState<_CategoryForm> {
       _error = null;
     });
 
-    final TimetableActions actions = ref.read(actionsProvider);
+    final SubjectActions subjects = ref.read(subjectActionsProvider);
     int? id = widget.category?.id;
     if (id == null) {
-      id = await actions.addCategory(
+      id = await subjects.addCategory(
         ClassCategory(
           name: name,
           defaultDurationMinutes: _minutes,
@@ -104,7 +104,7 @@ class _CategoryFormState extends ConsumerState<_CategoryForm> {
         ),
       );
     } else {
-      await actions.updateCategory(
+      await subjects.updateCategory(
         ClassCategory(
           id: id,
           name: name,
@@ -115,7 +115,7 @@ class _CategoryFormState extends ConsumerState<_CategoryForm> {
       );
     }
 
-    await _applyMembership(actions, id);
+    await _applyMembership(subjects, id);
 
     if (!mounted) return;
     Navigator.of(context).pop(id);
@@ -123,7 +123,7 @@ class _CategoryFormState extends ConsumerState<_CategoryForm> {
 
   /// Writes only the subjects that changed: `updated_at` drives sync, so a
   /// rewrite of one already filed here would be a change nobody made.
-  Future<void> _applyMembership(TimetableActions actions, int id) async {
+  Future<void> _applyMembership(SubjectActions subjects, int id) async {
     for (final Subject subject
         in ref.read(timetableProvider).value?.subjects ?? const <Subject>[]) {
       final int? subjectId = subject.id;
@@ -133,7 +133,7 @@ class _CategoryFormState extends ConsumerState<_CategoryForm> {
       final bool held = subject.categoryId == id;
       if (wanted == held) continue;
 
-      await actions.updateSubject(
+      await subjects.updateSubject(
         wanted
             ? subject.copyWith(categoryId: id)
             : subject.copyWith(clearCategory: true),

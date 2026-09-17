@@ -235,7 +235,7 @@ class HolidaysSection extends ConsumerWidget {
     );
     if (label == null) return;
 
-    await ref.read(actionsProvider).addHolidays(<Holiday>[
+    await ref.read(scheduleActionsProvider).addHolidays(<Holiday>[
       for (int i = 0; i < days; i++)
         Holiday(date: Dates.addDays(range.start, i), name: label),
     ]);
@@ -278,8 +278,9 @@ class HolidaysSection extends ConsumerWidget {
       if (confirmed != true) return;
     }
 
-    final TimetableActions actions = ref.read(actionsProvider);
-    await actions.deleteHolidays(run.ids);
-    showUndoSnack(messenger, actions, '${run.name} removed');
+    final ActionCore core = ref.read(actionCoreProvider);
+    final ScheduleActions schedule = ref.read(scheduleActionsProvider);
+    await schedule.deleteHolidays(run.ids);
+    showUndoSnack(messenger, core, '${run.name} removed');
   }
 }

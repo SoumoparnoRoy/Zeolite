@@ -408,7 +408,7 @@ class RoomsSection extends ConsumerWidget {
                     room: room,
                     onRename: () => _renameRoom(context, ref, room),
                     onDelete: () =>
-                        ref.read(actionsProvider).deleteRoom(room.id!),
+                        ref.read(subjectActionsProvider).deleteRoom(room.id!),
                   ),
               ],
             ),
@@ -420,7 +420,7 @@ class RoomsSection extends ConsumerWidget {
   Future<void> _addRoom(BuildContext context, WidgetRef ref) async {
     final String? name = await _promptRoomName(context, title: 'Add a room');
     if (name == null) return;
-    await ref.read(actionsProvider).addRoom(Room(name: name));
+    await ref.read(subjectActionsProvider).addRoom(Room(name: name));
   }
 
   Future<void> _renameRoom(
@@ -434,7 +434,9 @@ class RoomsSection extends ConsumerWidget {
       initial: room.name,
     );
     if (name == null) return;
-    await ref.read(actionsProvider).updateRoom(room.copyWith(name: name));
+    await ref
+        .read(subjectActionsProvider)
+        .updateRoom(room.copyWith(name: name));
   }
 }
 
@@ -572,7 +574,7 @@ class TagsSection extends ConsumerWidget {
   Future<void> _addTag(BuildContext context, WidgetRef ref) async {
     final String? name = await _promptTagName(context, title: 'Add a tag');
     if (name == null) return;
-    await ref.read(actionsProvider).addTag(Tag(name: name));
+    await ref.read(subjectActionsProvider).addTag(Tag(name: name));
   }
 
   Future<void> _renameTag(
@@ -586,7 +588,7 @@ class TagsSection extends ConsumerWidget {
       initial: tag.name,
     );
     if (name == null) return;
-    await ref.read(actionsProvider).updateTag(tag.copyWith(name: name));
+    await ref.read(subjectActionsProvider).updateTag(tag.copyWith(name: name));
   }
 
   Future<void> _confirmDelete(
@@ -595,14 +597,15 @@ class TagsSection extends ConsumerWidget {
     Tag tag,
   ) async {
     final int id = tag.id!;
-    final TimetableActions actions = ref.read(actionsProvider);
-    final int inUse = await actions.countMarksWithTag(id);
+    final ActionCore core = ref.read(actionCoreProvider);
+    final SubjectActions subjects = ref.read(subjectActionsProvider);
+    final int inUse = await subjects.countMarksWithTag(id);
     if (!context.mounted) return;
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
 
     if (inUse == 0) {
-      await actions.deleteTag(id);
-      showUndoSnack(messenger, actions, '${tag.name} deleted');
+      await subjects.deleteTag(id);
+      showUndoSnack(messenger, core, '${tag.name} deleted');
       return;
     }
 
@@ -630,8 +633,8 @@ class TagsSection extends ConsumerWidget {
       ),
     );
     if (confirmed != true) return;
-    await actions.deleteTag(id);
-    showUndoSnack(messenger, actions, '${tag.name} deleted');
+    await subjects.deleteTag(id);
+    showUndoSnack(messenger, core, '${tag.name} deleted');
   }
 }
 

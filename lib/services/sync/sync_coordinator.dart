@@ -44,7 +44,7 @@ class SyncRunResult {
   final int pulled;
 
   /// Which rows [pulled] counted, by kind. Undo needs them by name — see
-  /// `TimetableActions._pulledSinceUndo`.
+  /// `ActionCore._pulledSinceUndo`.
   final Map<SyncKind, List<String>> pulledKeys;
 
   final int archived;

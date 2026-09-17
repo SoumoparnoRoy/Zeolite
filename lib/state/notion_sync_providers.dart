@@ -148,7 +148,7 @@ class NotionSyncController extends Notifier<SyncStatus> {
       // A run writes through the repository, so without this a row edited in
       // Notion sits in the database unseen until something else reloads.
       if (result.pulled > 0) {
-        await ref.read(actionsProvider).reloadAfterSync(
+        await ref.read(actionCoreProvider).reloadAfterSync(
               target: coordinator.target.id,
               pulled: result.pulledKeys,
             );
@@ -173,7 +173,7 @@ class NotionSyncController extends Notifier<SyncStatus> {
     await coordinator.applyReview(review, decisions);
     // The rows that were taken have been written here, so the screens holding
     // them are stale until this lands.
-    await ref.read(actionsProvider).reloadAfterSync();
+    await ref.read(actionCoreProvider).reloadAfterSync();
 
     state = coordinator.status.running();
     final SyncRunResult result = await coordinator.runAfterReview();

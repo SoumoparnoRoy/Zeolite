@@ -145,7 +145,7 @@ void main() {
         ],
       );
 
-      await container.read(actionsProvider).updateSlotAndMoveMarks(
+      await container.read(scheduleActionsProvider).updateSlotAndMoveMarks(
             _slot,
             _slot.copyWith(subjectId: _physics.id),
           );
@@ -174,7 +174,7 @@ void main() {
         ],
       );
 
-      await container.read(actionsProvider).updateSlotAndMoveMarks(
+      await container.read(scheduleActionsProvider).updateSlotAndMoveMarks(
             _slot,
             _slot.copyWith(subjectId: _physics.id),
           );
@@ -193,7 +193,7 @@ void main() {
         records: <AttendanceRecord>[_mark(_chemistry.id!, _firstMonday)],
       );
 
-      await container.read(actionsProvider).updateSlotAndMoveMarks(
+      await container.read(scheduleActionsProvider).updateSlotAndMoveMarks(
             _slot,
             _slot.copyWith(startMinutes: 11 * 60, endMinutes: 12 * 60),
           );
@@ -227,7 +227,7 @@ void main() {
         date: _secondMonday,
       );
       await container
-          .read(actionsProvider)
+          .read(scheduleActionsProvider)
           .updateExtraClassAndMoveMarks(extra, moved);
 
       expect(repo.written.single.subjectId, _physics.id);
@@ -242,7 +242,9 @@ void main() {
       final (ProviderContainer container, _Recording repo) =
           await _harness(extras: <ExtraClass>[extra]);
 
-      await container.read(actionsProvider).updateExtraClassAndMoveMarks(
+      await container
+          .read(scheduleActionsProvider)
+          .updateExtraClassAndMoveMarks(
             extra,
             extra.copyWith(subjectId: _physics.id),
           );

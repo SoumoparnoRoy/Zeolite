@@ -90,7 +90,7 @@ class _BalanceCounter extends ConsumerWidget {
   final Subject subject;
 
   Future<void> _add(WidgetRef ref, {required bool attended}) {
-    return ref.read(actionsProvider).updateSubject(
+    return ref.read(subjectActionsProvider).updateSubject(
           subject.copyWith(
             priorHeld: subject.priorHeld + 1,
             priorAttended: subject.priorAttended + (attended ? 1 : 0),
@@ -421,9 +421,10 @@ class _SubjectRow extends ConsumerWidget {
     );
 
     if (confirmed != true) return;
-    final TimetableActions actions = ref.read(actionsProvider);
-    await actions.deleteSubject(id);
-    showUndoSnack(messenger, actions, '${subject.name} deleted');
+    final ActionCore core = ref.read(actionCoreProvider);
+    final SubjectActions subjects = ref.read(subjectActionsProvider);
+    await subjects.deleteSubject(id);
+    showUndoSnack(messenger, core, '${subject.name} deleted');
   }
 
   /// "a, b and c" — reads like a sentence rather than a list of counts.

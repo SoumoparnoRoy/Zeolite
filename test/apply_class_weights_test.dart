@@ -125,7 +125,7 @@ void main() {
       'is left worth one', () async {
     final (ProviderContainer container, _Recording repo) = await _harness();
 
-    await container.read(actionsProvider).applyClassWeights();
+    await container.read(importActionsProvider).applyClassWeights();
 
     // Only the lab moved: nothing here has anything to say about a subject
     // in no category.
@@ -141,7 +141,7 @@ void main() {
     // The lecture is already worth one, so it is left alone; rewriting every
     // row would make the returned count meaningless.
     final int changed =
-        await container.read(actionsProvider).applyClassWeights();
+        await container.read(importActionsProvider).applyClassWeights();
 
     expect(changed, 1);
     expect(repo.written.single.subjectId, 1);
@@ -153,10 +153,10 @@ void main() {
       stored: <AttendanceRecord>[_mark(1, 1)],
     );
 
-    await container.read(actionsProvider).applyClassWeights();
+    await container.read(importActionsProvider).applyClassWeights();
 
     expect(repo.snapshots, 1);
-    expect(container.read(actionsProvider).pendingUndoToken, isNotNull);
+    expect(container.read(actionCoreProvider).pendingUndoToken, isNotNull);
   });
 
   test('a category worth nothing is applied, not read as unset', () async {
@@ -165,7 +165,7 @@ void main() {
       stored: <AttendanceRecord>[_mark(1, 2)],
     );
 
-    await container.read(actionsProvider).applyClassWeights();
+    await container.read(importActionsProvider).applyClassWeights();
 
     // Reading a zero as "unset" would leave this worth one, which is the bug
     // this pins.

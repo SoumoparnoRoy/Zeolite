@@ -146,7 +146,8 @@ Future<void> showSessionOptions(
   // Grabbed before the sheet opens: every option below pops it first, so the
   // undo offer has to be raised through something that outlives the route.
   final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
-  final TimetableActions actions = ref.read(actionsProvider);
+  final ActionCore core = ref.read(actionCoreProvider);
+  final ScheduleActions schedule = ref.read(scheduleActionsProvider);
 
   await showAppSheet<void>(
     context: context,
@@ -205,10 +206,10 @@ Future<void> showSessionOptions(
             danger: true,
             onTap: () async {
               Navigator.of(context).pop();
-              await actions.skipSlotOn(slot!, session.date);
+              await schedule.skipSlotOn(slot!, session.date);
               showUndoSnack(
                 messenger,
-                actions,
+                core,
                 '${session.subject.name} on '
                 '${Dates.formatDayMonth(session.date)} removed',
               );
@@ -225,7 +226,7 @@ Future<void> showSessionOptions(
             onTap: () async {
               Navigator.of(context).pop();
               await ref
-                  .read(actionsProvider)
+                  .read(attendanceActionsProvider)
                   .mark(session, AttendanceStatus.cancelled);
             },
           ),
@@ -257,13 +258,13 @@ Future<void> showSessionOptions(
               }
               Navigator.of(context).pop();
               if (slot != null && endingMarkCount > 0) {
-                await actions.endSlotFromAndClearMarks(slot, session.date);
+                await schedule.endSlotFromAndClearMarks(slot, session.date);
               } else {
-                await actions.endSlotFrom(session.slotId!, session.date);
+                await schedule.endSlotFrom(session.slotId!, session.date);
               }
               showUndoSnack(
                 messenger,
-                actions,
+                core,
                 endingMarkCount > 0
                     ? '${session.subject.name} stops repeating from '
                         '${Dates.formatDayMonth(session.date)}, and its '
@@ -295,13 +296,13 @@ Future<void> showSessionOptions(
               }
               Navigator.of(context).pop();
               if (slot != null) {
-                await actions.deleteSlotAndMarks(slot);
+                await schedule.deleteSlotAndMarks(slot);
               } else {
-                await actions.deleteSlot(session.slotId!);
+                await schedule.deleteSlot(session.slotId!);
               }
               showUndoSnack(
                 messenger,
-                actions,
+                core,
                 markCount > 0
                     ? 'Weekly ${session.subject.name} and its '
                         '${Words.plural(markCount, 'mark')} deleted'
@@ -319,10 +320,10 @@ Future<void> showSessionOptions(
             danger: true,
             onTap: () async {
               Navigator.of(context).pop();
-              await actions.deleteExtraClass(session.extraClassId!);
+              await schedule.deleteExtraClass(session.extraClassId!);
               showUndoSnack(
                 messenger,
-                actions,
+                core,
                 'One-off ${session.subject.name} deleted',
               );
             },
@@ -336,7 +337,7 @@ Future<void> showSessionOptions(
             subtitle: 'Sets this class back to unmarked.',
             onTap: () async {
               Navigator.of(context).pop();
-              await ref.read(actionsProvider).clearMark(session);
+              await ref.read(attendanceActionsProvider).clearMark(session);
             },
           ),
         ],

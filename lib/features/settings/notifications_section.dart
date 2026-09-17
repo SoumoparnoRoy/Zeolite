@@ -45,7 +45,7 @@ class NotificationsSection extends ConsumerWidget {
                   }
                   await controller
                       .save(settings.copyWith(notificationsEnabled: v));
-                  await ref.read(actionsProvider).reloadAfterImport();
+                  await ref.read(actionCoreProvider).reloadAfterImport();
                 },
               ),
               const Divider(indent: 58),
@@ -88,7 +88,7 @@ class NotificationsSection extends ConsumerWidget {
                       }
                       await controller
                           .save(settings.copyWith(notifyBeforeClass: v));
-                      await ref.read(actionsProvider).reloadAfterImport();
+                      await ref.read(actionCoreProvider).reloadAfterImport();
                     },
                     onTapSubtitle: settings.notifyBeforeClass
                         ? () =>
@@ -109,7 +109,7 @@ class NotificationsSection extends ConsumerWidget {
                       }
                       await controller
                           .save(settings.copyWith(notifyAtClassEnd: v));
-                      await ref.read(actionsProvider).reloadAfterImport();
+                      await ref.read(actionCoreProvider).reloadAfterImport();
                     },
                   ),
                   if (settings.classRemindersActive ||
@@ -139,7 +139,7 @@ class NotificationsSection extends ConsumerWidget {
                       }
                       await controller
                           .save(settings.copyWith(notifyEveningReminder: v));
-                      await ref.read(actionsProvider).reloadAfterImport();
+                      await ref.read(actionCoreProvider).reloadAfterImport();
                     },
                     onTapSubtitle: settings.notifyEveningReminder
                         ? () =>
@@ -162,7 +162,7 @@ class NotificationsSection extends ConsumerWidget {
                       }
                       await controller
                           .save(settings.copyWith(notifyAttendanceDanger: v));
-                      await ref.read(actionsProvider).reloadAfterImport();
+                      await ref.read(actionCoreProvider).reloadAfterImport();
                     },
                   ),
                 ],
@@ -200,7 +200,7 @@ class NotificationsSection extends ConsumerWidget {
     );
     if (picked == null) return;
     await controller.save(settings.copyWith(notifyLeadMinutes: picked));
-    await ref.read(actionsProvider).reloadAfterImport();
+    await ref.read(actionCoreProvider).reloadAfterImport();
   }
 
   Future<void> _pickEveningTime(
@@ -223,7 +223,7 @@ class NotificationsSection extends ConsumerWidget {
         eveningReminderMinutes: Clock.toMinutes(picked.hour, picked.minute),
       ),
     );
-    await ref.read(actionsProvider).reloadAfterImport();
+    await ref.read(actionCoreProvider).reloadAfterImport();
   }
 
   /// Android owns the decision, so the app opens the screen and re-reads the
@@ -231,6 +231,6 @@ class NotificationsSection extends ConsumerWidget {
   Future<void> _requestExactAlarms(BuildContext context, WidgetRef ref) async {
     await ref.read(notificationsProvider).requestExactAlarms();
     ref.invalidate(exactAlarmsProvider);
-    await ref.read(actionsProvider).refreshNotifications();
+    await ref.read(actionCoreProvider).refreshNotifications();
   }
 }

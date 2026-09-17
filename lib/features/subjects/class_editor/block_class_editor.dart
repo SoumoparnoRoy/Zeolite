@@ -116,7 +116,7 @@ class _BlockClassFormState extends ConsumerState<_BlockClassForm> {
         _saving = true;
         _error = null;
       });
-      await ref.read(actionsProvider).addExtraClass(proposed);
+      await ref.read(scheduleActionsProvider).addExtraClass(proposed);
       if (!mounted) return;
       Navigator.of(context).pop();
       return;
@@ -162,7 +162,7 @@ class _BlockClassFormState extends ConsumerState<_BlockClassForm> {
       _error = null;
     });
 
-    await ref.read(actionsProvider).addSlot(proposed);
+    await ref.read(scheduleActionsProvider).addSlot(proposed);
 
     if (!mounted) return;
     Navigator.of(context).pop();

@@ -72,8 +72,9 @@ class _NotionImportScreenState extends ConsumerState<NotionImportScreen> {
     final NavigatorState navigator = Navigator.of(context);
     setState(() => _saving = true);
 
-    final TimetableActions actions = ref.read(actionsProvider);
-    final int count = await actions.importNotionLog(<NotionPlanSubject>[
+    final ActionCore core = ref.read(actionCoreProvider);
+    final ImportActions imports = ref.read(importActionsProvider);
+    final int count = await imports.importNotionLog(<NotionPlanSubject>[
       for (final NotionPlanSubject s in plan.subjects)
         if (!_excluded.contains(s.name)) s,
     ]);
@@ -81,7 +82,7 @@ class _NotionImportScreenState extends ConsumerState<NotionImportScreen> {
     navigator.pop();
     showUndoSnack(
       messenger,
-      actions,
+      core,
       'Brought in ${Words.plural(count, 'class', 'classes')}',
     );
   }
@@ -163,7 +164,8 @@ class _NotionImportScreenState extends ConsumerState<NotionImportScreen> {
               Text(
                 'Every class is written as its own mark, so the attendance log '
                 'reads day by day rather than as one carried total.',
-                style: TextStyle(fontSize: 12, height: 1.45, color: p.textFaint),
+                style:
+                    TextStyle(fontSize: 12, height: 1.45, color: p.textFaint),
               ),
             ],
           ),

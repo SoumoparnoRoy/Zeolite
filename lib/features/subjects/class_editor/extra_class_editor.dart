@@ -184,16 +184,16 @@ class _ExtraClassFormState extends ConsumerState<_ExtraClassForm> {
       _error = null;
     });
 
-    final TimetableActions actions = ref.read(actionsProvider);
+    final ScheduleActions schedule = ref.read(scheduleActionsProvider);
     if (_isEditing) {
       final ExtraClass previous = widget.extra!;
       if (_hasMark(previous) && _rekeys(previous, value)) {
-        await actions.updateExtraClassAndMoveMarks(previous, value);
+        await schedule.updateExtraClassAndMoveMarks(previous, value);
       } else {
-        await actions.updateExtraClass(value);
+        await schedule.updateExtraClass(value);
       }
     } else {
-      await actions.addExtraClass(value);
+      await schedule.addExtraClass(value);
     }
 
     if (!mounted) return;

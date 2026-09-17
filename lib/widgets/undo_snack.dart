@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../state/providers.dart';
+import '../state/actions/action_core.dart';
 
 /// Reports [message] and offers to put the data back.
 ///
-/// Takes the messenger and [actions] rather than a context and a `WidgetRef`
+/// Takes the messenger and [core] rather than a context and a `WidgetRef`
 /// because most of these actions unmount the widget that raised them — a row
 /// just deleted, or a sheet that pops first.
 ///
@@ -12,10 +12,10 @@ import '../state/providers.dart';
 /// a second delete may have replaced what is pending.
 void showUndoSnack(
   ScaffoldMessengerState messenger,
-  TimetableActions actions,
+  ActionCore core,
   String message,
 ) {
-  final int? token = actions.pendingUndoToken;
+  final int? token = core.pendingUndoToken;
 
   messenger.hideCurrentSnackBar();
   messenger.showSnackBar(
@@ -27,7 +27,7 @@ void showUndoSnack(
           : SnackBarAction(
               label: 'Undo',
               onPressed: () async {
-                final bool restored = await actions.undo(token);
+                final bool restored = await core.undo(token);
                 messenger.hideCurrentSnackBar();
                 messenger.showSnackBar(
                   SnackBar(

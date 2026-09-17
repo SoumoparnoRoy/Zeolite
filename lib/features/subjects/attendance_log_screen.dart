@@ -259,15 +259,16 @@ class _LogTile extends ConsumerWidget {
                     // Same reason as the Today card: the row is replaced on
                     // write, so the tag has to be handed back or correcting
                     // Present to Absent would quietly strip it.
-                    onTap: () => ref.read(actionsProvider).setStatusAt(
-                          subjectId: subjectId,
-                          date: entry.date,
-                          startMinutes: entry.startMinutes,
-                          current: entry.status,
-                          status: status,
-                          weight: entry.weight,
-                          tagId: entry.tagId,
-                        ),
+                    onTap: () =>
+                        ref.read(attendanceActionsProvider).setStatusAt(
+                              subjectId: subjectId,
+                              date: entry.date,
+                              startMinutes: entry.startMinutes,
+                              current: entry.status,
+                              status: status,
+                              weight: entry.weight,
+                              tagId: entry.tagId,
+                            ),
                   ),
                 ),
             ],
@@ -351,7 +352,7 @@ extension on _LogTile {
         false;
 
     if (!confirmed) return;
-    await ref.read(actionsProvider).clearStatusAt(
+    await ref.read(attendanceActionsProvider).clearStatusAt(
           subjectId: subjectId,
           date: entry.date,
           startMinutes: entry.startMinutes,

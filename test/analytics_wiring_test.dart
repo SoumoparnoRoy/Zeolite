@@ -66,7 +66,7 @@ void main() {
     await container.read(settingsProvider.future);
     await container.read(timetableProvider.future);
 
-    await container.read(actionsProvider).setStatusAt(
+    await container.read(attendanceActionsProvider).setStatusAt(
           subjectId: id,
           date: DateTime(2026, 9, 1),
           startMinutes: 540,
@@ -91,9 +91,9 @@ void main() {
     await container.read(settingsProvider.future);
     await container.read(timetableProvider.future);
 
-    await container.read(actionsProvider).deleteSubject(id);
-    final int token = container.read(actionsProvider).pendingUndoToken!;
-    await container.read(actionsProvider).undo(token);
+    await container.read(subjectActionsProvider).deleteSubject(id);
+    final int token = container.read(actionCoreProvider).pendingUndoToken!;
+    await container.read(actionCoreProvider).undo(token);
 
     expect(analytics.events, contains('undo_used'));
   });

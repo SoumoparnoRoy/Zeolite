@@ -172,13 +172,14 @@ class _ImportTimetableScreenState extends ConsumerState<ImportTimetableScreen> {
     // The screen pops on success, so the offer is raised on the messenger
     // rather than through this route's context.
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
-    final TimetableActions actions = ref.read(actionsProvider);
+    final ActionCore core = ref.read(actionCoreProvider);
+    final ImportActions imports = ref.read(importActionsProvider);
     final int count = result.classes.length;
-    await actions.importTimetable(result, weighByBlocks: _weighByBlocks);
+    await imports.importTimetable(result, weighByBlocks: _weighByBlocks);
     if (mounted) Navigator.of(context).pop();
     showUndoSnack(
       messenger,
-      actions,
+      core,
       'Added ${Words.plural(count, 'class', 'classes')} to your timetable',
     );
   }

@@ -40,7 +40,7 @@ class _SyncMergeScreenState extends ConsumerState<SyncMergeScreen> {
 
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
     final NavigatorState navigator = Navigator.of(context);
-    final TimetableActions actions = ref.read(actionsProvider);
+    final ActionCore core = ref.read(actionCoreProvider);
     setState(() => _merging = true);
 
     SyncRunResult? result;
@@ -56,7 +56,7 @@ class _SyncMergeScreenState extends ConsumerState<SyncMergeScreen> {
     navigator.pop();
     showUndoSnack(
       messenger,
-      actions,
+      core,
       result != null && result.ok
           ? 'Merged. ${Words.plural(result.pushed, 'row')} sent, '
               '${Words.plural(result.pulled, 'row')} brought down.'
@@ -71,9 +71,8 @@ class _SyncMergeScreenState extends ConsumerState<SyncMergeScreen> {
         ref.watch(timetableProvider).value?.subjects ?? const <Subject>[];
     final Map<String, String> names = _namesByUuid(plan, subjects);
 
-    final int fromAccount = _choices.values
-        .where((SyncSide side) => side == SyncSide.there)
-        .length;
+    final int fromAccount =
+        _choices.values.where((SyncSide side) => side == SyncSide.there).length;
 
     return PushScaffold(
       title: 'Two sets of history',
@@ -152,14 +151,14 @@ String _titleOf(SyncMergeRow row, Map<String, String> names) {
     SyncKind.tag => 'Label · ${row.localKey}',
     SyncKind.holiday => 'Holiday · ${_day(row.localKey)}',
     SyncKind.subject => names[row.localKey] ?? 'A subject',
-    SyncKind.slot || SyncKind.extraClass =>
+    SyncKind.slot ||
+    SyncKind.extraClass =>
       names[row.fields['subject'] as String? ?? ''] ?? 'A class',
     // Keyed on the rule rather than the subject, so there is no name to look
     // up — the date is what tells the two apart anyway.
     SyncKind.slotOverride =>
       'Just this class · ${_day(row.localKey.split(':').last)}',
-    SyncKind.attendance =>
-      names[row.localKey.split(':').first] ?? 'A subject',
+    SyncKind.attendance => names[row.localKey.split(':').first] ?? 'A subject',
   };
 }
 
@@ -339,9 +338,8 @@ String _describe(SyncMergeRow row, SyncSide side) {
   if (side == SyncSide.there && (row.remote?.deleted ?? false)) {
     return 'Deleted';
   }
-  final Map<String, Object?>? fields = side == SyncSide.here
-      ? row.local?.fields
-      : row.remote?.fields;
+  final Map<String, Object?>? fields =
+      side == SyncSide.here ? row.local?.fields : row.remote?.fields;
   if (fields == null) return '—';
 
   switch (row.kind) {

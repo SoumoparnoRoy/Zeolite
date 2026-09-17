@@ -256,7 +256,7 @@ class DataSection extends ConsumerWidget {
     }
 
     if (result.success) {
-      await ref.read(actionsProvider).reloadAfterImport();
+      await ref.read(actionCoreProvider).reloadAfterImport();
     }
     if (!context.mounted) return;
     ScaffoldMessenger.of(context)
@@ -291,8 +291,9 @@ class DataSection extends ConsumerWidget {
       ),
     );
     if (confirmed != true) return;
-    final TimetableActions actions = ref.read(actionsProvider);
-    await actions.resetEverything();
-    showUndoSnack(messenger, actions, 'All data deleted');
+    final ActionCore core = ref.read(actionCoreProvider);
+    final DataActions data = ref.read(dataActionsProvider);
+    await data.resetEverything();
+    showUndoSnack(messenger, core, 'All data deleted');
   }
 }

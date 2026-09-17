@@ -100,13 +100,13 @@ void main() {
     final String uuid = (await repo.getSubjects())
         .firstWhere((Subject s) => s.id == kept)
         .uuid!;
-    await container.read(actionsProvider).deleteSubject(doomed);
+    await container.read(subjectActionsProvider).deleteSubject(doomed);
     return uuid;
   }
 
   test('a pull that lands mid-offer does not take Undo with it', () async {
     await deleteAfterReconciling();
-    final int? token = container.read(actionsProvider).pendingUndoToken;
+    final int? token = container.read(actionCoreProvider).pendingUndoToken;
     expect(token, isNotNull);
 
     target.remote = <RemoteState>[
@@ -118,21 +118,21 @@ void main() {
     expect(result?.pulled, 1,
         reason: 'the pull has to land, or nothing is proved');
 
-    expect(container.read(actionsProvider).pendingUndoToken, token);
-    expect(await container.read(actionsProvider).undo(token!), isTrue);
+    expect(container.read(actionCoreProvider).pendingUndoToken, token);
+    expect(await container.read(actionCoreProvider).undo(token!), isTrue);
   });
 
   test('undoing after a pull forgets only the rows that pull brought down',
       () async {
     final String uuid = await deleteAfterReconciling();
-    final int token = container.read(actionsProvider).pendingUndoToken!;
+    final int token = container.read(actionCoreProvider).pendingUndoToken!;
 
     target.remote = <RemoteState>[
       ...?target.remote,
       arriving('pulled1', 'Other Course'),
     ];
     await container.read(syncStatusProvider.notifier).run(force: true);
-    await container.read(actionsProvider).undo(token);
+    await container.read(actionCoreProvider).undo(token);
 
     final List<String> keys =
         (await repo.getRemoteLinks(target.id, SyncKind.subject))

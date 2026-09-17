@@ -390,7 +390,7 @@ class _SlotFormState extends ConsumerState<_SlotForm> {
       _error = null;
     });
 
-    final TimetableActions actions = ref.read(actionsProvider);
+    final ScheduleActions schedule = ref.read(scheduleActionsProvider);
 
     if (_isEditing) {
       final _ClassTime time = _times.first;
@@ -411,9 +411,9 @@ class _SlotFormState extends ConsumerState<_SlotForm> {
       // The date is deliberately left alone: the student did attend that
       // subject on that day, and rewriting it invents one they missed.
       if (_strandedMarkCount(previous, updated) > 0) {
-        await actions.updateSlotAndMoveMarks(previous, updated);
+        await schedule.updateSlotAndMoveMarks(previous, updated);
       } else {
-        await actions.updateSlot(updated);
+        await schedule.updateSlot(updated);
       }
     } else {
       final List<_ClassTime> ordered = <_ClassTime>[..._times]..sort(
@@ -425,7 +425,7 @@ class _SlotFormState extends ConsumerState<_SlotForm> {
           },
         );
       for (final _ClassTime time in ordered) {
-        await actions.addSlot(
+        await schedule.addSlot(
           ClassSlot(
             subjectId: _subjectId!,
             weekday: time.weekday,

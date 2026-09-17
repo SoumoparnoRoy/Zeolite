@@ -154,7 +154,7 @@ class _OccurrenceFormState extends ConsumerState<_OccurrenceForm> {
       _error = null;
     });
     await ref
-        .read(actionsProvider)
+        .read(scheduleActionsProvider)
         .setSlotOverride(widget.slot, widget.date, override);
     if (!mounted) return;
     Navigator.of(context).pop();

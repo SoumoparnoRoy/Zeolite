@@ -83,7 +83,7 @@ class SyncController extends Notifier<SyncStatus> {
   }
 
   /// The merge screen's answer, applied. Routed through here rather than
-  /// called on [TimetableActions] directly so the status card learns the run
+  /// called on [ActionCore] directly so the status card learns the run
   /// happened — otherwise Settings goes on offering a review of a difference
   /// that has already been settled.
   Future<SyncRunResult?> merge(Map<String, SyncSide> decisions) async {
@@ -91,8 +91,9 @@ class SyncController extends Notifier<SyncStatus> {
     if (coordinator == null) return null;
 
     state = coordinator.status.running();
-    final SyncRunResult result =
-        await ref.read(actionsProvider).applySyncMerge(coordinator, decisions);
+    final SyncRunResult result = await ref
+        .read(dataActionsProvider)
+        .applySyncMerge(coordinator, decisions);
     _last = result;
     state = coordinator.status;
     // `applySyncMerge` has already reloaded, so only the stamp is left.
@@ -128,7 +129,7 @@ class SyncController extends Notifier<SyncStatus> {
       // value and stamping from it would push the pulled settings straight
       // back out.
       if (result.pulled > 0) {
-        await ref.read(actionsProvider).reloadAfterSync(
+        await ref.read(actionCoreProvider).reloadAfterSync(
               target: coordinator.target.id,
               pulled: result.pulledKeys,
             );

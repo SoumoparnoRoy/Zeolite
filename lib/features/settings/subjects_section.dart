@@ -267,7 +267,7 @@ class CategoriesSection extends ConsumerWidget {
     if (id == null) return;
 
     final int inUse =
-        await ref.read(actionsProvider).countSubjectsInCategory(id);
+        await ref.read(subjectActionsProvider).countSubjectsInCategory(id);
     if (!context.mounted) return;
 
     final bool? confirmed = await showDialog<bool>(
@@ -299,7 +299,7 @@ class CategoriesSection extends ConsumerWidget {
     );
 
     if (confirmed != true) return;
-    await ref.read(actionsProvider).deleteCategory(id);
+    await ref.read(subjectActionsProvider).deleteCategory(id);
   }
 
   /// The one action that restates history, so it asks first.
@@ -330,11 +330,12 @@ class CategoriesSection extends ConsumerWidget {
     if (confirmed != true || !context.mounted) return;
 
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
-    final TimetableActions actions = ref.read(actionsProvider);
-    final int changed = await actions.applyClassWeights();
+    final ActionCore core = ref.read(actionCoreProvider);
+    final ImportActions imports = ref.read(importActionsProvider);
+    final int changed = await imports.applyClassWeights();
     showUndoSnack(
       messenger,
-      actions,
+      core,
       changed == 0
           ? 'Everything already matched'
           : 'Re-weighted ${Words.plural(changed, 'mark', 'marks')}',

@@ -124,12 +124,12 @@ class _SubjectFormState extends ConsumerState<_SubjectForm> {
       expectedTotal: total,
     );
 
-    final TimetableActions actions = ref.read(actionsProvider);
+    final SubjectActions subjects = ref.read(subjectActionsProvider);
     int? id = widget.subject?.id;
     if (id == null) {
-      id = await actions.addSubject(value);
+      id = await subjects.addSubject(value);
     } else {
-      await actions.updateSubject(value);
+      await subjects.updateSubject(value);
     }
 
     if (!mounted) return;
@@ -329,7 +329,7 @@ Future<void> showSubjectColorPicker(
                   Navigator.of(context).pop();
                   if (value == subject.colorValue) return;
                   await ref
-                      .read(actionsProvider)
+                      .read(subjectActionsProvider)
                       .updateSubject(subject.copyWith(colorValue: value));
                 },
               ),

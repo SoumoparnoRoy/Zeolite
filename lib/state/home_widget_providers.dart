@@ -74,7 +74,7 @@ final homeWidgetMarkWatcherProvider = Provider<void>((Ref ref) {
       primed = true;
       return;
     }
-    await ref.read(actionsProvider).reloadAfterWidgetMark();
+    await ref.read(actionCoreProvider).reloadAfterWidgetMark();
   }
 
   final AppLifecycleListener listener =
@@ -207,7 +207,9 @@ Future<void> _handleExternalMark(
     // status a class already has clears it. A notification action is not —
     // the same action can arrive twice, and the second must not undo the first.
     if (toggles || session.status != request.status) {
-      await container.read(actionsProvider).mark(session, request.status);
+      await container
+          .read(attendanceActionsProvider)
+          .mark(session, request.status);
     }
     await _pushFromContainer(container);
     await HomeWidget.saveWidgetData<String>(

@@ -45,10 +45,10 @@ Widget _host(SessionCard card) {
   );
 }
 
-/// Captures what [TimetableActions.mark] forwarded, without a database behind
+/// Captures what [AttendanceActions.mark] forwarded, without a database behind
 /// it. The point is the arguments `mark` builds, not the write itself.
-class _RecordingActions extends TimetableActions {
-  _RecordingActions(super.ref);
+class _RecordingActions extends AttendanceActions {
+  _RecordingActions(super.core);
 
   int? seenTagId;
   AttendanceStatus? seenStatus;
@@ -207,8 +207,8 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            actionsProvider.overrideWith((Ref ref) {
-              return actions = _RecordingActions(ref);
+            attendanceActionsProvider.overrideWith((Ref ref) {
+              return actions = _RecordingActions(ActionCore(ref));
             }),
           ],
           child: Consumer(
@@ -222,7 +222,7 @@ void main() {
                   use24Hour: true,
                   tagName: 'Proxy',
                   onMark: (AttendanceStatus status) => ref
-                      .read(actionsProvider)
+                      .read(attendanceActionsProvider)
                       .mark(
                         _session(status: AttendanceStatus.present, tagId: 7),
                         status,
@@ -249,8 +249,8 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            actionsProvider.overrideWith((Ref ref) {
-              return actions = _RecordingActions(ref);
+            attendanceActionsProvider.overrideWith((Ref ref) {
+              return actions = _RecordingActions(ActionCore(ref));
             }),
           ],
           child: Consumer(
@@ -259,8 +259,9 @@ void main() {
                 SessionCard(
                   session: _session(),
                   use24Hour: true,
-                  onMark: (AttendanceStatus status) =>
-                      ref.read(actionsProvider).mark(_session(), status),
+                  onMark: (AttendanceStatus status) => ref
+                      .read(attendanceActionsProvider)
+                      .mark(_session(), status),
                 ),
               );
             },

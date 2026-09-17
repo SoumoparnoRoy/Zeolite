@@ -596,9 +596,10 @@ class _SubjectDetail extends ConsumerWidget {
     if (confirmed != true) return;
     final int? id = subject.id;
     if (id != null) {
-      final TimetableActions actions = ref.read(actionsProvider);
-      await actions.deleteSubject(id);
-      showUndoSnack(messenger, actions, '${subject.name} deleted');
+      final ActionCore core = ref.read(actionCoreProvider);
+      final SubjectActions subjects = ref.read(subjectActionsProvider);
+      await subjects.deleteSubject(id);
+      showUndoSnack(messenger, core, '${subject.name} deleted');
     }
     if (context.mounted) Navigator.of(context).pop();
   }

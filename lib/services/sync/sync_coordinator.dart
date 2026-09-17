@@ -304,6 +304,7 @@ class SyncCoordinator {
         merge: merge,
         tally: tally,
         joining: joining,
+        rewrite: rewrite,
       );
       if (stop != null) {
         _status = _status.failed(stop, message: tally.message);
@@ -342,6 +343,7 @@ class SyncCoordinator {
     required Map<String, SyncSide>? merge,
     required _Tally tally,
     bool joining = false,
+    bool rewrite = false,
   }) async {
     final SyncPlan plan = SyncPlan.from(
       local: items,
@@ -385,8 +387,17 @@ class SyncCoordinator {
           !_content.contains(kind) &&
           state != null &&
           !_reusesABuriedName(push.item, state);
+      // Made on both sides before either synced it, so there is no link to
+      // call it a conflict, but it is one. A merge answer or a rewrite has
+      // already said which side to keep.
+      final bool newerThere = push.kind == SyncPushKind.adopt &&
+          merge == null &&
+          !rewrite &&
+          _content.contains(kind) &&
+          _remoteWins(push.item, state);
       if (chosenAway ||
           defaultsHere ||
+          newerThere ||
           (push.kind == SyncPushKind.conflict &&
               _remoteWins(push.item, state))) {
         final RemoteLink? link = await _pulls.apply(

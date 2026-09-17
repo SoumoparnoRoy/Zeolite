@@ -267,6 +267,34 @@ void main() {
     );
   });
 
+  test('a mark made on two devices before either synced keeps the later one',
+      () async {
+    final Subject subject = await seed();
+    await coordinator().run();
+
+    await repo.setAttendance(
+      AttendanceRecord(
+        subjectId: subject.id!,
+        date: _day,
+        startMinutes: 540,
+        status: AttendanceStatus.absent,
+        markedAt: _early,
+      ),
+    );
+    target.remote = <RemoteState>[
+      mark(subject.uuid!, status: 'cancelled', editedAt: _late),
+    ];
+
+    final SyncRunResult result = await coordinator().run();
+
+    expect(result.pulled, 1);
+    expect(result.pushed, 0);
+    expect(
+      (await repo.getAttendanceAt(subject.id!, _day, 540))?.status,
+      AttendanceStatus.cancelled,
+    );
+  });
+
   test('a first run with data on both sides merges nothing', () async {
     final Subject subject = await seed(status: AttendanceStatus.present);
     target.remote = <RemoteState>[

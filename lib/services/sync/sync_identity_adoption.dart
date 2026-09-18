@@ -6,6 +6,8 @@ import '../../data/models/subject.dart';
 import '../../domain/restore_identity.dart';
 import '../../domain/sync/sync_target.dart';
 
+import 'remote_fields.dart';
+
 /// Matches rows restored without their identities to the ones an account
 /// already holds, so a first sync links them instead of copying them.
 class SyncIdentityAdoption {
@@ -44,7 +46,7 @@ class SyncIdentityAdoption {
         for (final Subject s in unknown) RowIdentity(key: subjectKey(s.code)),
       ],
       known: _adoptable(theirs, held,
-          (RemoteState r) => subjectKey(r.fields['code'] as String?)),
+          (RemoteState r) => subjectKey(readString(r.fields['code']))),
     );
 
     for (final MapEntry<int, String> entry in adopted.entries) {
@@ -83,9 +85,9 @@ class SyncIdentityAdoption {
           theirSlots,
           held,
           (RemoteState r) => slotKey(
-            r.fields['subject'] as String?,
-            (r.fields['weekday'] as num?)?.toInt() ?? -1,
-            (r.fields['startMinutes'] as num?)?.toInt() ?? -1,
+            readString(r.fields['subject']),
+            readInt(r.fields['weekday']) ?? -1,
+            readInt(r.fields['startMinutes']) ?? -1,
           ),
         ),
       );
@@ -119,9 +121,9 @@ class SyncIdentityAdoption {
         theirExtras,
         held,
         (RemoteState r) => extraKey(
-          r.fields['subject'] as String?,
-          (r.fields['date'] as num?)?.toInt() ?? -1,
-          (r.fields['startMinutes'] as num?)?.toInt() ?? -1,
+          readString(r.fields['subject']),
+          readInt(r.fields['date']) ?? -1,
+          readInt(r.fields['startMinutes']) ?? -1,
         ),
       ),
     );

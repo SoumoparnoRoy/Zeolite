@@ -7,6 +7,7 @@ import '../../domain/sync/sync_plan.dart';
 import '../../domain/sync/sync_status.dart';
 import '../../domain/sync/sync_target.dart';
 
+import 'remote_fields.dart';
 import 'sync_identity_adoption.dart';
 import 'sync_local_rows.dart';
 import 'sync_pull_applier.dart';
@@ -34,6 +35,7 @@ class SyncRunResult {
     this.pulledKeys = const <SyncKind, List<String>>{},
     this.archived = 0,
     this.overwritten = 0,
+    this.unreadable = 0,
     this.review = const <SyncPull>[],
     this.failure,
     this.message,
@@ -52,6 +54,11 @@ class SyncRunResult {
   /// Rows changed in both places where this device's copy won. Counted
   /// because the far side's version is gone and the user should be told.
   final int overwritten;
+
+  /// Rows the account holds that no version of this app could have written,
+  /// passed over so the rest still apply. Counted because a row that is left
+  /// behind without a word looks exactly like one that synced.
+  final int unreadable;
 
   /// Remote rows this run refused to apply on its own — everything from an
   /// untrusted target, and everything from a first run that found data on both
@@ -251,6 +258,25 @@ class SyncCoordinator {
     Map<String, SyncSide>? merge,
     bool rewrite = false,
   }) async {
+    try {
+      return await _attempt(force: force, merge: merge, rewrite: rewrite);
+    } catch (error, stack) {
+      // Anything unforeseen still has to end the run, or the status stays on
+      // running and every later run is turned away as already in progress.
+      debugPrint('Sync run failed: $error\n$stack');
+      _status = _status.failed(SyncFailure.unknown);
+      return const SyncRunResult(
+        outcome: SyncRunOutcome.failed,
+        failure: SyncFailure.unknown,
+      );
+    }
+  }
+
+  Future<SyncRunResult> _attempt({
+    required bool force,
+    required Map<String, SyncSide>? merge,
+    required bool rewrite,
+  }) async {
     if (!force && !canRunNow()) {
       return const SyncRunResult(outcome: SyncRunOutcome.deferred);
     }
@@ -314,6 +340,7 @@ class SyncCoordinator {
           pulled: tally.pulled,
           archived: tally.archived,
           overwritten: tally.overwritten,
+          unreadable: tally.unreadable,
           review: tally.review,
           failure: stop,
           message: tally.message,
@@ -329,6 +356,7 @@ class SyncCoordinator {
       pulledKeys: tally.pulledKeys,
       archived: tally.archived,
       overwritten: tally.overwritten,
+      unreadable: tally.unreadable,
       review: tally.review,
     );
   }
@@ -365,7 +393,13 @@ class SyncCoordinator {
         tally.review.add(pull);
         continue;
       }
-      final RemoteLink? link = await _pulls.apply(pull, kind, local);
+      final RemoteLink? link;
+      try {
+        link = await _pulls.apply(pull, kind, local);
+      } on UnreadableRow {
+        tally.unreadable++;
+        continue;
+      }
       if (link == null) {
         forget.add(pull.remote.localKey);
       } else {
@@ -400,11 +434,17 @@ class SyncCoordinator {
           newerThere ||
           (push.kind == SyncPushKind.conflict &&
               _remoteWins(push.item, state))) {
-        final RemoteLink? link = await _pulls.apply(
-          SyncPull(remote: state!, link: push.link),
-          kind,
-          local,
-        );
+        final RemoteLink? link;
+        try {
+          link = await _pulls.apply(
+            SyncPull(remote: state!, link: push.link),
+            kind,
+            local,
+          );
+        } on UnreadableRow {
+          tally.unreadable++;
+          continue;
+        }
         if (link == null) {
           forget.add(state.localKey);
         } else {
@@ -498,8 +538,13 @@ class SyncCoordinator {
       settled++;
 
       if (side == SyncSide.there) {
-        final RemoteLink? link =
-            await _pulls.apply(pull, SyncKind.attendance, read);
+        final RemoteLink? link;
+        try {
+          link = await _pulls.apply(pull, SyncKind.attendance, read);
+        } on UnreadableRow {
+          settled--;
+          continue;
+        }
         if (link == null) {
           forget.add(pull.remote.localKey);
         } else {
@@ -646,6 +691,7 @@ class _Tally {
   int pulled = 0;
   int archived = 0;
   int overwritten = 0;
+  int unreadable = 0;
   String? message;
   final List<SyncPull> review = <SyncPull>[];
 

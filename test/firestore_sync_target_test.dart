@@ -111,4 +111,17 @@ void main() {
         .get();
     expect(someoneElse.docs, isEmpty);
   });
+
+  test('a timestamp of the wrong type reads as undated', () async {
+    await firestore
+        .collection('users')
+        .doc(_uid)
+        .collection('attendance')
+        .doc(_mark().localKey)
+        .set(<String, Object?>{'status': 'present', 'changedAt': 'yesterday'});
+
+    final RemoteState state = (await target.fetch(SyncKind.attendance))!.single;
+    expect(state.editedAt, isNull);
+    expect(state.deleted, isFalse);
+  });
 }

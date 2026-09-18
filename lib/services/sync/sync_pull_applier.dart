@@ -16,6 +16,7 @@ import '../../data/settings/app_settings.dart';
 import '../../domain/sync/sync_plan.dart';
 import '../../domain/sync/sync_target.dart';
 
+import 'remote_fields.dart';
 import 'sync_local_rows.dart';
 
 /// Writes what the far side holds into the local database, one row at a time,
@@ -88,19 +89,19 @@ class SyncPullApplier {
     final AppSettings current = await _settings.load();
 
     final AppSettings merged = current.copyWith(
-      semesterStart: _date(f['semesterStart']),
-      semesterEnd: _date(f['semesterEnd']),
-      targetPercent: _double(f['targetPercent']),
-      defaultClassDurationMinutes: _int(f['defaultClassMinutes']),
-      dayStartMinutes: _int(f['dayStartMinutes']),
-      dayEndMinutes: _int(f['dayEndMinutes']),
-      blockMinutes: _int(f['blockMinutes']),
-      breakAfterBlock: _int(f['breakAfterBlock']),
-      breakMinutes: _int(f['breakMinutes']),
+      semesterStart: readDay(f['semesterStart']),
+      semesterEnd: readDay(f['semesterEnd']),
+      targetPercent: readDouble(f['targetPercent']),
+      defaultClassDurationMinutes: readInt(f['defaultClassMinutes']),
+      dayStartMinutes: readInt(f['dayStartMinutes']),
+      dayEndMinutes: readInt(f['dayEndMinutes']),
+      blockMinutes: readInt(f['blockMinutes']),
+      breakAfterBlock: readInt(f['breakAfterBlock']),
+      breakMinutes: readInt(f['breakMinutes']),
       scheduleChangedAt: state.editedAt,
       // An account that knows its term has been set up, so a device joining
       // one must not ask again and save the answer over what this pull brought.
-      onboarded: _date(f['semesterStart']) == null ? null : true,
+      onboarded: readDay(f['semesterStart']) == null ? null : true,
     );
     await _settings.save(merged);
     return SyncItem.settings(merged, changedAt: merged.scheduleChangedAt);
@@ -112,7 +113,7 @@ class SyncPullApplier {
     final ClassCategory category = ClassCategory(
       id: existing?.id,
       name: state.localKey,
-      defaultDurationMinutes: _int(state.fields['defaultMinutes']) ??
+      defaultDurationMinutes: readInt(state.fields['defaultMinutes']) ??
           existing?.defaultDurationMinutes ??
           60,
       createdAt: state.editedAt ?? existing?.createdAt,
@@ -138,7 +139,7 @@ class SyncPullApplier {
     final Room room = Room(
       id: existing?.id,
       name: state.localKey,
-      position: _int(state.fields['position']) ?? existing?.position ?? 0,
+      position: readInt(state.fields['position']) ?? existing?.position ?? 0,
     );
 
     if (existing == null) {
@@ -157,7 +158,7 @@ class SyncPullApplier {
     final Tag tag = Tag(
       id: existing?.id,
       name: state.localKey,
-      position: _int(state.fields['position']) ?? existing?.position ?? 0,
+      position: readInt(state.fields['position']) ?? existing?.position ?? 0,
     );
 
     if (existing == null) {
@@ -176,15 +177,15 @@ class SyncPullApplier {
   /// could have moved.
   Future<SyncItem?> _applyHoliday(
       RemoteState state, SyncLocalRows local) async {
-    final int? dateKey = int.tryParse(state.localKey);
-    final String? name = state.fields['name'] as String?;
-    if (dateKey == null || name == null) return null;
+    final DateTime? date = readDay(state.localKey);
+    final String? name = readString(state.fields['name']);
+    if (date == null || name == null) throw UnreadableRow(state.localKey);
 
     final Holiday? existing = local.holidayByKey[state.localKey];
     if (existing?.id != null) {
       await _repository.deleteHoliday(existing!.id!);
     }
-    final Holiday holiday = Holiday(date: Dates.fromKey(dateKey), name: name);
+    final Holiday holiday = Holiday(date: date, name: name);
     final int id = await _repository.insertHoliday(holiday);
     local.holidayByKey[state.localKey] =
         Holiday(id: id, date: holiday.date, name: holiday.name);
@@ -195,18 +196,18 @@ class SyncPullApplier {
       RemoteState state, SyncLocalRows local) async {
     final Subject? existing = local.subjectByUuid[state.localKey];
     final Map<String, Object?> f = state.fields;
-    final String? name = f['name'] as String?;
-    if (name == null || name.isEmpty) return null;
+    final String? name = readString(f['name']);
+    if (name == null || name.isEmpty) throw UnreadableRow(state.localKey);
 
-    final String? categoryName = f['category'] as String?;
+    final String? categoryName = readString(f['category']);
     final Subject subject = Subject(
       id: existing?.id,
       uuid: state.localKey,
       name: name,
-      code: f['code'] as String?,
-      teacher: f['teacher'] as String?,
-      colorValue: _int(f['color']) ?? existing?.colorValue ?? 0xff607d8b,
-      targetPercent: _double(f['targetPercent']),
+      code: readString(f['code']),
+      teacher: readString(f['teacher']),
+      colorValue: readInt(f['color']) ?? existing?.colorValue ?? 0xff607d8b,
+      targetPercent: readDouble(f['targetPercent']),
       // Categories sync first, so a named one is already here unless the far
       // side never had it.
       categoryId:
@@ -215,9 +216,9 @@ class SyncPullApplier {
       // for the first time has none of its own to keep.
       createdAt: existing?.createdAt ?? state.editedAt,
       updatedAt: state.editedAt,
-      priorHeld: _int(f['priorHeld']) ?? 0,
-      priorAttended: _int(f['priorAttended']) ?? 0,
-      expectedTotal: _int(f['expectedTotal']),
+      priorHeld: readInt(f['priorHeld']) ?? 0,
+      priorAttended: readInt(f['priorAttended']) ?? 0,
+      expectedTotal: readInt(f['expectedTotal']),
     );
 
     if (existing == null) {
@@ -232,25 +233,39 @@ class SyncPullApplier {
 
   Future<SyncItem?> _applySlot(RemoteState state, SyncLocalRows local) async {
     final Map<String, Object?> f = state.fields;
-    final String? subjectUuid = f['subject'] as String?;
+    final String? subjectUuid = readString(f['subject']);
     final Subject? subject =
         subjectUuid == null ? null : local.subjectByUuid[subjectUuid];
-    final int? startDate = _int(f['startDate']);
-    if (subject?.id == null || startDate == null) return null;
+    if (subject?.id == null) return null;
 
-    final int? endDate = _int(f['endDate']);
+    final DateTime? startDate = readDay(f['startDate']);
+    final DateTime? endDate = readDay(f['endDate']);
+    final int? weekday = readInt(f['weekday']);
+    final int? start = readInt(f['startMinutes']);
+    final int? end = readInt(f['endMinutes']);
+    // An end date that is there but unreadable must not become "repeats for
+    // ever", which is what a null one means.
+    if (startDate == null ||
+        (f['endDate'] != null && endDate == null) ||
+        weekday == null ||
+        weekday < DateTime.monday ||
+        weekday > DateTime.sunday ||
+        !isClassTime(start, end)) {
+      throw UnreadableRow(state.localKey);
+    }
+
     final ClassSlot? existing = local.slotByUuid[state.localKey];
     final ClassSlot slot = ClassSlot(
       id: existing?.id,
       uuid: state.localKey,
       subjectId: subject!.id!,
-      weekday: _int(f['weekday']) ?? DateTime.monday,
-      startMinutes: _int(f['startMinutes']) ?? 0,
-      endMinutes: _int(f['endMinutes']) ?? 0,
-      room: f['room'] as String?,
-      weight: _int(f['weight']) ?? 1,
-      startDate: Dates.fromKey(startDate),
-      endDate: endDate == null ? null : Dates.fromKey(endDate),
+      weekday: weekday,
+      startMinutes: start!,
+      endMinutes: end!,
+      room: readString(f['room']),
+      weight: readInt(f['weight']) ?? 1,
+      startDate: startDate,
+      endDate: endDate,
     );
 
     if (existing == null) {
@@ -266,23 +281,29 @@ class SyncPullApplier {
   Future<SyncItem?> _applyExtraClass(
       RemoteState state, SyncLocalRows local) async {
     final Map<String, Object?> f = state.fields;
-    final String? subjectUuid = f['subject'] as String?;
+    final String? subjectUuid = readString(f['subject']);
     final Subject? subject =
         subjectUuid == null ? null : local.subjectByUuid[subjectUuid];
-    final int? date = _int(f['date']);
-    if (subject?.id == null || date == null) return null;
+    if (subject?.id == null) return null;
+
+    final DateTime? date = readDay(f['date']);
+    final int? start = readInt(f['startMinutes']);
+    final int? end = readInt(f['endMinutes']);
+    if (date == null || !isClassTime(start, end)) {
+      throw UnreadableRow(state.localKey);
+    }
 
     final ExtraClass? existing = local.extraByUuid[state.localKey];
     final ExtraClass extra = ExtraClass(
       id: existing?.id,
       uuid: state.localKey,
       subjectId: subject!.id!,
-      date: Dates.fromKey(date),
-      startMinutes: _int(f['startMinutes']) ?? 0,
-      endMinutes: _int(f['endMinutes']) ?? 0,
-      room: f['room'] as String?,
-      weight: _int(f['weight']) ?? 1,
-      note: f['note'] as String?,
+      date: date,
+      startMinutes: start!,
+      endMinutes: end!,
+      room: readString(f['room']),
+      weight: readInt(f['weight']) ?? 1,
+      note: readString(f['note']),
     );
 
     if (existing == null) {
@@ -302,11 +323,21 @@ class SyncPullApplier {
   Future<SyncItem?> _applySlotOverride(
       RemoteState state, SyncLocalRows local) async {
     final _OverrideKey? key = _OverrideKey.parse(state.localKey);
-    final ClassSlot? slot = key == null ? null : local.slotByUuid[key.slotUuid];
-    if (key == null || slot?.id == null) return null;
+    if (key == null) throw UnreadableRow(state.localKey);
+    final ClassSlot? slot = local.slotByUuid[key.slotUuid];
+    if (slot?.id == null) return null;
 
     final Map<String, Object?> f = state.fields;
-    final String? subjectUuid = f['subject'] as String?;
+    final int? start = readInt(f['startMinutes']);
+    final int? end = readInt(f['endMinutes']);
+    // Either may be absent, which means the rule's own time carries through.
+    final bool startOk = f['startMinutes'] == null || isMinuteOfDay(start);
+    final bool endOk = f['endMinutes'] == null ||
+        (end != null && end > 0 && end <= Clock.minutesPerDay);
+    if (!startOk || !endOk || (start != null && end != null && end <= start)) {
+      throw UnreadableRow(state.localKey);
+    }
+    final String? subjectUuid = readString(f['subject']);
     final int? subjectId =
         subjectUuid == null ? null : local.subjectByUuid[subjectUuid]?.id;
 
@@ -316,9 +347,9 @@ class SyncPullApplier {
       date: key.date,
       skipped: f['skipped'] == true,
       subjectId: subjectId,
-      startMinutes: _int(f['startMinutes']),
-      endMinutes: _int(f['endMinutes']),
-      room: f['room'] as String?,
+      startMinutes: start,
+      endMinutes: end,
+      room: readString(f['room']),
     );
 
     // A row that changes nothing is not stored, so there is no link to keep
@@ -343,25 +374,26 @@ class SyncPullApplier {
   Future<SyncItem?> _applyAttendance(
       RemoteState state, SyncLocalRows local) async {
     final _MarkKey? key = _MarkKey.parse(state.localKey);
-    final Subject? subject = key == null ? null : local.subjectByUuid[key.uuid];
+    if (key == null) throw UnreadableRow(state.localKey);
+    final Subject? subject = local.subjectByUuid[key.uuid];
     // A mark for a subject this device has never heard of. Subjects sync
     // first, so the only way here is a subject that failed to apply; the row
     // stays unlinked and the next run offers it again.
-    if (key == null || subject?.id == null) return null;
+    if (subject?.id == null) return null;
 
     final AttendanceStatus? status =
-        AttendanceStatus.fromName(state.fields['status'] as String?);
-    if (status == null) return null;
+        AttendanceStatus.fromName(readString(state.fields['status']));
+    if (status == null) throw UnreadableRow(state.localKey);
 
-    final String? tagName = state.fields['tag'] as String?;
+    final String? tagName = readString(state.fields['tag']);
     final AttendanceRecord record = AttendanceRecord(
       subjectId: subject!.id!,
       date: key.date,
       startMinutes: key.startMinutes,
       status: status,
-      weight: _int(state.fields['weight']) ?? 1,
+      weight: readInt(state.fields['weight']) ?? 1,
       tagId: tagName == null ? null : local.tagByName[tagName]?.id,
-      note: state.fields['note'] as String?,
+      note: readString(state.fields['note']),
       markedAt: state.editedAt,
     );
     await _repository.setAttendance(record);
@@ -435,9 +467,9 @@ class _OverrideKey {
   static _OverrideKey? parse(String key) {
     final List<String> parts = key.split(':');
     if (parts.length != 2) return null;
-    final int? dateKey = int.tryParse(parts[1]);
-    if (parts[0].isEmpty || dateKey == null) return null;
-    return _OverrideKey(parts[0], Dates.fromKey(dateKey));
+    final DateTime? date = readDay(parts[1]);
+    if (parts[0].isEmpty || date == null) return null;
+    return _OverrideKey(parts[0], date);
   }
 }
 
@@ -451,29 +483,11 @@ class _MarkKey {
   static _MarkKey? parse(String key) {
     final List<String> parts = key.split(':');
     if (parts.length != 3) return null;
-    final int? dateKey = int.tryParse(parts[1]);
+    final DateTime? date = readDay(parts[1]);
     final int? start = int.tryParse(parts[2]);
-    if (parts[0].isEmpty || dateKey == null || start == null) return null;
-    return _MarkKey(parts[0], Dates.fromKey(dateKey), start);
+    if (parts[0].isEmpty || date == null || !isMinuteOfDay(start)) {
+      return null;
+    }
+    return _MarkKey(parts[0], date, start!);
   }
 }
-
-int? _int(Object? value) => switch (value) {
-      int v => v,
-      num v => v.round(),
-      String v => int.tryParse(v),
-      _ => null,
-    };
-
-/// A day key back to a date. Null stays null, so a semester end that has not
-/// been set travels as "not set" rather than as an epoch.
-DateTime? _date(Object? value) {
-  final int? key = _int(value);
-  return key == null ? null : Dates.fromKey(key);
-}
-
-double? _double(Object? value) => switch (value) {
-      num v => v.toDouble(),
-      String v => double.tryParse(v),
-      _ => null,
-    };

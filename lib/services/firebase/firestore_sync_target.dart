@@ -159,7 +159,6 @@ class FirestoreSyncTarget implements SyncTarget {
     final Map<String, Object?> fields = Map<String, Object?>.from(data)
       ..remove('changedAt')
       ..remove('deletedAt');
-    final int? changedAt = data['changedAt'] as int?;
 
     return RemoteState(
       kind: kind,
@@ -172,7 +171,7 @@ class FirestoreSyncTarget implements SyncTarget {
       // A tombstone is timed by when it was written, not by the last edit
       // before it: the coordinator needs to know whether a local row of the
       // same name predates the burial or reuses the name after it.
-      editedAt: _timeOf(deleted ? data['deletedAt'] : changedAt),
+      editedAt: _timeOf(deleted ? data['deletedAt'] : data['changedAt']),
       deleted: deleted,
     );
   }

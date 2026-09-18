@@ -49,6 +49,7 @@ String _counts(SyncRunResult? last) {
     // Removals are counted too, or unmarking a class reads exactly like a run
     // that did nothing at all.
     if (last.archived > 0) '${last.archived} removed there',
+    if (last.unreadable > 0) '${last.unreadable} could not be read',
   ];
   return parts.isEmpty ? '' : ' ${parts.join(', ')}.';
 }

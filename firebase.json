@@ -1,4 +1,7 @@
 {
+  "firestore": {
+    "rules": "firestore.rules"
+  },
   "hosting": {
     "public": "site",
     "cleanUrls": true,
@@ -13,5 +16,9 @@
         ]
       }
     ]
+  },
+  "emulators": {
+    "firestore": { "port": 8085 },
+    "ui": { "enabled": false }
   }
 }

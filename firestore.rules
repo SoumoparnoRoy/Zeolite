@@ -2,16 +2,49 @@ rules_version = '2';
 
 // Every document belongs to exactly one signed-in user and lives under their
 // uid. There is no shared data, no public read, and nothing a user may see
-// that is not their own, so one rule covers the whole database.
+// that is not their own. Isolation is the part that has to be right.
 //
-// Deliberately not validating field shapes here. The device is the source of
-// truth and re-pushes anything malformed on the next run, so a schema check
-// would buy little and give a second place for the schema to drift from
-// FirestoreSyncTarget. Isolation is the part that has to be right.
+// Writes are also held to the shape of what the app files: one of its own
+// collections, a bounded number of fields, and timestamps that are numbers.
+// That keeps one account from filling the free quota every account shares.
+// Field types beyond the two timestamps are deliberately not checked here: the
+// app reads every field defensively, and a second copy of the schema would
+// drift from FirestoreSyncTarget and turn the drift into refused writes.
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /users/{uid}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function isAppCollection(name) {
+      return name in [
+        'attendance', 'subjects', 'categories', 'rooms', 'tags', 'holidays',
+        'slots', 'extraClasses', 'slotOverrides', 'meta'
+      ];
+    }
+
+    function timeOrNull(data, field) {
+      return !(field in data) || data[field] == null || data[field] is int;
+    }
+
+    // The widest row the app writes has eleven fields, so forty leaves room
+    // for the schema to grow without a rules change.
+    function isAppShaped(data) {
+      return data.size() <= 40
+        && timeOrNull(data, 'changedAt')
+        && timeOrNull(data, 'deletedAt');
+    }
+
+    // Deleting an account removes the user document after its collections.
+    match /users/{uid} {
+      allow read, delete: if isOwner(uid);
+    }
+
+    match /users/{uid}/{collection}/{doc} {
+      allow read, delete: if isOwner(uid);
+      allow create, update: if isOwner(uid)
+        && isAppCollection(collection)
+        && isAppShaped(request.resource.data);
     }
   }
 }

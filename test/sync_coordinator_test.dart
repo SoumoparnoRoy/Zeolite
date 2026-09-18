@@ -15,6 +15,7 @@ import 'package:zeolite/data/models/subject.dart';
 import 'package:zeolite/data/settings/app_settings.dart';
 import 'package:zeolite/domain/sync/sync_merge.dart';
 import 'package:zeolite/domain/sync/sync_plan.dart';
+import 'package:zeolite/domain/sync/sync_status.dart';
 import 'package:zeolite/domain/sync/sync_target.dart';
 import 'package:zeolite/services/sync/sync_coordinator.dart';
 
@@ -725,6 +726,59 @@ void main() {
 
     expect(after.hash, before.hash);
   });
+
+  test('a row no version of the app wrote is skipped, not fatal', () async {
+    const String good = 'aaaaaaaabbbbccccddddeeeeeeeeeeee';
+    const String bad = 'ffffffffbbbbccccddddeeeeeeeeeeee';
+    final RemoteState numberForName = RemoteState(
+      kind: SyncKind.subject,
+      localKey: bad,
+      remoteId: bad,
+      hash: 'bad-hash',
+      fields: const <String, Object?>{'name': 5},
+      editedAt: _early,
+    );
+    const String month13 = '$good:20261399:540';
+    target.remote = <RemoteState>[
+      subjectRow(good),
+      numberForName,
+      mark(good, editedAt: _early),
+      const RemoteState(
+        kind: SyncKind.attendance,
+        localKey: month13,
+        remoteId: month13,
+        hash: 'mark-hash',
+        fields: <String, Object?>{'status': 'present'},
+      ),
+    ];
+
+    final SyncCoordinator run = coordinator();
+    final SyncRunResult result = await run.run();
+
+    expect(result.outcome, SyncRunOutcome.synced);
+    expect(result.pulled, 2);
+    expect(result.unreadable, 2);
+    expect((await repo.getSubjects()).single.uuid, good);
+    expect(run.status.state, isNot(SyncState.running));
+  });
+
+  test('a surprise mid-run ends it instead of leaving it running', () async {
+    target = _ThrowingTarget()..trustsPulls = true;
+    final SyncCoordinator run = coordinator();
+
+    final SyncRunResult first = await run.run();
+    expect(first.outcome, SyncRunOutcome.failed);
+    expect(run.status.state, SyncState.failed);
+
+    // The next run gets through rather than joining the one that failed.
+    expect((await run.run(force: true)).outcome, SyncRunOutcome.failed);
+  });
+}
+
+class _ThrowingTarget extends FakeSyncTarget {
+  @override
+  Future<List<RemoteState>?> fetch(SyncKind kind) async =>
+      throw StateError('not a FirebaseException');
 }
 
 /// The owed re-run hands back no future, so it is waited for by its effect.

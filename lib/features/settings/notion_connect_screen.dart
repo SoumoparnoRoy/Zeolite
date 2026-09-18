@@ -234,7 +234,7 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
             Text(
               widget.retakeTemplate
                   ? 'You will go back to Notion and take a fresh copy of the '
-                      'template. Your current database is left exactly as it '
+                      'template. Your current table is left exactly as it '
                       'is until the new one is filled.'
                   : 'You will sign in to Notion in your browser and choose '
                       'which pages Zeolite may write to. Your attendance '
@@ -389,7 +389,7 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
             builder: (BuildContext context) => const NotionMappingScreen(),
           ),
         ),
-        child: Text(_mapped ? 'Change the database' : 'Finish setting up'),
+        child: Text(_mapped ? 'Change the table' : 'Finish setting up'),
       ),
       const SizedBox(height: AppSpacing.sm),
       OutlinedButton(

@@ -157,7 +157,7 @@ class NotionConnectionStore {
     if (id == null || id.isEmpty) return null;
     return RetiredNotionDatabase(
       id: id,
-      title: (entry['title'] as String?) ?? 'the old database',
+      title: (entry['title'] as String?) ?? 'the old table',
       pageId: entry['pageId'] as String?,
       // Null on a record written before this was stored, and on one whose
       // stamp no longer parses. The row simply goes without a date.

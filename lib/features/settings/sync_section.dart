@@ -119,7 +119,7 @@ class NotionSection extends ConsumerWidget {
               if (ref.watch(notionConnectionProvider).value != null)
                 SettingsRow(
                   icon: Icons.table_chart_outlined,
-                  title: 'Database',
+                  title: 'Table',
                   value: ref.watch(notionMappingProvider).value?.title ??
                       'Not set up',
                   onTap: () => Navigator.of(context).push(
@@ -135,7 +135,7 @@ class NotionSection extends ConsumerWidget {
                 SettingsRow(
                   icon: Icons.auto_awesome_motion_outlined,
                   title: 'Take the latest template',
-                  value: 'Move to a new database and rewrite every row',
+                  value: 'Move to a new table and rewrite every row',
                   onTap: () => NotionTemplateMigration(ref).start(context),
                 ),
               // Several wait whenever a template was retaken without
@@ -145,7 +145,7 @@ class NotionSection extends ConsumerWidget {
                   when retired.isNotEmpty)
                 SettingsRow(
                   icon: Icons.delete_outline_rounded,
-                  title: 'Move an old database to trash',
+                  title: 'Move an old table to trash',
                   value: retired.length == 1
                       ? retired.single.title
                       : '${retired.length} are waiting',
@@ -156,7 +156,7 @@ class NotionSection extends ConsumerWidget {
               if (ref.watch(notionMappingProvider).value != null)
                 SettingsRow(
                   icon: Icons.download_for_offline_outlined,
-                  title: 'Import from your database',
+                  title: 'Import from your table',
                   value: 'Bring in classes already recorded in Notion',
                   onTap: () => _importFromNotion(context, ref),
                 ),
@@ -234,7 +234,7 @@ class NotionSection extends ConsumerWidget {
       messenger.showSnackBar(
         SnackBar(
           content: Text(export.problems.isEmpty
-              ? 'Nothing in that database could be read as a class.'
+              ? 'Nothing in that table could be read as a class.'
               : export.problems.first),
           duration: const Duration(seconds: 6),
         ),
@@ -257,7 +257,7 @@ class NotionSection extends ConsumerWidget {
           backgroundColor: context.palette.surfaceHigh,
           title: const Text('Which rows?'),
           content: const Text(
-            'Some rows in that database were written by this app. Bring them '
+            'Some rows in that table were written by this app. Bring them '
             'in too if you are setting this device up again, or leave them out '
             'if you only want what you typed into Notion yourself.',
             style: TextStyle(height: 1.4),
@@ -283,7 +283,7 @@ class NotionSection extends ConsumerWidget {
           'Could not reach Notion. Check your network and try again.',
         SyncFailure.rateLimited => 'Notion is busy. Wait a moment and try '
             'again.',
-        _ => 'Notion refused that request. Check the database is still shared '
+        _ => 'Notion refused that request. Check the table is still shared '
             'with Zeolite.',
       };
 }

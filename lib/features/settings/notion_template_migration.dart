@@ -142,12 +142,12 @@ class NotionTemplateMigration {
   }
 
   static const String _changeFailed =
-      'Could not change the old database. It is still in Notion and can be '
+      'Could not change the old table. It is still in Notion and can be '
       'renamed or deleted there.';
 
   static const String _rewriteFailed =
-      'The new database is connected, but writing your marks into it did not '
-      'finish. Use Sync now, then come back — the old database is untouched.';
+      'The new table is connected, but writing your marks into it did not '
+      'finish. Use Sync now, then come back — the old table is untouched.';
 
   void _say(BuildContext context, String message) {
     ScaffoldMessenger.of(context)
@@ -161,7 +161,7 @@ class NotionTemplateMigration {
         backgroundColor: context.palette.surfaceHigh,
         title: const Text('Take the latest template'),
         content: const Text(
-          'Notion will add a new database to your workspace, and every mark '
+          'Notion will add a new table to your workspace, and every mark '
           'is written into it. Your current one is left exactly as it is, and '
           'you choose what happens to it afterwards.',
           style: TextStyle(height: 1.4),
@@ -314,10 +314,10 @@ class NotionTemplateMigration {
       context: context,
       builder: (BuildContext context) => AlertDialog(
         backgroundColor: context.palette.surfaceHigh,
-        title: const Text('And the old database?'),
+        title: const Text('And the old table?'),
         content: Text(
           <String>[
-            'Your marks are now in the new database. "$title" is still in '
+            'Your marks are now in the new table. "$title" is still in '
                 'your workspace with a copy of all of them.',
             if (whole)
               'It came in a page of its own, so renaming or trashing it takes '

@@ -544,7 +544,7 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
   @override
   Widget build(BuildContext context) {
     return PushScaffold(
-      title: 'Notion database',
+      title: 'Notion table',
       subtitle: switch (_stage) {
         _Stage.sources => 'Where should attendance go?',
         _ => _databaseTitle.isEmpty ? null : _databaseTitle,
@@ -588,7 +588,7 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
         const EmptyState(
           icon: Icons.table_chart_outlined,
           title: 'No tables shared',
-          message: 'A database you have just made can take a moment to appear. '
+          message: 'A table you have just made can take a moment to appear. '
               'Try again, or share it with Zeolite in Notion — the page '
               'holding your tables, so every one of them comes along.',
         ),

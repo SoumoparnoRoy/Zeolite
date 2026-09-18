@@ -15,6 +15,7 @@ import '../../widgets/gradient_header.dart';
 import '../../widgets/undo_snack.dart';
 import '../subjects/attendance_log_screen.dart';
 import '../subjects/class_editor_sheets.dart';
+import 'simulate_sheet.dart';
 
 /// Attendance overview: where you stand, and how much room you have left.
 class StatsScreen extends ConsumerWidget {
@@ -474,7 +475,6 @@ class _SubjectDetail extends ConsumerWidget {
         const SizedBox(height: AppSpacing.xl),
         SurfaceCard(
           elevated: false,
-          color: p.surfaceHigh,
           padding: const EdgeInsets.all(14),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -514,6 +514,19 @@ class _SubjectDetail extends ConsumerWidget {
           ),
         ],
         const SizedBox(height: AppSpacing.xl),
+        OutlinedButton.icon(
+          onPressed: () => showSimulateSheet(context, stats),
+          icon: const Icon(Icons.tune_rounded, size: 18),
+          label: const Text('Simulate'),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          'See where your percentage would land if you attend or miss the '
+          'classes ahead.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 11.5, height: 1.4, color: p.textTertiary),
+        ),
+        const SizedBox(height: AppSpacing.lg),
         OutlinedButton.icon(
           onPressed: () async {
             // Same ordering as Edit below: push on top first, because popping
@@ -622,7 +635,9 @@ class _MetricTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
       decoration: BoxDecoration(
-        color: p.surfaceHigh,
+        // Not surfaceHigh: in light that is the sheet's own colour, and the
+        // tiles only ever sit on the subject sheet.
+        color: p.surface,
         borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
       ),
       child: Column(

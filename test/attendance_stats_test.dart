@@ -140,6 +140,58 @@ void main() {
     });
   });
 
+  group('simulating the classes ahead', () {
+    test('moves the percentage and the verdict together', () {
+      // 5/10 at risk; attending 10 more is exactly the recovery run.
+      final SubjectStats now = statsOf(present: 5, absent: 5, remaining: 30);
+      final SubjectStats later = now.after(attended: 10);
+      expect(later.percent, 75);
+      expect(later.meetsTarget, isTrue);
+      expect(later.headline, contains('Right on target'));
+    });
+
+    test('takes the simulated classes out of what is left', () {
+      final SubjectStats fromSlots =
+          statsOf(present: 6, absent: 2, remaining: 12);
+      expect(fromSlots.after(attended: 3, missed: 2).remainingPlanned, 7);
+
+      const Subject declared = Subject(
+        id: 2,
+        name: 'Chemistry',
+        colorValue: 0xFF7C6BFF,
+        expectedTotal: 20,
+      );
+      const SubjectStats withTotal = SubjectStats(
+        subject: declared,
+        present: 6,
+        absent: 2,
+        cancelled: 0,
+        target: 0.75,
+        plannedFromSlots: 0,
+      );
+      expect(withTotal.after(attended: 3, missed: 2).remainingPlanned, 7);
+    });
+
+    test('is out of reach once every class left is spent below target', () {
+      final SubjectStats later =
+          statsOf(present: 7, absent: 5, remaining: 3).after(missed: 3);
+      expect(later.remainingPlanned, 0);
+      expect(later.health, AttendanceHealth.lost);
+      expect(later.headline, 'Target is out of reach this term');
+    });
+
+    test('keeps the cancelled-counts rule', () {
+      final SubjectStats later = statsOf(
+        present: 6,
+        absent: 2,
+        cancelled: 4,
+        cancelledCounts: true,
+      ).after(missed: 2);
+      expect(later.held, 14);
+      expect(later.attended, 10);
+    });
+  });
+
   group('overall aggregation', () {
     test('sums across subjects and flags the weakest', () {
       final OverallStats overall = OverallStats(

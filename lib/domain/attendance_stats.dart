@@ -43,6 +43,7 @@ class SubjectStats {
     required this.plannedFromSlots,
     this.weighted = false,
     this.cancelledCounts = false,
+    this.termSpent = false,
   });
 
   final Subject subject;
@@ -69,6 +70,11 @@ class SubjectStats {
   /// Whether a cancelled class joins both sides of the fraction instead of
   /// leaving it alone. The institution's rule, not the app's preference.
   final bool cancelledCounts;
+
+  /// Set only by [after] when the imagined classes use up everything the term
+  /// had left. A [remainingPlanned] of zero cannot say that on its own, since
+  /// it also means no term dates were given, where nothing is out of reach.
+  final bool termSpent;
 
   /// The unit the headlines count in.
   String get _unit => weighted ? 'period' : 'class';
@@ -137,17 +143,15 @@ class SubjectStats {
   /// True when even a perfect run from here cannot reach the target.
   bool get isUnrecoverable =>
       !meetsTarget &&
-      remainingPlanned > 0 &&
-      maxAchievableRatio < target - 1e-9;
+      (termSpent ||
+          remainingPlanned > 0 && maxAchievableRatio < target - 1e-9);
 
   AttendanceHealth get health {
     if (!hasData) return AttendanceHealth.empty;
     if (meetsTarget) {
       return canSkip >= 2 ? AttendanceHealth.safe : AttendanceHealth.tight;
     }
-    if (remainingPlanned > 0 && maxAchievableRatio < target - 1e-9) {
-      return AttendanceHealth.lost;
-    }
+    if (isUnrecoverable) return AttendanceHealth.lost;
     return AttendanceHealth.atRisk;
   }
 
@@ -171,6 +175,27 @@ class SubjectStats {
       case AttendanceHealth.lost:
         return 'Target is out of reach this term';
     }
+  }
+
+  /// Where this subject would stand after [attended] more classes and
+  /// [missed] more, for the Simulate sheet. A real [SubjectStats] rather than
+  /// a separate projection, so the imagined verdict is worded and coloured by
+  /// the same rules as the real one.
+  SubjectStats after({int attended = 0, int missed = 0}) {
+    final int left = remainingPlanned;
+    return SubjectStats(
+      subject: subject,
+      present: present + attended,
+      absent: absent + missed,
+      cancelled: cancelled,
+      target: target,
+      // A term total already shrinks through [held]; only the projection from
+      // the slots has to be told that these classes are no longer ahead.
+      plannedFromSlots: math.max(0, plannedFromSlots - attended - missed),
+      weighted: weighted,
+      cancelledCounts: cancelledCounts,
+      termSpent: left > 0 && attended + missed >= left,
+    );
   }
 
   static SubjectStats fromSessions({

@@ -59,11 +59,16 @@ class FakeSyncTarget implements SyncTarget {
   /// Rows [claim] hands back for whichever unlinked keys they carry.
   List<SyncClaim> claimable = <SyncClaim>[];
 
+  /// What the last [claim] was offered besides the unkeyed rows.
+  Set<String> lastStrays = const <String>{};
+
   @override
   Future<List<SyncClaim>> claim(
     SyncKind kind,
-    List<SyncItem> unlinked,
-  ) async {
+    List<SyncItem> unlinked, {
+    Set<String> strays = const <String>{},
+  }) async {
+    lastStrays = strays;
     final Set<String> keys = <String>{
       for (final SyncItem item in unlinked) item.localKey,
     };

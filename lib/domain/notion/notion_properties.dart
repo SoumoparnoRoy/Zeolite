@@ -97,6 +97,37 @@ class NotionProperties {
           key.id: _text(localKey),
       };
 
+  /// The class type alone, for a claimed row whose type cell was left empty:
+  /// a table that works out what a class counts for from that column counts
+  /// such a row as nothing. Empty where the category is not paired.
+  Map<String, Object?> typeOnly(String? categoryName) {
+    final NotionProperty? property = mapping.fields[NotionField.kind];
+    if (property == null || categoryName == null) {
+      return const <String, Object?>{};
+    }
+    final Object? value = _named(
+      property,
+      mapping.kindValues[categoryName.trim().toLowerCase()],
+    );
+    return value == null
+        ? const <String, Object?>{}
+        : <String, Object?>{property.id: value};
+  }
+
+  /// Whether [page] has nothing in its class type column.
+  bool typeIsEmpty(Map<String, Object?> page) {
+    final NotionProperty? property = mapping.fields[NotionField.kind];
+    if (property == null) return false;
+    return optionNameOf(
+          valueOf(
+            (page['properties'] as Map<String, Object?>?) ??
+                <String, Object?>{},
+            property,
+          ),
+        ) ==
+        null;
+  }
+
   /// What [decode] will report for this mark once it is written.
   ///
   /// Recorded as the remote hash after a push. Derived here rather than

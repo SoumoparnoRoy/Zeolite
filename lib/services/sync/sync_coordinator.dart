@@ -710,8 +710,16 @@ class SyncCoordinator {
     final Map<SyncKind, List<RemoteState>> disputed =
         <SyncKind, List<RemoteState>>{};
     for (final SyncKind kind in _kinds) {
-      final List<RemoteState>? known = remote[kind];
+      List<RemoteState>? known = remote[kind];
       if (known == null) continue;
+      final Set<String> strays = _strays(kind, known, local, links);
+      if (strays.isNotEmpty) {
+        known = <RemoteState>[
+          for (final RemoteState state in known)
+            if (!strays.contains(state.remoteId)) state,
+        ];
+        remote[kind] = known;
+      }
       final Set<String> taken = <String>{
         for (final RemoteLink link in links[kind]!) link.localKey,
         for (final RemoteState state in known) state.localKey,
@@ -721,7 +729,8 @@ class SyncCoordinator {
           if (!taken.contains(item.localKey)) item,
       ];
       if (unlinked.isEmpty) continue;
-      final List<SyncClaim> claimed = await target.claim(kind, unlinked);
+      final List<SyncClaim> claimed =
+          await target.claim(kind, unlinked, strays: strays);
       if (claimed.isEmpty) continue;
 
       remote[kind] = <RemoteState>[
@@ -736,6 +745,44 @@ class SyncCoordinator {
       if (differing.isNotEmpty) disputed[kind] = differing;
     }
     return disputed;
+  }
+
+  /// Marks on the far side whose key names a subject this device has never
+  /// held — left by an install since wiped, so every key still points at
+  /// the old one. As good as unkeyed: claimed for the marks the new subjects
+  /// hold, instead of pulled as strangers while every class is filed again.
+  /// Only where a person keeps the table; a store this app owns pulls them.
+  ///
+  /// And only on a device with no links there yet, which is what a wiped
+  /// install is. Two devices writing one table without an account between
+  /// them would otherwise take each other's rows back and forth every run.
+  Set<String> _strays(
+    SyncKind kind,
+    List<RemoteState> known,
+    Map<SyncKind, List<SyncItem>> local,
+    Map<SyncKind, List<RemoteLink>> links,
+  ) {
+    if (kind != SyncKind.attendance ||
+        target.trustsPulls ||
+        links[kind]!.isNotEmpty) {
+      return const <String>{};
+    }
+    String subjectOf(String key) => key.split(':').first;
+    final Set<String> linked = <String>{
+      for (final RemoteLink link in links[kind]!) link.localKey,
+    };
+    final Set<String> subjects = <String>{
+      for (final SyncItem item in local[kind]!) subjectOf(item.localKey),
+      for (final String key in linked) subjectOf(key),
+      for (final SyncItem item in local[SyncKind.subject] ?? const <SyncItem>[])
+        item.localKey,
+    };
+    return <String>{
+      for (final RemoteState state in known)
+        if (!linked.contains(state.localKey) &&
+            !subjects.contains(subjectOf(state.localKey)))
+          state.remoteId,
+    };
   }
 
   /// The first run against a target — no ledger at all — is the only time two

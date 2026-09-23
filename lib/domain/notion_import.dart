@@ -127,6 +127,32 @@ class NotionPlanSubject {
     return counts;
   }
 
+  /// The class type the subject is filed under: the source's word its rows
+  /// use most. Rows are written back with it, and a table working out `Held`
+  /// from the type counts a row without one as nothing. Null when no row says.
+  String? get categoryName {
+    final Map<String, int> counts = <String, int>{};
+    for (final NotionPlacement p in placements) {
+      final String? label = p.row.kindLabel;
+      if (label != null) counts[label] = (counts[label] ?? 0) + 1;
+    }
+    if (counts.isEmpty) return null;
+    return counts.entries
+        .reduce((MapEntry<String, int> a, MapEntry<String, int> b) =>
+            b.value > a.value ? b : a)
+        .key;
+  }
+
+  /// What [categoryName] reads as, for a category the import has to create.
+  NotionKind? get categoryKind {
+    final String? name = categoryName;
+    if (name == null) return null;
+    return placements
+        .firstWhere((NotionPlacement p) => p.row.kindLabel == name)
+        .row
+        .kind;
+  }
+
   /// Held and attended in the same unit the subject will read in.
   int get held => present + absent + (countsCancelled ? cancelled : 0);
   int get attended => present + (countsCancelled ? cancelled : 0);
@@ -139,7 +165,13 @@ class NotionPlan {
     required this.grouping,
     this.countsCancelled,
     this.creditedOtherwise = 0,
+    this.untyped = 0,
   });
+
+  /// Rows the table counts for nothing only because their class type is
+  /// empty, where the rest of the table has one. The preview asks whether
+  /// they count; syncing then fills the type in.
+  final int untyped;
 
   final List<NotionPlanSubject> subjects;
   final NotionGrouping grouping;
@@ -173,7 +205,17 @@ class NotionPlan {
     required List<ClassSlot> slots,
     required List<AttendanceRecord> records,
     bool countsCancelledNow = false,
+    bool countUntyped = true,
   }) {
+    // Only a table that gives its rows a type can have left one out; where
+    // none has a type, a zero is the table's own reason, not a missing cell.
+    final bool typed =
+        export.rows.any((NotionRow r) => r.kindLabel != null);
+    bool untyped(NotionRow r) =>
+        typed &&
+        r.kindLabel == null &&
+        r.weight == 0 &&
+        r.status != AttendanceStatus.cancelled;
     final int credited =
         export.rows.where((NotionRow r) => r.credited == true).length;
     final int uncredited =
@@ -221,6 +263,7 @@ class NotionPlan {
             entry.value,
             slots.where((ClassSlot s) => s.subjectId == id).toList(),
             grouping,
+            counted: (NotionRow r) => countUntyped && untyped(r),
           ),
         ),
       );
@@ -233,6 +276,7 @@ class NotionPlan {
       grouping: grouping,
       countsCancelled: rule,
       creditedOtherwise: rule == null ? 0 : (rule ? uncredited : credited),
+      untyped: export.rows.where(untyped).length,
     );
   }
 
@@ -268,8 +312,10 @@ class NotionPlan {
   static List<NotionPlacement> _place(
     List<NotionRow> rows,
     List<ClassSlot> slots,
-    NotionGrouping grouping,
-  ) {
+    NotionGrouping grouping, {
+    required bool Function(NotionRow) counted,
+  }) {
+    int weightOf(NotionRow row) => counted(row) ? 1 : _weightOf(row, grouping);
     final Map<int, List<NotionRow>> byDay = <int, List<NotionRow>>{};
     for (final NotionRow row in rows) {
       byDay.putIfAbsent(Dates.keyOf(row.date), () => <NotionRow>[]).add(row);
@@ -300,7 +346,7 @@ class NotionPlan {
             row: row,
             startMinutes: start,
             scheduled: free.contains(row.startMinutes),
-            weight: _weightOf(row, grouping),
+            weight: weightOf(row),
           ),
         );
       }
@@ -328,7 +374,7 @@ class NotionPlan {
             row: row,
             startMinutes: start,
             scheduled: scheduled,
-            weight: _weightOf(row, grouping),
+            weight: weightOf(row),
           ),
         );
       }

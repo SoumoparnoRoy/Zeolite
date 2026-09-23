@@ -43,6 +43,8 @@ class _NotionImportScreenState extends ConsumerState<NotionImportScreen> {
           ? NotionGrouping.grouped
           : NotionGrouping.separate);
 
+  bool _countUntyped = true;
+
   final Set<String> _excluded = <String>{};
   final Set<String> _seeded = <String>{};
   bool _saving = false;
@@ -106,6 +108,7 @@ class _NotionImportScreenState extends ConsumerState<NotionImportScreen> {
       slots: data?.slots ?? const <ClassSlot>[],
       records: data?.records ?? const <AttendanceRecord>[],
       countsCancelledNow: settings.cancelledCountsAsAttended,
+      countUntyped: _countUntyped,
     );
     _seed(plan, ready: data != null);
 
@@ -137,6 +140,12 @@ class _NotionImportScreenState extends ConsumerState<NotionImportScreen> {
                 _Problems(problems: widget.export.problems),
               _OutsideTermWarning(export: widget.export, settings: settings),
               _CancelledRule(plan: plan, settings: settings),
+              if (plan.untyped > 0)
+                _UntypedChoice(
+                  rows: plan.untyped,
+                  counted: _countUntyped,
+                  onChanged: (bool on) => setState(() => _countUntyped = on),
+                ),
               const SectionHeader('How the courses split'),
               CourseSplitChoice(
                 grouped: grouping == NotionGrouping.grouped,
@@ -321,6 +330,61 @@ class _CancelledRule extends StatelessWidget {
             const SizedBox(height: 5),
             Text(
               '$why Cancelled classes count as attended in Settings.$rest',
+              style: const TextStyle(fontSize: 12.5, height: 1.4),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Rows the table cannot count for want of a class type. Asked, not assumed:
+/// whether they were real classes is something only the student knows.
+class _UntypedChoice extends StatelessWidget {
+  const _UntypedChoice({
+    required this.rows,
+    required this.counted,
+    required this.onChanged,
+  });
+
+  final int rows;
+  final bool counted;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final AppPalette p = context.palette;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: SurfaceCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    '${Words.plural(rows, 'class', 'classes')} with no type',
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: p.warning,
+                    ),
+                  ),
+                ),
+                Switch(value: counted, onChanged: onChanged),
+              ],
+            ),
+            const SizedBox(height: 5),
+            Text(
+              counted
+                  ? 'Your table counts none of these, because their type is '
+                      'empty. They will count here, and syncing fills in the '
+                      "course's type so your table counts them too."
+                  : 'Your table counts none of these, because their type is '
+                      'empty. They will come in without counting, as they are '
+                      'there.',
               style: const TextStyle(fontSize: 12.5, height: 1.4),
             ),
           ],

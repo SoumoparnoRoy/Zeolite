@@ -21,6 +21,14 @@ class ClassCategory {
     this.createdAt,
   });
 
+  /// The three most timetables need on day one, laid down on install and again
+  /// after a reset. Ordinary rows the user can rename, retime or delete.
+  static const List<ClassCategory> defaults = <ClassCategory>[
+    ClassCategory(name: 'Lecture', defaultDurationMinutes: 60),
+    ClassCategory(name: 'Practical', defaultDurationMinutes: 120),
+    ClassCategory(name: 'Tutorial', defaultDurationMinutes: 60),
+  ];
+
   final int? id;
   final String name;
   final int defaultDurationMinutes;

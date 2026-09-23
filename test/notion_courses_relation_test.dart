@@ -204,8 +204,10 @@ void main() {
     expect(_textOf(patched['c4']), 'HIS1');
   });
 
-  test('a lab relates to the course it belongs to in a table kept by hand',
+  test('a subject with no page of its own goes where its classes already are',
       () async {
+    // Named in no pattern the app could guess from — only the table knows
+    // this lab's classes are counted under the course.
     final List<Map<String, Object?>> created = <Map<String, Object?>>[];
     final MockClient client = MockClient((http.Request r) async {
       if (r.url.path == '/v1/data_sources/ds-2/query') {
@@ -216,16 +218,27 @@ void main() {
           200,
         );
       }
+      if (r.url.path == '/v1/data_sources/ds-1/query') {
+        final Map<String, Object?> earlier =
+            _classRow('earlier', relatedTo: 'his-page');
+        ((earlier['properties']! as Map<String, Object?>)['Zeolite ID']!
+                as Map<String, Object?>)['rich_text'] = <Object?>[
+          <String, Object?>{'plain_text': '$_uuid:20260303:540'},
+        ];
+        return http.Response(_coursePages(<Map<String, Object?>>[earlier]), 200);
+      }
       if (r.method == 'POST') {
         created.add(jsonDecode(r.body) as Map<String, Object?>);
       }
       return http.Response('{"id":"mark"}', 200);
     });
 
-    await _target(
+    final NotionSyncTarget target = _target(
       client,
-      course: const NotionCourse(uuid: _uuid, name: 'Thermodynamics Lab'),
-    ).create(_mark());
+      course: const NotionCourse(uuid: _uuid, name: 'Taller práctico'),
+    );
+    await target.fetch(SyncKind.attendance);
+    await target.create(_mark());
 
     expect(created, hasLength(1), reason: 'no Lab course page is made');
     expect(

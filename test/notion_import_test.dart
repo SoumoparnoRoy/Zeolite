@@ -393,6 +393,45 @@ void main() {
     expect(plan.subjects.single.held, 1);
   });
 
+  test('each subject takes the type its rows mostly say, in their words', () {
+    final NotionPlan plan = _plan(
+      _read(<String>[
+        'ABC101L,1,Thermodynamics,Aug 3,1,Yes,Lecture,Present',
+        'ABC101L,1,Thermodynamics,Aug 4,1,Yes,Lecture,Present',
+        'ABC101T,1,Thermodynamics,Aug 5,1,Yes,Tutorial,Present',
+        'ABC101P,2,Thermodynamics,Aug 6,2,Yes,Lab,Present',
+      ]),
+      grouping: NotionGrouping.separate,
+    );
+    final Map<String, String?> types = <String, String?>{
+      for (final NotionPlanSubject s in plan.subjects) s.name: s.categoryName,
+    };
+    expect(types, <String, String?>{
+      'Thermodynamics': 'Lecture',
+      'Thermodynamics Lab': 'Lab',
+    });
+  });
+
+  test('rows left without a type count only if the student says so', () {
+    final NotionExport export = _read(<String>[
+      'ABC101L,1,Thermodynamics,Aug 3,1,Yes,Lecture,Present',
+      'ABC101L,0,Thermodynamics,Aug 4,0,No,,Present',
+    ]);
+    final NotionPlan counted = _plan(export);
+    final NotionPlan asTheyAre = NotionPlan.from(
+      export: export,
+      grouping: NotionGrouping.grouped,
+      subjects: const <Subject>[],
+      slots: const <ClassSlot>[],
+      records: const <AttendanceRecord>[],
+      countUntyped: false,
+    );
+
+    expect(counted.untyped, 1);
+    expect(counted.subjects.single.held, 2);
+    expect(asTheyAre.subjects.single.held, 1);
+  });
+
   test('a table that mostly does not credit cancellations turns it off', () {
     final NotionPlan plan = _plan(_read(<String>[
       'ABC101L,1,Thermodynamics,Aug 3,1,Yes,Lecture,Present',

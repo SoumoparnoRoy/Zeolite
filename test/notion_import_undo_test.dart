@@ -9,6 +9,7 @@ import 'package:zeolite/data/db/app_database.dart';
 import 'package:zeolite/data/db/zeolite_repository.dart';
 import 'package:zeolite/data/models/attendance_status.dart';
 import 'package:zeolite/data/models/attendance_record.dart';
+import 'package:zeolite/data/models/class_category.dart';
 import 'package:zeolite/data/models/class_slot.dart';
 import 'package:zeolite/data/models/subject.dart';
 import 'package:zeolite/domain/notion_export.dart';
@@ -51,6 +52,56 @@ void main() {
   tearDown(() async {
     await appDb?.close();
     await dir.delete(recursive: true);
+  });
+
+  test('imported subjects get a type, reusing one of the same name', () async {
+    await container.read(settingsProvider.future);
+    await container.read(timetableProvider.future);
+    NotionRow row(String course, NotionKind kind, String label) =>
+        NotionRow.read(
+          component: '',
+          course: course,
+          kind: kind,
+          date: DateTime(2026, 9, 1),
+          status: 'Present',
+          held: 1,
+          credit: 1,
+          kindLabel: label,
+        );
+    final NotionPlan plan = NotionPlan.from(
+      export: NotionExport(
+        rows: <NotionRow>[
+          row('Generic Course', NotionKind.lecture, 'lecture'),
+          row('Another Course', NotionKind.practical, 'Lab'),
+        ],
+        problems: const <String>[],
+      ),
+      grouping: NotionGrouping.grouped,
+      subjects: const <Subject>[],
+      slots: const <ClassSlot>[],
+      records: const <AttendanceRecord>[],
+    );
+
+    await container.read(importActionsProvider).importNotionLog(plan.subjects);
+
+    final List<ClassCategory> categories = await repo.getCategories();
+    final List<Subject> subjects = await repo.getSubjects();
+    String? nameOf(String subject) {
+      final int? id =
+          subjects.firstWhere((Subject s) => s.name == subject).categoryId;
+      return categories
+          .where((ClassCategory c) => c.id == id)
+          .firstOrNull
+          ?.name;
+    }
+
+    // The installed "Lecture", not a second one; "Lab" had none to reuse.
+    expect(nameOf('Generic Course'), 'Lecture');
+    expect(nameOf('Another Course'), 'Lab');
+    expect(
+      categories.where((ClassCategory c) => c.name.toLowerCase() == 'lecture'),
+      hasLength(1),
+    );
   });
 
   test('undoing an import puts the cancelled setting back with the marks',

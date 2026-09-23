@@ -599,6 +599,43 @@ void main() {
     expect(target.calls, contains('update their-page'));
   });
 
+  test('a fresh install claims rows keyed by the install it replaced',
+      () async {
+    final Subject subject = await seed(status: AttendanceStatus.present);
+    final String key = SyncItem.keyFor(subject.uuid!, _day, 540);
+    target
+      ..trustsPulls = false
+      ..kinds = <SyncKind>{SyncKind.attendance}
+      ..remote = <RemoteState>[
+        const RemoteState(
+          kind: SyncKind.attendance,
+          localKey: 'wiped-install-subject:20260304:540',
+          remoteId: 'old-page',
+          hash: 'theirs',
+          fields: <String, Object?>{'status': 'present'},
+        ),
+      ]
+      ..claimable = <SyncClaim>[
+        SyncClaim(
+          agrees: true,
+          state: RemoteState(
+            kind: SyncKind.attendance,
+            localKey: key,
+            remoteId: 'old-page',
+            hash: 'theirs',
+            fields: const <String, Object?>{'status': 'present'},
+          ),
+        ),
+      ];
+
+    final SyncRunResult result = await coordinator().run(force: true);
+
+    expect(target.lastStrays, <String>{'old-page'});
+    expect(result.review, isEmpty);
+    expect(target.calls, contains('update old-page'));
+    expect(target.calls.where((String c) => c.startsWith('create ')), isEmpty);
+  });
+
   test('keeping mine retires a page this device has no mark for', () async {
     // A row whose mark does not exist here has no link, so there was nothing
     // to mark as answered and it came back on every run — a rewrite could not

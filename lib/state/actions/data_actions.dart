@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../data/db/zeolite_repository.dart';
+import '../../data/models/class_category.dart';
 import '../../data/settings/app_settings.dart';
 import '../../domain/sync/sync_merge.dart';
 import '../../services/sync/sync_coordinator.dart';
@@ -77,6 +78,11 @@ class DataActions {
   Future<void> resetEverything() async {
     final DatabaseSnapshot before = await _core.repo.snapshot();
     await _core.repo.clearAll();
+    // Put back as on install: without them there is nothing to give a new
+    // subject a type, which is what the type sent to Notion comes from.
+    for (final ClassCategory category in ClassCategory.defaults) {
+      await _core.repo.insertCategory(category);
+    }
     await _core.ref.read(notificationsProvider).cancelAll();
     await _core.refresh();
     _core.arm(before);

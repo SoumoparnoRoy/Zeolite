@@ -4,6 +4,7 @@ import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../data/db/zeolite_repository.dart';
 import '../../data/models/attendance_record.dart';
+import '../../data/models/class_category.dart';
 import '../../data/models/class_slot.dart';
 import '../../data/models/extra_class.dart';
 import '../../data/models/room.dart';
@@ -13,6 +14,7 @@ import '../../data/settings/app_settings.dart';
 import '../../domain/attendance_totals_import.dart';
 import '../../domain/attendance_totals_ocr.dart';
 import '../../domain/class_weight.dart';
+import '../../domain/notion_export.dart';
 import '../../domain/notion_import.dart';
 import '../../domain/timetable_import.dart';
 import '../providers.dart';
@@ -263,6 +265,26 @@ class ImportActions {
         }
       }
 
+      // Matched by name first, the same way tags are, so a table's
+      // "Practical" lands on the app's "Practical" rather than beside it.
+      final Map<String, int> categoryIds = <String, int>{
+        for (final ClassCategory category in data.categories)
+          if (category.id != null)
+            category.name.trim().toLowerCase(): category.id!,
+      };
+      Future<int?> categoryFor(NotionPlanSubject planned) async {
+        final String? name = planned.categoryName;
+        if (name == null) return null;
+        final String key = name.toLowerCase();
+        return categoryIds[key] ??= await repository.insertCategory(
+          ClassCategory(
+            name: name,
+            defaultDurationMinutes:
+                planned.categoryKind == NotionKind.practical ? 120 : 60,
+          ),
+        );
+      }
+
       int created = 0;
       for (final NotionPlanSubject planned in chosen) {
         if (planned.placements.isEmpty) continue;
@@ -275,10 +297,19 @@ class ImportActions {
               code: planned.code,
               colorValue:
                   palette[(data.subjects.length + created) % palette.length],
+              categoryId: await categoryFor(planned),
             ),
           );
           created++;
-        } else if (planned.match == NotionMatch.overlap) {
+        } else if (planned.subject!.categoryId == null) {
+          final int? category = await categoryFor(planned);
+          if (category != null) {
+            await repository.updateSubject(
+              planned.subject!.copyWith(categoryId: category),
+            );
+          }
+        }
+        if (planned.match == NotionMatch.overlap) {
           final List<DateTime> dates = planned.placements
               .map((NotionPlacement placement) => placement.row.date)
               .toList()

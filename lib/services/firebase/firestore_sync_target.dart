@@ -41,8 +41,9 @@ class FirestoreSyncTarget implements SyncTarget {
   @override
   Future<List<SyncClaim>> claim(
     SyncKind kind,
-    List<SyncItem> unlinked,
-  ) async =>
+    List<SyncItem> unlinked, {
+    Set<String> strays = const <String>{},
+  }) async =>
       const <SyncClaim>[];
 
   /// Every collection a signed-in device writes under `users/{uid}`.

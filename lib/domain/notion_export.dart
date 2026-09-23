@@ -52,6 +52,7 @@ class NotionRow {
     this.startMinutes,
     this.creditDisagrees = false,
     this.credited,
+    this.kindLabel,
   });
 
   /// One row off a status word and the two counters, wherever they were read
@@ -69,6 +70,7 @@ class NotionRow {
     required int held,
     int? credit,
     int? startMinutes,
+    String? kindLabel,
   }) {
     final String raw = status.trim().toLowerCase();
     final AttendanceStatus read = NotionExport._statusOf(raw, held, credit);
@@ -87,6 +89,9 @@ class NotionRow {
       credited: (raw == 'cancelled' || raw == 'canceled') && credit != null
           ? held > 0 && credit > 0
           : null,
+      kindLabel: kindLabel == null || kindLabel.trim().isEmpty
+          ? null
+          : kindLabel.trim(),
     );
   }
 
@@ -125,6 +130,11 @@ class NotionRow {
   /// Whether the source credited this cancelled class, or null. A mark has
   /// nowhere to keep it; the import sets the app-wide setting from it.
   final bool? credited;
+
+  /// The source's own word for [kind] — `Practical`, `Lab`. Categories are
+  /// named from it, so each pairs with that option by name when the type is
+  /// written back.
+  final String? kindLabel;
 }
 
 /// Everything read out of one export, plus what could not be read.
@@ -290,6 +300,7 @@ class NotionExport {
           status: raw,
           held: held,
           credit: credit,
+          kindLabel: at(columns.kind),
         ),
       );
     }

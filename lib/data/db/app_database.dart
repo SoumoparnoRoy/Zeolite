@@ -3,6 +3,7 @@ import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
 import '../../core/ids.dart';
+import '../models/class_category.dart';
 
 /// Owns the SQLite connection and the schema.
 ///
@@ -287,26 +288,17 @@ class AppDatabase {
       )
     ''';
 
-  /// The three categories most timetables need on day one. They are ordinary
-  /// rows — the user can rename, retime or delete them like any other.
   static Future<void> _seedCategories(Database db) async {
-    final int now = DateTime.now().millisecondsSinceEpoch;
     final Batch batch = db.batch();
-    batch.insert('categories', <String, Object?>{
-      'name': 'Lecture',
-      'default_minutes': 60,
-      'created_at': now,
-    });
-    batch.insert('categories', <String, Object?>{
-      'name': 'Practical',
-      'default_minutes': 120,
-      'created_at': now,
-    });
-    batch.insert('categories', <String, Object?>{
-      'name': 'Tutorial',
-      'default_minutes': 60,
-      'created_at': now,
-    });
+    final int now = DateTime.now().millisecondsSinceEpoch;
+    // No `weight`: the v2 upgrade seeds before v11 adds that column.
+    for (final ClassCategory category in ClassCategory.defaults) {
+      batch.insert('categories', <String, Object?>{
+        'name': category.name,
+        'default_minutes': category.defaultDurationMinutes,
+        'created_at': now,
+      });
+    }
     await batch.commit(noResult: true);
   }
 

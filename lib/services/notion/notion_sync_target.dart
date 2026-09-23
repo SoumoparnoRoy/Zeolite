@@ -92,19 +92,29 @@ class NotionSyncTarget implements SyncTarget {
 
     final List<RemoteState> found = <RemoteState>[];
     final List<Map<String, Object?>> unkeyed = <Map<String, Object?>>[];
+    final Map<String, Map<String, Object?>> keyed =
+        <String, Map<String, Object?>>{};
+    _untyped.clear();
+    _filedUnder.clear();
     for (final Map<String, Object?> page in rows.pages) {
       _noteCourse(page);
+      if (page['id'] is String && _properties.typeIsEmpty(page)) {
+        _untyped.add(page['id']! as String);
+      }
       // Null is a row somebody made by hand. It is only ever taken for a mark
       // by [claim], which knows the marks; filing it by itself here would put
       // it against a class it may have nothing to do with.
       final RemoteState? state = _properties.decode(page);
       if (state != null) {
         found.add(state);
+        keyed[state.remoteId] = page;
+        _noteFiledUnder(state.localKey, state.remoteId);
       } else if (page['id'] is String) {
         unkeyed.add(page);
       }
     }
     _unkeyed = unkeyed;
+    _keyed = keyed;
     return found;
   }
 
@@ -112,8 +122,22 @@ class NotionSyncTarget implements SyncTarget {
   /// second read of the table.
   List<Map<String, Object?>> _unkeyed = const <Map<String, Object?>>[];
 
+  /// And the keyed ones, by page id, for a claim handed strays.
+  Map<String, Map<String, Object?>> _keyed = <String, Map<String, Object?>>{};
+
   /// Pages claimed this run, so [update] writes nothing but the key into one.
   final Set<String> _claimed = <String>{};
+
+  /// Pages with no class type. A claim writes the missing type with the key,
+  /// never over one somebody chose.
+  final Set<String> _untyped = <String>{};
+
+  Map<String, Object?> _keyAndMissingType(String localKey, String remoteId) =>
+      <String, Object?>{
+        ..._properties.keyOnly(localKey),
+        if (_untyped.contains(remoteId))
+          ..._properties.typeOnly(_categoryName?.call(_subjectOf(localKey))),
+      };
 
   /// What each page's `Course` points at, by page id. [update] leaves a
   /// relation to a course still in the table alone: it is somebody's choice
@@ -132,6 +156,30 @@ class NotionSyncTarget implements SyncTarget {
     if (ids.isNotEmpty) _related[page['id']! as String] = ids;
   }
 
+  /// Course pages each subject's rows already point at, with how many do.
+  /// Where a subject has no page of its own name — a lab kept apart from the
+  /// course it belongs to, whatever either is called — its classes go where
+  /// the table already files them.
+  final Map<String, Map<String, int>> _filedUnder =
+      <String, Map<String, int>>{};
+
+  void _noteFiledUnder(String localKey, String remoteId) {
+    final Map<String, int> pages =
+        _filedUnder.putIfAbsent(_subjectOf(localKey), () => <String, int>{});
+    for (final String id in _related[remoteId] ?? const <String>[]) {
+      pages[id] = (pages[id] ?? 0) + 1;
+    }
+  }
+
+  String? _usualCourseOf(String subjectUuid) {
+    final Map<String, int>? pages = _filedUnder[subjectUuid];
+    if (pages == null || pages.isEmpty) return null;
+    return pages.entries
+        .reduce((MapEntry<String, int> a, MapEntry<String, int> b) =>
+            b.value > a.value ? b : a)
+        .key;
+  }
+
   /// A trashed course page stays in the relation, so pointing somewhere is
   /// not enough: the page it points at has to be live.
   Future<bool> _keepsCourse(String remoteId) async {
@@ -146,9 +194,14 @@ class NotionSyncTarget implements SyncTarget {
   @override
   Future<List<SyncClaim>> claim(
     SyncKind kind,
-    List<SyncItem> unlinked,
-  ) async {
-    final List<Map<String, Object?>> pages = _unkeyed;
+    List<SyncItem> unlinked, {
+    Set<String> strays = const <String>{},
+  }) async {
+    final List<Map<String, Object?>> pages = <Map<String, Object?>>[
+      ..._unkeyed,
+      for (final String id in strays)
+        if (_keyed[id] case final Map<String, Object?> page) page,
+    ];
     if (kind != SyncKind.attendance || pages.isEmpty) {
       return const <SyncClaim>[];
     }
@@ -165,7 +218,7 @@ class NotionSyncTarget implements SyncTarget {
       for (final SyncItem item in unlinked) item.localKey: item,
     };
     final Map<String, String> paired = NotionClaim.pair(
-      rows: reader.unkeyed(pages, courseNames: courseNames),
+      rows: reader.unkeyed(pages, courseNames: courseNames, strays: strays),
       marks: unlinked,
       subjectName: (String uuid) => _course(uuid)?.name,
     );
@@ -182,6 +235,7 @@ class NotionSyncTarget implements SyncTarget {
       final bool agrees =
           state.hash == _properties.remoteHashFor(markByKey[pair.key]!);
       if (agrees) _claimed.add(state.remoteId);
+      _noteFiledUnder(pair.key, state.remoteId);
       claimed.add(SyncClaim(state: state, agrees: agrees));
     }
     return claimed;
@@ -234,7 +288,7 @@ class NotionSyncTarget implements SyncTarget {
     final NotionResult result = await _client.updatePage(
       remoteId,
       keyOnly
-          ? _properties.keyOnly(item.localKey)
+          ? _keyAndMissingType(item.localKey, remoteId)
           : await _encode(item, relate: !await _keepsCourse(remoteId)),
     );
     if (!result.ok) return _failure(result);
@@ -256,8 +310,10 @@ class NotionSyncTarget implements SyncTarget {
         message: _noKeyColumn,
       );
     }
-    final NotionResult result =
-        await _client.updatePage(remoteId, _properties.keyOnly(localKey));
+    final NotionResult result = await _client.updatePage(
+      remoteId,
+      _keyAndMissingType(localKey, remoteId),
+    );
     if (!result.ok) return _failure(result);
     return SyncOutcome.done(remoteId: remoteId, remoteHash: '');
   }
@@ -288,7 +344,7 @@ class NotionSyncTarget implements SyncTarget {
       categoryName: _categoryName?.call(uuid),
       courseRelationId: course == null || !relate
           ? null
-          : await _courses?.pageIdFor(course),
+          : await _courses?.pageIdFor(course, usual: _usualCourseOf(uuid)),
     );
   }
 

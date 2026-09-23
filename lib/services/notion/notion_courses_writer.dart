@@ -41,7 +41,10 @@ class NotionCoursesWriter {
   /// The page id for [course], creating or correcting the page as needed, or
   /// null when the table cannot be read or written. Null is not fatal — the
   /// caller writes the mark without a relation rather than not at all.
-  Future<String?> pageIdFor(NotionCourse course) async {
+  ///
+  /// [usual] is the page the subject's classes already point at in the table,
+  /// used when no page carries the subject's key or name.
+  Future<String?> pageIdFor(NotionCourse course, {String? usual}) async {
     final Map<String, _Page>? pages = await _load();
     if (pages == null) return null;
 
@@ -53,8 +56,9 @@ class NotionCoursesWriter {
       // and a third page of the app's own would only add to it.
       if (named.length > 1) return null;
       if (named.isEmpty) {
-        return _courseOfLab(course.name, pages)?.id ??
-            _create(course, pages);
+        return usual != null && await holdsAny(<String>[usual])
+            ? usual
+            : _create(course, pages);
       }
       _unkeyed.remove(name);
       existing = pages[course.uuid] = named.single;
@@ -107,23 +111,6 @@ class NotionCoursesWriter {
   }
 
   static String _nameKey(String name) => name.trim().toLowerCase();
-
-  /// The import names a practical `X Lab` in a table whose labs belong to
-  /// course X, so a table somebody kept has no page for it. Only a page of
-  /// theirs is used: one the app made keeps a lab subject on its own page.
-  _Page? _courseOfLab(String name, Map<String, _Page> pages) {
-    final List<String> words = name.trim().split(RegExp(r'\s+'));
-    if (words.length < 2 || words.last.toLowerCase() != 'lab') return null;
-    final String course =
-        _nameKey(words.sublist(0, words.length - 1).join(' '));
-
-    final List<_Page> unkeyed = _unkeyed[course] ?? const <_Page>[];
-    if (unkeyed.length == 1) return unkeyed.single;
-    for (final _Page page in pages.values) {
-      if (page.adopted && _nameKey(page.course.name) == course) return page;
-    }
-    return null;
-  }
 
   Future<String?> _create(NotionCourse course, Map<String, _Page> pages) async {
     final NotionResult result = await _client.createPage(

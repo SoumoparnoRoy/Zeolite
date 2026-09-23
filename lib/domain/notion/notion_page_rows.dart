@@ -66,9 +66,13 @@ class NotionPageRows {
   /// The rows with no `Zeolite ID`, each beside the page it came from, read
   /// exactly as the import reads them so a claim pairs a page with the mark
   /// that importing it made. A row the import would refuse is left out.
+  ///
+  /// [strays] are keyed pages to read as unkeyed all the same: their key
+  /// names nothing the device holds.
   List<NotionUnkeyedRow> unkeyed(
     List<Map<String, Object?>> pages, {
     Map<String, String> courseNames = const <String, String>{},
+    Set<String> strays = const <String>{},
   }) {
     final List<NotionUnkeyedRow> out = <NotionUnkeyedRow>[];
     for (int i = 0; i < pages.length; i++) {
@@ -76,7 +80,8 @@ class NotionPageRows {
       final Object? id = page['id'];
       final Map<String, Object?> cells = _propertiesOf(page);
       if (id is! String || page['in_trash'] == true) continue;
-      if (page['archived'] == true || _keyOf(cells) != null) continue;
+      if (page['archived'] == true) continue;
+      if (_keyOf(cells) != null && !strays.contains(id)) continue;
       final NotionRow? row = _rowOf(cells, courseNames, i).row;
       if (row != null) out.add(NotionUnkeyedRow(pageId: id, row: row));
     }
@@ -120,6 +125,9 @@ class NotionPageRows {
         held: _numberOf(NotionField.held, cells)?.round() ?? 1,
         credit: _numberOf(NotionField.credit, cells)?.round(),
         startMinutes: _timeOf(cells),
+        kindLabel: NotionProperties.optionNameOf(
+          NotionProperties.valueOf(cells, mapping.fields[NotionField.kind]),
+        ),
       ),
       problem: null,
     );

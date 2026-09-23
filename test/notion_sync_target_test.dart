@@ -339,6 +339,7 @@ void main() {
       claimed.map((SyncClaim c) => c.agrees),
       containsAll(<bool>[true, false]),
     );
+    // The key, and the type their row left empty; nothing they filled in.
     expect(written[pageOf[agrees.localKey]], <String, Object?>{
       'p7': <String, Object?>{
         'rich_text': <Object?>[
@@ -346,6 +347,9 @@ void main() {
             'text': <String, Object?>{'content': agrees.localKey},
           },
         ],
+      },
+      'p4': <String, Object?>{
+        'select': <String, Object?>{'name': 'Practical'},
       },
     });
     // The app is where the class was marked, so a row saying otherwise is

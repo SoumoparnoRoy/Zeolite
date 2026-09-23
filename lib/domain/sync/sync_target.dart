@@ -474,7 +474,14 @@ abstract class SyncTarget {
   /// Rows [fetch] could not key that are these [unlinked] rows all the same,
   /// keyed to them so the planner adopts each one instead of filing a copy
   /// beside it. Only a target a person also writes to can hold such a row.
-  Future<List<SyncClaim>> claim(SyncKind kind, List<SyncItem> unlinked);
+  ///
+  /// [strays] are rows [fetch] did key, by remote id, whose key names nothing
+  /// on this device; they are candidates exactly as an unkeyed row is.
+  Future<List<SyncClaim>> claim(
+    SyncKind kind,
+    List<SyncItem> unlinked, {
+    Set<String> strays = const <String>{},
+  });
 
   Future<SyncOutcome> create(SyncItem item);
 

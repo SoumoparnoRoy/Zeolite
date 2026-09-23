@@ -56,6 +56,24 @@ class FakeSyncTarget implements SyncTarget {
         .toList(growable: false);
   }
 
+  /// Rows [claim] hands back for whichever unlinked keys they carry.
+  List<SyncClaim> claimable = <SyncClaim>[];
+
+  @override
+  Future<List<SyncClaim>> claim(
+    SyncKind kind,
+    List<SyncItem> unlinked,
+  ) async {
+    final Set<String> keys = <String>{
+      for (final SyncItem item in unlinked) item.localKey,
+    };
+    return <SyncClaim>[
+      for (final SyncClaim claim in claimable)
+        if (claim.state.kind == kind && keys.contains(claim.state.localKey))
+          claim,
+    ];
+  }
+
   @override
   Future<SyncOutcome> create(SyncItem item) async {
     if (!reachedCreate.isCompleted) reachedCreate.complete();

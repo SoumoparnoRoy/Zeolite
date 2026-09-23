@@ -40,7 +40,6 @@ class NotionPageRows {
     Map<String, String> courseNames = const <String, String>{},
     bool skipKeyed = false,
   }) {
-    final NotionProperties properties = NotionProperties(mapping);
     final List<NotionRow> rows = <NotionRow>[];
     final List<String> problems = <String>[];
     int keyed = 0;
@@ -51,44 +50,10 @@ class NotionPageRows {
         keyed++;
         continue;
       }
-
-      final String course = _courseOf(cells, courseNames) ?? '';
-      final String component = _componentOf(cells) ?? '';
-      final String label = component.isEmpty ? course : component;
-      final String where = 'Row ${i + 1}${label.isEmpty ? '' : ' ($label)'}';
-
-      final DateTime? date = _dateOf(cells);
-      if (date == null) {
-        problems.add('$where: no date this can read.');
-        continue;
-      }
-      if (course.isEmpty) {
-        problems.add('$where: no course named.');
-        continue;
-      }
-
-      final String? option = NotionProperties.optionNameOf(
-        NotionProperties.valueOf(cells, mapping.fields[NotionField.status]),
-      );
-      final String? word = properties.wordFor(option);
-      if (word == null || !NotionRow.knowsStatus(word)) {
-        problems.add('$where: "${option ?? ''}" is not a status this can '
-            'read.');
-        continue;
-      }
-
-      rows.add(
-        NotionRow.read(
-          component: component,
-          course: course,
-          kind: _kindOf(cells) ?? NotionKind.lecture,
-          date: date,
-          status: word,
-          held: _numberOf(NotionField.held, cells)?.round() ?? 1,
-          credit: _numberOf(NotionField.credit, cells)?.round(),
-          startMinutes: _timeOf(cells),
-        ),
-      );
+      final ({NotionRow? row, String? problem}) read =
+          _rowOf(cells, courseNames, i);
+      if (read.row != null) rows.add(read.row!);
+      if (read.problem != null) problems.add(read.problem!);
     }
 
     if (keyed > 0) {
@@ -96,6 +61,68 @@ class NotionPageRows {
           'this device were left out.');
     }
     return NotionExport(rows: rows, problems: problems);
+  }
+
+  /// The rows with no `Zeolite ID`, each beside the page it came from, read
+  /// exactly as the import reads them so a claim pairs a page with the mark
+  /// that importing it made. A row the import would refuse is left out.
+  List<NotionUnkeyedRow> unkeyed(
+    List<Map<String, Object?>> pages, {
+    Map<String, String> courseNames = const <String, String>{},
+  }) {
+    final List<NotionUnkeyedRow> out = <NotionUnkeyedRow>[];
+    for (int i = 0; i < pages.length; i++) {
+      final Map<String, Object?> page = pages[i];
+      final Object? id = page['id'];
+      final Map<String, Object?> cells = _propertiesOf(page);
+      if (id is! String || page['in_trash'] == true) continue;
+      if (page['archived'] == true || _keyOf(cells) != null) continue;
+      final NotionRow? row = _rowOf(cells, courseNames, i).row;
+      if (row != null) out.add(NotionUnkeyedRow(pageId: id, row: row));
+    }
+    return out;
+  }
+
+  ({NotionRow? row, String? problem}) _rowOf(
+    Map<String, Object?> cells,
+    Map<String, String> courseNames,
+    int index,
+  ) {
+    final String course = _courseOf(cells, courseNames) ?? '';
+    final String component = _componentOf(cells) ?? '';
+    final String label = component.isEmpty ? course : component;
+    final String where = 'Row ${index + 1}${label.isEmpty ? '' : ' ($label)'}';
+
+    final DateTime? date = _dateOf(cells);
+    if (date == null) {
+      return (row: null, problem: '$where: no date this can read.');
+    }
+    if (course.isEmpty) return (row: null, problem: '$where: no course named.');
+
+    final String? option = NotionProperties.optionNameOf(
+      NotionProperties.valueOf(cells, mapping.fields[NotionField.status]),
+    );
+    final String? word = NotionProperties(mapping).wordFor(option);
+    if (word == null || !NotionRow.knowsStatus(word)) {
+      return (
+        row: null,
+        problem: '$where: "${option ?? ''}" is not a status this can read.',
+      );
+    }
+
+    return (
+      row: NotionRow.read(
+        component: component,
+        course: course,
+        kind: _kindOf(cells) ?? NotionKind.lecture,
+        date: date,
+        status: word,
+        held: _numberOf(NotionField.held, cells)?.round() ?? 1,
+        credit: _numberOf(NotionField.credit, cells)?.round(),
+        startMinutes: _timeOf(cells),
+      ),
+      problem: null,
+    );
   }
 
   /// Whether any row carries a `Zeolite ID`, and so whether leaving this
@@ -193,4 +220,12 @@ class NotionPageRows {
 
   static Map<String, Object?> _propertiesOf(Map<String, Object?> page) =>
       (page['properties'] as Map<String, Object?>?) ?? <String, Object?>{};
+}
+
+/// A hand-made row and the page it lives on.
+class NotionUnkeyedRow {
+  const NotionUnkeyedRow({required this.pageId, required this.row});
+
+  final String pageId;
+  final NotionRow row;
 }

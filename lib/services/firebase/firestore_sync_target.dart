@@ -37,6 +37,14 @@ class FirestoreSyncTarget implements SyncTarget {
   @override
   Set<SyncKind> get kinds => SyncKind.values.toSet();
 
+  // Every document is filed under its sync key, so none can go unrecognised.
+  @override
+  Future<List<SyncClaim>> claim(
+    SyncKind kind,
+    List<SyncItem> unlinked,
+  ) async =>
+      const <SyncClaim>[];
+
   /// Every collection a signed-in device writes under `users/{uid}`.
   static Iterable<String> get collectionNames => _collections.values;
 

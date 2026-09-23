@@ -468,6 +468,110 @@ void main() {
     expect((await sync.run(force: true)).review, isEmpty);
   });
 
+  test('a hand-made row the target claims is keyed, not copied', () async {
+    final Subject subject = await seed(status: AttendanceStatus.present);
+    target
+      ..trustsPulls = false
+      ..kinds = <SyncKind>{SyncKind.attendance}
+      ..claimable = <SyncClaim>[
+        SyncClaim(
+          agrees: true,
+          state: RemoteState(
+            kind: SyncKind.attendance,
+            localKey: SyncItem.keyFor(subject.uuid!, _day, 540),
+            remoteId: 'their-page',
+            hash: 'theirs',
+            fields: const <String, Object?>{'status': 'present'},
+          ),
+        ),
+      ];
+
+    final SyncRunResult result = await coordinator().run(force: true);
+
+    expect(target.calls, contains('update their-page'));
+    expect(target.calls.where((String c) => c.startsWith('create ')), isEmpty);
+    expect(result.review, isEmpty);
+    // Still theirs: removing the mark here must not trash a row they made.
+    final RemoteLink link =
+        (await repo.getRemoteLinks(target.id, SyncKind.attendance)).single;
+    expect(link.origin, SyncOrigin.remote);
+  });
+
+  /// Their own row, recognised in a mark of this device's but saying
+  /// something else about it.
+  void claimDiffering(String uuid) {
+    target
+      ..trustsPulls = false
+      ..kinds = <SyncKind>{SyncKind.attendance}
+      ..claimable = <SyncClaim>[
+        SyncClaim(
+          agrees: false,
+          state: RemoteState(
+            kind: SyncKind.attendance,
+            localKey: SyncItem.keyFor(uuid, _day, 540),
+            remoteId: 'their-page',
+            hash: 'theirs',
+            fields: const <String, Object?>{'status': 'absent', 'weight': 1},
+            editedAt: _late,
+          ),
+        ),
+      ];
+  }
+
+  test('a claimed row that disagrees is asked about, not written over',
+      () async {
+    final Subject subject = await seed(status: AttendanceStatus.present);
+    claimDiffering(subject.uuid!);
+
+    final SyncRunResult result = await coordinator().run(force: true);
+
+    expect(result.review, hasLength(1));
+    expect(result.review.single.remote.remoteId, 'their-page');
+    // Neither written over nor filed a second time.
+    expect(target.calls.where((String c) => c != 'fetch'), isEmpty);
+  });
+
+  test('keeping mine pushes this device into their row instead of trashing it',
+      () async {
+    final Subject subject = await seed(status: AttendanceStatus.present);
+    claimDiffering(subject.uuid!);
+    final SyncCoordinator sync = coordinator();
+    final SyncRunResult asked = await sync.run(force: true);
+
+    await sync.applyReview(asked.review, <String, SyncSide>{
+      SyncItem.keyFor(subject.uuid!, _day, 540): SyncSide.here,
+    });
+    target.claimable = <SyncClaim>[];
+    final SyncRunResult after = await sync.run(force: true);
+
+    expect(target.calls, isNot(contains('archive their-page')));
+    expect(target.calls, contains('update their-page'));
+    expect(after.review, isEmpty);
+    expect(
+      (await repo.getAttendanceAt(subject.id!, _day, 540))?.status,
+      AttendanceStatus.present,
+    );
+  });
+
+  test('taking theirs writes their row here and claims it', () async {
+    final Subject subject = await seed(status: AttendanceStatus.present);
+    claimDiffering(subject.uuid!);
+    final SyncCoordinator sync = coordinator();
+    final SyncRunResult asked = await sync.run(force: true);
+
+    await sync.applyReview(asked.review, <String, SyncSide>{
+      SyncItem.keyFor(subject.uuid!, _day, 540): SyncSide.there,
+    });
+
+    expect(
+      (await repo.getAttendanceAt(subject.id!, _day, 540))?.status,
+      AttendanceStatus.absent,
+    );
+    final RemoteLink link =
+        (await repo.getRemoteLinks(target.id, SyncKind.attendance)).single;
+    expect(link.remoteId, 'their-page');
+  });
+
   test('keeping mine retires a page this device has no mark for', () async {
     // A row whose mark does not exist here has no link, so there was nothing
     // to mark as answered and it came back on every run — a rewrite could not

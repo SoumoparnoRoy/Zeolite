@@ -298,6 +298,8 @@ class SyncCoordinator {
 
     final SyncLocalRows read = await SyncLocalRows.read(_repository, _settings);
     final Map<SyncKind, List<SyncItem>> local = read.items;
+    final Map<SyncKind, List<RemoteState>> disputed =
+        await _claimUnkeyedRows(local, links, remote);
 
     // [rewrite] is the user having already answered this: they asked for the
     // far side to be written over. Without it, forgetting the ledger to force
@@ -326,6 +328,7 @@ class SyncCoordinator {
         items: local[kind]!,
         links: links[kind]!,
         remote: remote[kind],
+        disputed: disputed[kind] ?? const <RemoteState>[],
         local: read,
         merge: merge,
         tally: tally,
@@ -370,9 +373,26 @@ class SyncCoordinator {
     required SyncLocalRows local,
     required Map<String, SyncSide>? merge,
     required _Tally tally,
+    List<RemoteState> disputed = const <RemoteState>[],
     bool joining = false,
     bool rewrite = false,
   }) async {
+    // A row of theirs that says something else about a class this device also
+    // holds. Left out of the plan and put to the user instead: pushing would
+    // write over what they typed, and creating would file the same class
+    // twice.
+    final Set<String> held = <String>{};
+    for (final RemoteState state in disputed) {
+      held.add(state.localKey);
+      tally.review.add(SyncPull(remote: state));
+    }
+    if (held.isNotEmpty) {
+      items = <SyncItem>[
+        for (final SyncItem item in items)
+          if (!held.contains(item.localKey)) item,
+      ];
+    }
+
     final SyncPlan plan = SyncPlan.from(
       local: items,
       links: links,
@@ -553,23 +573,44 @@ class SyncCoordinator {
         continue;
       }
 
-      // A page with no link has no mark here to keep, so there is nothing to
-      // mark as needing a push — and a rewrite cannot make a link for a mark
-      // that does not exist. Left alone it was offered again on every run
-      // forever, so "mine wins" retires it instead. Trashed, not deleted.
       final RemoteLink? link = pull.link;
-      if (link == null) {
+      final SyncItem? mine = link == null
+          ? read.items[SyncKind.attendance]!
+              .where((SyncItem item) => item.localKey == pull.remote.localKey)
+              .firstOrNull
+          : null;
+
+      // A page with no link and no mark here has nothing to keep, so there is
+      // nothing to mark as needing a push — and a rewrite cannot make a link
+      // for a mark that does not exist. Left alone it was offered again on
+      // every run forever, so "mine wins" retires it instead. Trashed, not
+      // deleted.
+      if (link == null && mine == null) {
         final SyncOutcome outcome =
             await target.archive(SyncKind.attendance, pull.remote.remoteId);
         if (!outcome.ok) settled--;
         continue;
       }
+
+      // A row of theirs this device was recognised in has no link yet, so one
+      // is made here. An empty local hash is what says it still needs pushing,
+      // and the push is what puts the user's own answer into their row.
       write.add(
-        link.copyWith(
-          localHash: '',
-          remoteHash: pull.remote.hash,
-          syncedAt: _now(),
-        ),
+        link?.copyWith(
+              localHash: '',
+              remoteHash: pull.remote.hash,
+              syncedAt: _now(),
+            ) ??
+            RemoteLink(
+              target: target.id,
+              kind: SyncKind.attendance,
+              localKey: pull.remote.localKey,
+              remoteId: pull.remote.remoteId,
+              localHash: '',
+              remoteHash: pull.remote.hash,
+              origin: SyncOrigin.remote,
+              syncedAt: _now(),
+            ),
       );
     }
 
@@ -643,6 +684,48 @@ class SyncCoordinator {
   ) async {
     if (_kinds.any((SyncKind k) => links[k]!.isNotEmpty)) return;
     await _adoption.adopt(remote);
+  }
+
+  /// Folds into [remote] the rows a person kept on the far side before this
+  /// app wrote any key there, matched to the local rows nothing links yet.
+  /// Without it a table filled in by hand gets every class a second time the
+  /// moment its key column exists.
+  /// Returns the claimed rows that disagree with the local row they were
+  /// recognised in, for the caller to put to the user.
+  Future<Map<SyncKind, List<RemoteState>>> _claimUnkeyedRows(
+    Map<SyncKind, List<SyncItem>> local,
+    Map<SyncKind, List<RemoteLink>> links,
+    Map<SyncKind, List<RemoteState>?> remote,
+  ) async {
+    final Map<SyncKind, List<RemoteState>> disputed =
+        <SyncKind, List<RemoteState>>{};
+    for (final SyncKind kind in _kinds) {
+      final List<RemoteState>? known = remote[kind];
+      if (known == null) continue;
+      final Set<String> taken = <String>{
+        for (final RemoteLink link in links[kind]!) link.localKey,
+        for (final RemoteState state in known) state.localKey,
+      };
+      final List<SyncItem> unlinked = <SyncItem>[
+        for (final SyncItem item in local[kind]!)
+          if (!taken.contains(item.localKey)) item,
+      ];
+      if (unlinked.isEmpty) continue;
+      final List<SyncClaim> claimed = await target.claim(kind, unlinked);
+      if (claimed.isEmpty) continue;
+
+      remote[kind] = <RemoteState>[
+        ...known,
+        for (final SyncClaim claim in claimed)
+          if (claim.agrees) claim.state,
+      ];
+      final List<RemoteState> differing = <RemoteState>[
+        for (final SyncClaim claim in claimed)
+          if (!claim.agrees) claim.state,
+      ];
+      if (differing.isNotEmpty) disputed[kind] = differing;
+    }
+    return disputed;
   }
 
   /// The first run against a target — no ledger at all — is the only time two

@@ -90,6 +90,13 @@ class NotionProperties {
     return out;
   }
 
+  /// The key and nothing else, for a row somebody made by hand that already
+  /// says what the mark says: every other cell is theirs, worded their way.
+  Map<String, Object?> keyOnly(String localKey) => <String, Object?>{
+        if (mapping.fields[NotionField.key] case final NotionProperty key)
+          key.id: _text(localKey),
+      };
+
   /// What [decode] will report for this mark once it is written.
   ///
   /// Recorded as the remote hash after a push. Derived here rather than
@@ -146,7 +153,14 @@ class NotionProperties {
         (page['properties'] as Map<String, Object?>?) ?? <String, Object?>{};
     final String? localKey = plainTextOf(valueOf(properties, keyProperty));
     if (localKey == null || localKey.isEmpty) return null;
+    return stateOf(page, localKey);
+  }
 
+  /// [page] read as the row [localKey] names, whether or not the page says so
+  /// itself — which is how a hand-made row is claimed for the mark it matches.
+  RemoteState stateOf(Map<String, Object?> page, String localKey) {
+    final Map<String, Object?> properties =
+        (page['properties'] as Map<String, Object?>?) ?? <String, Object?>{};
     final String? word = optionNameOf(
       valueOf(properties, mapping.fields[NotionField.status]),
     );
@@ -164,7 +178,7 @@ class NotionProperties {
     return RemoteState(
       kind: SyncKind.attendance,
       localKey: localKey,
-      remoteId: id,
+      remoteId: page['id']! as String,
       hash: SyncItem(
         kind: SyncKind.attendance,
         localKey: localKey,

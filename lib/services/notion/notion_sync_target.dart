@@ -1,9 +1,12 @@
+import '../../domain/notion/notion_claim.dart';
 import '../../domain/notion/notion_course.dart';
 import '../../domain/notion/notion_mapping.dart';
+import '../../domain/notion/notion_page_rows.dart';
 import '../../domain/notion/notion_properties.dart';
 import '../../domain/sync/sync_target.dart';
 import 'notion_client.dart';
 import 'notion_courses_writer.dart';
+import 'notion_database_reader.dart';
 
 /// A Notion data source as somewhere attendance can be mirrored to.
 ///
@@ -81,18 +84,80 @@ class NotionSyncTarget implements SyncTarget {
     // have to be seen rather than duplicated.
     _courses?.forget();
 
+    _unkeyed = const <Map<String, Object?>>[];
+    _claimed.clear();
     final NotionRows rows = await _client.queryAllPages(_mapping.dataSourceId);
     if (!rows.ok) return null;
 
     final List<RemoteState> found = <RemoteState>[];
+    final List<Map<String, Object?>> unkeyed = <Map<String, Object?>>[];
     for (final Map<String, Object?> page in rows.pages) {
-      // Null is a row somebody made by hand, which belongs to the import
-      // screen; adopting it here would file it against a class it may have
-      // nothing to do with.
+      // Null is a row somebody made by hand. It is only ever taken for a mark
+      // by [claim], which knows the marks; filing it by itself here would put
+      // it against a class it may have nothing to do with.
       final RemoteState? state = _properties.decode(page);
-      if (state != null) found.add(state);
+      if (state != null) {
+        found.add(state);
+      } else if (page['id'] is String) {
+        unkeyed.add(page);
+      }
     }
+    _unkeyed = unkeyed;
     return found;
+  }
+
+  /// This run's pages with no key, kept from [fetch] so a claim costs no
+  /// second read of the table.
+  List<Map<String, Object?>> _unkeyed = const <Map<String, Object?>>[];
+
+  /// Pages claimed this run, so [update] writes nothing but the key into one.
+  final Set<String> _claimed = <String>{};
+
+  /// A row made by hand is the mark the import made from it, until the key
+  /// column exists and nothing yet says so. Pairing them here is what stops
+  /// the first run after adding the column filing every class twice.
+  @override
+  Future<List<SyncClaim>> claim(
+    SyncKind kind,
+    List<SyncItem> unlinked,
+  ) async {
+    final List<Map<String, Object?>> pages = _unkeyed;
+    if (kind != SyncKind.attendance || pages.isEmpty) {
+      return const <SyncClaim>[];
+    }
+
+    final NotionPageRows reader = NotionPageRows(_mapping);
+    final Map<String, String> courseNames = <String, String>{};
+    for (final String id in reader.relatedCourseIds(pages)) {
+      final String? title =
+          NotionDatabaseReader.titleOf((await _client.page(id)).body);
+      if (title != null) courseNames[id] = title;
+    }
+
+    final Map<String, SyncItem> markByKey = <String, SyncItem>{
+      for (final SyncItem item in unlinked) item.localKey: item,
+    };
+    final Map<String, String> paired = NotionClaim.pair(
+      rows: reader.unkeyed(pages, courseNames: courseNames),
+      marks: unlinked,
+      subjectName: (String uuid) => _course(uuid)?.name,
+    );
+    final Map<String, Map<String, Object?>> byId =
+        <String, Map<String, Object?>>{
+      for (final Map<String, Object?> page in pages)
+        page['id']! as String: page,
+    };
+
+    final List<SyncClaim> claimed = <SyncClaim>[];
+    for (final MapEntry<String, String> pair in paired.entries) {
+      final RemoteState state =
+          _properties.stateOf(byId[pair.value]!, pair.key);
+      final bool agrees =
+          state.hash == _properties.remoteHashFor(markByKey[pair.key]!);
+      if (agrees) _claimed.add(state.remoteId);
+      claimed.add(SyncClaim(state: state, agrees: agrees));
+    }
+    return claimed;
   }
 
   /// Refused rather than pushed when nothing can identify a row again.
@@ -136,8 +201,13 @@ class NotionSyncTarget implements SyncTarget {
         message: _noKeyColumn,
       );
     }
-    final NotionResult result =
-        await _client.updatePage(remoteId, await _encode(item));
+    // A claimed row takes the key alone. One that disagrees with the mark
+    // never reaches here: it goes to review, and comes back with a link.
+    final bool keyOnly = _claimed.remove(remoteId);
+    final NotionResult result = await _client.updatePage(
+      remoteId,
+      keyOnly ? _properties.keyOnly(item.localKey) : await _encode(item),
+    );
     if (!result.ok) return _failure(result);
     return SyncOutcome.done(
       remoteId: remoteId,

@@ -401,6 +401,19 @@ class RemoteState {
   final bool deleted;
 }
 
+/// A row on the far side that a local row has been recognised in.
+///
+/// [agrees] decides what may be done to it: one that already holds what the
+/// local row holds takes the key and nothing else, and one that does not is a
+/// disagreement for the user to settle.
+@immutable
+class SyncClaim {
+  const SyncClaim({required this.state, required this.agrees});
+
+  final RemoteState state;
+  final bool agrees;
+}
+
 /// Why a call did not go through. The coordinator treats these differently:
 /// [auth] stops the run and asks the user, the rest are retried with backoff.
 enum SyncFailure { offline, auth, rateLimited, rejected, unknown }
@@ -457,6 +470,11 @@ abstract class SyncTarget {
   /// What the target holds now, or null when it could not be read this run —
   /// the planner then pushes without claiming to know the far side.
   Future<List<RemoteState>?> fetch(SyncKind kind);
+
+  /// Rows [fetch] could not key that are these [unlinked] rows all the same,
+  /// keyed to them so the planner adopts each one instead of filing a copy
+  /// beside it. Only a target a person also writes to can hold such a row.
+  Future<List<SyncClaim>> claim(SyncKind kind, List<SyncItem> unlinked);
 
   Future<SyncOutcome> create(SyncItem item);
 

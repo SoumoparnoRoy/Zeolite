@@ -267,10 +267,92 @@ void main() {
 
     final List<RemoteState>? read = await target.fetch(SyncKind.attendance);
 
-    // Adopting a hand-made row would file it against a class it may have
-    // nothing to do with.
+    // Only a claim, which sees the marks, may take a hand-made row for one.
     expect(read, hasLength(1));
     expect(read!.single.remoteId, 'page-1');
+  });
+
+  test('a claimed row gets its key and keeps every other cell unless it '
+      'disagrees', () async {
+    Map<String, Object?> handMade(String id, String status) =>
+        <String, Object?>{
+          'id': id,
+          'properties': <String, Object?>{
+            'Course': <String, Object?>{
+              'id': 'p1',
+              'select': <String, Object?>{'name': 'Generic Course'},
+            },
+            'Date': <String, Object?>{
+              'id': 'p2',
+              'date': <String, Object?>{'start': '2026-03-04'},
+            },
+            'Status': <String, Object?>{
+              'id': 'p3',
+              'select': <String, Object?>{'name': status},
+            },
+            'Held': <String, Object?>{'id': 'p5', 'number': 1},
+          },
+        };
+    final Map<String, Map<String, Object?>> written =
+        <String, Map<String, Object?>>{};
+    final NotionSyncTarget target = _target(
+      MockClient((http.Request r) async {
+        if (r.url.path.endsWith('/query')) {
+          return http.Response(
+            jsonEncode(<String, Object?>{
+              'results': <Object?>[
+                handMade('theirs-9am', 'Present'),
+                handMade('theirs-10am', 'Present'),
+              ],
+              'has_more': false,
+            }),
+            200,
+          );
+        }
+        written[r.url.pathSegments.last] =
+            (jsonDecode(r.body) as Map<String, Object?>)['properties']!
+                as Map<String, Object?>;
+        return http.Response('{}', 200);
+      }),
+    );
+    final SyncItem agrees = _mark();
+    final SyncItem differs = SyncItem(
+      kind: SyncKind.attendance,
+      localKey: '$_uuid:20260304:600',
+      fields: const <String, Object?>{'status': 'absent', 'weight': 1},
+    );
+
+    await target.fetch(SyncKind.attendance);
+    final List<SyncClaim> claimed =
+        await target.claim(SyncKind.attendance, <SyncItem>[agrees, differs]);
+    final Map<String, String> pageOf = <String, String>{
+      for (final SyncClaim c in claimed) c.state.localKey: c.state.remoteId,
+    };
+    for (final SyncItem item in <SyncItem>[agrees, differs]) {
+      await target.update(item, pageOf[item.localKey]!);
+    }
+
+    expect(pageOf, hasLength(2));
+    // The row that disagrees is only ever written over once the user has
+    // answered for it, and then it takes the whole mark.
+    expect(
+      claimed.map((SyncClaim c) => c.agrees),
+      containsAll(<bool>[true, false]),
+    );
+    expect(written[pageOf[agrees.localKey]], <String, Object?>{
+      'p7': <String, Object?>{
+        'rich_text': <Object?>[
+          <String, Object?>{
+            'text': <String, Object?>{'content': agrees.localKey},
+          },
+        ],
+      },
+    });
+    // The app is where the class was marked, so a row saying otherwise is
+    // written over like any other.
+    expect(written[pageOf[differs.localKey]]!['p3'], <String, Object?>{
+      'select': <String, Object?>{'name': 'Absent'},
+    });
   });
 
   test('a database with no key column reports itself unreadable', () async {

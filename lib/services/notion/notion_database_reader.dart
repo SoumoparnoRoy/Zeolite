@@ -70,7 +70,7 @@ class NotionDatabaseReader {
     // leaves its own rows to be reported as unnamed rather than failing an
     // import over one page.
     for (final String id in pageRows.relatedCourseIds(rows.pages)) {
-      final String? title = _titleOf((await _client.page(id)).body);
+      final String? title = titleOf((await _client.page(id)).body);
       if (title != null) courseNames[id] = title;
     }
 
@@ -84,7 +84,7 @@ class NotionDatabaseReader {
   }
 
   /// A page's own name, which is whichever of its properties is the title.
-  static String? _titleOf(Map<String, Object?>? page) {
+  static String? titleOf(Map<String, Object?>? page) {
     final Object? properties = page?['properties'];
     if (properties is! Map<String, Object?>) return null;
     for (final Object? value in properties.values) {

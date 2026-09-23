@@ -25,9 +25,19 @@ import '../../widgets/undo_snack.dart';
 /// answer for itself — and which changes both the subjects created and what a
 /// lab is worth, so the totals are re-read as it flips.
 class NotionImportScreen extends ConsumerStatefulWidget {
-  const NotionImportScreen({super.key, required this.export});
+  const NotionImportScreen({
+    super.key,
+    required this.export,
+    this.title = 'Classes from Notion',
+    this.remap,
+  });
 
   final NotionExport export;
+  final String title;
+
+  /// Reads the file again under a mapping the user changes, for a class log
+  /// whose columns were guessed. Null where there is nothing to remap.
+  final Future<NotionExport?> Function()? remap;
 
   @override
   ConsumerState<NotionImportScreen> createState() => _NotionImportScreenState();
@@ -45,6 +55,20 @@ class _NotionImportScreenState extends ConsumerState<NotionImportScreen> {
           : NotionGrouping.separate);
 
   bool _countUntyped = true;
+
+  late NotionExport _export = widget.export;
+
+  Future<void> _remap() async {
+    final NotionExport? read = await widget.remap!();
+    if (read != null && mounted) {
+      setState(() {
+        _export = read;
+        // What was chosen belonged to the rows as they were read before.
+        _excluded.clear();
+        _seeded.clear();
+      });
+    }
+  }
 
   final Set<String> _excluded = <String>{};
   final Set<String> _seeded = <String>{};
@@ -104,7 +128,7 @@ class _NotionImportScreenState extends ConsumerState<NotionImportScreen> {
     final NotionGrouping grouping =
         _groupingFrom(data?.categories ?? const <ClassCategory>[]);
     final NotionPlan plan = NotionPlan.from(
-      export: widget.export,
+      export: _export,
       grouping: grouping,
       subjects: data?.subjects ?? const <Subject>[],
       slots: data?.slots ?? const <ClassSlot>[],
@@ -124,7 +148,7 @@ class _NotionImportScreenState extends ConsumerState<NotionImportScreen> {
     );
 
     return PushScaffold(
-      title: 'Classes from Notion',
+      title: widget.title,
       subtitle: '${Words.plural(plan.subjects.length, 'subject')} · '
           '${Words.plural(classes, 'class', 'classes')} to bring in',
       floatingActionButton: classes == 0 || _saving
@@ -138,9 +162,18 @@ class _NotionImportScreenState extends ConsumerState<NotionImportScreen> {
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 96),
           sliver: SliverList.list(
             children: <Widget>[
-              if (widget.export.problems.isNotEmpty)
-                _Problems(problems: widget.export.problems),
-              _OutsideTermWarning(export: widget.export, settings: settings),
+              if (widget.remap != null)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: _remap,
+                    icon: const Icon(Icons.tune_rounded, size: 17),
+                    label: const Text('Change how the file is read'),
+                  ),
+                ),
+              if (_export.problems.isNotEmpty)
+                _Problems(problems: _export.problems),
+              _OutsideTermWarning(export: _export, settings: settings),
               _CancelledRule(plan: plan, settings: settings),
               _TypeWorth(
                 plan: plan,
@@ -163,7 +196,7 @@ class _NotionImportScreenState extends ConsumerState<NotionImportScreen> {
               SectionHeader(
                 'What was read',
                 trailing: Text(
-                  _span(widget.export),
+                  _span(_export),
                   style: TextStyle(
                     fontSize: 11.5,
                     fontWeight: FontWeight.w600,

@@ -10,12 +10,15 @@ import '../../core/words.dart';
 import '../../data/models/class_category.dart';
 import '../../data/models/subject.dart';
 import '../../data/settings/app_settings.dart';
+import '../../domain/class_log.dart';
 import '../../domain/class_weight.dart';
 import '../../domain/notion_export.dart';
+import '../../services/class_log_mapping_store.dart';
 import '../../state/providers.dart';
 import '../../widgets/common.dart';
 import '../../widgets/undo_snack.dart';
 import '../subjects/class_editor_sheets.dart';
+import '../subjects/class_log_mapping_screen.dart';
 import '../subjects/notion_import_screen.dart';
 import '../subjects/subjects_screen.dart';
 import '../timetable/import_screen.dart';
@@ -76,7 +79,7 @@ class SubjectsSection extends ConsumerWidget {
           child: SettingsRow(
             icon: Icons.history_rounded,
             title: 'Import a class log',
-            value: 'A Notion export of what you have attended',
+            value: 'A spreadsheet or Notion export of what you attended',
             onTap: () => _importNotionLog(context, ref),
           ),
         ),
@@ -91,34 +94,79 @@ class SubjectsSection extends ConsumerWidget {
 
   /// Reads the file and hands it to the preview, which owns the writing — the
   /// same split the portal page's import uses.
+  ///
+  /// A file that explains itself — a template export, or a layout read once
+  /// before — goes straight to the preview; anything else is matched first.
   Future<void> _importNotionLog(BuildContext context, WidgetRef ref) async {
     final PlatformFile? picked = await FilePicker.pickFile(
-      dialogTitle: 'Choose a Notion export',
+      dialogTitle: 'Choose a class log (CSV or Notion export)',
     );
     if (picked == null || !context.mounted) return;
 
-    final NotionExport export = NotionExport.read(await picked.readAsBytes());
+    final ClassLogTable? table = ClassLogTable.of(await picked.readAsBytes());
+    if (!context.mounted) return;
+    if (table == null) {
+      _say(context, 'No rows could be found in that file. It needs to be a '
+          'CSV, or a Notion export holding one.');
+      return;
+    }
+
+    final ClassLogMappingStore store = ClassLogMappingStore();
+    ClassLogMapping? mapping =
+        ((await store.load(table)) ?? ClassLogMapping.guess(table))
+            .withGuessedWords(table);
     if (!context.mounted) return;
 
+    Future<ClassLogMapping?> ask(ClassLogMapping from) =>
+        Navigator.of(context).push<ClassLogMapping>(
+          MaterialPageRoute<ClassLogMapping>(
+            settings: const RouteSettings(name: 'class_log_mapping'),
+            builder: (BuildContext context) =>
+                ClassLogMappingScreen(table: table, initial: from),
+          ),
+        );
+
+    if (!mapping.readyFor(table)) {
+      mapping = await ask(mapping);
+      if (mapping == null || !context.mounted) return;
+    }
+    await store.save(table, mapping);
+
+    final NotionExport export = readClassLog(table, mapping);
+    if (!context.mounted) return;
     if (export.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(export.problems.isEmpty
-              ? 'No classes could be read out of that file.'
-              : export.problems.first),
-          duration: const Duration(seconds: 6),
-        ),
+      _say(
+        context,
+        export.problems.isEmpty
+            ? 'No classes could be read out of that file.'
+            : export.problems.first,
       );
       return;
     }
 
+    ClassLogMapping current = mapping;
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         settings: const RouteSettings(name: 'notion_import'),
-        builder: (BuildContext context) => NotionImportScreen(export: export),
+        builder: (BuildContext context) => NotionImportScreen(
+          export: export,
+          title: 'Classes from the file',
+          remap: () async {
+            final ClassLogMapping? changed = await ask(current);
+            if (changed == null) return null;
+            current = changed;
+            await store.save(table, changed);
+            return readClassLog(table, changed);
+          },
+        ),
       ),
     );
   }
+
+  void _say(BuildContext context, String message) =>
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), duration: const Duration(seconds: 6)),
+      );
 }
 
 class CategoriesSection extends ConsumerWidget {

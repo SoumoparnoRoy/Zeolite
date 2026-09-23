@@ -6,6 +6,8 @@ import 'package:flutter/foundation.dart';
 
 import '../core/date_utils.dart';
 import '../data/models/attendance_status.dart';
+import 'class_log.dart';
+import 'notion/notion_mapping.dart';
 
 /// Which part of a course a row belongs to.
 enum NotionKind {
@@ -71,6 +73,7 @@ class NotionRow {
     int? credit,
     int? startMinutes,
     String? kindLabel,
+    String? tag,
   }) {
     final String raw = status.trim().toLowerCase();
     final AttendanceStatus read = NotionExport._statusOf(raw, held, credit);
@@ -84,7 +87,7 @@ class NotionRow {
       // keeps a size for the setting to credit.
       weight: math.max(read == AttendanceStatus.cancelled ? 1 : 0, held),
       startMinutes: startMinutes,
-      tagName: raw == 'proxy' ? 'Proxy' : null,
+      tagName: tag ?? (raw == 'proxy' ? 'Proxy' : null),
       creditDisagrees: held > 0 && NotionExport._creditDisagrees(raw, credit),
       credited: (raw == 'cancelled' || raw == 'canceled') && credit != null
           ? held > 0 && credit > 0
@@ -172,14 +175,37 @@ class NotionExport {
   /// [today] anchors the year, which the export leaves off. Injected so the
   /// inference is testable rather than tied to the clock.
   static NotionExport read(Uint8List bytes, {DateTime? today}) {
-    final String? csv = _findCsv(bytes);
-    if (csv == null) {
+    if (_findCsv(bytes) == null) {
       return const NotionExport(
         rows: <NotionRow>[],
         problems: <String>['No CSV was found in that file.'],
       );
     }
-    return _parse(csv, today ?? Dates.today());
+    final ClassLogTable? table = ClassLogTable.of(bytes);
+    if (table == null) {
+      return const NotionExport(
+        rows: <NotionRow>[],
+        problems: <String>['That CSV has no rows in it.'],
+      );
+    }
+    final ClassLogMapping mapping = ClassLogMapping.guess(table);
+    if (!<NotionField>[NotionField.course, NotionField.date, NotionField.status]
+        .every(mapping.columns.containsKey)) {
+      return const NotionExport(
+        rows: <NotionRow>[],
+        problems: <String>[
+          'That CSV is not a Notion class log — it needs a course, a date and '
+              'a status column.',
+        ],
+      );
+    }
+    return readClassLog(table, mapping, today: today);
+  }
+
+  /// The file's CSV as cells, wherever in the export it sits.
+  static List<List<String>>? csvCells(Uint8List bytes) {
+    final String? csv = _findCsv(bytes);
+    return csv == null ? null : readCsv(csv);
   }
 
   /// Walks a zip for the export's CSV, one level of nesting deep.
@@ -235,79 +261,6 @@ class NotionExport {
     return text.startsWith('﻿') ? text.substring(1) : text;
   }
 
-  static NotionExport _parse(String csv, DateTime today) {
-    final List<List<String>> table = readCsv(csv);
-    if (table.isEmpty) {
-      return const NotionExport(
-        rows: <NotionRow>[],
-        problems: <String>['That CSV has no rows in it.'],
-      );
-    }
-
-    final _Columns? columns = _Columns.from(table.first);
-    if (columns == null) {
-      return const NotionExport(
-        rows: <NotionRow>[],
-        problems: <String>[
-          'That CSV is not a Notion class log — it needs a course, a date and '
-              'a status column.',
-        ],
-      );
-    }
-
-    final List<NotionRow> rows = <NotionRow>[];
-    final List<String> problems = <String>[];
-
-    for (int i = 1; i < table.length; i++) {
-      final List<String> cells = table[i];
-      if (cells.every((String c) => c.trim().isEmpty)) continue;
-
-      String at(int? index) =>
-          index == null || index >= cells.length ? '' : cells[index].trim();
-
-      final String course = _courseName(at(columns.course));
-      final String component = at(columns.component);
-      final String label = component.isEmpty ? course : component;
-      final String where = 'Row ${i + 1}${label.isEmpty ? '' : ' ($label)'}';
-
-      final DateTime? date = _date(at(columns.date), today);
-      if (date == null) {
-        problems.add('$where: "${at(columns.date)}" is not a date this can '
-            'read.');
-        continue;
-      }
-      if (course.isEmpty) {
-        problems.add('$where: no course named.');
-        continue;
-      }
-
-      final String raw = at(columns.status).toLowerCase();
-      if (!NotionRow.knowsStatus(raw)) {
-        problems.add('$where: "${at(columns.status)}" is not a status this '
-            'can read.');
-        continue;
-      }
-
-      final int held = int.tryParse(at(columns.held)) ?? 1;
-      final int? credit = int.tryParse(at(columns.credit));
-
-      rows.add(
-        NotionRow.read(
-          component: component,
-          course: course,
-          kind: NotionKind.fromLabel(at(columns.kind)) ?? NotionKind.lecture,
-          date: date,
-          status: raw,
-          held: held,
-          credit: credit,
-          kindLabel: at(columns.kind),
-        ),
-      );
-    }
-
-    return NotionExport(rows: rows, problems: problems);
-  }
-
   static const Set<String> _known = <String>{
     'present',
     'absent',
@@ -340,7 +293,18 @@ class NotionExport {
 
   /// `Thermodynamics (https://notion.so/...)` — Notion appends the page link
   /// to every relation cell.
-  static String _courseName(String cell) {
+  /// `09:00` as minutes past midnight, or null.
+  static int? timeOf(String? text) {
+    if (text == null) return null;
+    final Match? match = RegExp(r'^\s*(\d{1,2}):(\d{2})').firstMatch(text);
+    if (match == null) return null;
+    final int hour = int.parse(match.group(1)!);
+    final int minute = int.parse(match.group(2)!);
+    if (hour > 23 || minute > 59) return null;
+    return hour * 60 + minute;
+  }
+
+  static String courseName(String cell) {
     final int link = cell.indexOf(' (http');
     return (link < 0 ? cell : cell.substring(0, link)).trim();
   }
@@ -350,18 +314,31 @@ class NotionExport {
     'jul', 'aug', 'sep', 'oct', 'nov', 'dec',
   ];
 
-  /// Reads `Jul 27`, `July 27, 2025` or an ISO date.
+  /// Reads `Jul 27`, `July 27, 2025`, an ISO date, or a numeric one such as
+  /// `27/07/2025` in the order [dayFirst] gives — null leaves a numeric date
+  /// unread, since `05/08` is a different day either way.
   ///
   /// With no year printed — which is what Notion does inside the current year
   /// — the date is placed at its most recent occurrence on or before [today].
   /// A term running across new year then splits correctly: January lands in
   /// this year and December in the last.
-  static DateTime? _date(String cell, DateTime today) {
+  static DateTime? dateOf(String cell, DateTime today, {bool? dayFirst}) {
     final String value = cell.trim();
     if (value.isEmpty) return null;
 
     final DateTime? iso = DateTime.tryParse(value);
     if (iso != null) return DateTime(iso.year, iso.month, iso.day);
+
+    final List<int>? numbers = ClassLogMapping.numericDate(value);
+    if (numbers != null) {
+      if (dayFirst == null) return null;
+      final int day = dayFirst ? numbers[0] : numbers[1];
+      final int month = dayFirst ? numbers[1] : numbers[0];
+      final int year = numbers[2] < 100 ? 2000 + numbers[2] : numbers[2];
+      final DateTime date = DateTime(year, month, day);
+      // DateTime rolls 31/02 into March; a date that moved was not a date.
+      return date.day == day && date.month == month ? date : null;
+    }
 
     final RegExpMatch? match = RegExp(
       r'^([A-Za-z]{3,})\.?\s+(\d{1,2})(?:\s*,?\s*(\d{4}))?$',
@@ -384,55 +361,6 @@ class NotionExport {
   }
 }
 
-/// Which column holds what, located by header name.
-///
-/// Matched loosely because the columns are the user's own: they can be
-/// reordered, and the two counters are named after their own values.
-class _Columns {
-  const _Columns({
-    required this.course,
-    required this.date,
-    required this.status,
-    this.component,
-    this.kind,
-    this.held,
-    this.credit,
-  });
-
-  final int course;
-  final int date;
-  final int status;
-  final int? component;
-  final int? kind;
-  final int? held;
-  final int? credit;
-
-  static _Columns? from(List<String> header) {
-    int? find(bool Function(String) test) {
-      for (int i = 0; i < header.length; i++) {
-        if (test(header[i].trim().toLowerCase())) return i;
-      }
-      return null;
-    }
-
-    final int? course = find((String h) => h == 'course');
-    final int? date = find((String h) => h == 'date');
-    final int? status = find((String h) => h == 'status');
-    if (course == null || date == null || status == null) return null;
-
-    return _Columns(
-      course: course,
-      date: date,
-      status: status,
-      component: find((String h) => h == 'name'),
-      kind: find((String h) => h.contains('l/t/p') || h == 'type'),
-      // "Held?" is a yes/no beside it, so the counter is the one carrying its
-      // own values in the name.
-      held: find((String h) => h.startsWith('held') && h.contains('/')),
-      credit: find((String h) => h.contains('credit')),
-    );
-  }
-}
 
 /// Splits CSV text into rows of cells, honouring quotes.
 ///

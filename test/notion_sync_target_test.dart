@@ -206,6 +206,32 @@ void main() {
     });
   });
 
+  test("a class's own type wins over its subject's", () async {
+    late http.Request sent;
+    final NotionSyncTarget target = _target(
+      MockClient((http.Request r) async {
+        sent = r;
+        return http.Response('{"id":"page-1"}', 200);
+      }),
+      category: 'Seminar',
+    );
+
+    await target.create(
+      SyncItem(
+        kind: SyncKind.attendance,
+        localKey: _key,
+        fields: const <String, Object?>{'status': 'present', 'category': 'Lab'},
+      ),
+    );
+
+    final Map<String, Object?> props =
+        (jsonDecode(sent.body) as Map<String, Object?>)['properties']!
+            as Map<String, Object?>;
+    expect(props['p4'], <String, Object?>{
+      'select': <String, Object?>{'name': 'Practical'},
+    });
+  });
+
   test('a category nobody has paired leaves the type alone', () async {
     late http.Request sent;
     final NotionSyncTarget target = _target(

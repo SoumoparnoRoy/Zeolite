@@ -28,6 +28,7 @@ class AttendanceActions {
       current: session.status,
       status: status,
       weight: session.record?.weight ?? session.weight,
+      categoryId: session.record?.categoryId ?? session.categoryId,
       // Carried across a status change on purpose. `setAttendance` replaces the
       // row, so without this, correcting Present to Absent would silently drop
       // the tag — and the tag describes the class, not the verdict. Clearing
@@ -50,6 +51,7 @@ class AttendanceActions {
     required AttendanceStatus? current,
     required AttendanceStatus status,
     int weight = 1,
+    int? categoryId,
     int? tagId,
   }) async {
     if (current == status) {
@@ -60,6 +62,13 @@ class AttendanceActions {
       );
       return;
     }
+    // The log corrects a mark with no session behind it, so the type it was
+    // made with is read back rather than lost to the row being replaced.
+    final int? type = categoryId ??
+        (current == null
+            ? null
+            : (await _core.repo.getAttendanceAt(subjectId, date, startMinutes))
+                ?.categoryId);
     await _core.repo.setAttendance(
       AttendanceRecord(
         subjectId: subjectId,
@@ -67,6 +76,7 @@ class AttendanceActions {
         startMinutes: startMinutes,
         status: status,
         weight: weight,
+        categoryId: type,
         tagId: tagId,
         markedAt: DateTime.now(),
       ),
@@ -145,6 +155,7 @@ class AttendanceActions {
           startMinutes: session.startMinutes,
           status: status,
           weight: session.weight,
+          categoryId: session.categoryId,
           markedAt: DateTime.now(),
         ),
       );

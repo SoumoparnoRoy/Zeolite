@@ -29,7 +29,7 @@ class AppDatabase {
   // install finds its data, so renaming it would strand every database in
   // place and read as a wipe. It is never shown to the user.
   static const String fileName = 'attend_it.db';
-  static const int schemaVersion = 13;
+  static const int schemaVersion = 14;
 
   Database? _db;
 
@@ -184,6 +184,19 @@ class AppDatabase {
             // still follows the rule, which is what every existing install
             // already does.
             await db.execute(_slotOverridesTable);
+          }
+          if (oldVersion < 14) {
+            // v14 adds a per-class type. Left null on every existing row,
+            // which reads exactly as it did before.
+            for (final String table in <String>[
+              'class_slots',
+              'extra_classes',
+              'attendance',
+            ]) {
+              await db.execute(
+                'ALTER TABLE $table ADD COLUMN category_id INTEGER',
+              );
+            }
           }
           await db.execute(_slotOverrideIndex);
           await db.execute(_subjectUuidIndex);
@@ -348,6 +361,7 @@ class AppDatabase {
         end_minutes   INTEGER NOT NULL,
         room          TEXT,
         weight        INTEGER NOT NULL DEFAULT 1,
+        category_id   INTEGER,
         start_date    INTEGER NOT NULL,
         end_date      INTEGER,
         FOREIGN KEY (subject_id) REFERENCES subjects (id) ON DELETE CASCADE
@@ -365,6 +379,7 @@ class AppDatabase {
         end_minutes   INTEGER NOT NULL,
         room          TEXT,
         weight        INTEGER NOT NULL DEFAULT 1,
+        category_id   INTEGER,
         note          TEXT,
         FOREIGN KEY (subject_id) REFERENCES subjects (id) ON DELETE CASCADE
       )
@@ -379,6 +394,7 @@ class AppDatabase {
         start_minutes INTEGER NOT NULL,
         status        TEXT    NOT NULL,
         weight        INTEGER NOT NULL DEFAULT 1,
+        category_id   INTEGER,
         tag_id        INTEGER,
         note          TEXT,
         marked_at     INTEGER NOT NULL,

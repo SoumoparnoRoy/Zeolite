@@ -9,6 +9,7 @@ import '../../data/models/class_category.dart';
 import '../../data/models/class_slot.dart';
 import '../../data/models/subject.dart';
 import '../../data/settings/app_settings.dart';
+import '../../domain/class_weight.dart';
 import '../../domain/notion_export.dart';
 import '../../domain/notion_import.dart';
 import '../../state/providers.dart';
@@ -82,6 +83,7 @@ class _NotionImportScreenState extends ConsumerState<NotionImportScreen> {
           if (!_excluded.contains(s.name)) s,
       ],
       cancelledCounts: plan.countsCancelled,
+      typeWeights: plan.typeWeights,
     );
     if (!mounted) return;
     navigator.pop();
@@ -140,6 +142,10 @@ class _NotionImportScreenState extends ConsumerState<NotionImportScreen> {
                 _Problems(problems: widget.export.problems),
               _OutsideTermWarning(export: widget.export, settings: settings),
               _CancelledRule(plan: plan, settings: settings),
+              _TypeWorth(
+                plan: plan,
+                types: data?.categories ?? const <ClassCategory>[],
+              ),
               if (plan.untyped > 0)
                 _UntypedChoice(
                   rows: plan.untyped,
@@ -330,6 +336,57 @@ class _CancelledRule extends StatelessWidget {
             const SizedBox(height: 5),
             Text(
               '$why Cancelled classes count as attended in Settings.$rest',
+              style: const TextStyle(fontSize: 12.5, height: 1.4),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The class types whose worth the import sets, said before it does. A type
+/// already worth what the table counts goes unmentioned.
+class _TypeWorth extends StatelessWidget {
+  const _TypeWorth({required this.plan, required this.types});
+
+  final NotionPlan plan;
+  final List<ClassCategory> types;
+
+  @override
+  Widget build(BuildContext context) {
+    final List<String> lines = <String>[
+      for (final MapEntry<String, int> type in plan.typeWeights.entries)
+        if (type.value !=
+            (types
+                    .where((ClassCategory c) =>
+                        c.name.toLowerCase() == type.key.toLowerCase())
+                    .firstOrNull
+                    ?.weight ??
+                1))
+          '${type.key}: ${classWeightLabel(type.value)}',
+    ];
+    if (lines.isEmpty) return const SizedBox.shrink();
+
+    final AppPalette p = context.palette;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: SurfaceCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              'Class types will count as your table counts them',
+              style: TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w700,
+                color: p.warning,
+              ),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              '${lines.join(' · ')}. Classes you add later count the same. '
+              'Marks already in the app keep what they were worth.',
               style: const TextStyle(fontSize: 12.5, height: 1.4),
             ),
           ],

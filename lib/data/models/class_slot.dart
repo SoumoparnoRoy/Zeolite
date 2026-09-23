@@ -21,6 +21,7 @@ class ClassSlot {
     required this.endMinutes,
     this.room,
     this.weight = 1,
+    this.categoryId,
     required this.startDate,
     this.endDate,
   });
@@ -43,6 +44,10 @@ class ClassSlot {
   /// How many classes one occurrence of this rule counts as. 1 unless the
   /// institution counts a longer class more than once.
   final int weight;
+
+  /// A type of this rule's own, for the practical meeting of a course that
+  /// also lectures. Null uses the subject's.
+  final int? categoryId;
 
   /// First date this rule applies from (inclusive). Recurrence runs forward
   /// from here, which is exactly the "repeats every week from now on" model.
@@ -82,6 +87,8 @@ class ClassSlot {
     int? endMinutes,
     String? room,
     int? weight,
+    int? categoryId,
+    bool clearCategory = false,
     DateTime? startDate,
     DateTime? endDate,
     bool clearEndDate = false,
@@ -95,6 +102,7 @@ class ClassSlot {
       endMinutes: endMinutes ?? this.endMinutes,
       room: room ?? this.room,
       weight: weight ?? this.weight,
+      categoryId: clearCategory ? null : (categoryId ?? this.categoryId),
       startDate: startDate ?? this.startDate,
       endDate: clearEndDate ? null : (endDate ?? this.endDate),
     );
@@ -109,6 +117,7 @@ class ClassSlot {
         'end_minutes': endMinutes,
         'room': room,
         'weight': weight,
+        'category_id': categoryId,
         'start_date': Dates.keyOf(startDate),
         'end_date': endDate == null ? null : Dates.keyOf(endDate!),
       };
@@ -123,6 +132,7 @@ class ClassSlot {
       endMinutes: (map['end_minutes'] as int?) ?? 0,
       room: map['room'] as String?,
       weight: math.max(0, (map['weight'] as num?)?.toInt() ?? 1),
+      categoryId: map['category_id'] as int?,
       startDate: Dates.fromKey((map['start_date'] as int?) ?? 19700101),
       endDate: map['end_date'] == null
           ? null

@@ -681,13 +681,23 @@ final defaultWeightProvider = Provider.family<int, int?>((ref, int? subjectId) {
 /// Without this the two rules are indistinguishable on screen, which is how a
 /// subject that was never given a category reads as a broken feature rather
 /// than as a subject that was never given a category.
-final defaultDurationLabelProvider =
-    Provider.family<String, int?>((ref, int? subjectId) {
-  final int minutes = ref.watch(defaultDurationProvider(subjectId));
+final defaultDurationLabelProvider = Provider.family<String, int?>(
+  (ref, int? subjectId) => ref.watch(
+    classLengthLabelProvider((subjectId: subjectId, categoryId: null)),
+  ),
+);
+
+/// [defaultDurationLabelProvider] for a class with a type of its own, which
+/// is what its length then follows.
+final classLengthLabelProvider =
+    Provider.family<String, ({int? subjectId, int? categoryId})>((ref, key) {
   final DayGrid grid = ref.watch(dayGridProvider);
   final TimetableData? data = ref.watch(timetableProvider).value;
+  final ClassCategory? own = data?.categoryById(key.categoryId);
+  final int minutes = own?.defaultDurationMinutes ??
+      ref.watch(defaultDurationProvider(key.subjectId));
   final ClassCategory? category =
-      data?.categoryFor(data.subjectById(subjectId));
+      own ?? data?.categoryFor(data.subjectById(key.subjectId));
 
   final List<String> parts = <String>[category?.name ?? 'no category'];
   if (grid.isWholeBlocks(minutes)) {

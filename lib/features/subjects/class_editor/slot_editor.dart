@@ -5,8 +5,10 @@ import '../../../core/app_theme.dart';
 import '../../../core/date_utils.dart';
 import '../../../core/time_picker.dart';
 import '../../../data/models/attendance_record.dart';
+import '../../../data/models/class_category.dart';
 import '../../../data/models/class_slot.dart';
 import '../../../domain/class_clash.dart';
+import '../../../domain/class_weight.dart';
 import '../../../state/providers.dart';
 import '../../../widgets/common.dart';
 
@@ -97,11 +99,21 @@ class _SlotFormState extends ConsumerState<_SlotForm> {
 
   bool get _isEditing => widget.slot != null;
 
-  /// The class length implied by the chosen subject's category, falling back
-  /// to the global setting.
-  int get _defaultDuration => ref.read(defaultDurationProvider(_subjectId));
+  /// Null leaves the type to the subject.
+  int? _categoryId;
 
-  int get _defaultWeight => ref.read(defaultWeightProvider(_subjectId));
+  ClassCategory? get _ownType =>
+      ref.read(timetableProvider).value?.categoryById(_categoryId);
+
+  /// Length from the class's type, falling back to the subject's category
+  /// and then the global setting.
+  int get _defaultDuration =>
+      _ownType?.defaultDurationMinutes ??
+      ref.read(defaultDurationProvider(_subjectId));
+
+  int get _defaultWeight => _ownType == null
+      ? ref.read(defaultWeightProvider(_subjectId))
+      : weightFor(_ownType);
 
   /// Re-lengths every row from the current default. Call inside setState.
   void _applyDefaultDurationToAll() {
@@ -134,6 +146,7 @@ class _SlotFormState extends ConsumerState<_SlotForm> {
     final ClassSlot? slot = widget.slot;
     final DateTime seed = widget.initialDate ?? Dates.today();
     _subjectId = slot?.subjectId;
+    _categoryId = slot?.categoryId;
 
     if (slot != null) {
       _lastStart = slot.startMinutes;
@@ -404,6 +417,7 @@ class _SlotFormState extends ConsumerState<_SlotForm> {
         endMinutes: time.endMinutes,
         room: time.room,
         weight: _weight,
+        categoryId: _categoryId,
         startDate: _startDate,
         endDate: _endDate,
       );
@@ -433,6 +447,7 @@ class _SlotFormState extends ConsumerState<_SlotForm> {
             endMinutes: time.endMinutes,
             room: time.room,
             weight: _weight,
+            categoryId: _categoryId,
             startDate: _startDate,
             endDate: _endDate,
           ),
@@ -449,7 +464,9 @@ class _SlotFormState extends ConsumerState<_SlotForm> {
     final bool use24Hour =
         ref.watch(settingsProvider).value?.use24HourTime ?? false;
     final String durationLabel =
-        ref.watch(defaultDurationLabelProvider(_subjectId));
+        ref.watch(classLengthLabelProvider(
+          (subjectId: _subjectId, categoryId: _categoryId),
+        ));
     final List<int> days = _days;
 
     return Column(
@@ -508,6 +525,16 @@ class _SlotFormState extends ConsumerState<_SlotForm> {
             ),
           ),
         ],
+        const SizedBox(height: AppSpacing.xl),
+        TypePicker(
+          subjectId: _subjectId,
+          value: _categoryId,
+          onChanged: (int? id) => setState(() {
+            _categoryId = id;
+            if (!_durationTouched) _applyDefaultDurationToAll();
+            if (!_weightTouched) _weight = _defaultWeight;
+          }),
+        ),
         const SizedBox(height: AppSpacing.xl),
         WeightPicker(
           value: _weight,

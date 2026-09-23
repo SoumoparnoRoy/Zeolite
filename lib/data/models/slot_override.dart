@@ -73,6 +73,7 @@ class SlotOverride {
       endMinutes: endMinutes ?? slot.endMinutes,
       room: room ?? slot.room,
       weight: slot.weight,
+      categoryId: slot.categoryId,
       startDate: slot.startDate,
       endDate: slot.endDate,
     );

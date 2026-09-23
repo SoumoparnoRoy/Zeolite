@@ -5,8 +5,10 @@ import '../../../core/app_theme.dart';
 import '../../../core/date_utils.dart';
 import '../../../core/time_picker.dart';
 import '../../../data/models/attendance_record.dart';
+import '../../../data/models/class_category.dart';
 import '../../../data/models/extra_class.dart';
 import '../../../domain/class_clash.dart';
+import '../../../domain/class_weight.dart';
 import '../../../state/providers.dart';
 import '../../../widgets/common.dart';
 
@@ -54,9 +56,19 @@ class _ExtraClassFormState extends ConsumerState<_ExtraClassForm> {
 
   bool get _isEditing => widget.extra != null;
 
-  int get _defaultDuration => ref.read(defaultDurationProvider(_subjectId));
+  /// See the weekly form's `_categoryId`.
+  int? _categoryId;
 
-  int get _defaultWeight => ref.read(defaultWeightProvider(_subjectId));
+  ClassCategory? get _ownType =>
+      ref.read(timetableProvider).value?.categoryById(_categoryId);
+
+  int get _defaultDuration =>
+      _ownType?.defaultDurationMinutes ??
+      ref.read(defaultDurationProvider(_subjectId));
+
+  int get _defaultWeight => _ownType == null
+      ? ref.read(defaultWeightProvider(_subjectId))
+      : weightFor(_ownType);
 
   @override
   void initState() {
@@ -66,6 +78,7 @@ class _ExtraClassFormState extends ConsumerState<_ExtraClassForm> {
     _room = TextEditingController(text: extra?.room ?? '');
     if (extra != null) {
       _subjectId = extra.subjectId;
+      _categoryId = extra.categoryId;
       _start = extra.startMinutes;
       _end = extra.endMinutes;
       _weight = extra.weight;
@@ -160,6 +173,7 @@ class _ExtraClassFormState extends ConsumerState<_ExtraClassForm> {
       endMinutes: _end,
       room: _room.text.trim().isEmpty ? null : _room.text.trim(),
       weight: _weight,
+      categoryId: _categoryId,
       note: widget.extra?.note,
     );
 
@@ -251,6 +265,18 @@ class _ExtraClassFormState extends ConsumerState<_ExtraClassForm> {
         const SizedBox(height: AppSpacing.lg),
         const SectionHeader('Room'),
         RoomField(controller: _room),
+        const SizedBox(height: AppSpacing.xl),
+        TypePicker(
+          subjectId: _subjectId,
+          value: _categoryId,
+          onChanged: (int? id) => setState(() {
+            _categoryId = id;
+            if (!_durationTouched) {
+              _end = Clock.endFromStart(_start, _defaultDuration);
+            }
+            if (!_weightTouched) _weight = _defaultWeight;
+          }),
+        ),
         const SizedBox(height: AppSpacing.xl),
         WeightPicker(
           value: _weight,

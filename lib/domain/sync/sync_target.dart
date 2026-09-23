@@ -86,6 +86,7 @@ class SyncItem {
     AttendanceRecord record,
     String subjectUuid, {
     String? tagName,
+    String? categoryName,
   }) {
     return SyncItem(
       kind: SyncKind.attendance,
@@ -95,6 +96,7 @@ class SyncItem {
         'weight': record.weight,
         'note': record.note,
         'tag': tagName,
+        'category': categoryName,
       },
       changedAt: record.markedAt,
     );
@@ -156,7 +158,15 @@ class SyncItem {
 
   /// The rule, not its occurrences. `subject` is the far side's key for the
   /// course, never the local row id.
-  factory SyncItem.slot(ClassSlot slot, String subjectUuid) => SyncItem(
+  ///
+  /// The type goes by name, like a subject's; a row without one hashes as it
+  /// always did.
+  factory SyncItem.slot(
+    ClassSlot slot,
+    String subjectUuid, {
+    String? categoryName,
+  }) =>
+      SyncItem(
         kind: SyncKind.slot,
         localKey: slot.uuid ?? '',
         fields: <String, Object?>{
@@ -166,13 +176,18 @@ class SyncItem {
           'endMinutes': slot.endMinutes,
           'room': slot.room,
           'weight': slot.weight,
+          'category': categoryName,
           'startDate': Dates.keyOf(slot.startDate),
           'endDate':
               slot.endDate == null ? null : Dates.keyOf(slot.endDate!),
         },
       );
 
-  factory SyncItem.extraClass(ExtraClass extra, String subjectUuid) =>
+  factory SyncItem.extraClass(
+    ExtraClass extra,
+    String subjectUuid, {
+    String? categoryName,
+  }) =>
       SyncItem(
         kind: SyncKind.extraClass,
         localKey: extra.uuid ?? '',
@@ -183,6 +198,7 @@ class SyncItem {
           'endMinutes': extra.endMinutes,
           'room': extra.room,
           'weight': extra.weight,
+          'category': categoryName,
           'note': extra.note,
         },
       );

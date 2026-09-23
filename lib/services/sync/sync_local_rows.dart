@@ -125,12 +125,24 @@ class SyncLocalRows {
       SyncKind.slot: <SyncItem>[
         for (final ClassSlot s in slots)
           if (s.uuid != null && uuidById[s.subjectId] != null)
-            SyncItem.slot(s, uuidById[s.subjectId]!),
+            SyncItem.slot(
+              s,
+              uuidById[s.subjectId]!,
+              categoryName: s.categoryId == null
+                  ? null
+                  : categoryNameById[s.categoryId],
+            ),
       ],
       SyncKind.extraClass: <SyncItem>[
         for (final ExtraClass e in extras)
           if (e.uuid != null && uuidById[e.subjectId] != null)
-            SyncItem.extraClass(e, uuidById[e.subjectId]!),
+            SyncItem.extraClass(
+              e,
+              uuidById[e.subjectId]!,
+              categoryName: e.categoryId == null
+                  ? null
+                  : categoryNameById[e.categoryId],
+            ),
       ],
       SyncKind.slotOverride: <SyncItem>[
         for (final SlotOverride o in overrides)
@@ -148,6 +160,9 @@ class SyncLocalRows {
               r,
               uuidById[r.subjectId]!,
               tagName: r.tagId == null ? null : tagNameById[r.tagId],
+              categoryName: r.categoryId == null
+                  ? null
+                  : categoryNameById[r.categoryId],
             ),
       ],
     });

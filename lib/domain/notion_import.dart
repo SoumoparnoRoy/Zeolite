@@ -166,7 +166,13 @@ class NotionPlan {
     this.countsCancelled,
     this.creditedOtherwise = 0,
     this.untyped = 0,
+    this.typeWeights = const <String, int>{},
   });
+
+  /// What one class of each type counts as in the table, keyed by the
+  /// table's word for it — two where labs count double. Only with labs
+  /// grouped into their course: apart, each counts once by design.
+  final Map<String, int> typeWeights;
 
   /// Rows the table counts for nothing only because their class type is
   /// empty, where the rest of the table has one. The preview asks whether
@@ -277,7 +283,33 @@ class NotionPlan {
       countsCancelled: rule,
       creditedOtherwise: rule == null ? 0 : (rule ? uncredited : credited),
       untyped: export.rows.where(untyped).length,
+      typeWeights: grouping == NotionGrouping.grouped
+          ? _typeWeights(export.rows)
+          : const <String, int>{},
     );
+  }
+
+  /// The worth most rows of each type carry. Cancelled and uncounted rows say
+  /// nothing about it.
+  static Map<String, int> _typeWeights(List<NotionRow> rows) {
+    final Map<String, Map<int, int>> seen = <String, Map<int, int>>{};
+    for (final NotionRow row in rows) {
+      final String? type = row.kindLabel;
+      if (type == null ||
+          row.weight == 0 ||
+          row.status == AttendanceStatus.cancelled) {
+        continue;
+      }
+      final Map<int, int> counts = seen.putIfAbsent(type, () => <int, int>{});
+      counts[row.weight] = (counts[row.weight] ?? 0) + 1;
+    }
+    return <String, int>{
+      for (final MapEntry<String, Map<int, int>> type in seen.entries)
+        type.key: type.value.entries
+            .reduce((MapEntry<int, int> a, MapEntry<int, int> b) =>
+                b.value > a.value ? b : a)
+            .key,
+    };
   }
 
   /// The code the components agree on — `ABC101L` and `ABC101P` give `ABC101`.

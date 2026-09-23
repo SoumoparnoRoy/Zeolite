@@ -81,12 +81,19 @@ class ZeoliteRepository {
       await db.delete('categories', where: 'id = ?', whereArgs: <Object?>[id]);
       // Older rows created before foreign keys were enforced may still point
       // at the deleted row, so clear them explicitly.
-      await db.update(
+      for (final String table in <String>[
         'subjects',
-        <String, Object?>{'category_id': null},
-        where: 'category_id = ?',
-        whereArgs: <Object?>[id],
-      );
+        'class_slots',
+        'extra_classes',
+        'attendance',
+      ]) {
+        await db.update(
+          table,
+          <String, Object?>{'category_id': null},
+          where: 'category_id = ?',
+          whereArgs: <Object?>[id],
+        );
+      }
     });
   }
 

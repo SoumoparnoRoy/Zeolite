@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/app_theme.dart';
 import '../../../core/date_utils.dart';
+import '../../../data/models/class_category.dart';
 import '../../../data/models/class_slot.dart';
 import '../../../data/models/extra_class.dart';
 import '../../../domain/class_clash.dart';
+import '../../../domain/class_weight.dart';
 import '../../../domain/day_grid.dart';
 import '../../../state/providers.dart';
 import '../../../widgets/common.dart';
@@ -61,6 +63,16 @@ class _BlockClassFormState extends ConsumerState<_BlockClassForm> {
   int _weight = 1;
   bool _weightTouched = false;
 
+  /// As `_SlotFormState._categoryId`.
+  int? _categoryId;
+
+  ClassCategory? get _ownType =>
+      ref.read(timetableProvider).value?.categoryById(_categoryId);
+
+  int get _defaultWeight => _ownType == null
+      ? ref.read(defaultWeightProvider(_subjectId))
+      : weightFor(_ownType);
+
   String? _error;
   bool _saving = false;
 
@@ -95,6 +107,7 @@ class _BlockClassFormState extends ConsumerState<_BlockClassForm> {
         endMinutes: end,
         room: room,
         weight: _weight,
+        categoryId: _categoryId,
       );
       // One call covers both halves here: another one-off on this date, and a
       // weekly rule whose window reaches it.
@@ -141,6 +154,7 @@ class _BlockClassFormState extends ConsumerState<_BlockClassForm> {
       endMinutes: end,
       room: room,
       weight: _weight,
+      categoryId: _categoryId,
       startDate: _startDate,
     );
 
@@ -173,8 +187,14 @@ class _BlockClassFormState extends ConsumerState<_BlockClassForm> {
     final DayGrid grid = ref.watch(dayGridProvider);
     final bool use24Hour =
         ref.watch(settingsProvider).value?.use24HourTime ?? false;
-    final int categoryBlocks =
-        grid.blocksFor(ref.watch(defaultDurationProvider(_subjectId)));
+    final int categoryBlocks = grid.blocksFor(
+      ref
+              .watch(timetableProvider)
+              .value
+              ?.categoryById(_categoryId)
+              ?.defaultDurationMinutes ??
+          ref.watch(defaultDurationProvider(_subjectId)),
+    );
     final int blocks = _blocks ?? categoryBlocks;
 
     // A class cannot run past the end of the day, but it always occupies at
@@ -194,9 +214,7 @@ class _BlockClassFormState extends ConsumerState<_BlockClassForm> {
           onChanged: (int? id) => setState(() {
             _subjectId = id;
             _error = null;
-            if (!_weightTouched) {
-              _weight = ref.read(defaultWeightProvider(id));
-            }
+            if (!_weightTouched) _weight = _defaultWeight;
           }),
         ),
         const SizedBox(height: AppSpacing.xl),
@@ -228,7 +246,9 @@ class _BlockClassFormState extends ConsumerState<_BlockClassForm> {
         Text(
           _subjectId == null
               ? 'Choosing a subject sets this from its category.'
-              : ref.watch(defaultDurationLabelProvider(_subjectId)),
+              : ref.watch(classLengthLabelProvider(
+                  (subjectId: _subjectId, categoryId: _categoryId),
+                )),
           style: TextStyle(
             fontSize: 12,
             height: 1.4,
@@ -290,6 +310,15 @@ class _BlockClassFormState extends ConsumerState<_BlockClassForm> {
               color: context.palette.textTertiary,
             ),
           ),
+        const SizedBox(height: AppSpacing.xl),
+        TypePicker(
+          subjectId: _subjectId,
+          value: _categoryId,
+          onChanged: (int? id) => setState(() {
+            _categoryId = id;
+            if (!_weightTouched) _weight = _defaultWeight;
+          }),
+        ),
         const SizedBox(height: AppSpacing.xl),
         WeightPicker(
           value: _weight,

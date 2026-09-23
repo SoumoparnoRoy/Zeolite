@@ -20,6 +20,7 @@ class AttendanceRecord {
     required this.startMinutes,
     required this.status,
     this.weight = 1,
+    this.categoryId,
     this.tagId,
     this.note,
     this.markedAt,
@@ -37,6 +38,10 @@ class AttendanceRecord {
   /// through the rule, so correcting a slot's length later cannot silently
   /// restate a term of history.
   final int weight;
+
+  /// The type the class was when marked, copied like [weight] so retyping
+  /// the class later cannot restate this mark. Older marks have none.
+  final int? categoryId;
 
   /// Optional label from the user's own list — "Proxy", "Online". Null means
   /// untagged, which is what every mark made before tags existed still is.
@@ -58,6 +63,7 @@ class AttendanceRecord {
     int? startMinutes,
     AttendanceStatus? status,
     int? weight,
+    int? categoryId,
     int? tagId,
     bool clearTag = false,
     String? note,
@@ -70,6 +76,7 @@ class AttendanceRecord {
       startMinutes: startMinutes ?? this.startMinutes,
       status: status ?? this.status,
       weight: weight ?? this.weight,
+      categoryId: categoryId ?? this.categoryId,
       tagId: clearTag ? null : (tagId ?? this.tagId),
       note: note ?? this.note,
       markedAt: markedAt ?? this.markedAt,
@@ -83,6 +90,7 @@ class AttendanceRecord {
         'start_minutes': startMinutes,
         'status': status.name,
         'weight': weight,
+        'category_id': categoryId,
         'tag_id': tagId,
         'note': note,
         'marked_at': (markedAt ?? DateTime.now()).millisecondsSinceEpoch,
@@ -99,6 +107,7 @@ class AttendanceRecord {
       // Zero is a real weight — a class held but not assessed. Negative is
       // not, and a hand-edited backup is where one would come from.
       weight: math.max(0, (map['weight'] as num?)?.toInt() ?? 1),
+      categoryId: map['category_id'] as int?,
       tagId: map['tag_id'] as int?,
       note: map['note'] as String?,
       markedAt: map['marked_at'] == null

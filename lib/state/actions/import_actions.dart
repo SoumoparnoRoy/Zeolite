@@ -115,19 +115,27 @@ class ImportActions {
 
     final DatabaseSnapshot before = await _core.repo.snapshot();
 
-    int weightOf(int subjectId) =>
-        weightFor(data.categoryFor(data.subjectById(subjectId)));
+    // Each class by its own type first, so a practical inside a lecture
+    // course is re-weighted as a practical.
+    int weightOf(int subjectId, [int? categoryId]) {
+      final ClassCategory? own = categoryId == null
+          ? null
+          : data.categories
+              .where((ClassCategory c) => c.id == categoryId)
+              .firstOrNull;
+      return weightFor(own ?? data.categoryFor(data.subjectById(subjectId)));
+    }
 
     final int changedCount = await _core.repo.transaction(
       (ZeoliteRepository repository) async {
         for (final ClassSlot slot in data.slots) {
-          final int weight = weightOf(slot.subjectId);
+          final int weight = weightOf(slot.subjectId, slot.categoryId);
           if (slot.weight != weight) {
             await repository.updateSlot(slot.copyWith(weight: weight));
           }
         }
         for (final ExtraClass extra in data.extras) {
-          final int weight = weightOf(extra.subjectId);
+          final int weight = weightOf(extra.subjectId, extra.categoryId);
           if (extra.weight != weight) {
             await repository.updateExtraClass(extra.copyWith(weight: weight));
           }
@@ -139,8 +147,10 @@ class ImportActions {
         final List<AttendanceRecord> stored = await repository.getAttendance();
         final List<AttendanceRecord> changed = <AttendanceRecord>[
           for (final AttendanceRecord record in stored)
-            if (record.weight != weightOf(record.subjectId))
-              record.copyWith(weight: weightOf(record.subjectId)),
+            if (record.weight != weightOf(record.subjectId, record.categoryId))
+              record.copyWith(
+                weight: weightOf(record.subjectId, record.categoryId),
+              ),
         ];
         await repository.setManyAttendance(changed);
         return changed.length;
@@ -226,9 +236,12 @@ class ImportActions {
   ///
   /// [cancelledCounts] is the table's answer on cancelled classes, set here
   /// rather than by the caller so Undo can put it back with the marks.
+  ///
+  /// [typeWeights] is [NotionPlan.typeWeights], applied to the categories.
   Future<int> importNotionLog(
     List<NotionPlanSubject> chosen, {
     bool? cancelledCounts,
+    Map<String, int> typeWeights = const <String, int>{},
   }) async {
     final TimetableData? data = _core.ref.read(timetableProvider).value;
     if (data == null || chosen.isEmpty) return 0;
@@ -272,40 +285,57 @@ class ImportActions {
           if (category.id != null)
             category.name.trim().toLowerCase(): category.id!,
       };
-      Future<int?> categoryFor(NotionPlanSubject planned) async {
-        final String? name = planned.categoryName;
+      final Set<String> weighed = <String>{};
+      Future<int?> typeNamed(String? name, NotionKind? kind) async {
         if (name == null) return null;
         final String key = name.toLowerCase();
-        return categoryIds[key] ??= await repository.insertCategory(
+        final int? worth = typeWeights[name];
+        final int? known = categoryIds[key];
+        if (known != null) {
+          if (worth != null && weighed.add(key)) {
+            final ClassCategory? type = data.categoryById(known);
+            if (type != null && type.weight != worth) {
+              await repository.updateCategory(type.copyWith(weight: worth));
+            }
+          }
+          return known;
+        }
+        weighed.add(key);
+        return categoryIds[key] = await repository.insertCategory(
           ClassCategory(
             name: name,
-            defaultDurationMinutes:
-                planned.categoryKind == NotionKind.practical ? 120 : 60,
+            defaultDurationMinutes: kind == NotionKind.practical ? 120 : 60,
+            weight: worth ?? 1,
           ),
         );
       }
+
+      Future<int?> categoryFor(NotionPlanSubject planned) =>
+          typeNamed(planned.categoryName, planned.categoryKind);
 
       int created = 0;
       for (final NotionPlanSubject planned in chosen) {
         if (planned.placements.isEmpty) continue;
 
         int? id = planned.subject?.id;
+        int? subjectType = planned.subject?.categoryId;
         if (id == null) {
+          subjectType = await categoryFor(planned);
           id = await repository.insertSubject(
             Subject(
               name: planned.name,
               code: planned.code,
               colorValue:
                   palette[(data.subjects.length + created) % palette.length],
-              categoryId: await categoryFor(planned),
+              categoryId: subjectType,
             ),
           );
           created++;
-        } else if (planned.subject!.categoryId == null) {
-          final int? category = await categoryFor(planned);
-          if (category != null) {
+        } else if (subjectType == null) {
+          subjectType = await categoryFor(planned);
+          if (subjectType != null) {
             await repository.updateSubject(
-              planned.subject!.copyWith(categoryId: category),
+              planned.subject!.copyWith(categoryId: subjectType),
             );
           }
         }
@@ -318,6 +348,10 @@ class ImportActions {
         }
 
         for (final NotionPlacement placed in planned.placements) {
+          // Stored only when it differs from the subject's, which is what
+          // lets a grouped course hold its labs as labs.
+          final int? type =
+              await typeNamed(placed.row.kindLabel, placed.row.kind);
           records.add(
             AttendanceRecord(
               subjectId: id,
@@ -325,6 +359,7 @@ class ImportActions {
               startMinutes: placed.startMinutes,
               status: placed.row.status,
               weight: placed.weight,
+              categoryId: type == subjectType ? null : type,
               tagId: tagIds[placed.row.tagName],
               markedAt: DateTime.now(),
             ),

@@ -466,6 +466,9 @@ class BackupService {
                 endMinutes: slot.endMinutes,
                 room: slot.room,
                 weight: slot.weight,
+                categoryId: slot.categoryId == null
+                    ? null
+                    : categoryIdMap[slot.categoryId],
                 startDate: slot.startDate,
                 endDate: slot.endDate,
               ),
@@ -535,6 +538,9 @@ class BackupService {
                 startMinutes: extra.startMinutes,
                 endMinutes: extra.endMinutes,
                 room: extra.room,
+                categoryId: extra.categoryId == null
+                    ? null
+                    : categoryIdMap[extra.categoryId],
                 weight: extra.weight,
                 note: extra.note,
               ),
@@ -556,6 +562,9 @@ class BackupService {
                 startMinutes: record.startMinutes,
                 status: record.status,
                 weight: record.weight,
+                categoryId: record.categoryId == null
+                    ? null
+                    : categoryIdMap[record.categoryId],
                 // An unknown tag id drops to null rather than failing the import.
                 // The mark is the data worth keeping; the label is not worth
                 // rejecting a whole backup over.

@@ -183,6 +183,7 @@ void main() {
     // can move.
     expect(mark['weight'], 1);
     expect(mark['tag_id'], isNull);
+    expect(mark['category_id'], isNull);
   });
 
   test('a category that predates the weight column is worth one', () async {

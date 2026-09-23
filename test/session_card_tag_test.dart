@@ -62,6 +62,7 @@ class _RecordingActions extends AttendanceActions {
     required AttendanceStatus? current,
     required AttendanceStatus status,
     int weight = 1,
+    int? categoryId,
     int? tagId,
   }) async {
     called = true;

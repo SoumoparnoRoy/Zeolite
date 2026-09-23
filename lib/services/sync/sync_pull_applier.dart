@@ -255,6 +255,7 @@ class SyncPullApplier {
     }
 
     final ClassSlot? existing = local.slotByUuid[state.localKey];
+    final ClassCategory? type = _typeOf(f, local);
     final ClassSlot slot = ClassSlot(
       id: existing?.id,
       uuid: state.localKey,
@@ -264,6 +265,7 @@ class SyncPullApplier {
       endMinutes: end!,
       room: readString(f['room']),
       weight: readInt(f['weight']) ?? 1,
+      categoryId: type?.id,
       startDate: startDate,
       endDate: endDate,
     );
@@ -275,7 +277,19 @@ class SyncPullApplier {
       await _repository.updateSlot(slot);
       local.slotByUuid[state.localKey] = slot;
     }
-    return SyncItem.slot(slot, subjectUuid!);
+    return SyncItem.slot(slot, subjectUuid!, categoryName: type?.name);
+  }
+
+  /// A class's own type, by name. Only one that resolved is reported back: a
+  /// type this device does not have was not written, and the hash has to say
+  /// so for the difference to surface again once it arrives.
+  static ClassCategory? _typeOf(
+    Map<String, Object?> fields,
+    SyncLocalRows local,
+  ) {
+    final String? name = readString(fields['category']);
+    final ClassCategory? type = name == null ? null : local.categoryByName[name];
+    return type?.id == null ? null : type;
   }
 
   Future<SyncItem?> _applyExtraClass(
@@ -294,6 +308,7 @@ class SyncPullApplier {
     }
 
     final ExtraClass? existing = local.extraByUuid[state.localKey];
+    final ClassCategory? type = _typeOf(f, local);
     final ExtraClass extra = ExtraClass(
       id: existing?.id,
       uuid: state.localKey,
@@ -303,6 +318,7 @@ class SyncPullApplier {
       endMinutes: end!,
       room: readString(f['room']),
       weight: readInt(f['weight']) ?? 1,
+      categoryId: type?.id,
       note: readString(f['note']),
     );
 
@@ -313,7 +329,7 @@ class SyncPullApplier {
       await _repository.updateExtraClass(extra);
       local.extraByUuid[state.localKey] = extra;
     }
-    return SyncItem.extraClass(extra, subjectUuid!);
+    return SyncItem.extraClass(extra, subjectUuid!, categoryName: type?.name);
   }
 
   /// The rule has to be on this device already, which the coordinator's
@@ -386,18 +402,25 @@ class SyncPullApplier {
     if (status == null) throw UnreadableRow(state.localKey);
 
     final String? tagName = readString(state.fields['tag']);
+    final ClassCategory? type = _typeOf(state.fields, local);
     final AttendanceRecord record = AttendanceRecord(
       subjectId: subject!.id!,
       date: key.date,
       startMinutes: key.startMinutes,
       status: status,
       weight: readInt(state.fields['weight']) ?? 1,
+      categoryId: type?.id,
       tagId: tagName == null ? null : local.tagByName[tagName]?.id,
       note: readString(state.fields['note']),
       markedAt: state.editedAt,
     );
     await _repository.setAttendance(record);
-    return SyncItem.attendance(record, key.uuid, tagName: tagName);
+    return SyncItem.attendance(
+      record,
+      key.uuid,
+      tagName: tagName,
+      categoryName: type?.name,
+    );
   }
 
   Future<void> _deleteLocal(

@@ -419,7 +419,11 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                                       )
                                     : null,
                                 categoryName:
-                                    data?.categoryFor(session.subject)?.name,
+                                    data
+                                        ?.categoryById(
+                                          session.effectiveCategoryId,
+                                        )
+                                        ?.name,
                                 tagName:
                                     data?.tagById(session.record?.tagId)?.name,
                                 isNext: next != null &&

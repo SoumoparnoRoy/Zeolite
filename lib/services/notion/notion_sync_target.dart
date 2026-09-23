@@ -132,12 +132,22 @@ class NotionSyncTarget implements SyncTarget {
   /// never over one somebody chose.
   final Set<String> _untyped = <String>{};
 
-  Map<String, Object?> _keyAndMissingType(String localKey, String remoteId) =>
+  Map<String, Object?> _keyAndMissingType(
+    String localKey,
+    String remoteId, [
+    SyncItem? item,
+  ]) =>
       <String, Object?>{
         ..._properties.keyOnly(localKey),
         if (_untyped.contains(remoteId))
-          ..._properties.typeOnly(_categoryName?.call(_subjectOf(localKey))),
+          ..._properties.typeOnly(_typeOf(localKey, item)),
       };
+
+  /// Its own type where the mark carries one, which is how a practical
+  /// grouped under a lecture course still reads as one.
+  String? _typeOf(String localKey, SyncItem? item) =>
+      (item?.fields['category'] as String?) ??
+      _categoryName?.call(_subjectOf(localKey));
 
   /// What each page's `Course` points at, by page id. [update] leaves a
   /// relation to a course still in the table alone: it is somebody's choice
@@ -288,7 +298,7 @@ class NotionSyncTarget implements SyncTarget {
     final NotionResult result = await _client.updatePage(
       remoteId,
       keyOnly
-          ? _keyAndMissingType(item.localKey, remoteId)
+          ? _keyAndMissingType(item.localKey, remoteId, item)
           : await _encode(item, relate: !await _keepsCourse(remoteId)),
     );
     if (!result.ok) return _failure(result);
@@ -341,7 +351,7 @@ class NotionSyncTarget implements SyncTarget {
     return _properties.encode(
       item,
       courseName: course?.name,
-      categoryName: _categoryName?.call(uuid),
+      categoryName: _typeOf(item.localKey, item),
       courseRelationId: course == null || !relate
           ? null
           : await _courses?.pageIdFor(course, usual: _usualCourseOf(uuid)),

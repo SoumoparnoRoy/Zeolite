@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/app_theme.dart';
 import '../../../core/date_utils.dart';
+import '../../../data/models/class_category.dart';
 import '../../../data/models/room.dart';
 import '../../../data/models/subject.dart';
 import '../../../domain/class_weight.dart';
@@ -124,6 +125,69 @@ class WeightPicker extends StatelessWidget {
                 'costs $value. Marks already made keep what they were worth '
                 'when you made them.',
           },
+          style: TextStyle(
+            fontSize: 12,
+            height: 1.4,
+            color: context.palette.textTertiary,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Gives one class a type other than its subject's usual one. Null keeps the
+/// subject's.
+class TypePicker extends ConsumerWidget {
+  const TypePicker({
+    super.key,
+    required this.subjectId,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final int? subjectId;
+  final int? value;
+  final ValueChanged<int?> onChanged;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final TimetableData? data = ref.watch(timetableProvider).value;
+    final List<ClassCategory> types =
+        data?.categories ?? const <ClassCategory>[];
+    if (types.isEmpty) return const SizedBox.shrink();
+    final String? subjectType =
+        data?.categoryFor(data.subjectById(subjectId))?.name;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        const SectionHeader('Type'),
+        Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.sm,
+          children: <Widget>[
+            OptionChip(
+              label: subjectType == null
+                  ? "Subject's type"
+                  : "Subject's · $subjectType",
+              selected: value == null,
+              onTap: () => onChanged(null),
+            ),
+            for (final ClassCategory type in types)
+              if (type.id != null)
+                OptionChip(
+                  label: type.name,
+                  selected: value == type.id,
+                  onTap: () => onChanged(type.id),
+                ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          'Only for a class that is not what its subject usually is, such as '
+          'a lab in a lecture course. Marks already made keep the type they '
+          'were made with.',
           style: TextStyle(
             fontSize: 12,
             height: 1.4,

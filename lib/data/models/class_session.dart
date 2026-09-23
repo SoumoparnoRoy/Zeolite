@@ -19,6 +19,7 @@ class ClassSession {
     required this.endMinutes,
     this.room,
     this.weight = 1,
+    this.categoryId,
     this.slotId,
     this.extraClassId,
     this.record,
@@ -33,6 +34,14 @@ class ClassSession {
   /// How many classes this occurrence counts as, carried down from the rule
   /// or the extra that produced it. See [ClassSlot.weight].
   final int weight;
+
+  /// Carried down from the rule or the extra, like [weight].
+  final int? categoryId;
+
+  /// What to show and write: the mark's type once made, then the class's,
+  /// then its subject's.
+  int? get effectiveCategoryId =>
+      record?.categoryId ?? categoryId ?? subject.categoryId;
 
   /// Set when this session came from a recurring rule.
   final int? slotId;
@@ -91,6 +100,7 @@ class ClassSession {
       endMinutes: endMinutes,
       room: room,
       weight: weight,
+      categoryId: categoryId,
       slotId: slotId,
       extraClassId: extraClassId,
       record: clearRecord ? null : (record ?? this.record),

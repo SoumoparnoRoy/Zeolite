@@ -17,6 +17,7 @@ class ExtraClass {
     required this.endMinutes,
     this.room,
     this.weight = 1,
+    this.categoryId,
     this.note,
   });
 
@@ -35,6 +36,9 @@ class ExtraClass {
   /// See [ClassSlot.weight] — a one-off lab counts the same as a recurring one.
   final int weight;
 
+  /// See [ClassSlot.categoryId].
+  final int? categoryId;
+
   final String? note;
 
   int get durationMinutes => endMinutes - startMinutes;
@@ -48,6 +52,8 @@ class ExtraClass {
     int? endMinutes,
     String? room,
     int? weight,
+    int? categoryId,
+    bool clearCategory = false,
     String? note,
   }) {
     return ExtraClass(
@@ -59,6 +65,7 @@ class ExtraClass {
       endMinutes: endMinutes ?? this.endMinutes,
       room: room ?? this.room,
       weight: weight ?? this.weight,
+      categoryId: clearCategory ? null : (categoryId ?? this.categoryId),
       note: note ?? this.note,
     );
   }
@@ -72,6 +79,7 @@ class ExtraClass {
         'end_minutes': endMinutes,
         'room': room,
         'weight': weight,
+        'category_id': categoryId,
         'note': note,
       };
 
@@ -85,6 +93,7 @@ class ExtraClass {
       endMinutes: (map['end_minutes'] as int?) ?? 0,
       room: map['room'] as String?,
       weight: math.max(0, (map['weight'] as num?)?.toInt() ?? 1),
+      categoryId: map['category_id'] as int?,
       note: map['note'] as String?,
     );
   }

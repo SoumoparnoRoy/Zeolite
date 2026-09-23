@@ -51,6 +51,7 @@ class NotionRow {
     this.tagName,
     this.startMinutes,
     this.creditDisagrees = false,
+    this.credited,
   });
 
   /// One row off a status word and the two counters, wherever they were read
@@ -70,20 +71,22 @@ class NotionRow {
     int? startMinutes,
   }) {
     final String raw = status.trim().toLowerCase();
+    final AttendanceStatus read = NotionExport._statusOf(raw, held, credit);
     return NotionRow(
       component: component,
       course: course,
       kind: kind,
       date: date,
-      status: NotionExport._statusOf(raw, held, credit),
-      weight: math.max(1, held),
+      status: read,
+      // A zero is the app's "does not count", except on a cancellation, which
+      // keeps a size for the setting to credit.
+      weight: math.max(read == AttendanceStatus.cancelled ? 1 : 0, held),
       startMinutes: startMinutes,
-      tagName: switch (raw) {
-        'proxy' => 'Proxy',
-        'cancelled' || 'canceled' => 'Cancelled',
-        _ => null,
-      },
-      creditDisagrees: NotionExport._creditDisagrees(raw, credit),
+      tagName: raw == 'proxy' ? 'Proxy' : null,
+      creditDisagrees: held > 0 && NotionExport._creditDisagrees(raw, credit),
+      credited: (raw == 'cancelled' || raw == 'canceled') && credit != null
+          ? held > 0 && credit > 0
+          : null,
     );
   }
 
@@ -118,6 +121,10 @@ class NotionRow {
   /// but credited nothing, or absent and credited anyway. The credit still
   /// decides, so this only says the sheet contradicts itself.
   final bool creditDisagrees;
+
+  /// Whether the source credited this cancelled class, or null. A mark has
+  /// nowhere to keep it; the import sets the app-wide setting from it.
+  final bool? credited;
 }
 
 /// Everything read out of one export, plus what could not be read.
@@ -298,28 +305,19 @@ class NotionExport {
     'canceled',
   };
 
-  /// The credit column decides whether a class counted, not the word beside it.
-  ///
-  /// An institution can credit a cancelled class in full — this one does — and
-  /// hard-coding either reading puts every such class on the wrong side. The
-  /// export records the answer per row, so it is read rather than assumed.
-  /// Only when the column is missing does the word have to stand in.
-  ///
-  /// `Held` of zero means the class never happened, the one case that counts
-  /// towards neither side.
+  /// The credit column decides whether a class was attended, not the word
+  /// beside it — except a cancellation, which stays one so the setting can
+  /// decide, and a `Held` of zero, whose credit means nothing.
   static AttendanceStatus _statusOf(String raw, int held, int? credit) {
-    final bool cancelled = raw == 'cancelled' || raw == 'canceled';
-    if (held == 0) return AttendanceStatus.cancelled;
-    if (credit == null) {
-      if (cancelled) return AttendanceStatus.cancelled;
+    if (raw == 'cancelled' || raw == 'canceled') {
+      return AttendanceStatus.cancelled;
+    }
+    if (credit == null || held == 0) {
       return raw == 'absent'
           ? AttendanceStatus.absent
           : AttendanceStatus.present;
     }
-    if (credit > 0) return AttendanceStatus.present;
-    // Uncredited and cancelled is not an absence — it is a class that counted
-    // for nobody either way.
-    return cancelled ? AttendanceStatus.cancelled : AttendanceStatus.absent;
+    return credit > 0 ? AttendanceStatus.present : AttendanceStatus.absent;
   }
 
   /// Cancelled is exempt — see [NotionRow.creditDisagrees] — or the export's

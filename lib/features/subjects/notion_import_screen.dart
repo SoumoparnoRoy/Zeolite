@@ -74,10 +74,13 @@ class _NotionImportScreenState extends ConsumerState<NotionImportScreen> {
 
     final ActionCore core = ref.read(actionCoreProvider);
     final ImportActions imports = ref.read(importActionsProvider);
-    final int count = await imports.importNotionLog(<NotionPlanSubject>[
-      for (final NotionPlanSubject s in plan.subjects)
-        if (!_excluded.contains(s.name)) s,
-    ]);
+    final int count = await imports.importNotionLog(
+      <NotionPlanSubject>[
+        for (final NotionPlanSubject s in plan.subjects)
+          if (!_excluded.contains(s.name)) s,
+      ],
+      cancelledCounts: plan.countsCancelled,
+    );
     if (!mounted) return;
     navigator.pop();
     showUndoSnack(
@@ -102,6 +105,7 @@ class _NotionImportScreenState extends ConsumerState<NotionImportScreen> {
       subjects: data?.subjects ?? const <Subject>[],
       slots: data?.slots ?? const <ClassSlot>[],
       records: data?.records ?? const <AttendanceRecord>[],
+      countsCancelledNow: settings.cancelledCountsAsAttended,
     );
     _seed(plan, ready: data != null);
 
@@ -132,6 +136,7 @@ class _NotionImportScreenState extends ConsumerState<NotionImportScreen> {
               if (widget.export.problems.isNotEmpty)
                 _Problems(problems: widget.export.problems),
               _OutsideTermWarning(export: widget.export, settings: settings),
+              _CancelledRule(plan: plan, settings: settings),
               const SectionHeader('How the courses split'),
               CourseSplitChoice(
                 grouped: grouping == NotionGrouping.grouped,
@@ -265,6 +270,58 @@ class _OutsideTermWarning extends StatelessWidget {
               'the percentages only count classes inside the term dates. '
               'Widen the term in Settings if these should count.',
               style: TextStyle(fontSize: 12.5, height: 1.4),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The one setting an import changes, said before it does.
+class _CancelledRule extends StatelessWidget {
+  const _CancelledRule({required this.plan, required this.settings});
+
+  final NotionPlan plan;
+  final AppSettings settings;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool? counts = plan.countsCancelled;
+    if (counts == null || counts == settings.cancelledCountsAsAttended) {
+      return const SizedBox.shrink();
+    }
+
+    final AppPalette p = context.palette;
+    final int otherwise = plan.creditedOtherwise;
+    final String why = counts
+        ? 'Your table credits its cancelled classes, so this turns on'
+        : 'Your table does not credit its cancelled classes, so this turns off';
+    final String rest = otherwise == 0
+        ? ''
+        : ' ${Words.plural(otherwise, 'cancelled class', 'cancelled classes')} '
+            '${otherwise == 1 ? 'is' : 'are'} credited the other way and will '
+            'follow the setting too.';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: SurfaceCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              counts
+                  ? 'Cancelled classes will count as attended'
+                  : 'Cancelled classes will stop counting',
+              style: TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w700,
+                color: p.warning,
+              ),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              '$why Cancelled classes count as attended in Settings.$rest',
+              style: const TextStyle(fontSize: 12.5, height: 1.4),
             ),
           ],
         ),

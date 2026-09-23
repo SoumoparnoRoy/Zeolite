@@ -194,8 +194,9 @@ void main() {
 
     expect(export.rows[0].status, AttendanceStatus.present);
     expect(export.rows[0].creditDisagrees, isTrue);
-    // Held of zero is the class that never happened, whatever the word says.
-    expect(export.rows[1].status, AttendanceStatus.cancelled);
+    // Held of zero: the word stands, and the row carries no weight.
+    expect(export.rows[1].status, AttendanceStatus.present);
+    expect(export.rows[1].weight, 0);
     expect(export.rows[2].tagName, 'Proxy');
   });
 

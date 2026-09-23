@@ -64,6 +64,7 @@ class NotionPlanSubject {
     required this.placements,
     required this.subject,
     required this.marksInRange,
+    this.countsCancelled = false,
   });
 
   final String name;
@@ -79,6 +80,10 @@ class NotionPlanSubject {
   /// Marks already recorded here inside the export's date range.
   final int marksInRange;
 
+  /// Whether cancelled classes will count once imported, so the preview's
+  /// figures are the ones the subject will show.
+  final bool countsCancelled;
+
   NotionMatch get match {
     if (subject == null) return NotionMatch.create;
     return marksInRange > 0 ? NotionMatch.overlap : NotionMatch.update;
@@ -89,8 +94,9 @@ class NotionPlanSubject {
   int get unscheduled =>
       placements.where((NotionPlacement p) => !p.scheduled).length;
 
+  /// A zero is not a longer class, so it does not make the figures periods.
   bool get hasWeighted =>
-      placements.any((NotionPlacement p) => p.weight != 1);
+      placements.any((NotionPlacement p) => p.weight > 1);
 
   int get suspect =>
       placements.where((NotionPlacement p) => p.row.creditDisagrees).length;
@@ -108,28 +114,44 @@ class NotionPlanSubject {
   int get cancelled =>
       _periods((NotionRow r) => r.status == AttendanceStatus.cancelled);
 
-  /// How many classes carry each label the export used, "Proxy" and
-  /// "Cancelled" among them, for the preview to say what is arriving.
+  /// How many classes carry each label the export used, for the preview to
+  /// say what is arriving. Cancelled is counted beside them, since it is a
+  /// status now rather than a tag.
   Map<String, int> get labels {
     final Map<String, int> counts = <String, int>{};
     for (final NotionPlacement p in placements) {
-      final String? tag = p.row.tagName;
-      if (tag != null) counts[tag] = (counts[tag] ?? 0) + 1;
+      final String? label = p.row.tagName ??
+          (p.row.status == AttendanceStatus.cancelled ? 'Cancelled' : null);
+      if (label != null) counts[label] = (counts[label] ?? 0) + 1;
     }
     return counts;
   }
 
   /// Held and attended in the same unit the subject will read in.
-  int get held => present + absent;
-  int get attended => present;
+  int get held => present + absent + (countsCancelled ? cancelled : 0);
+  int get attended => present + (countsCancelled ? cancelled : 0);
 }
 
 /// Every subject an export would write, resolved against what is stored.
 class NotionPlan {
-  const NotionPlan({required this.subjects, required this.grouping});
+  const NotionPlan({
+    required this.subjects,
+    required this.grouping,
+    this.countsCancelled,
+    this.creditedOtherwise = 0,
+  });
 
   final List<NotionPlanSubject> subjects;
   final NotionGrouping grouping;
+
+  /// Whether the table credits a cancelled class, by what most of its
+  /// cancelled rows say. Null when none say either way, or they split evenly:
+  /// the setting is then left as it is.
+  final bool? countsCancelled;
+
+  /// Cancelled rows credited the other way from [countsCancelled]. They follow
+  /// the setting all the same, so the preview says how many.
+  final int creditedOtherwise;
 
   int countOf(NotionMatch match) =>
       subjects.where((NotionPlanSubject s) => s.match == match).length;
@@ -150,7 +172,15 @@ class NotionPlan {
     required List<Subject> subjects,
     required List<ClassSlot> slots,
     required List<AttendanceRecord> records,
+    bool countsCancelledNow = false,
   }) {
+    final int credited =
+        export.rows.where((NotionRow r) => r.credited == true).length;
+    final int uncredited =
+        export.rows.where((NotionRow r) => r.credited == false).length;
+    final bool? rule = credited == uncredited ? null : credited > uncredited;
+    final bool counts = rule ?? countsCancelledNow;
+
     final Map<String, Subject> byName = <String, Subject>{
       for (final Subject s in subjects) s.name.trim().toLowerCase(): s,
     };
@@ -178,6 +208,7 @@ class NotionPlan {
           name: entry.key,
           code: _sharedCode(components[entry.key]!),
           subject: existing,
+          countsCancelled: counts,
           marksInRange: id == null
               ? 0
               : records
@@ -197,7 +228,12 @@ class NotionPlan {
 
     out.sort((NotionPlanSubject a, NotionPlanSubject b) =>
         a.name.compareTo(b.name));
-    return NotionPlan(subjects: out, grouping: grouping);
+    return NotionPlan(
+      subjects: out,
+      grouping: grouping,
+      countsCancelled: rule,
+      creditedOtherwise: rule == null ? 0 : (rule ? uncredited : credited),
+    );
   }
 
   /// The code the components agree on — `ABC101L` and `ABC101P` give `ABC101`.
@@ -264,7 +300,7 @@ class NotionPlan {
             row: row,
             startMinutes: start,
             scheduled: free.contains(row.startMinutes),
-            weight: grouping == NotionGrouping.grouped ? row.weight : 1,
+            weight: _weightOf(row, grouping),
           ),
         );
       }
@@ -292,7 +328,7 @@ class NotionPlan {
             row: row,
             startMinutes: start,
             scheduled: scheduled,
-            weight: grouping == NotionGrouping.grouped ? row.weight : 1,
+            weight: _weightOf(row, grouping),
           ),
         );
       }
@@ -304,6 +340,12 @@ class NotionPlan {
       return byDate != 0 ? byDate : a.startMinutes.compareTo(b.startMinutes);
     });
     return out;
+  }
+
+  /// Kept apart, a lab counts once; a zero stays a zero.
+  static int _weightOf(NotionRow row, NotionGrouping grouping) {
+    if (row.weight == 0) return 0;
+    return grouping == NotionGrouping.grouped ? row.weight : 1;
   }
 
   static const int _fallbackStart = 9 * 60;

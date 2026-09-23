@@ -27,7 +27,17 @@ class ActionCore {
   final UndoStore _undo = UndoStore();
 
   /// Arms an Undo offer against the database as it stood before an action.
-  int arm(DatabaseSnapshot before) => _undo.arm(before);
+  ///
+  /// [settings] too when the action changed one: the snapshot holds only the
+  /// database, and an import that switched a setting would otherwise leave it
+  /// switched after its marks were gone.
+  int arm(DatabaseSnapshot before, {AppSettings? settings}) {
+    final int token = _undo.arm(before);
+    _settingsUndo = settings == null ? null : (token, settings);
+    return token;
+  }
+
+  (int, AppSettings)? _settingsUndo;
 
   Future<DatabaseSnapshot> snapshot() => repo.snapshot();
 
@@ -118,6 +128,7 @@ class ActionCore {
   void _dropUndo() {
     _undo.drop();
     _mergeUndoToken = null;
+    _settingsUndo = null;
     _pulledSinceUndo.clear();
   }
 
@@ -136,7 +147,11 @@ class ActionCore {
   Future<bool> undo(int token) async {
     final DatabaseSnapshot? snapshot = _undo.take(token);
     if (snapshot == null) return false;
+    final (int, AppSettings)? settings = _settingsUndo;
     await repo.restore(snapshot);
+    if (settings != null && settings.$1 == token) {
+      await ref.read(settingsProvider.notifier).save(settings.$2);
+    }
     if (token == _mergeUndoToken && _mergeUndoTarget != null) {
       await repo.deleteRemoteLinksFor(_mergeUndoTarget!);
     }

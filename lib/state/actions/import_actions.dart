@@ -221,11 +221,26 @@ class ImportActions {
   /// touched. A [NotionMatch.overlap] subject has its marks inside the
   /// export's own span cleared first — the export is the whole truth for those
   /// dates, so keeping both would double the term.
-  Future<int> importNotionLog(List<NotionPlanSubject> chosen) async {
+  ///
+  /// [cancelledCounts] is the table's answer on cancelled classes, set here
+  /// rather than by the caller so Undo can put it back with the marks.
+  Future<int> importNotionLog(
+    List<NotionPlanSubject> chosen, {
+    bool? cancelledCounts,
+  }) async {
     final TimetableData? data = _core.ref.read(timetableProvider).value;
     if (data == null || chosen.isEmpty) return 0;
 
     final DatabaseSnapshot before = await _core.repo.snapshot();
+    final AppSettings? settings = _core.ref.read(settingsProvider).value;
+    final bool switches = settings != null &&
+        cancelledCounts != null &&
+        cancelledCounts != settings.cancelledCountsAsAttended;
+    if (switches) {
+      await _core.ref
+          .read(settingsProvider.notifier)
+          .save(settings.copyWith(cancelledCountsAsAttended: cancelledCounts));
+    }
     final List<int> palette = AppColors.subjectPalette;
 
     // A tag per label the file actually uses, matched against the user's own
@@ -289,7 +304,7 @@ class ImportActions {
       await repository.setManyAttendance(records);
     });
     await _core.refresh();
-    _core.arm(before);
+    _core.arm(before, settings: switches ? settings : null);
     unawaited(_core.analytics.timetableImported('notion'));
     return records.length;
   }

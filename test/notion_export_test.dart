@@ -57,40 +57,38 @@ void main() {
       expect(export.rows.last.status, AttendanceStatus.absent);
     });
 
-    test('a credited cancelled class counts as attended, and says so', () {
-      // This institution credits a cancelled class in full, and the portal's
-      // own percentage only comes out right if it is counted.
+    test('a cancelled class stays cancelled, credited or not', () {
       final NotionExport export = NotionExport.read(
         _bytes(_csv(<String>[
           'ABC101L,1,Thermodynamics,Aug 5,1,Yes,Lecture,Cancelled',
+          'ABC101L,0,Thermodynamics,Aug 6,1,Yes,Lecture,Cancelled',
         ])),
         today: _today,
       );
-      final NotionRow row = export.rows.single;
-      expect(row.status, AttendanceStatus.present);
-      expect(row.tagName, 'Cancelled');
-      expect(row.creditDisagrees, isFalse);
+      final NotionRow credited = export.rows.first;
+      final NotionRow uncredited = export.rows.last;
+      expect(credited.status, AttendanceStatus.cancelled);
+      expect(credited.credited, isTrue);
+      expect(credited.tagName, isNull);
+      expect(credited.creditDisagrees, isFalse);
+      expect(uncredited.status, AttendanceStatus.cancelled);
+      expect(uncredited.credited, isFalse);
     });
 
-    test('an uncredited cancelled class counts towards neither side', () {
-      final NotionExport export = NotionExport.read(
-        _bytes(_csv(<String>[
-          'ABC101L,0,Thermodynamics,Aug 5,1,Yes,Lecture,Cancelled',
-        ])),
-        today: _today,
-      );
-      // Not an absence: nobody was credited, so it is not held against you.
-      expect(export.rows.single.status, AttendanceStatus.cancelled);
-    });
-
-    test('a class that never happened counts towards neither side', () {
+    test('a row the table does not count keeps its word and counts nothing',
+        () {
+      // Filed as cancelled it would count as attended the moment the setting
+      // for cancellations went on.
       final NotionExport export = NotionExport.read(
         _bytes(_csv(<String>[
           'ABC101L,0,Thermodynamics,Aug 5,0,No,Lecture,Present',
         ])),
         today: _today,
       );
-      expect(export.rows.single.status, AttendanceStatus.cancelled);
+      final NotionRow row = export.rows.single;
+      expect(row.status, AttendanceStatus.present);
+      expect(row.weight, 0);
+      expect(row.creditDisagrees, isFalse);
     });
 
     test('the credit column wins when the word beside it disagrees', () {

@@ -336,8 +336,8 @@ void main() {
       final NotionPlanSubject only = plan.subjects.single;
       expect(only.labels, <String, int>{'Proxy': 1, 'Cancelled': 1});
       expect(only.suspect, 1);
-      // The proxy and the credited cancellation both count as attended; only
-      // the uncredited row is an absence.
+      // The proxy and the cancellation, which this table credits, both count
+      // as attended; only the uncredited row is an absence.
       expect(only.attended, 2);
       expect(only.held, 3);
     });
@@ -364,16 +364,46 @@ void main() {
       expect((only.attended * 1000 / only.held).round() / 10, 76.2);
     });
 
-    test('dropping the cancelled classes is what got this wrong', () {
-      // Excluding them gives 13 of 18 — 72.2%, which the portal never prints.
-      final NotionPlanSubject only = _plan(export).subjects.single;
-      final int credited = only.placements
-          .where((NotionPlacement p) => p.row.tagName == 'Cancelled')
-          .fold<int>(0, (int sum, NotionPlacement p) => sum + p.weight);
-      expect(credited, 3);
-      expect(only.attended - credited, 13);
-      expect(only.held - credited, 18);
+    test('its cancelled classes stay cancelled and turn the setting on', () {
+      final NotionPlan plan = _plan(export);
+      expect(plan.countsCancelled, isTrue);
+      expect(plan.creditedOtherwise, 0);
+      expect(
+        plan.subjects.single.placements
+            .where((NotionPlacement p) =>
+                p.row.status == AttendanceStatus.cancelled)
+            .length,
+        2,
+      );
     });
+  });
+
+  test('a row the table does not count stays at nothing when labs split', () {
+    final NotionPlan plan = _plan(
+      _read(<String>[
+        'ABC101P,0,Thermodynamics,Aug 3,0,No,Practical,Present',
+        'ABC101P,2,Thermodynamics,Aug 4,2,Yes,Practical,Present',
+      ]),
+      grouping: NotionGrouping.separate,
+    );
+    expect(
+      plan.subjects.single.placements.map((NotionPlacement p) => p.weight),
+      <int>[0, 1],
+    );
+    expect(plan.subjects.single.held, 1);
+  });
+
+  test('a table that mostly does not credit cancellations turns it off', () {
+    final NotionPlan plan = _plan(_read(<String>[
+      'ABC101L,1,Thermodynamics,Aug 3,1,Yes,Lecture,Present',
+      'ABC101L,1,Thermodynamics,Aug 4,1,Yes,Lecture,Cancelled',
+      'ABC101L,0,Thermodynamics,Aug 5,1,Yes,Lecture,Cancelled',
+      'ABC101L,0,Thermodynamics,Aug 6,1,Yes,Lecture,Cancelled',
+    ]));
+    expect(plan.countsCancelled, isFalse);
+    expect(plan.creditedOtherwise, 1);
+    expect(plan.subjects.single.attended, 1);
+    expect(plan.subjects.single.held, 1);
   });
 
 }

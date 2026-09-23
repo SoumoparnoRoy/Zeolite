@@ -572,6 +572,33 @@ void main() {
     expect(link.remoteId, 'their-page');
   });
 
+  test('taking theirs puts the key on their row, or pushes it next run',
+      () async {
+    final Subject subject = await seed(status: AttendanceStatus.present);
+    final String key = SyncItem.keyFor(subject.uuid!, _day, 540);
+    claimDiffering(subject.uuid!);
+    final SyncCoordinator sync = coordinator();
+
+    await sync.applyReview((await sync.run(force: true)).review,
+        <String, SyncSide>{key: SyncSide.there});
+
+    // Only the key: every value on the row is already the one taken.
+    expect(target.calls, contains('key their-page $key'));
+    expect(target.calls, isNot(contains('update their-page')));
+
+    // Offline when answering: the next run writes the row, key and all.
+    await repo.deleteRemoteLinks(target.id, SyncKind.attendance, <String>[key]);
+    target
+      ..calls.clear()
+      ..failNext = SyncFailure.offline;
+    await sync.applyReview((await sync.run(force: true)).review,
+        <String, SyncSide>{key: SyncSide.there});
+    target.claimable = <SyncClaim>[];
+    await sync.run(force: true);
+
+    expect(target.calls, contains('update their-page'));
+  });
+
   test('keeping mine retires a page this device has no mark for', () async {
     // A row whose mark does not exist here has no link, so there was nothing
     // to mark as answered and it came back on every run — a rewrite could not

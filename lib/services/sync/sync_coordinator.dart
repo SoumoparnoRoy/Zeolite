@@ -384,7 +384,7 @@ class SyncCoordinator {
     final Set<String> held = <String>{};
     for (final RemoteState state in disputed) {
       held.add(state.localKey);
-      tally.review.add(SyncPull(remote: state));
+      tally.review.add(SyncPull(remote: state, claimed: true));
     }
     if (held.isNotEmpty) {
       items = <SyncItem>[
@@ -567,9 +567,19 @@ class SyncCoordinator {
         }
         if (link == null) {
           forget.add(pull.remote.localKey);
-        } else {
-          write.add(link);
+          continue;
         }
+        // A claimed row is linked here but still unkeyed there. If the key
+        // cannot go now, a push next run carries it with the values just
+        // taken, which are theirs anyway.
+        final bool keyed = !pull.claimed ||
+            (await target.writeKey(
+              SyncKind.attendance,
+              pull.remote.localKey,
+              pull.remote.remoteId,
+            ))
+                .ok;
+        write.add(keyed ? link : link.copyWith(localHash: ''));
         continue;
       }
 

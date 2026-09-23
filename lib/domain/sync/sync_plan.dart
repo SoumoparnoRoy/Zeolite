@@ -63,12 +63,16 @@ class SyncPush {
 /// history and history is the thing the app exists to keep.
 @immutable
 class SyncPull {
-  const SyncPull({required this.remote, this.link});
+  const SyncPull({required this.remote, this.link, this.claimed = false});
 
   final RemoteState remote;
 
   /// Null when the far side holds a row the app has never seen.
   final RemoteLink? link;
+
+  /// A row made by hand that a mark was recognised in. Its page has no key
+  /// yet, which a new row from another device already carries.
+  final bool claimed;
 }
 
 @immutable

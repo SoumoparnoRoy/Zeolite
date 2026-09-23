@@ -244,6 +244,24 @@ class NotionSyncTarget implements SyncTarget {
     );
   }
 
+  @override
+  Future<SyncOutcome> writeKey(
+    SyncKind kind,
+    String localKey,
+    String remoteId,
+  ) async {
+    if (!_canBeFoundAgain) {
+      return const SyncOutcome.failed(
+        SyncFailure.rejected,
+        message: _noKeyColumn,
+      );
+    }
+    final NotionResult result =
+        await _client.updatePage(remoteId, _properties.keyOnly(localKey));
+    if (!result.ok) return _failure(result);
+    return SyncOutcome.done(remoteId: remoteId, remoteHash: '');
+  }
+
   /// Trashed rather than deleted, so the user can get the page back.
   ///
   /// A page that is already gone counts as done: the mark was removed here,

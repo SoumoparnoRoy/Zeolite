@@ -96,6 +96,18 @@ class FakeSyncTarget implements SyncTarget {
   }
 
   @override
+  Future<SyncOutcome> writeKey(
+    SyncKind kind,
+    String localKey,
+    String remoteId,
+  ) async {
+    calls.add('key $remoteId $localKey');
+    final SyncOutcome? failure = _takeFailure();
+    if (failure != null) return failure;
+    return SyncOutcome.done(remoteId: remoteId, remoteHash: '');
+  }
+
+  @override
   Future<SyncOutcome> archive(SyncKind kind, String remoteId) async {
     calls.add('archive $remoteId');
     final SyncOutcome? failure = _takeFailure();

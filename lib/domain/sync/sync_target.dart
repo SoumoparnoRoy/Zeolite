@@ -480,6 +480,11 @@ abstract class SyncTarget {
 
   Future<SyncOutcome> update(SyncItem item, String remoteId);
 
+  /// Puts [localKey] on a claimed row and changes nothing else. For a row
+  /// settled in the far side's favour: it already holds the right values, but
+  /// without the key another device would have to claim it all over again.
+  Future<SyncOutcome> writeKey(SyncKind kind, String localKey, String remoteId);
+
   /// [kind] is carried because a target files each kind separately, and a
   /// tombstone written into the wrong collection would delete nothing and
   /// resurrect the row on the next run.

@@ -129,6 +129,15 @@ class FirestoreSyncTarget implements SyncTarget {
   Future<SyncOutcome> update(SyncItem item, String remoteId) =>
       _write(item, remoteId);
 
+  // The key is the document id, so there is never one missing to write.
+  @override
+  Future<SyncOutcome> writeKey(
+    SyncKind kind,
+    String localKey,
+    String remoteId,
+  ) async =>
+      SyncOutcome.done(remoteId: remoteId, remoteHash: '');
+
   /// Writes a tombstone instead of removing the document. A device that has
   /// been offline has to be able to learn the row is gone; a missing document
   /// only tells it the row was never pushed.

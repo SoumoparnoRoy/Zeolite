@@ -86,12 +86,14 @@ class NotionSyncTarget implements SyncTarget {
 
     _unkeyed = const <Map<String, Object?>>[];
     _claimed.clear();
+    _related.clear();
     final NotionRows rows = await _client.queryAllPages(_mapping.dataSourceId);
     if (!rows.ok) return null;
 
     final List<RemoteState> found = <RemoteState>[];
     final List<Map<String, Object?>> unkeyed = <Map<String, Object?>>[];
     for (final Map<String, Object?> page in rows.pages) {
+      _noteCourse(page);
       // Null is a row somebody made by hand. It is only ever taken for a mark
       // by [claim], which knows the marks; filing it by itself here would put
       // it against a class it may have nothing to do with.
@@ -112,6 +114,31 @@ class NotionSyncTarget implements SyncTarget {
 
   /// Pages claimed this run, so [update] writes nothing but the key into one.
   final Set<String> _claimed = <String>{};
+
+  /// What each page's `Course` points at, by page id. [update] leaves a
+  /// relation to a course still in the table alone: it is somebody's choice
+  /// of where the class counts, and may not be the app's.
+  final Map<String, List<String>> _related = <String, List<String>>{};
+
+  void _noteCourse(Map<String, Object?> page) {
+    final NotionProperty? course = _mapping.fields[NotionField.course];
+    if (course?.type != 'relation' || page['id'] is! String) return;
+    final List<String> ids = NotionProperties.relationIdsOf(
+      NotionProperties.valueOf(
+        (page['properties'] as Map<String, Object?>?) ?? <String, Object?>{},
+        course,
+      ),
+    );
+    if (ids.isNotEmpty) _related[page['id']! as String] = ids;
+  }
+
+  /// A trashed course page stays in the relation, so pointing somewhere is
+  /// not enough: the page it points at has to be live.
+  Future<bool> _keepsCourse(String remoteId) async {
+    final List<String>? ids = _related[remoteId];
+    if (ids == null) return false;
+    return await _courses?.holdsAny(ids) ?? true;
+  }
 
   /// A row made by hand is the mark the import made from it, until the key
   /// column exists and nothing yet says so. Pairing them here is what stops
@@ -206,7 +233,9 @@ class NotionSyncTarget implements SyncTarget {
     final bool keyOnly = _claimed.remove(remoteId);
     final NotionResult result = await _client.updatePage(
       remoteId,
-      keyOnly ? _properties.keyOnly(item.localKey) : await _encode(item),
+      keyOnly
+          ? _properties.keyOnly(item.localKey)
+          : await _encode(item, relate: !await _keepsCourse(remoteId)),
     );
     if (!result.ok) return _failure(result);
     return SyncOutcome.done(
@@ -229,15 +258,19 @@ class NotionSyncTarget implements SyncTarget {
     return _failure(result);
   }
 
-  Future<Map<String, Object?>> _encode(SyncItem item) async {
+  Future<Map<String, Object?>> _encode(
+    SyncItem item, {
+    bool relate = true,
+  }) async {
     final String uuid = _subjectOf(item.localKey);
     final NotionCourse? course = _course(uuid);
     return _properties.encode(
       item,
       courseName: course?.name,
       categoryName: _categoryName?.call(uuid),
-      courseRelationId:
-          course == null ? null : await _courses?.pageIdFor(course),
+      courseRelationId: course == null || !relate
+          ? null
+          : await _courses?.pageIdFor(course),
     );
   }
 

@@ -72,9 +72,18 @@ class FakeSyncTarget implements SyncTarget {
     final Set<String> keys = <String>{
       for (final SyncItem item in unlinked) item.localKey,
     };
+    // A page that already carries a key can only be claimed when offered as
+    // a stray, as in Notion; the rest of [claimable] stands for unkeyed rows.
+    final Set<String> keyed = <String>{
+      for (final RemoteState state in remote ?? const <RemoteState>[])
+        state.remoteId,
+    };
     return <SyncClaim>[
       for (final SyncClaim claim in claimable)
-        if (claim.state.kind == kind && keys.contains(claim.state.localKey))
+        if (claim.state.kind == kind &&
+            keys.contains(claim.state.localKey) &&
+            (!keyed.contains(claim.state.remoteId) ||
+                strays.contains(claim.state.remoteId)))
           claim,
     ];
   }

@@ -6,6 +6,7 @@ import '../../core/date_utils.dart';
 import '../../data/models/attendance_record.dart';
 import '../../data/models/attendance_status.dart';
 import '../../data/models/subject.dart';
+import '../../data/models/tag.dart';
 import '../../domain/sync/sync_merge.dart';
 import '../../domain/sync/sync_plan.dart';
 import '../../state/notion_sync_providers.dart';
@@ -87,6 +88,7 @@ class _NotionReviewScreenState extends ConsumerState<NotionReviewScreen> {
                       pull: pull,
                       subjects: subjects,
                       records: records,
+                      tags: data?.tags ?? const <Tag>[],
                       side: _choices[pull.remote.localKey] ?? SyncSide.here,
                       onChanged: (SyncSide side) => setState(
                         () => _choices[pull.remote.localKey] = side,
@@ -132,6 +134,7 @@ class _Row extends StatelessWidget {
     required this.pull,
     required this.subjects,
     required this.records,
+    required this.tags,
     required this.side,
     required this.onChanged,
   });
@@ -139,6 +142,7 @@ class _Row extends StatelessWidget {
   final SyncPull pull;
   final List<Subject> subjects;
   final List<AttendanceRecord> records;
+  final List<Tag> tags;
   final SyncSide side;
   final ValueChanged<SyncSide> onChanged;
 
@@ -241,14 +245,17 @@ class _Row extends StatelessWidget {
     return 'Here it is ${_describe(<String, Object?>{
           'status': mark.status.name,
           'weight': mark.weight,
+          'tag': tags.where((Tag t) => t.id == mark.tagId).firstOrNull?.name,
         })}';
   }
 
   static String _describe(Map<String, Object?> fields) {
     final String status = (fields['status'] as String?) ?? 'present';
     final Object? weight = fields['weight'];
-    final String label =
+    final String? tag = fields['tag'] as String?;
+    final String word =
         AttendanceStatus.fromName(status)?.label ?? _capitalise(status);
+    final String label = tag == null ? word : '$word · $tag';
     return weight is int && weight != 1 ? '$label, counts as $weight' : label;
   }
 

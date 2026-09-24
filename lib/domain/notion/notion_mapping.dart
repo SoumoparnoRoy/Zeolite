@@ -116,12 +116,12 @@ enum NotionField {
   /// only reads one, never writes it.
   held(
     label: 'Held',
-    description: 'How many classes this row counts as. Usually 1.',
+    description: 'How many classes a row counts as. Usually 1.',
     types: <String>{'number', 'formula'},
   ),
   credit(
     label: 'Attendance Credit',
-    description: 'How much of that you attended, for the Notion rollups.',
+    description: 'How many of those you were credited with.',
     types: <String>{'number', 'formula'},
   ),
 
@@ -313,16 +313,52 @@ class NotionCourses {
   }
 }
 
-/// The status words a row can carry, as the importer already reads them.
+/// What a status word in a table or a file is taken to mean.
 ///
-/// Kept as strings rather than [AttendanceStatus] because two of them are
-/// tags rather than statuses, and the far side only ever sees the word.
-const List<String> kNotionStatusValues = <String>[
-  'present',
-  'absent',
-  'cancelled',
-  'proxy',
-];
+/// Present, absent and cancelled are the marks themselves. Any other word —
+/// `Proxy`, `Medical`, `Online` — is a label on a present or absent mark,
+/// kept as a tag in the source's own spelling.
+enum LogVerdict {
+  present,
+  absent,
+  cancelled,
+  presentTagged,
+  absentTagged,
+  leftOut;
+
+  bool get tagged => this == presentTagged || this == absentTagged;
+
+  String? get word => switch (this) {
+        present || presentTagged => 'present',
+        absent || absentTagged => 'absent',
+        cancelled => 'cancelled',
+        leftOut => null,
+      };
+
+  /// How a choice reads beside [word], the same on every screen that asks.
+  String labelFor(String word) => switch (this) {
+        present => 'Present',
+        absent => 'Absent',
+        cancelled => 'Cancelled',
+        presentTagged => 'Present, tagged "$word"',
+        absentTagged => 'Absent, tagged "$word"',
+        leftOut => 'Leave these rows out',
+      };
+
+  static const String explained = 'Present, absent and cancelled are the '
+      'marks. Any other word can ride on one of them as a tag, in its own '
+      'spelling.';
+
+  /// The words any tracker is likely to use, and Proxy, which the template
+  /// has always carried. Anything else is the user's to say.
+  static LogVerdict? guess(String word) => switch (word.trim().toLowerCase()) {
+        'present' => present,
+        'absent' => absent,
+        'cancelled' || 'canceled' => cancelled,
+        'proxy' => presentTagged,
+        _ => null,
+      };
+}
 
 /// Which data source attendance is filed in, and which column holds what.
 @immutable
@@ -334,7 +370,7 @@ class NotionMapping {
     required this.fields,
     this.courses,
     this.templatePageId,
-    this.statusValues = const <String, String>{},
+    this.statusMeanings = const <String, LogVerdict>{},
     this.kindValues = const <String, String>{},
   });
 
@@ -357,16 +393,17 @@ class NotionMapping {
 
   final Map<NotionField, NotionProperty> fields;
 
-  /// Zeolite's word to the workspace's own. Notion select options are free
-  /// text, so `Present` here can be `Attended` there.
-  final Map<String, String> statusValues;
+  /// Each `Status` option, as the workspace spells it, to what it means here.
+  /// Options are free text, so `Attended` can be present and `Medical` an
+  /// absence with a tag.
+  final Map<String, LogVerdict> statusMeanings;
 
   /// A class category here to a `Type` option there, keyed by the lowercased
   /// category name — `lab` to `Practical`.
   ///
   /// A category says what kind of session a subject holds, which is the only
   /// local thing `Type` describes; a tag says how one class went, and belongs
-  /// in [statusValues] instead.
+  /// in [statusMeanings] instead.
   final Map<String, String> kindValues;
 
   bool get isComplete => NotionField.values
@@ -385,9 +422,9 @@ class NotionMapping {
     return <String>[
       for (final NotionField field in NotionField.values)
         if (!fields.containsKey(field)) field.label,
-      if (fields.containsKey(NotionField.status))
-        for (final String word in kNotionStatusValues)
-          if (!statusValues.containsKey(word)) 'Status: $word',
+      for (final String option
+          in fields[NotionField.status]?.options ?? const <String>[])
+        if (!statusMeanings.containsKey(option)) 'Status: $option',
       if (fields.containsKey(NotionField.kind))
         for (final String name in categoryNames)
           if (!kindValues.containsKey(name.trim().toLowerCase())) 'Type: $name',
@@ -398,7 +435,7 @@ class NotionMapping {
     String? dataSourceId,
     String? title,
     Map<NotionField, NotionProperty>? fields,
-    Map<String, String>? statusValues,
+    Map<String, LogVerdict>? statusMeanings,
     Map<String, String>? kindValues,
     NotionCourses? courses,
     String? templatePageId,
@@ -408,7 +445,7 @@ class NotionMapping {
       dataSourceId: dataSourceId ?? this.dataSourceId,
       title: title ?? this.title,
       fields: fields ?? this.fields,
-      statusValues: statusValues ?? this.statusValues,
+      statusMeanings: statusMeanings ?? this.statusMeanings,
       kindValues: kindValues ?? this.kindValues,
       courses: courses ?? this.courses,
       templatePageId: templatePageId ?? this.templatePageId,
@@ -459,12 +496,41 @@ class NotionMapping {
       dataSourceId: dataSourceId,
       title: title,
       fields: fields,
-      statusValues: _pairByName(
-        fields[NotionField.status],
-        kNotionStatusValues,
-      ),
+      statusMeanings: guessMeanings(fields[NotionField.status]),
       kindValues: _pairByName(fields[NotionField.kind], categoryNames),
     );
+  }
+
+  /// Each option of [status] whose meaning its name makes plain.
+  static Map<String, LogVerdict> guessMeanings(NotionProperty? status) =>
+      <String, LogVerdict>{
+        for (final String option in status?.options ?? const <String>[])
+          if (LogVerdict.guess(option) case final LogVerdict v) option: v,
+      };
+
+  LogVerdict? meaningOf(String? option) =>
+      option == null ? null : statusMeanings[option];
+
+  /// The option a mark is written as.
+  ///
+  /// A tag wins when an option is named after it — the workspace's word for
+  /// what the user recorded, with the credit column saying whether it counted.
+  /// Otherwise the first option that means the plain status; a tag the table
+  /// has no word for stays in the app rather than adding one to it.
+  String? optionFor(String status, String? tag) {
+    final String? wanted = tag?.trim().toLowerCase();
+    if (wanted != null && wanted.isNotEmpty) {
+      for (final MapEntry<String, LogVerdict> e in statusMeanings.entries) {
+        if (e.value != LogVerdict.leftOut &&
+            e.key.trim().toLowerCase() == wanted) {
+          return e.key;
+        }
+      }
+    }
+    for (final MapEntry<String, LogVerdict> e in statusMeanings.entries) {
+      if (!e.value.tagged && e.value.word == status) return e.key;
+    }
+    return null;
   }
 
   /// Pairs each of [words] with an option spelled the same way.
@@ -497,7 +563,10 @@ class NotionMapping {
           for (final MapEntry<NotionField, NotionProperty> e in fields.entries)
             e.key.name: e.value.toJson(),
         },
-        'statusValues': statusValues,
+        'statusMeanings': <String, String>{
+          for (final MapEntry<String, LogVerdict> e in statusMeanings.entries)
+            e.key: e.value.name,
+        },
         'kindValues': kindValues,
         if (courses != null) 'courses': courses!.toJson(),
         if (templatePageId != null) 'templatePageId': templatePageId,
@@ -526,11 +595,31 @@ class NotionMapping {
       dataSourceId: dataSourceId,
       title: (json['title'] as String?) ?? '',
       fields: fields,
-      statusValues: _stringMap(json['statusValues']),
+      statusMeanings: _meaningsOf(json),
       kindValues: _stringMap(json['kindValues']),
       courses: NotionCourses.fromJson(json['courses']),
       templatePageId: json['templatePageId'] as String?,
     );
+  }
+
+  /// Mappings saved before options had meanings stored our word to theirs,
+  /// which turns round without asking anything: `proxy` was always a present
+  /// class with the tag.
+  static Map<String, LogVerdict> _meaningsOf(Map<String, Object?> json) {
+    final Object? stored = json['statusMeanings'];
+    if (stored is Map<String, Object?>) {
+      return <String, LogVerdict>{
+        for (final MapEntry<String, Object?> e in stored.entries)
+          if (LogVerdict.values.where((LogVerdict v) => v.name == e.value)
+              case final Iterable<LogVerdict> found when found.isNotEmpty)
+            e.key: found.first,
+      };
+    }
+    return <String, LogVerdict>{
+      for (final MapEntry<String, String> e
+          in _stringMap(json['statusValues']).entries)
+        if (LogVerdict.guess(e.key) case final LogVerdict v) e.value: v,
+    };
   }
 
   static Map<String, String> _stringMap(Object? raw) => <String, String>{

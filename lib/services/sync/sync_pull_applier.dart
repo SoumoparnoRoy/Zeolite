@@ -387,6 +387,22 @@ class SyncPullApplier {
     );
   }
 
+  /// A tag a mark arrives with, made here when this device has none of that
+  /// name: a table's `Medical` is a word the user recorded, and dropping it
+  /// would lose it on the next push back.
+  Future<int?> _tagIdFor(String name, SyncLocalRows local) async {
+    final Tag? known = local.tagByName[name] ??
+        local.tagByName.values
+            .where((Tag t) => t.name.trim().toLowerCase() ==
+                name.trim().toLowerCase())
+            .firstOrNull;
+    if (known != null) return known.id;
+    final Tag made = Tag(name: name, position: local.tagByName.length);
+    final int id = await _repository.insertTag(made);
+    local.tagByName[name] = Tag(id: id, name: name, position: made.position);
+    return id;
+  }
+
   Future<SyncItem?> _applyAttendance(
       RemoteState state, SyncLocalRows local) async {
     final _MarkKey? key = _MarkKey.parse(state.localKey);
@@ -410,7 +426,7 @@ class SyncPullApplier {
       status: status,
       weight: readInt(state.fields['weight']) ?? 1,
       categoryId: type?.id,
-      tagId: tagName == null ? null : local.tagByName[tagName]?.id,
+      tagId: tagName == null ? null : await _tagIdFor(tagName, local),
       note: readString(state.fields['note']),
       markedAt: state.editedAt,
     );

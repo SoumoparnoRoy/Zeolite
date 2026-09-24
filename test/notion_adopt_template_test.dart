@@ -169,7 +169,7 @@ void main() {
         '"Date":{"id":"p2","type":"date"},'
         '"Zeolite ID":{"id":"p7","type":"rich_text"},'
         '"Status":{"id":"p3","type":"select","select":{"options":['
-        '{"name":"Present"},{"name":"Absent"}]}}}}';
+        '{"name":"Present"},{"name":"Absent"},{"name":"Medical"}]}}}}';
 
     final MockClient client = MockClient((http.Request r) async {
       if (r.url.path == '/v1/databases/db-1') {
@@ -194,10 +194,10 @@ void main() {
               categoryNames: <String>['Lab'],
             );
     expect(missing, contains('Attendance Credit'));
-    // The two status words the workspace does spell the same way are paired,
-    // so only the two it does not are reported.
-    expect(missing, contains('Status: cancelled'));
-    expect(missing, isNot(contains('Status: present')));
+    // Only the column's own options are asked about, and only the one whose
+    // name does not say what it means.
+    expect(missing, contains('Status: Medical'));
+    expect(missing, isNot(contains('Status: Present')));
     // Type has no column at all, so its options are not asked about — the
     // field itself is what needs pointing at first.
     expect(missing, isNot(contains('Type: Lab')));

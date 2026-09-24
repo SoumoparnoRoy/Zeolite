@@ -21,9 +21,9 @@ NotionMapping _mapping({String courseType = 'select'}) => NotionMapping(
         NotionField.date: _p('p2', 'Date', 'date'),
         NotionField.status: _p('p3', 'Status', 'select'),
       },
-      statusValues: const <String, String>{
-        'present': 'Present',
-        'absent': 'Absent',
+      statusMeanings: const <String, LogVerdict>{
+        'Present': LogVerdict.present,
+        'Absent': LogVerdict.absent,
       },
     );
 

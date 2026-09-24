@@ -150,9 +150,9 @@ void main() {
     expect(saved!.dataSourceId, 'ds-1');
     expect(saved.title, 'Zeolite Attendance');
     expect(saved.fields[NotionField.date]!.id, 'p2');
-    expect(saved.statusValues['present'], 'Present');
+    expect(saved.statusMeanings['Present'], LogVerdict.present);
     // Absent from the schema, so it must not have been invented.
-    expect(saved.statusValues.containsKey('proxy'), isFalse);
+    expect(saved.statusMeanings.containsKey('Proxy'), isFalse);
   });
 
   testWidgets('a database missing a date column cannot be saved',
@@ -264,6 +264,42 @@ void main() {
     // the Courses table went silently.
     expect(saved!.kindValues, <String, String>{'theory': 'Lecture'});
     expect(saved.courses?.dataSourceId, 'ds-2');
+  });
+
+  testWidgets('an option added to Status since the last save is asked about',
+      (WidgetTester tester) async {
+    final NotionConnectionStore store =
+        NotionConnectionStore(storage: const FlutterSecureStorage());
+    await store.write(const NotionTokens(accessToken: 'a-token'));
+
+    // Saved when the column held only these two.
+    await store.writeMapping(const NotionMapping(
+      databaseId: 'db-1',
+      dataSourceId: 'ds-1',
+      title: 'Zeolite Attendance',
+      fields: <NotionField, NotionProperty>{
+        NotionField.status: NotionProperty(
+          id: 'p3',
+          name: 'Status',
+          type: 'select',
+          options: <String>['Present', 'Absent'],
+        ),
+      },
+      statusMeanings: <String, LogVerdict>{
+        'Present': LogVerdict.present,
+        'Absent': LogVerdict.absent,
+      },
+    ));
+
+    await tester.pumpWidget(_app(_notion(schema: <String, Object?>{
+      ..._schema(),
+      'Status': _select('p3', <String>['Present', 'Absent', 'Medical']),
+    })));
+    await tester.pumpAndSettle();
+
+    final Finder medical = find.text('Medical');
+    await tester.ensureVisible(medical);
+    expect(medical, findsOneWidget);
   });
 
   testWidgets('narrowed to the gaps, only the unmapped columns are shown',

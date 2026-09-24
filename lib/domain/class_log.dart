@@ -4,30 +4,6 @@ import '../core/date_utils.dart';
 import 'notion/notion_mapping.dart';
 import 'notion_export.dart';
 
-/// What a status word in a class log is taken to mean.
-///
-/// Present, absent and cancelled are the marks themselves. Any other word —
-/// `Proxy`, `Medical`, `Online` — is a label on a present or absent mark,
-/// kept as a tag in the file's own spelling.
-enum LogVerdict {
-  present,
-  absent,
-  cancelled,
-  presentTagged,
-  absentTagged,
-  leftOut;
-
-  bool get tagged => this == presentTagged || this == absentTagged;
-
-  /// The word the row reader already understands for this verdict.
-  String? get word => switch (this) {
-        present || presentTagged => 'present',
-        absent || absentTagged => 'absent',
-        cancelled => 'cancelled',
-        leftOut => null,
-      };
-}
-
 /// A class log's cells, before anything is decided about what they mean.
 @immutable
 class ClassLogTable {
@@ -117,7 +93,7 @@ class ClassLogMapping {
   ClassLogMapping withGuessedWords(ClassLogTable table) {
     final Map<String, LogVerdict> statuses = <String, LogVerdict>{
       for (final String word in table.valuesOf(columns[NotionField.status]))
-        if (_statusGuess(word) case final LogVerdict v) word.toLowerCase(): v,
+        if (LogVerdict.guess(word) case final LogVerdict v) word.toLowerCase(): v,
       ...this.statuses,
     };
     final Map<String, NotionKind> types = <String, NotionKind>{
@@ -133,15 +109,6 @@ class ClassLogMapping {
           _dateOrder(table.valuesOf(columns[NotionField.date])),
     );
   }
-
-  static LogVerdict? _statusGuess(String word) =>
-      switch (word.trim().toLowerCase()) {
-        'present' => LogVerdict.present,
-        'absent' => LogVerdict.absent,
-        'cancelled' || 'canceled' => LogVerdict.cancelled,
-        'proxy' => LogVerdict.presentTagged,
-        _ => null,
-      };
 
   /// Day first if some date's first number is above twelve, month first if
   /// some date's second is; null when neither or both happen.

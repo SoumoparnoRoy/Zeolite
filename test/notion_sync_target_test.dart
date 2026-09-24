@@ -33,11 +33,11 @@ NotionMapping _mapping({bool withKey = true}) => NotionMapping(
         if (withKey) NotionField.key: _p('p7', 'Zeolite ID', 'rich_text'),
         NotionField.time: _p('p8', 'Time', 'rich_text'),
       },
-      statusValues: const <String, String>{
-        'present': 'Present',
-        'absent': 'Absent',
-        'cancelled': 'Cancelled',
-        'proxy': 'Proxy',
+      statusMeanings: const <String, LogVerdict>{
+        'Present': LogVerdict.present,
+        'Absent': LogVerdict.absent,
+        'Cancelled': LogVerdict.cancelled,
+        'Proxy': LogVerdict.presentTagged,
       },
       kindValues: const <String, String>{'lab': 'Practical'},
     );

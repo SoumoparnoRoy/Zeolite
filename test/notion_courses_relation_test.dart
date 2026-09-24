@@ -27,7 +27,9 @@ NotionMapping _mapping() => NotionMapping(
         NotionField.status: _p('p3', 'Status', 'select'),
         NotionField.key: _p('p7', 'Zeolite ID', 'rich_text'),
       },
-      statusValues: const <String, String>{'present': 'Present'},
+      statusMeanings: const <String, LogVerdict>{
+        'Present': LogVerdict.present,
+      },
       courses: NotionCourses(
         databaseId: 'db-2',
         dataSourceId: 'ds-2',

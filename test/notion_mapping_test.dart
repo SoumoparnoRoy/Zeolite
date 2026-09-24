@@ -135,14 +135,29 @@ void main() {
     expect(mapping.fields[NotionField.component]!.id, 'title');
   });
 
-  test('status words pair with options spelled the same way', () {
+  test('options whose names say what they mean are answered', () {
     final NotionMapping mapping = _match(_template());
 
-    expect(mapping.statusValues, <String, String>{
-      'present': 'Present',
-      'absent': 'Absent',
-      'cancelled': 'Cancelled',
-      'proxy': 'Proxy',
+    expect(mapping.statusMeanings, <String, LogVerdict>{
+      'Present': LogVerdict.present,
+      'Absent': LogVerdict.absent,
+      'Cancelled': LogVerdict.cancelled,
+      'Proxy': LogVerdict.presentTagged,
+    });
+  });
+
+  test('a mapping saved as word to option reads back as meanings', () {
+    final NotionMapping? old = NotionMapping.fromJson(<String, Object?>{
+      'dataSourceId': 'ds-1',
+      'statusValues': <String, Object?>{
+        'present': 'Attended',
+        'proxy': 'Proxy',
+      },
+    });
+
+    expect(old!.statusMeanings, <String, LogVerdict>{
+      'Attended': LogVerdict.present,
+      'Proxy': LogVerdict.presentTagged,
     });
   });
 
@@ -163,7 +178,7 @@ void main() {
 
     // Guessing that "Attended" means present is exactly the invention that
     // would file attendance wrongly and never say so.
-    expect(mapping.statusValues, isEmpty);
+    expect(mapping.statusMeanings, isEmpty);
     expect(mapping.fields[NotionField.status]!.id, 'p3');
   });
 
@@ -224,7 +239,7 @@ void main() {
     expect(back, isNotNull);
     expect(back!.dataSourceId, 'ds-1');
     expect(back.title, 'Zeolite Attendance');
-    expect(back.statusValues, mapping.statusValues);
+    expect(back.statusMeanings, mapping.statusMeanings);
     expect(back.kindValues, mapping.kindValues);
     expect(
       <NotionField, String>{

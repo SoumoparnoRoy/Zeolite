@@ -11,6 +11,7 @@ import 'remote_fields.dart';
 import 'sync_identity_adoption.dart';
 import 'sync_local_rows.dart';
 import 'sync_pull_applier.dart';
+import 'sync_stray_store.dart';
 
 /// How a run ended.
 enum SyncRunOutcome {
@@ -84,7 +85,9 @@ class SyncCoordinator {
     required this.target,
     SyncBackoff backoff = const SyncBackoff(),
     DateTime Function() now = DateTime.now,
+    SyncStrayStore? strays,
   })  : _repository = repository,
+        _strayStore = strays ?? SyncStrayStore(),
         _settings = settings,
         _backoff = backoff,
         _now = now,
@@ -103,6 +106,7 @@ class SyncCoordinator {
   final DateTime Function() _now;
   final SyncPullApplier _pulls;
   final SyncIdentityAdoption _adoption;
+  final SyncStrayStore _strayStore;
 
   SyncStatus _status = const SyncStatus();
   SyncStatus get status => _status;
@@ -712,7 +716,7 @@ class SyncCoordinator {
     for (final SyncKind kind in _kinds) {
       List<RemoteState>? known = remote[kind];
       if (known == null) continue;
-      final Set<String> strays = _strays(kind, known, local, links);
+      final Set<String> strays = await _strays(kind, known, local, links);
       if (strays.isNotEmpty) {
         known = <RemoteState>[
           for (final RemoteState state in known)
@@ -753,18 +757,20 @@ class SyncCoordinator {
   /// hold, instead of pulled as strangers while every class is filed again.
   /// Only where a person keeps the table; a store this app owns pulls them.
   ///
-  /// And only on a device with no links there yet, which is what a wiped
-  /// install is. Two devices writing one table without an account between
-  /// them would otherwise take each other's rows back and forth every run.
-  Set<String> _strays(
+  /// A device with no links there yet is what a wiped install is, so that
+  /// run takes every unknown subject and remembers which they were. Later
+  /// runs take only those: a claim still in review, or a row whose class has
+  /// not been marked here yet, keeps its old key — pushed or pulled as a
+  /// stranger, it would be filed twice. Any other subject is left alone, or
+  /// two devices writing one table without an account between them would
+  /// take each other's rows back and forth every run.
+  Future<Set<String>> _strays(
     SyncKind kind,
     List<RemoteState> known,
     Map<SyncKind, List<SyncItem>> local,
     Map<SyncKind, List<RemoteLink>> links,
-  ) {
-    if (kind != SyncKind.attendance ||
-        target.trustsPulls ||
-        links[kind]!.isNotEmpty) {
+  ) async {
+    if (kind != SyncKind.attendance || target.trustsPulls) {
       return const <String>{};
     }
     String subjectOf(String key) => key.split(':').first;
@@ -777,11 +783,24 @@ class SyncCoordinator {
       for (final SyncItem item in local[SyncKind.subject] ?? const <SyncItem>[])
         item.localKey,
     };
-    return <String>{
+    final List<RemoteState> unknown = <RemoteState>[
       for (final RemoteState state in known)
         if (!linked.contains(state.localKey) &&
             !subjects.contains(subjectOf(state.localKey)))
-          state.remoteId,
+          state,
+    ];
+    final Set<String> old;
+    if (linked.isEmpty) {
+      old = <String>{
+        for (final RemoteState state in unknown) subjectOf(state.localKey),
+      };
+      await _strayStore.save(target.id, old);
+    } else {
+      old = await _strayStore.load(target.id);
+    }
+    return <String>{
+      for (final RemoteState state in unknown)
+        if (old.contains(subjectOf(state.localKey))) state.remoteId,
     };
   }
 

@@ -12,6 +12,7 @@ import 'package:zeolite/data/models/attendance_status.dart';
 import 'package:zeolite/data/models/class_category.dart';
 import 'package:zeolite/data/models/class_slot.dart';
 import 'package:zeolite/data/models/subject.dart';
+import 'package:zeolite/data/models/tag.dart';
 import 'package:zeolite/data/settings/app_settings.dart';
 import 'package:zeolite/domain/sync/sync_merge.dart';
 import 'package:zeolite/domain/sync/sync_plan.dart';
@@ -99,6 +100,7 @@ void main() {
     String uuid, {
     String status = 'present',
     int weight = 1,
+    String? tag,
     DateTime? editedAt,
     bool deleted = false,
   }) {
@@ -107,6 +109,7 @@ void main() {
       'status': status,
       'weight': weight,
       'note': null,
+      if (tag != null) 'tag': tag,
     };
     return RemoteState(
       kind: SyncKind.attendance,
@@ -237,6 +240,24 @@ void main() {
       (await repo.getAttendanceAt(subject.id!, _day, 540))?.status,
       AttendanceStatus.cancelled,
     );
+  });
+
+  test('a pulled mark brings its tag, made here if this device lacks it',
+      () async {
+    final Subject subject = await seed(status: AttendanceStatus.present);
+    await coordinator().run();
+
+    target.remote = <RemoteState>[
+      mark(subject.uuid!, status: 'absent', tag: 'Medical', editedAt: _late),
+    ];
+    await coordinator().run();
+
+    final AttendanceRecord? pulled =
+        await repo.getAttendanceAt(subject.id!, _day, 540);
+    final Tag made = (await repo.getTags()).single;
+    expect(made.name, 'Medical');
+    expect(pulled?.status, AttendanceStatus.absent);
+    expect(pulled?.tagId, made.id);
   });
 
   test('an older remote edit is overwritten and counted', () async {
@@ -634,6 +655,56 @@ void main() {
     expect(result.review, isEmpty);
     expect(target.calls, contains('update old-page'));
     expect(target.calls.where((String c) => c.startsWith('create ')), isEmpty);
+  });
+
+  test('what the first run left in the old install stays claimable after',
+      () async {
+    final Subject subject = await seed(status: AttendanceStatus.present);
+    final String key = SyncItem.keyFor(subject.uuid!, _day, 540);
+    // A second class, so the first run leaves this device holding links.
+    await repo.setAttendance(
+      AttendanceRecord(
+        subjectId: subject.id!,
+        date: _day,
+        startMinutes: 600,
+        status: AttendanceStatus.present,
+        markedAt: _early,
+      ),
+    );
+    RemoteState old(String day) => RemoteState(
+          kind: SyncKind.attendance,
+          localKey: 'wiped-install-subject:$day:540',
+          remoteId: 'old-page-$day',
+          hash: 'theirs',
+          fields: const <String, Object?>{'status': 'absent'},
+        );
+    claimDiffering(subject.uuid!);
+    target
+      ..remote = <RemoteState>[old('20260304'), old('20260305')]
+      ..claimable = <SyncClaim>[
+        SyncClaim(
+          agrees: false,
+          state: RemoteState(
+            kind: SyncKind.attendance,
+            localKey: key,
+            remoteId: 'old-page-20260304',
+            hash: 'theirs',
+            fields: const <String, Object?>{'status': 'absent'},
+          ),
+        ),
+      ];
+    final SyncCoordinator sync = coordinator();
+    await sync.run(force: true);
+    target.calls.clear();
+
+    // The review is still open, and the 5th has no mark here to pair with.
+    final SyncRunResult second = await sync.run(force: true);
+
+    expect(target.calls, isNot(contains('create $key')));
+    expect(
+      second.review.map((SyncPull p) => p.remote.remoteId),
+      <String>['old-page-20260304'],
+    );
   });
 
   test('keeping mine retires a page this device has no mark for', () async {

@@ -107,8 +107,9 @@ class NotionPageRows {
     final String? option = NotionProperties.optionNameOf(
       NotionProperties.valueOf(cells, mapping.fields[NotionField.status]),
     );
-    final String? word = NotionProperties(mapping).wordFor(option);
-    if (word == null || !NotionRow.knowsStatus(word)) {
+    final LogVerdict? meaning = mapping.meaningOf(option);
+    if (meaning == LogVerdict.leftOut) return (row: null, problem: null);
+    if (meaning == null) {
       return (
         row: null,
         problem: '$where: "${option ?? ''}" is not a status this can read.',
@@ -121,13 +122,14 @@ class NotionPageRows {
         course: course,
         kind: _kindOf(cells) ?? NotionKind.lecture,
         date: date,
-        status: word,
+        status: meaning.word!,
         held: _numberOf(NotionField.held, cells)?.round() ?? 1,
         credit: _numberOf(NotionField.credit, cells)?.round(),
         startMinutes: _timeOf(cells),
         kindLabel: NotionProperties.optionNameOf(
           NotionProperties.valueOf(cells, mapping.fields[NotionField.kind]),
         ),
+        tag: meaning.tagged ? option : null,
       ),
       problem: null,
     );

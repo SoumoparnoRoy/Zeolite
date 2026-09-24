@@ -87,7 +87,7 @@ class NotionRow {
       // keeps a size for the setting to credit.
       weight: math.max(read == AttendanceStatus.cancelled ? 1 : 0, held),
       startMinutes: startMinutes,
-      tagName: tag ?? (raw == 'proxy' ? 'Proxy' : null),
+      tagName: tag,
       creditDisagrees: held > 0 && NotionExport._creditDisagrees(raw, credit),
       credited: (raw == 'cancelled' || raw == 'canceled') && credit != null
           ? held > 0 && credit > 0
@@ -97,10 +97,6 @@ class NotionRow {
           : kindLabel.trim(),
     );
   }
-
-  /// Whether a reader has anywhere to put this word.
-  static bool knowsStatus(String status) =>
-      NotionExport._known.contains(status.trim().toLowerCase());
 
   /// When the class started, if the source said. Null is the ordinary case —
   /// only a `Time` column can supply it — and leaves the importer to place the
@@ -260,14 +256,6 @@ class NotionExport {
     final String text = utf8.decode(bytes, allowMalformed: true);
     return text.startsWith('﻿') ? text.substring(1) : text;
   }
-
-  static const Set<String> _known = <String>{
-    'present',
-    'absent',
-    'proxy',
-    'cancelled',
-    'canceled',
-  };
 
   /// The credit column decides whether a class was attended, not the word
   /// beside it — except a cancellation, which stays one so the setting can

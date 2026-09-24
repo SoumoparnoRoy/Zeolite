@@ -49,7 +49,7 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
 
   List<NotionProperty> _properties = const <NotionProperty>[];
   Map<NotionField, NotionProperty> _fields = <NotionField, NotionProperty>{};
-  Map<String, String> _statusValues = <String, String>{};
+  Map<String, LogVerdict> _statusMeanings = <String, LogVerdict>{};
   Map<String, String> _kindValues = <String, String>{};
   NotionCourses? _courses;
 
@@ -91,7 +91,7 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
     _databaseId = existing.databaseId;
     _databaseTitle = existing.title;
     _fields = Map<NotionField, NotionProperty>.from(existing.fields);
-    _statusValues = Map<String, String>.from(existing.statusValues);
+    _statusMeanings = Map<String, LogVerdict>.from(existing.statusMeanings);
     _kindValues = Map<String, String>.from(existing.kindValues);
     // Carried, not rebuilt: saving without it would drop the dashboard.
     _courses = existing.courses;
@@ -237,18 +237,20 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
       // A column deleted in Notion since is dropped rather than kept: a choice
       // pointing at a property that no longer exists leaves the dropdown with
       // a value that is not among its items, which throws instead of drawing.
-      final Set<String> live = <String>{
-        for (final NotionProperty p in properties) p.id,
+      // A kept choice takes the column as it is now, so an option added to
+      // Status or Type since the last save is there to be answered.
+      final Map<String, NotionProperty> live = <String, NotionProperty>{
+        for (final NotionProperty p in properties) p.id: p,
       };
       _fields = <NotionField, NotionProperty>{
         ...guess.fields,
         if (keepChoices)
           for (final MapEntry<NotionField, NotionProperty> e in _fields.entries)
-            if (live.contains(e.value.id)) e.key: e.value,
+            if (live[e.value.id] case final NotionProperty now) e.key: now,
       };
-      _statusValues = <String, String>{
-        ...guess.statusValues,
-        if (keepChoices) ..._statusValues,
+      _statusMeanings = <String, LogVerdict>{
+        ...guess.statusMeanings,
+        if (keepChoices) ..._statusMeanings,
       };
       _kindValues = <String, String>{
         ...guess.kindValues,
@@ -482,8 +484,8 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
     };
     _gapStatus = <String>{
       if (_fields.containsKey(NotionField.status))
-        for (final String word in kNotionStatusValues)
-          if (!_statusValues.containsKey(word)) word,
+        for (final String option in _fields[NotionField.status]!.options)
+          if (!_statusMeanings.containsKey(option)) option,
     };
     _gapKinds = <String>{
       if (_fields.containsKey(NotionField.kind))
@@ -510,7 +512,7 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
             dataSourceId: _dataSourceId,
             title: _databaseTitle,
             fields: _fields,
-            statusValues: _statusValues,
+            statusMeanings: _statusMeanings,
             kindValues: _kindValues,
             courses: _courses,
           ),
@@ -675,7 +677,9 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
             }
             // The words belong to the column, so a different Status column
             // leaves the old workspace's spellings behind.
-            if (field == NotionField.status) _statusValues = <String, String>{};
+            if (field == NotionField.status) {
+              _statusMeanings = NotionMapping.guessMeanings(property);
+            }
             if (field == NotionField.kind) _kindValues = <String, String>{};
           }),
         ),
@@ -715,18 +719,22 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
           status.options.isNotEmpty &&
           (!_narrowed || _gapStatus!.isNotEmpty)) ...<Widget>[
         const SizedBox(height: AppSpacing.lg),
-        const SectionHeader('What each status is called'),
-        for (final String word in kNotionStatusValues)
-          if (!_narrowed || _gapStatus!.contains(word)) ...<Widget>[
-          _ValuePicker(
-            word: word,
-            options: status.options,
-            chosen: _statusValues[word],
-            onChanged: (String? option) => setState(() {
-              if (option == null) {
-                _statusValues.remove(word);
+        const SectionHeader('What each status means'),
+        Text(
+          LogVerdict.explained,
+          style: TextStyle(fontSize: 12, color: context.palette.textTertiary),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        for (final String option in status.options)
+          if (!_narrowed || _gapStatus!.contains(option)) ...<Widget>[
+          _MeaningPicker(
+            option: option,
+            chosen: _statusMeanings[option],
+            onChanged: (LogVerdict? meaning) => setState(() {
+              if (meaning == null) {
+                _statusMeanings.remove(option);
               } else {
-                _statusValues[word] = option;
+                _statusMeanings[option] = meaning;
               }
             }),
           ),
@@ -905,6 +913,57 @@ class _ValuePicker extends StatelessWidget {
                   DropdownMenuItem<String>(
                     value: option,
                     child: Text(option, overflow: TextOverflow.ellipsis),
+                  ),
+              ],
+              onChanged: onChanged,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One `Status` option and what it means, worded as the class-log screen
+/// words it.
+class _MeaningPicker extends StatelessWidget {
+  const _MeaningPicker({
+    required this.option,
+    required this.chosen,
+    required this.onChanged,
+  });
+
+  final String option;
+  final LogVerdict? chosen;
+  final ValueChanged<LogVerdict?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SurfaceCard(
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: Text(
+              option,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+          Expanded(
+            child: DropdownButton<LogVerdict>(
+              isExpanded: true,
+              value: chosen,
+              hint: Text(
+                'Choose',
+                style: TextStyle(color: context.palette.textTertiary),
+              ),
+              items: <DropdownMenuItem<LogVerdict>>[
+                for (final LogVerdict verdict in LogVerdict.values)
+                  DropdownMenuItem<LogVerdict>(
+                    value: verdict,
+                    child: Text(
+                      verdict.labelFor(option),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
               ],
               onChanged: onChanged,

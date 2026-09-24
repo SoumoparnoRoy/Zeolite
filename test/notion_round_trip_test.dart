@@ -19,11 +19,12 @@ NotionMapping _mapping({String counters = 'number'}) => NotionMapping(
         NotionField.key: _p('p7', 'Zeolite ID', 'rich_text'),
         NotionField.time: _p('p8', 'Time', 'rich_text'),
       },
-      statusValues: const <String, String>{
-        'present': 'Present',
-        'absent': 'Absent',
-        'cancelled': 'Cancelled',
-        'proxy': 'Proxy',
+      statusMeanings: const <String, LogVerdict>{
+        'Present': LogVerdict.present,
+        'Absent': LogVerdict.absent,
+        'Cancelled': LogVerdict.cancelled,
+        'Proxy': LogVerdict.presentTagged,
+        'Medical': LogVerdict.absentTagged,
       },
     );
 
@@ -93,6 +94,42 @@ void main() {
         reason: '${item.fields['status']} weight ${item.fields['weight']}',
       );
     }
+  });
+
+  test('a tagged option comes back as its status and tag', () {
+    final SyncItem medical = _mark(status: 'absent', tag: 'Medical');
+    final Map<String, Object?> written =
+        properties.encode(medical, courseName: 'Thermodynamics');
+    final RemoteState read = properties.decode(_pageFrom(written))!;
+
+    expect(read.fields['status'], 'absent');
+    expect(read.fields['tag'], 'Medical');
+    expect(read.hash, properties.remoteHashFor(medical));
+
+    // Online is not among the column's options, so the plain status is sent;
+    // the options are the user's, not the app's to add to.
+    final Map<String, Object?> online = properties.encode(
+      _mark(status: 'present', tag: 'Online'),
+      courseName: 'Thermodynamics',
+    );
+    expect(
+      ((online['p3']! as Map<String, Object?>)['select']!
+          as Map<String, Object?>)['name'],
+      'Present',
+    );
+  });
+
+  test('a Proxy row hashes as it did before options had meanings', () {
+    // Rows linked under the old word-to-option mapping stored this hash;
+    // anything else would push or review every Proxy row once.
+    expect(
+      properties.remoteHashFor(_mark(status: 'present', tag: 'Proxy')),
+      const SyncItem(
+        kind: SyncKind.attendance,
+        localKey: 'subject-uuid:20260304:540',
+        fields: <String, Object?>{'status': 'proxy', 'weight': 1},
+      ).hash,
+    );
   });
 
   test('formula counters are left alone and do not read as a change', () {

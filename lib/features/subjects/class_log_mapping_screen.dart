@@ -31,6 +31,8 @@ class _ClassLogMappingScreenState extends State<ClassLogMappingScreen> {
 
   ClassLogTable get _table => widget.table;
 
+  /// Where a field means something different in a file than in Notion; the
+  /// counting fields read the same in both.
   static const Map<NotionField, String> _descriptions = <NotionField, String>{
     NotionField.course: 'Which subject each class belongs to.',
     NotionField.date: 'The day each class was held.',
@@ -38,8 +40,6 @@ class _ClassLogMappingScreenState extends State<ClassLogMappingScreen> {
     NotionField.component: 'A code or title per row, used for the course code.',
     NotionField.time: 'Start time as 09:00, where the file has one.',
     NotionField.kind: 'Lecture, lab or tutorial, in the file\'s own words.',
-    NotionField.held: 'How many classes a row counts as.',
-    NotionField.credit: 'How many of those you were credited with.',
   };
 
   void _setColumn(NotionField field, int? column) => setState(() {
@@ -97,7 +97,7 @@ class _ClassLogMappingScreenState extends State<ClassLogMappingScreen> {
               for (final NotionField field in ClassLogMapping.fields) ...<Widget>[
                 _Choice<int>(
                   title: field.isRequired ? '${field.label} *' : field.label,
-                  subtitle: _descriptions[field],
+                  subtitle: _descriptions[field] ?? field.description,
                   value: _mapping.columns[field],
                   emptyLabel: field.isRequired ? 'Choose' : 'Not in file',
                   allowEmpty: !field.isRequired,
@@ -125,8 +125,7 @@ class _ClassLogMappingScreenState extends State<ClassLogMappingScreen> {
                 const SizedBox(height: AppSpacing.lg),
                 const SectionHeader('What each status means'),
                 Text(
-                  'Present, absent and cancelled are the marks. Any other word '
-                  'can ride on one of them as a tag, in the file\'s spelling.',
+                  LogVerdict.explained,
                   style: TextStyle(fontSize: 12, color: p.textTertiary),
                 ),
                 const SizedBox(height: AppSpacing.sm),
@@ -136,12 +135,8 @@ class _ClassLogMappingScreenState extends State<ClassLogMappingScreen> {
                     value: _mapping.statuses[word.toLowerCase()],
                     emptyLabel: 'Choose',
                     options: <LogVerdict, String>{
-                      LogVerdict.present: 'Present',
-                      LogVerdict.absent: 'Absent',
-                      LogVerdict.cancelled: 'Cancelled',
-                      LogVerdict.presentTagged: 'Present, tagged "$word"',
-                      LogVerdict.absentTagged: 'Absent, tagged "$word"',
-                      LogVerdict.leftOut: 'Leave these rows out',
+                      for (final LogVerdict verdict in LogVerdict.values)
+                        verdict: verdict.labelFor(word),
                     },
                     onChanged: (LogVerdict? verdict) => setState(() {
                       _mapping = _mapping.copyWith(

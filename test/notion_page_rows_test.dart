@@ -12,7 +12,7 @@ NotionProperty _p(String id, String name, String type,
 /// and a `Course` they type into a select rather than relate.
 NotionMapping _mapping({
   String courseType = 'select',
-  Map<String, String>? statusValues,
+  Map<String, LogVerdict>? statusMeanings,
   Map<String, String> kindValues = const <String, String>{},
   bool withKey = true,
   bool withTime = false,
@@ -32,12 +32,12 @@ NotionMapping _mapping({
         if (withKey) NotionField.key: _p('p8', 'Zeolite ID', 'rich_text'),
         if (withTime) NotionField.time: _p('p9', 'Time', 'rich_text'),
       },
-      statusValues: statusValues ??
-          const <String, String>{
-            'present': 'Present',
-            'absent': 'Absent',
-            'cancelled': 'Cancelled',
-            'proxy': 'Proxy',
+      statusMeanings: statusMeanings ??
+          const <String, LogVerdict>{
+            'Present': LogVerdict.present,
+            'Absent': LogVerdict.absent,
+            'Cancelled': LogVerdict.cancelled,
+            'Proxy': LogVerdict.presentTagged,
           },
       kindValues: kindValues,
     );
@@ -138,7 +138,7 @@ void main() {
         NotionField.held: _p('p6', 'Held (1/2/0)', 'formula'),
         NotionField.credit: _p('p7', 'Attendance Credit (1/2/0)', 'formula'),
       },
-      statusValues: base.statusValues,
+      statusMeanings: base.statusMeanings,
     );
     final Map<String, Object?> page = _page(kind: 'Practical', status: 'Absent');
     final Map<String, Object?> cells =
@@ -164,22 +164,32 @@ void main() {
 
   test("the workspace's own status words read back as ours", () {
     final NotionPageRows rows = NotionPageRows(
-      _mapping(statusValues: const <String, String>{
-        'present': 'Attended',
-        'absent': 'Missed',
+      _mapping(statusMeanings: const <String, LogVerdict>{
+        'Attended': LogVerdict.present,
+        'Missed': LogVerdict.absent,
+        'Medical': LogVerdict.absentTagged,
+        'Holiday': LogVerdict.leftOut,
       }),
     );
 
     final NotionExport export = rows.read(<Map<String, Object?>>[
       _page(status: 'Attended'),
       _page(status: 'Missed'),
+      _page(status: 'Medical'),
+      _page(status: 'Holiday'),
       _page(status: 'Rescheduled'),
     ]);
 
     expect(
       export.rows.map((NotionRow r) => r.status),
-      <AttendanceStatus>[AttendanceStatus.present, AttendanceStatus.absent],
+      <AttendanceStatus>[
+        AttendanceStatus.present,
+        AttendanceStatus.absent,
+        AttendanceStatus.absent,
+      ],
     );
+    expect(export.rows.last.tagName, 'Medical');
+    // Left out on purpose is not a problem; an unanswered word is.
     expect(export.problems.single, contains('"Rescheduled"'));
   });
 

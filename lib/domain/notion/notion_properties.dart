@@ -158,17 +158,7 @@ class NotionProperties {
   /// cannot predict; comparing it would flag every row as changed.
   bool get _heldIsFormula => mapping.fields[NotionField.held]?.type == 'formula';
 
-  /// The far side's word for this mark.
-  ///
-  /// A tag wins when the workspace has a value for it: "Proxy" is how the
-  /// export has always written a present-with-a-tag, and writing "Present"
-  /// instead would lose the distinction the user recorded.
-  String? _word(String status, String? tag) {
-    final String? tagged = tag == null
-        ? null
-        : mapping.statusValues[tag.trim().toLowerCase()];
-    return tagged ?? mapping.statusValues[status];
-  }
+  String? _word(String status, String? tag) => mapping.optionFor(status, tag);
 
   /// Reads one page into the shape the planner compares.
   ///
@@ -200,10 +190,19 @@ class NotionProperties {
     // Only what Notion actually holds. The hash is compared against its own
     // stored value rather than the local one, so it has to be stable, not
     // identical to what the device would produce.
-    final Map<String, Object?> fields = <String, Object?>{
+    final Map<String, Object?> hashed = <String, Object?>{
       'status': wordFor(word) ?? 'present',
       if (!_heldIsFormula)
         'weight': (held is Map<String, Object?> ? held['number'] : null) ?? 1,
+    };
+    // What a pull applies: a tagged option splits into its status and the
+    // tag. Kept out of the hash, which rows synced before tags were read
+    // back were stored under.
+    final LogVerdict? meaning = mapping.meaningOf(word);
+    final Map<String, Object?> fields = <String, Object?>{
+      ...hashed,
+      if (meaning?.word case final String status) 'status': status,
+      if (meaning != null && meaning.tagged) 'tag': word,
     };
 
     return RemoteState(
@@ -213,7 +212,7 @@ class NotionProperties {
       hash: SyncItem(
         kind: SyncKind.attendance,
         localKey: localKey,
-        fields: fields,
+        fields: hashed,
       ).hash,
       fields: fields,
       editedAt: DateTime.tryParse((page['last_edited_time'] as String?) ?? ''),
@@ -226,10 +225,14 @@ class NotionProperties {
   ///
   /// Null only for a column that is empty, which a pull reads as agreement
   /// and an import has to report rather than guess at.
+  ///
+  /// A tagged option reads as its own name, which is what `proxy` has always
+  /// hashed as.
   String? wordFor(String? option) {
     if (option == null) return null;
-    for (final MapEntry<String, String> entry in mapping.statusValues.entries) {
-      if (entry.value == option) return entry.key;
+    final LogVerdict? meaning = mapping.meaningOf(option);
+    if (meaning != null && !meaning.tagged && meaning.word != null) {
+      return meaning.word;
     }
     return option.trim().toLowerCase();
   }

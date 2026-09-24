@@ -193,6 +193,27 @@ void main() {
     expect(export.problems.single, contains('"Rescheduled"'));
   });
 
+  test('a row with no course takes the one its title is always filed under',
+      () {
+    final NotionExport export = NotionPageRows(_mapping()).read(
+      <Map<String, Object?>>[
+        _page(component: 'GEN101', date: '2026-03-02'),
+        _page(course: null, component: 'GEN101', date: '2026-03-03'),
+        _page(course: null, component: 'NEW202', date: '2026-03-03'),
+        // Filled in ahead by a template: not a class yet, whatever it says.
+        _page(component: 'GEN101', date: '2026-03-05', status: 'Absent'),
+      ],
+      today: DateTime(2026, 3, 4),
+    );
+
+    expect(export.rows.map((NotionRow r) => r.course), <String>[
+      'Generic Course',
+      'Generic Course',
+    ]);
+    expect(export.problems.single, contains('NEW202'));
+    expect(export.upcoming, 1);
+  });
+
   test('the credit column decides, and disagreement is reported', () {
     final NotionExport export = NotionPageRows(_mapping()).read(
       <Map<String, Object?>>[

@@ -1,3 +1,4 @@
+import '../../core/date_utils.dart';
 import '../notion_export.dart';
 import 'notion_mapping.dart';
 import 'notion_properties.dart';
@@ -39,10 +40,14 @@ class NotionPageRows {
     List<Map<String, Object?>> pages, {
     Map<String, String> courseNames = const <String, String>{},
     bool skipKeyed = false,
+    DateTime? today,
   }) {
     final List<NotionRow> rows = <NotionRow>[];
     final List<String> problems = <String>[];
+    final Map<String, String> titled = _coursesByTitle(pages, courseNames);
+    final int todayKey = Dates.keyOf(today ?? Dates.today());
     int keyed = 0;
+    int upcoming = 0;
 
     for (int i = 0; i < pages.length; i++) {
       final Map<String, Object?> cells = _propertiesOf(pages[i]);
@@ -51,8 +56,13 @@ class NotionPageRows {
         continue;
       }
       final ({NotionRow? row, String? problem}) read =
-          _rowOf(cells, courseNames, i);
-      if (read.row != null) rows.add(read.row!);
+          _rowOf(cells, courseNames, titled, i);
+      final NotionRow? row = read.row;
+      if (row != null && Dates.keyOf(row.date) > todayKey) {
+        upcoming++;
+      } else if (row != null) {
+        rows.add(row);
+      }
       if (read.problem != null) problems.add(read.problem!);
     }
 
@@ -60,7 +70,7 @@ class NotionPageRows {
       problems.add('$keyed ${keyed == 1 ? 'row' : 'rows'} already synced from '
           'this device were left out.');
     }
-    return NotionExport(rows: rows, problems: problems);
+    return NotionExport(rows: rows, problems: problems, upcoming: upcoming);
   }
 
   /// The rows with no `Zeolite ID`, each beside the page it came from, read
@@ -75,6 +85,7 @@ class NotionPageRows {
     Set<String> strays = const <String>{},
   }) {
     final List<NotionUnkeyedRow> out = <NotionUnkeyedRow>[];
+    final Map<String, String> titled = _coursesByTitle(pages, courseNames);
     for (int i = 0; i < pages.length; i++) {
       final Map<String, Object?> page = pages[i];
       final Object? id = page['id'];
@@ -82,19 +93,34 @@ class NotionPageRows {
       if (id is! String || page['in_trash'] == true) continue;
       if (page['archived'] == true) continue;
       if (_keyOf(cells) != null && !strays.contains(id)) continue;
-      final NotionRow? row = _rowOf(cells, courseNames, i).row;
+      final NotionRow? row = _rowOf(cells, courseNames, titled, i).row;
       if (row != null) out.add(NotionUnkeyedRow(pageId: id, row: row));
     }
     return out;
   }
 
+  Map<String, String> _coursesByTitle(
+    List<Map<String, Object?>> pages,
+    Map<String, String> courseNames,
+  ) =>
+      NotionExport.coursesByTitle(<({String title, String course})>[
+        for (final Map<String, Object?> page in pages)
+          (
+            title: _componentOf(_propertiesOf(page))?.trim() ?? '',
+            course: _courseOf(_propertiesOf(page), courseNames)?.trim() ?? '',
+          ),
+      ]);
+
   ({NotionRow? row, String? problem}) _rowOf(
     Map<String, Object?> cells,
     Map<String, String> courseNames,
+    Map<String, String> titled,
     int index,
   ) {
-    final String course = _courseOf(cells, courseNames) ?? '';
     final String component = _componentOf(cells) ?? '';
+    final String named = _courseOf(cells, courseNames)?.trim() ?? '';
+    final String course =
+        named.isEmpty ? titled[component.trim()] ?? '' : named;
     final String label = component.isEmpty ? course : component;
     final String where = 'Row ${index + 1}${label.isEmpty ? '' : ' ($label)'}';
 

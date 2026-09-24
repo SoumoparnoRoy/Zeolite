@@ -239,14 +239,27 @@ NotionExport readClassLog(
   final Map<NotionField, int> at = mapping.columns;
   final List<NotionRow> rows = <NotionRow>[];
   final List<String> problems = <String>[];
+  final Map<String, String> titled = NotionExport.coursesByTitle(
+    <({String title, String course})>[
+      for (final List<String> cells in table.rows)
+        (
+          title: table.cell(cells, at[NotionField.component]),
+          course: NotionExport.courseName(
+            table.cell(cells, at[NotionField.course]),
+          ),
+        ),
+    ],
+  );
+  int upcoming = 0;
 
   for (int i = 0; i < table.rows.length; i++) {
     final List<String> cells = table.rows[i];
     if (cells.every((String c) => c.trim().isEmpty)) continue;
     String get(NotionField field) => table.cell(cells, at[field]);
 
-    final String course = NotionExport.courseName(get(NotionField.course));
     final String component = get(NotionField.component);
+    final String named = NotionExport.courseName(get(NotionField.course));
+    final String course = named.isEmpty ? titled[component] ?? '' : named;
     final String label = component.isEmpty ? course : component;
     final String where = 'Row ${i + 2}${label.isEmpty ? '' : ' ($label)'}';
 
@@ -272,6 +285,10 @@ NotionExport readClassLog(
       continue;
     }
     if (verdict == LogVerdict.leftOut) continue;
+    if (Dates.keyOf(date) > Dates.keyOf(anchor)) {
+      upcoming++;
+      continue;
+    }
 
     final String kindWord = get(NotionField.kind);
     rows.add(
@@ -291,5 +308,5 @@ NotionExport readClassLog(
       ),
     );
   }
-  return NotionExport(rows: rows, problems: problems);
+  return NotionExport(rows: rows, problems: problems, upcoming: upcoming);
 }

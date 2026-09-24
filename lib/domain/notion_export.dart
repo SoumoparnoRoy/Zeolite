@@ -139,7 +139,11 @@ class NotionRow {
 /// Everything read out of one export, plus what could not be read.
 @immutable
 class NotionExport {
-  const NotionExport({required this.rows, required this.problems});
+  const NotionExport({
+    required this.rows,
+    required this.problems,
+    this.upcoming = 0,
+  });
 
   final List<NotionRow> rows;
 
@@ -148,7 +152,29 @@ class NotionExport {
   /// silently loses half its classes reads as an app bug.
   final List<String> problems;
 
+  /// Rows dated after today, left out. A table filled in ahead from a
+  /// repeating template holds days still to come, under whatever status the
+  /// template defaults to.
+  final int upcoming;
+
   bool get isEmpty => rows.isEmpty;
+
+  /// The course every row with a given title is filed under, for a row that
+  /// names none itself — a template whose course came out empty. A title
+  /// found under two courses, or none, is left for the row to be reported.
+  static Map<String, String> coursesByTitle(
+    Iterable<({String title, String course})> rows,
+  ) {
+    final Map<String, Set<String>> seen = <String, Set<String>>{};
+    for (final ({String title, String course}) row in rows) {
+      if (row.title.isEmpty || row.course.isEmpty) continue;
+      seen.putIfAbsent(row.title, () => <String>{}).add(row.course);
+    }
+    return <String, String>{
+      for (final MapEntry<String, Set<String>> e in seen.entries)
+        if (e.value.length == 1) e.key: e.value.single,
+    };
+  }
 
   DateTime? get firstDate => rows.isEmpty
       ? null

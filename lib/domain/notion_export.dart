@@ -5,6 +5,7 @@ import 'package:archive/archive.dart';
 import 'package:flutter/foundation.dart';
 
 import '../core/date_utils.dart';
+import '../core/words.dart';
 import '../data/models/attendance_status.dart';
 import 'class_log.dart';
 import 'notion/notion_mapping.dart';
@@ -143,6 +144,7 @@ class NotionExport {
     required this.rows,
     required this.problems,
     this.upcoming = 0,
+    this.alreadySynced = 0,
   });
 
   final List<NotionRow> rows;
@@ -156,6 +158,21 @@ class NotionExport {
   /// repeating template holds days still to come, under whatever status the
   /// template defaults to.
   final int upcoming;
+
+  /// Rows this device wrote itself, left out at the user's word.
+  final int alreadySynced;
+
+  /// Rows left out on purpose, said apart from [problems] — they were read
+  /// fine, and counting them as unreadable would overstate what went wrong.
+  List<String> get leftOut => <String>[
+        if (alreadySynced > 0)
+          '${Words.plural(alreadySynced, 'class', 'classes')} already synced '
+              'from this device ${alreadySynced == 1 ? 'was' : 'were'} left out.',
+        if (upcoming > 0)
+          '${Words.plural(upcoming, 'class', 'classes')} dated after today '
+              '${upcoming == 1 ? 'was' : 'were'} left out. Import again once '
+              '${upcoming == 1 ? 'it has' : 'they have'} happened.',
+      ];
 
   bool get isEmpty => rows.isEmpty;
 

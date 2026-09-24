@@ -233,9 +233,10 @@ class NotionSection extends ConsumerWidget {
     if (export.isEmpty) {
       messenger.showSnackBar(
         SnackBar(
-          content: Text(export.problems.isEmpty
-              ? 'Nothing in that table could be read as a class.'
-              : export.problems.first),
+          content: Text(
+            <String>[...export.problems, ...export.leftOut].firstOrNull ??
+                'Nothing in that table could be read as a class.',
+          ),
           duration: const Duration(seconds: 6),
         ),
       );

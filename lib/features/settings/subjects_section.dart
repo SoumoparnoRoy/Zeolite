@@ -137,9 +137,8 @@ class SubjectsSection extends ConsumerWidget {
     if (export.isEmpty) {
       _say(
         context,
-        export.problems.isEmpty
-            ? 'No classes could be read out of that file.'
-            : export.problems.first,
+        <String>[...export.problems, ...export.leftOut].firstOrNull ??
+            'No classes could be read out of that file.',
       );
       return;
     }

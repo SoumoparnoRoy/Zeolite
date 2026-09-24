@@ -173,14 +173,11 @@ class _NotionImportScreenState extends ConsumerState<NotionImportScreen> {
                 ),
               if (_export.problems.isNotEmpty)
                 _Problems(problems: _export.problems),
-              if (_export.upcoming > 0)
+              for (final String note in _export.leftOut)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Text(
-                    '${Words.plural(_export.upcoming, 'class', 'classes')} '
-                    'dated after today '
-                    '${_export.upcoming == 1 ? 'was' : 'were'} left out. '
-                    'Import again once they have happened.',
+                    note,
                     style: TextStyle(
                       fontSize: 12,
                       color: context.palette.textTertiary,

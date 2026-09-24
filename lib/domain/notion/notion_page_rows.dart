@@ -66,11 +66,12 @@ class NotionPageRows {
       if (read.problem != null) problems.add(read.problem!);
     }
 
-    if (keyed > 0) {
-      problems.add('$keyed ${keyed == 1 ? 'row' : 'rows'} already synced from '
-          'this device were left out.');
-    }
-    return NotionExport(rows: rows, problems: problems, upcoming: upcoming);
+    return NotionExport(
+      rows: rows,
+      problems: problems,
+      upcoming: upcoming,
+      alreadySynced: keyed,
+    );
   }
 
   /// The rows with no `Zeolite ID`, each beside the page it came from, read

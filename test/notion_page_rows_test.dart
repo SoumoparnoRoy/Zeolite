@@ -278,7 +278,8 @@ void main() {
 
     final NotionExport mine = rows.read(pages, skipKeyed: true);
     expect(mine.rows, hasLength(1));
-    expect(mine.problems.single, contains('1 row already synced'));
+    expect(mine.problems, isEmpty);
+    expect(mine.leftOut.single, contains('1 class already synced'));
   });
 
   test('nothing is keyed when the database has no ID column', () {

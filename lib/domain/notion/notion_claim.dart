@@ -1,4 +1,5 @@
 import '../../core/date_utils.dart';
+import '../../data/models/attendance_record.dart';
 import '../notion_export.dart';
 import '../sync/sync_target.dart';
 import 'notion_page_rows.dart';
@@ -32,7 +33,9 @@ class NotionClaim {
           );
     }
     for (final List<_Mark> day in marksByDay.values) {
-      day.sort((_Mark a, _Mark b) => a.start.compareTo(b.start));
+      day.sort(
+        (_Mark a, _Mark b) => AttendanceRecord.compareStarts(a.start, b.start),
+      );
     }
     final Set<String> subjects = <String>{
       for (final String key in marksByDay.keys) key.split('|').first,

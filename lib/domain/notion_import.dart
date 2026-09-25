@@ -339,8 +339,8 @@ class NotionPlan {
   /// same minute would collapse into one and quietly lose a class. A row that
   /// brought its own time keeps it and is placed first, so the rows that did
   /// not cannot take a slot one of them already occupies. The rest take that
-  /// day's scheduled start times in order, and anything left over falls back
-  /// to an hour the day has not used yet.
+  /// day's scheduled start times in order, and anything left over is kept
+  /// with no time at all ([AttendanceRecord.untimed]).
   static List<NotionPlacement> _place(
     List<NotionRow> rows,
     List<ClassSlot> slots,
@@ -361,6 +361,7 @@ class NotionPlan {
           .toList()
         ..sort();
       final Set<int> taken = <int>{};
+      int untimed = 0;
 
       // Told beats inferred, and claiming those minutes up front is what stops
       // the inference below from handing the same slot to a second row.
@@ -393,14 +394,7 @@ class NotionPlan {
           }
         }
         final bool scheduled = start != null;
-        if (start == null) {
-          // Nine in the morning, then the next free hour after it, so a day
-          // with two unplaceable rows still keeps them apart.
-          start = _fallbackStart;
-          while (!taken.add(start!)) {
-            start = start + 60;
-          }
-        }
+        start ??= AttendanceRecord.untimed(++untimed);
         out.add(
           NotionPlacement(
             row: row,
@@ -415,7 +409,9 @@ class NotionPlan {
     out.sort((NotionPlacement a, NotionPlacement b) {
       final int byDate =
           Dates.keyOf(a.row.date).compareTo(Dates.keyOf(b.row.date));
-      return byDate != 0 ? byDate : a.startMinutes.compareTo(b.startMinutes);
+      return byDate != 0
+          ? byDate
+          : AttendanceRecord.compareStarts(a.startMinutes, b.startMinutes);
     });
     return out;
   }
@@ -425,6 +421,4 @@ class NotionPlan {
     if (row.weight == 0) return 0;
     return grouping == NotionGrouping.grouped ? row.weight : 1;
   }
-
-  static const int _fallbackStart = 9 * 60;
 }

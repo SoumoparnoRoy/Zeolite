@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../core/words.dart';
+import '../../data/models/attendance_record.dart';
 import '../../data/models/attendance_status.dart';
 import '../../data/models/subject.dart';
 import '../../domain/sync/sync_merge.dart';
@@ -382,7 +383,7 @@ String _when(String localKey) {
   final int? start = int.tryParse(parts[2]);
   if (dateKey == null || start == null) return '';
   return '${Dates.formatDayMonth(Dates.fromKey(dateKey))} · '
-      '${Clock.format(start)}';
+      '${AttendanceRecord.startLabel(start)}';
 }
 
 class _Merging extends StatelessWidget {

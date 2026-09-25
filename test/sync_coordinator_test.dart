@@ -103,8 +103,9 @@ void main() {
     String? tag,
     DateTime? editedAt,
     bool deleted = false,
+    int start = 540,
   }) {
-    final String key = SyncItem.keyFor(uuid, _day, 540);
+    final String key = SyncItem.keyFor(uuid, _day, start);
     final Map<String, Object?> fields = <String, Object?>{
       'status': status,
       'weight': weight,
@@ -183,6 +184,21 @@ void main() {
           .localKey,
       SyncItem.keyFor(uuid, _day, 540),
     );
+  });
+
+  test('a mark with no time comes down with none', () async {
+    const String uuid = 'aaaaaaaabbbbccccddddeeeeeeeeeeee';
+    final int untimed = AttendanceRecord.untimed(1);
+    target.remote = <RemoteState>[
+      subjectRow(uuid),
+      mark(uuid, start: untimed, editedAt: _early),
+    ];
+
+    final SyncRunResult result = await coordinator().run();
+
+    expect(result.pulled, 2);
+    final Subject written = (await repo.getSubjects()).single;
+    expect(await repo.getAttendanceAt(written.id!, _day, untimed), isNotNull);
   });
 
   test('a tombstone removes the mark instead of importing it', () async {

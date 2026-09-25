@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zeolite/data/models/attendance_record.dart';
 import 'package:zeolite/domain/notion/notion_mapping.dart';
 import 'package:zeolite/domain/notion/notion_properties.dart';
 import 'package:zeolite/domain/sync/sync_target.dart';
@@ -117,6 +118,22 @@ void main() {
           as Map<String, Object?>)['name'],
       'Present',
     );
+  });
+
+  test('a class with no time leaves the Time column empty', () {
+    final Map<String, Object?> timed =
+        properties.encode(_mark(status: 'present'), courseName: 'Physics');
+    final Map<String, Object?> untimed = properties.encode(
+      SyncItem(
+        kind: SyncKind.attendance,
+        localKey: 'subject-uuid:20260304:${AttendanceRecord.untimed(1)}',
+        fields: const <String, Object?>{'status': 'present', 'weight': 1},
+      ),
+      courseName: 'Physics',
+    );
+
+    expect(timed.containsKey('p8'), isTrue);
+    expect(untimed.containsKey('p8'), isFalse);
   });
 
   test('a Proxy row hashes as it did before options had meanings', () {

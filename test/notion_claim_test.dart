@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zeolite/data/models/attendance_record.dart';
 import 'package:zeolite/data/models/attendance_status.dart';
 import 'package:zeolite/domain/notion/notion_claim.dart';
 import 'package:zeolite/domain/notion/notion_page_rows.dart';
@@ -50,6 +51,21 @@ Map<String, String> _pair(
     );
 
 void main() {
+  test('classes with no time pair with rows in the order they came in', () {
+    final Map<String, String> paired = _pair(
+      <NotionUnkeyedRow>[_row('first'), _row('second')],
+      <SyncItem>[
+        _mark('uuid-theory', AttendanceRecord.untimed(2)),
+        _mark('uuid-theory', AttendanceRecord.untimed(1)),
+      ],
+    );
+
+    expect(paired, <String, String>{
+      'uuid-theory:20260304:-1': 'first',
+      'uuid-theory:20260304:-2': 'second',
+    });
+  });
+
   test('a row pairs with its subject and day, and nothing else', () {
     final Map<String, String> paired = _pair(
       <NotionUnkeyedRow>[

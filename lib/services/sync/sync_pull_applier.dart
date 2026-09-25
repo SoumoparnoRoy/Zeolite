@@ -524,7 +524,10 @@ class _MarkKey {
     if (parts.length != 3) return null;
     final DateTime? date = readDay(parts[1]);
     final int? start = int.tryParse(parts[2]);
-    if (parts[0].isEmpty || date == null || !isMinuteOfDay(start)) {
+    final bool untimed = start != null && !AttendanceRecord.isTimed(start);
+    if (parts[0].isEmpty ||
+        date == null ||
+        !(untimed || isMinuteOfDay(start))) {
       return null;
     }
     return _MarkKey(parts[0], date, start!);

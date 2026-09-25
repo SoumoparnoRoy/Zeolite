@@ -185,7 +185,7 @@ void main() {
       );
     });
 
-    test('with no class that day the mark still lands, flagged unscheduled',
+    test('with no class that day the mark lands with no time, unscheduled',
         () {
       final NotionPlan plan = _plan(
         _read(<String>['ABC101L,1,Thermodynamics,Aug 3,1,Yes,Lecture,Present']),
@@ -194,7 +194,7 @@ void main() {
       );
       final NotionPlacement placed = plan.subjects.single.placements.single;
       expect(placed.scheduled, isFalse);
-      expect(placed.startMinutes, 9 * 60);
+      expect(AttendanceRecord.isTimed(placed.startMinutes), isFalse);
       expect(plan.subjects.single.unscheduled, 1);
     });
 
@@ -208,8 +208,8 @@ void main() {
       );
       final List<NotionPlacement> placed = plan.subjects.single.placements;
       expect(
-        placed.map((NotionPlacement p) => p.startMinutes).toSet(),
-        hasLength(2),
+        placed.map((NotionPlacement p) => p.startMinutes).toList(),
+        <int>[AttendanceRecord.untimed(1), AttendanceRecord.untimed(2)],
       );
     });
 

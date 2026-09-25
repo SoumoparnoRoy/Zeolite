@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
+import '../../data/models/attendance_record.dart';
 import '../../data/models/attendance_status.dart';
 import '../../data/models/subject.dart';
 import '../../data/settings/app_settings.dart';
@@ -200,7 +201,7 @@ class _LogTile extends ConsumerWidget {
         ref.watch(timetableProvider).value?.tagById(entry.tagId)?.name;
 
     final String time = entry.endMinutes == null
-        ? Clock.format(entry.startMinutes, use24Hour: use24Hour)
+        ? AttendanceRecord.startLabel(entry.startMinutes, use24Hour: use24Hour)
         : Clock.formatRange(
             entry.startMinutes,
             entry.endMinutes!,

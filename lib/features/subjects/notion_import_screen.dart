@@ -518,7 +518,7 @@ class _SubjectCard extends StatelessWidget {
       if (planned.unscheduled > 0)
         '${Words.plural(planned.unscheduled, 'class', 'classes')} had no '
             'matching class on your timetable that day. They still count, and '
-            'show in the log as left over from a rule that is not there.',
+            'show in the log with no time unless the file gave one.',
       if (planned.suspect > 0)
         '${Words.plural(planned.suspect, 'row')} disagree with their own '
             'credit column — attended but credited nothing, or the other way '

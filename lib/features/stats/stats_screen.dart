@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../core/words.dart';
+import '../../data/models/attendance_record.dart';
 import '../../data/models/attendance_status.dart';
 import '../../data/models/subject.dart';
 import '../../data/settings/app_settings.dart';
@@ -818,7 +819,7 @@ class _TaggedMarkRow extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   '${Dates.formatDayMonth(mark.record.date)} · '
-                  '${Clock.format(mark.record.startMinutes, use24Hour: use24Hour)}',
+                  '${AttendanceRecord.startLabel(mark.record.startMinutes, use24Hour: use24Hour)}',
                   style: monoStyle(color: p.textTertiary, size: 10),
                 ),
               ],

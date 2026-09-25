@@ -29,6 +29,9 @@ class AttendanceRecord {
   final int? id;
   final int subjectId;
   final DateTime date;
+
+  /// Minutes past midnight, or `-1`, `-2`... for a day's classes with no
+  /// time given, rather than a made-up hour that would sync as real.
   final int startMinutes;
   final AttendanceStatus status;
 
@@ -55,6 +58,22 @@ class AttendanceRecord {
       '$subjectId:${Dates.keyOf(date)}:$startMinutes';
 
   String get key => keyFor(subjectId, date, startMinutes);
+
+  /// The [startMinutes] of the [position]th untimed mark of a day, from 1.
+  static int untimed(int position) => -position;
+
+  static bool isTimed(int startMinutes) => startMinutes >= 0;
+
+  /// Timed marks by time, then untimed ones in the order they were given.
+  static int compareStarts(int a, int b) {
+    if (isTimed(a) != isTimed(b)) return isTimed(a) ? -1 : 1;
+    return isTimed(a) ? a.compareTo(b) : b.compareTo(a);
+  }
+
+  static String startLabel(int startMinutes, {bool use24Hour = false}) =>
+      isTimed(startMinutes)
+          ? Clock.format(startMinutes, use24Hour: use24Hour)
+          : 'No time';
 
   AttendanceRecord copyWith({
     int? id,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
@@ -21,6 +22,36 @@ class DangerDecision {
   final DangerAlert action;
   final Set<int> warned;
 }
+
+/// The notification categories Android lets a user block one at a time.
+enum TrayChannel { classes, reminders, alerts }
+
+/// What Android lets through, as opposed to what the settings ask for. The
+/// user can block either from the system screens, where the app is never told.
+@immutable
+class TrayAccess {
+  const TrayAccess({
+    this.appAllowed = true,
+    this.blocked = const <TrayChannel>{},
+  });
+
+  /// Assumed until Android has answered, so nothing warns on a guess.
+  static const TrayAccess open = TrayAccess();
+
+  final bool appAllowed;
+  final Set<TrayChannel> blocked;
+
+  bool allows(TrayChannel channel) =>
+      appAllowed && !blocked.contains(channel);
+
+  /// Blocked on its own, while the app as a whole is allowed. With the app
+  /// blocked the per-channel answer tells the user nothing new.
+  bool blocksOnly(TrayChannel channel) =>
+      appAllowed && blocked.contains(channel);
+}
+
+/// What to do with one day's evening reminder on this pass.
+enum EveningReminder { schedule, refresh, cancel, leave }
 
 /// All local notifications: class reminders, the evening "mark your
 /// attendance" nudge, and attendance danger alerts.
@@ -50,8 +81,17 @@ class NotificationService {
   /// Notification id ranges, kept apart so one feature never cancels another.
   static const int _classReminderBase = 100000;
   static const int _classEndReminderBase = 101000;
-  static const int _eveningReminderId = 10;
+  static const int _eveningReminderBase = 3000;
   static const int _dangerAlertId = 2000;
+
+  /// The daily repeating reminder older versions set. It fired whether or not
+  /// anything was left to mark, so an upgrade has to cancel it.
+  static const int _retiredEveningReminderId = 10;
+
+  /// Today and the thirty days after it: how long these keep coming without
+  /// the app being opened. Ids go round one more than this, so yesterday's
+  /// reminder has an id of its own to be cleared under.
+  static const int eveningDays = 31;
 
   /// Ids 2000-2004 belonged to the one-alert-per-subject version, so an
   /// upgrade has to clear them too.
@@ -222,6 +262,74 @@ class NotificationService {
     return await androidPlugin?.areNotificationsEnabled() ?? false;
   }
 
+  static const MethodChannel _settingsChannel =
+      MethodChannel('zeolite/notification_settings');
+
+  static final Map<String, TrayChannel> _channels = <String, TrayChannel>{
+    _classChannel.id: TrayChannel.classes,
+    _reminderChannel.id: TrayChannel.reminders,
+    _alertChannel.id: TrayChannel.alerts,
+  };
+
+  /// Reads the answer back from Android. A channel the app has not created yet
+  /// is not blocked, and a platform that cannot say is taken as open.
+  Future<TrayAccess> trayAccess() async {
+    final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
+        _plugin.resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+    if (androidPlugin == null) return TrayAccess.open;
+    try {
+      return trayAccessFrom(
+        appAllowed: await androidPlugin.areNotificationsEnabled(),
+        channels: await androidPlugin.getNotificationChannels(),
+      );
+    } catch (error) {
+      debugPrint('Zeolite: could not read notification access: $error');
+      return TrayAccess.open;
+    }
+  }
+
+  @visibleForTesting
+  static TrayAccess trayAccessFrom({
+    required bool? appAllowed,
+    required List<AndroidNotificationChannel>? channels,
+  }) {
+    return TrayAccess(
+      appAllowed: appAllowed ?? true,
+      blocked: <TrayChannel>{
+        for (final AndroidNotificationChannel c in channels ?? const [])
+          if (c.importance == Importance.none && _channels[c.id] != null)
+            _channels[c.id]!,
+      },
+    );
+  }
+
+  /// Asks again when Android still allows it to, and otherwise opens the
+  /// screen that decides: once the prompt has been refused, asking is silent.
+  Future<void> allowNotifications() async {
+    if (await requestPermissions()) return;
+    await openSettings();
+  }
+
+  /// Opens the system notification screen for the app, or for one channel.
+  Future<void> openSettings({TrayChannel? channel}) async {
+    final String? id = channel == null
+        ? null
+        : _channels.entries
+            .firstWhere((MapEntry<String, TrayChannel> e) => e.value == channel)
+            .key;
+    try {
+      await _settingsChannel.invokeMethod<void>(
+        'open',
+        <String, Object?>{'channel': id},
+      );
+    } on PlatformException catch (error) {
+      debugPrint('Zeolite: could not open notification settings: $error');
+    } on MissingPluginException {
+      return;
+    }
+  }
+
   Future<AndroidScheduleMode> _scheduleMode() async {
     return await canScheduleExactly()
         ? AndroidScheduleMode.exactAllowWhileIdle
@@ -233,6 +341,7 @@ class NotificationService {
   Future<void> rescheduleAll({
     required AppSettings settings,
     required List<ClassSession> upcoming,
+    required List<ClassSession> eveningSessions,
     required OverallStats stats,
   }) async {
     if (!_ready) await init();
@@ -240,12 +349,13 @@ class NotificationService {
 
     await _cancelRange(_classReminderBase, _maxClassReminders);
     await _cancelRange(_classEndReminderBase, _maxClassEndReminders);
-    await _plugin.cancel(id: _eveningReminderId);
+    await _plugin.cancel(id: _retiredEveningReminderId);
 
     // The master switch short-circuits everything. The cancellations above have
     // already run, so flipping it off clears the tray rather than leaving
     // previously scheduled alarms behind.
     if (!settings.notificationsEnabled) {
+      await _cancelRange(_eveningReminderBase, eveningDays + 1);
       await _clearDangerAlerts();
       return;
     }
@@ -259,7 +369,9 @@ class NotificationService {
       await _scheduleClassEndReminders(settings, upcoming, stats, mode);
     }
     if (settings.notifyEveningReminder) {
-      await _scheduleEveningReminder(settings, mode);
+      await _updateEveningReminders(settings, eveningSessions, mode);
+    } else {
+      await _cancelRange(_eveningReminderBase, eveningDays + 1);
     }
     if (settings.notifyAttendanceDanger) {
       await _updateDangerAlerts(stats);
@@ -513,47 +625,129 @@ class NotificationService {
     }
   }
 
-  Future<void> _scheduleEveningReminder(
+  /// How many classes each day's evening reminder would count, by day key.
+  ///
+  /// Only classes over by the time it fires: one still to come at 21:00 is
+  /// not something the 20:00 reminder can ask you to mark. A day with nothing
+  /// left is absent, which is what stops the reminder going off at all.
+  static Map<int, int> eveningCounts(
+    List<ClassSession> sessions, {
+    required int reminderMinutes,
+  }) {
+    final Map<int, int> counts = <int, int>{};
+    for (final ClassSession session in sessions) {
+      if (session.isMarked || session.endMinutes > reminderMinutes) continue;
+      final int key = Dates.keyOf(session.date);
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
+    return counts;
+  }
+
+  static String eveningBody(int count) =>
+      count == 1 ? '1 class still unmarked' : '$count classes still unmarked';
+
+  /// A reminder already in the tray stays, its count kept current, until the
+  /// last class is marked. Cancelling it on every pass would clear the nudge
+  /// for the classes still left.
+  static EveningReminder decideEvening({
+    required int count,
+    required bool due,
+    required bool shown,
+  }) {
+    if (count == 0) return EveningReminder.cancel;
+    if (!due) return EveningReminder.schedule;
+    return shown ? EveningReminder.refresh : EveningReminder.leave;
+  }
+
+  static int _eveningIdFor(DateTime day) {
+    final int epochDay =
+        DateTime.utc(day.year, day.month, day.day).millisecondsSinceEpoch ~/
+            Duration.millisecondsPerDay;
+    return _eveningReminderBase + epochDay % (eveningDays + 1);
+  }
+
+  Future<void> _updateEveningReminders(
     AppSettings settings,
+    List<ClassSession> sessions,
     AndroidScheduleMode mode,
   ) async {
-    final NotificationDetails details = NotificationDetails(
-      android: AndroidNotificationDetails(
-        _reminderChannel.id,
-        _reminderChannel.name,
-        channelDescription: _reminderChannel.description,
-        importance: Importance.defaultImportance,
-        priority: Priority.defaultPriority,
-      ),
-    );
+    final Map<int, int> counts =
+        eveningCounts(sessions, reminderMinutes: settings.eveningReminderMinutes);
+    final Set<int> shown = <int>{
+      for (final ActiveNotification n in await _activeNotifications())
+        if (n.id != null) n.id!,
+    };
 
     final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
-    tz.TZDateTime fireAt = tz.TZDateTime(
-      tz.local,
-      now.year,
-      now.month,
-      now.day,
-      Clock.hourOf(settings.eveningReminderMinutes),
-      Clock.minuteOf(settings.eveningReminderMinutes),
-    );
-    if (!fireAt.isAfter(now)) {
-      fireAt = fireAt.add(const Duration(days: 1));
-    }
+    final DateTime today = DateTime(now.year, now.month, now.day);
+    await _plugin.cancel(id: _eveningIdFor(Dates.addDays(today, -1)));
 
-    try {
-      await _plugin.zonedSchedule(
-        id: _eveningReminderId,
-        title: 'Mark today\'s attendance',
-        body: 'Tap to update Zeolite before you forget.',
-        scheduledDate: fireAt,
-        notificationDetails: details,
-        androidScheduleMode: mode,
-        // Repeats at the same wall-clock time every day.
-        matchDateTimeComponents: DateTimeComponents.time,
-        payload: 'evening',
+    for (int i = 0; i < eveningDays; i++) {
+      final DateTime day = Dates.addDays(today, i);
+      final int id = _eveningIdFor(day);
+      final int count = counts[Dates.keyOf(day)] ?? 0;
+      final tz.TZDateTime fireAt = tz.TZDateTime(
+        tz.local,
+        day.year,
+        day.month,
+        day.day,
+        Clock.hourOf(settings.eveningReminderMinutes),
+        Clock.minuteOf(settings.eveningReminderMinutes),
       );
+      final EveningReminder action = decideEvening(
+        count: count,
+        due: !fireAt.isAfter(now),
+        shown: shown.contains(id),
+      );
+
+      final NotificationDetails details = NotificationDetails(
+        android: AndroidNotificationDetails(
+          _reminderChannel.id,
+          _reminderChannel.name,
+          channelDescription: _reminderChannel.description,
+          importance: Importance.defaultImportance,
+          priority: Priority.defaultPriority,
+          // A refresh only changes the count; it should not sound again.
+          onlyAlertOnce: true,
+        ),
+      );
+      try {
+        switch (action) {
+          case EveningReminder.cancel:
+            await _plugin.cancel(id: id);
+          case EveningReminder.leave:
+            break;
+          case EveningReminder.schedule:
+            await _plugin.zonedSchedule(
+              id: id,
+              title: 'Mark today\'s attendance',
+              body: eveningBody(count),
+              scheduledDate: fireAt,
+              notificationDetails: details,
+              androidScheduleMode: mode,
+              payload: 'evening',
+            );
+          case EveningReminder.refresh:
+            await _plugin.show(
+              id: id,
+              title: 'Mark today\'s attendance',
+              body: eveningBody(count),
+              notificationDetails: details,
+              payload: 'evening',
+            );
+        }
+      } catch (error) {
+        debugPrint('Zeolite: could not schedule evening reminder: $error');
+      }
+    }
+  }
+
+  Future<List<ActiveNotification>> _activeNotifications() async {
+    try {
+      return await _plugin.getActiveNotifications();
     } catch (error) {
-      debugPrint('Zeolite: could not schedule evening reminder: $error');
+      debugPrint('Zeolite: could not read the tray: $error');
+      return const <ActiveNotification>[];
     }
   }
 

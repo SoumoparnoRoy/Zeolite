@@ -2,11 +2,13 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/date_utils.dart';
 import '../../data/db/zeolite_repository.dart';
 import '../../data/settings/app_settings.dart';
 import '../../domain/schedule_engine.dart';
 import '../../domain/sync/sync_target.dart';
 import '../../services/analytics_service.dart';
+import '../../services/notification_service.dart';
 import '../notion_sync_providers.dart';
 import '../providers.dart';
 import '../sync_providers.dart';
@@ -97,6 +99,13 @@ class ActionCore {
     await ref.read(notificationsProvider).rescheduleAll(
           settings: settings,
           upcoming: engine.upcomingSessions(),
+          eveningSessions: engine.sessionsBetween(
+            Dates.today(),
+            Dates.addDays(
+              Dates.today(),
+              NotificationService.eveningDays - 1,
+            ),
+          ),
           stats: ref.read(statsProvider),
         );
   }

@@ -12,6 +12,7 @@ class QuietNotifications extends NotificationService {
   Future<void> rescheduleAll({
     required AppSettings settings,
     required List<ClassSession> upcoming,
+    required List<ClassSession> eveningSessions,
     required OverallStats stats,
   }) async {}
 

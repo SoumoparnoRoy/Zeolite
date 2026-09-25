@@ -143,6 +143,9 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
     final AppSettings settings =
         ref.watch(settingsProvider).value ?? const AppSettings();
     final OverallStats stats = ref.watch(statsProvider);
+    // Watched only so the popup below runs again once Android has said
+    // whether the tray is blocked, which lands after the first frame.
+    ref.watch(inAppAlertsProvider);
     final ScheduleEngine? engine = ref.watch(scheduleEngineProvider);
     final List<ClassSession> unmarked = ref.watch(unmarkedSessionsProvider);
     final ClassSession? next = ref.watch(nextSessionProvider);

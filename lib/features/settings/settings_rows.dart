@@ -44,6 +44,7 @@ class SettingsSwitchRow extends StatelessWidget {
     required this.value,
     required this.onChanged,
     this.onTapSubtitle,
+    this.warning = false,
   });
 
   final IconData icon;
@@ -53,8 +54,12 @@ class SettingsSwitchRow extends StatelessWidget {
   final ValueChanged<bool> onChanged;
   final VoidCallback? onTapSubtitle;
 
+  /// Something outside the app is stopping this row; the tap goes there.
+  final bool warning;
+
   @override
   Widget build(BuildContext context) {
+    final Color link = warning ? context.palette.absent : context.palette.accent;
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 6, 14, 6),
       child: Row(
@@ -101,16 +106,18 @@ class SettingsSwitchRow extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 10.5,
                               color: onTapSubtitle != null
-                                  ? context.palette.accent
+                                  ? link
                                   : context.palette.textTertiary,
                             ),
                           ),
                         ),
                         if (onTapSubtitle != null)
                           Icon(
-                            Icons.edit_rounded,
+                            warning
+                                ? Icons.open_in_new_rounded
+                                : Icons.edit_rounded,
                             size: 12,
-                            color: context.palette.accent,
+                            color: link,
                           ),
                       ],
                     ),

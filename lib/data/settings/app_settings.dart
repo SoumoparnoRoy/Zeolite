@@ -252,8 +252,10 @@ class AppSettings {
   bool get dangerAlertsActive => notificationsEnabled && notifyAttendanceDanger;
 
   /// Attendance warnings are not reaching the tray, so the app shows them
-  /// itself instead of dropping them silently.
-  bool get showDangerInApp => inAppAlerts && !dangerAlertsActive;
+  /// itself instead of dropping them silently. [alertsReachTray] is Android's
+  /// half of that: a channel blocked there is as off as the switch here.
+  bool showDangerInApp({required bool alertsReachTray}) =>
+      inAppAlerts && !(dangerAlertsActive && alertsReachTray);
 
   bool get hasSemester => semesterStart != null && semesterEnd != null;
 

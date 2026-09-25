@@ -104,6 +104,11 @@ final exactAlarmsProvider = FutureProvider<bool>(
   (ref) => ref.watch(notificationsProvider).canScheduleExactly(),
 );
 
+/// Re-read whenever the app comes back to the front.
+final trayAccessProvider = FutureProvider<TrayAccess>(
+  (ref) => ref.watch(notificationsProvider).trayAccess(),
+);
+
 final backupServiceProvider = Provider<BackupService>(
   (ref) => BackupService(
     ref.watch(repositoryProvider),
@@ -600,7 +605,11 @@ final selectedTabProvider =
 /// tray is already handling it, so the two can never both fire.
 final inAppAlertsProvider = Provider<List<SubjectStats>>((ref) {
   final AppSettings? settings = ref.watch(settingsProvider).value;
-  if (settings == null || !settings.showDangerInApp) {
+  final TrayAccess tray = ref.watch(trayAccessProvider).value ?? TrayAccess.open;
+  if (settings == null ||
+      !settings.showDangerInApp(
+        alertsReachTray: tray.allows(TrayChannel.alerts),
+      )) {
     return const <SubjectStats>[];
   }
   return NotificationService.subjectsInDanger(ref.watch(statsProvider));

@@ -203,9 +203,14 @@ class _RootShellState extends ConsumerState<RootShell> {
 
   StreamSubscription<Uri?>? _linkSub;
 
+  AppLifecycleListener? _lifecycle;
+
   @override
   void initState() {
     super.initState();
+    _lifecycle = AppLifecycleListener(
+      onResume: () => ref.invalidate(trayAccessProvider),
+    );
     _tapped.addListener(_openTappedNotification);
     // The stream carries a tap that arrived while the app was running; only
     // the launch link carries the one that started it. Not app_links — a
@@ -223,6 +228,7 @@ class _RootShellState extends ConsumerState<RootShell> {
   void dispose() {
     _tapped.removeListener(_openTappedNotification);
     unawaited(_linkSub?.cancel());
+    _lifecycle?.dispose();
     _pages.dispose();
     super.dispose();
   }

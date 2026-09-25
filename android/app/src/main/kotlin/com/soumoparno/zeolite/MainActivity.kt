@@ -1,7 +1,11 @@
 package com.soumoparno.zeolite
 
 import android.content.ComponentName
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -26,6 +30,34 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SETTINGS_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "open" -> {
+                        openNotificationSettings(call.argument<String>("channel"))
+                        result.success(null)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+    }
+
+    // Below Android 8 there are no channels and no notification screen of the
+    // app's own, so the app info page is the nearest thing.
+    private fun openNotificationSettings(channel: String?) {
+        val intent = when {
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.O ->
+                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                    .setData(Uri.fromParts("package", packageName, null))
+            channel != null ->
+                Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                    .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                    .putExtra(Settings.EXTRA_CHANNEL_ID, channel)
+            else ->
+                Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                    .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+        }
+        startActivity(intent)
     }
 
     private fun current(): String =
@@ -58,6 +90,7 @@ class MainActivity : FlutterActivity() {
 
     private companion object {
         const val CHANNEL = "zeolite/launcher_icon"
+        const val SETTINGS_CHANNEL = "zeolite/notification_settings"
         const val DEFAULT = "default"
 
         val ICONS = listOf(

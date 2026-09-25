@@ -7,6 +7,7 @@ import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../core/time_picker.dart';
 import '../../data/settings/app_settings.dart';
+import '../../services/notification_service.dart';
 import '../../state/providers.dart';
 import '../../widgets/common.dart';
 
@@ -15,12 +16,30 @@ import 'settings_rows.dart';
 class NotificationsSection extends ConsumerWidget {
   const NotificationsSection({super.key});
 
+  static const String _blockedHere = 'Off in Android settings — tap to turn on';
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final AppSettings settings =
         ref.watch(settingsProvider).value ?? const AppSettings();
     final SettingsController controller = ref.read(settingsProvider.notifier);
     final bool exactAlarms = ref.watch(exactAlarmsProvider).value ?? true;
+    final TrayAccess tray =
+        ref.watch(trayAccessProvider).value ?? TrayAccess.open;
+    // Only a type the user has switched on is worth warning about.
+    bool blocked(TrayChannel channel, bool on) =>
+        on && tray.blocksOnly(channel);
+    final bool classesBlocked = blocked(
+      TrayChannel.classes,
+      settings.notifyBeforeClass || settings.notifyAtClassEnd,
+    );
+    final bool eveningBlocked =
+        blocked(TrayChannel.reminders, settings.notifyEveningReminder);
+    final bool alertsBlocked =
+        blocked(TrayChannel.alerts, settings.notifyAttendanceDanger);
+    final bool showInApp = settings.showDangerInApp(
+      alertsReachTray: tray.allows(TrayChannel.alerts),
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -30,6 +49,16 @@ class NotificationsSection extends ConsumerWidget {
           padding: EdgeInsets.zero,
           child: Column(
             children: <Widget>[
+              if (settings.notificationsEnabled && !tray.appAllowed) ...<Widget>[
+                SettingsRow(
+                  icon: Icons.notifications_off_outlined,
+                  title: 'Blocked in Android settings',
+                  value: 'Nothing reaches your tray — tap to allow',
+                  danger: true,
+                  onTap: () => _allow(ref),
+                ),
+                const Divider(indent: 58),
+              ],
               SettingsSwitchRow(
                 icon: settings.notificationsEnabled
                     ? Icons.notifications_outlined
@@ -52,7 +81,7 @@ class NotificationsSection extends ConsumerWidget {
               SettingsSwitchRow(
                 icon: Icons.chat_bubble_outline,
                 title: 'Show alerts in the app',
-                subtitle: settings.showDangerInApp
+                subtitle: showInApp
                     ? 'Attendance warnings appear here instead'
                     : 'Used when attendance alerts are switched off',
                 value: settings.inAppAlerts,
@@ -77,8 +106,10 @@ class NotificationsSection extends ConsumerWidget {
                   SettingsSwitchRow(
                     icon: Icons.notifications_active_outlined,
                     title: 'Before each class',
-                    subtitle:
-                        '${settings.notifyLeadMinutes} minutes before it starts',
+                    subtitle: classesBlocked && settings.notifyBeforeClass
+                        ? _blockedHere
+                        : '${settings.notifyLeadMinutes} minutes before it starts',
+                    warning: classesBlocked && settings.notifyBeforeClass,
                     value: settings.notifyBeforeClass,
                     onChanged: (bool v) async {
                       if (v) {
@@ -90,16 +121,28 @@ class NotificationsSection extends ConsumerWidget {
                           .save(settings.copyWith(notifyBeforeClass: v));
                       await ref.read(actionCoreProvider).reloadAfterImport();
                     },
-                    onTapSubtitle: settings.notifyBeforeClass
-                        ? () =>
-                            _pickLeadTime(context, controller, settings, ref)
-                        : null,
+                    onTapSubtitle: classesBlocked && settings.notifyBeforeClass
+                        ? () => _openChannel(ref, TrayChannel.classes)
+                        : settings.notifyBeforeClass
+                            ? () => _pickLeadTime(
+                                  context,
+                                  controller,
+                                  settings,
+                                  ref,
+                                )
+                            : null,
                   ),
                   const Divider(indent: 58),
                   SettingsSwitchRow(
                     icon: Icons.task_alt_rounded,
                     title: 'When each class ends',
-                    subtitle: 'Mark it from the notification',
+                    subtitle: classesBlocked && settings.notifyAtClassEnd
+                        ? _blockedHere
+                        : 'Mark it from the notification',
+                    warning: classesBlocked && settings.notifyAtClassEnd,
+                    onTapSubtitle: classesBlocked && settings.notifyAtClassEnd
+                        ? () => _openChannel(ref, TrayChannel.classes)
+                        : null,
                     value: settings.notifyAtClassEnd,
                     onChanged: (bool v) async {
                       if (v) {
@@ -128,8 +171,10 @@ class NotificationsSection extends ConsumerWidget {
                   SettingsSwitchRow(
                     icon: Icons.edit_calendar_outlined,
                     title: 'Evening reminder',
-                    subtitle:
-                        'Mark unmarked classes at ${Clock.format(settings.eveningReminderMinutes, use24Hour: settings.use24HourTime)}',
+                    subtitle: eveningBlocked
+                        ? _blockedHere
+                        : 'Mark unmarked classes at ${Clock.format(settings.eveningReminderMinutes, use24Hour: settings.use24HourTime)}',
+                    warning: eveningBlocked,
                     value: settings.notifyEveningReminder,
                     onChanged: (bool v) async {
                       if (v) {
@@ -141,18 +186,30 @@ class NotificationsSection extends ConsumerWidget {
                           .save(settings.copyWith(notifyEveningReminder: v));
                       await ref.read(actionCoreProvider).reloadAfterImport();
                     },
-                    onTapSubtitle: settings.notifyEveningReminder
-                        ? () =>
-                            _pickEveningTime(context, controller, settings, ref)
-                        : null,
+                    onTapSubtitle: eveningBlocked
+                        ? () => _openChannel(ref, TrayChannel.reminders)
+                        : settings.notifyEveningReminder
+                            ? () => _pickEveningTime(
+                                  context,
+                                  controller,
+                                  settings,
+                                  ref,
+                                )
+                            : null,
                   ),
                   const Divider(indent: 58),
                   SettingsSwitchRow(
                     icon: Icons.warning_amber_rounded,
                     title: 'Attendance alerts',
-                    subtitle: settings.showDangerInApp
-                        ? 'Off — shown in the app instead'
-                        : 'Warn me when a subject nears the limit',
+                    subtitle: alertsBlocked
+                        ? _blockedHere
+                        : settings.showDangerInApp(alertsReachTray: true)
+                            ? 'Off — shown in the app instead'
+                            : 'Warn me when a subject nears the limit',
+                    warning: alertsBlocked,
+                    onTapSubtitle: alertsBlocked
+                        ? () => _openChannel(ref, TrayChannel.alerts)
+                        : null,
                     value: settings.notifyAttendanceDanger,
                     onChanged: (bool v) async {
                       if (v) {
@@ -225,6 +282,14 @@ class NotificationsSection extends ConsumerWidget {
     );
     await ref.read(actionCoreProvider).reloadAfterImport();
   }
+
+  Future<void> _allow(WidgetRef ref) async {
+    await ref.read(notificationsProvider).allowNotifications();
+    ref.invalidate(trayAccessProvider);
+  }
+
+  Future<void> _openChannel(WidgetRef ref, TrayChannel channel) =>
+      ref.read(notificationsProvider).openSettings(channel: channel);
 
   /// Android owns the decision, so the app opens the screen and re-reads the
   /// answer once it closes.

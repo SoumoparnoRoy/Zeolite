@@ -78,18 +78,29 @@ void main() {
     test('are not raised while the tray is handling the warning', () {
       const AppSettings settings = AppSettings();
       expect(settings.dangerAlertsActive, isTrue);
-      expect(settings.showDangerInApp, isFalse);
+      expect(settings.showDangerInApp(alertsReachTray: true), isFalse);
     });
 
     test('take over when the attendance alert type is switched off', () {
       const AppSettings settings =
           AppSettings(notifyAttendanceDanger: false);
-      expect(settings.showDangerInApp, isTrue);
+      expect(settings.showDangerInApp(alertsReachTray: true), isTrue);
     });
 
     test('take over when the master switch is off', () {
       const AppSettings settings = AppSettings(notificationsEnabled: false);
-      expect(settings.showDangerInApp, isTrue);
+      expect(settings.showDangerInApp(alertsReachTray: true), isTrue);
+    });
+
+    test('take over when Android blocks the tray, unless switched off', () {
+      const AppSettings settings = AppSettings();
+      expect(settings.showDangerInApp(alertsReachTray: false), isTrue);
+      expect(
+        settings
+            .copyWith(inAppAlerts: false)
+            .showDangerInApp(alertsReachTray: false),
+        isFalse,
+      );
     });
 
     test('stay silent when the user has opted out of them too', () {
@@ -97,7 +108,7 @@ void main() {
         notificationsEnabled: false,
         inAppAlerts: false,
       );
-      expect(settings.showDangerInApp, isFalse);
+      expect(settings.showDangerInApp(alertsReachTray: true), isFalse);
     });
   });
 

@@ -544,12 +544,14 @@ class GradientFab extends StatelessWidget {
   const GradientFab({super.key, required this.label, required this.onPressed});
 
   final String label;
-  final VoidCallback onPressed;
+
+  /// Null greys the button out, the way a disabled [FilledButton] reads.
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
     final AppPalette p = context.palette;
-    return DecoratedBox(
+    final Widget button = DecoratedBox(
       decoration: BoxDecoration(
         gradient: p.accentGradient,
         borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
@@ -589,5 +591,6 @@ class GradientFab extends StatelessWidget {
         ),
       ),
     );
+    return onPressed == null ? Opacity(opacity: 0.4, child: button) : button;
   }
 }

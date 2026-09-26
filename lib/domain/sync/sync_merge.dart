@@ -27,12 +27,11 @@ class SyncMergeRow {
   Map<String, Object?> get fields =>
       local?.fields ?? remote?.fields ?? const <String, Object?>{};
 
-  /// The side edited more recently, which is what a differing row defaults to.
+  /// The side edited more recently.
   ///
   /// An undated remote row loses: it cannot be shown to be newer, and this
   /// device at least knows the user was here. A tombstone has no edit time of
-  /// its own worth trusting either, so accepting a deletion is always a
-  /// deliberate flip rather than something that happens by default.
+  /// its own worth trusting either, so a deletion never counts as newer.
   SyncSide get newer {
     final RemoteState? state = remote;
     if (state == null || state.deleted) return SyncSide.here;
@@ -78,11 +77,6 @@ class SyncMergePlan {
 
   bool get isEmpty =>
       onlyHere.isEmpty && onlyThere.isEmpty && differing.isEmpty;
-
-  /// Every differing row at its default, which is what the screen opens on.
-  Map<String, SyncSide> get defaults => <String, SyncSide>{
-        for (final SyncMergeRow row in differing) row.localKey: row.newer,
-      };
 
   static SyncMergePlan from({
     required List<SyncItem> local,

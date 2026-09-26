@@ -33,8 +33,27 @@ class SyncMergeScreen extends ConsumerStatefulWidget {
 }
 
 class _SyncMergeScreenState extends ConsumerState<SyncMergeScreen> {
-  late Map<String, SyncSide> _choices = widget.plan.defaults;
+  /// Starts empty, like the Notion review. Unlike it, a merge cannot leave a
+  /// row for later - the coordinator reads a missing answer as this device -
+  /// so Merge waits until every row has one.
+  Map<String, SyncSide> _choices = <String, SyncSide>{};
   bool _merging = false;
+
+  void _choose(String key, SyncSide side) => setState(() {
+        _choices = <String, SyncSide>{..._choices};
+        if (_choices[key] == side) {
+          _choices.remove(key);
+        } else {
+          _choices[key] = side;
+        }
+      });
+
+  void _chooseAll(SyncSide side) => setState(() {
+        _choices = <String, SyncSide>{
+          for (final SyncMergeRow row in widget.plan.differing)
+            row.localKey: side,
+        };
+      });
 
   Future<void> _merge() async {
     if (ref.read(syncCoordinatorProvider) == null) return;
@@ -74,6 +93,7 @@ class _SyncMergeScreenState extends ConsumerState<SyncMergeScreen> {
 
     final int fromAccount =
         _choices.values.where((SyncSide side) => side == SyncSide.there).length;
+    final int left = plan.differing.length - _choices.length;
 
     return PushScaffold(
       title: 'Two sets of history',
@@ -82,7 +102,12 @@ class _SyncMergeScreenState extends ConsumerState<SyncMergeScreen> {
           : '${Words.plural(plan.differing.length, 'disagreement')} to settle',
       floatingActionButton: _merging
           ? const _Merging()
-          : GradientFab(label: 'Merge', onPressed: _merge),
+          : GradientFab(
+              label: left == 0
+                  ? 'Merge'
+                  : 'Merge — $left left to choose',
+              onPressed: left == 0 ? _merge : null,
+            ),
       slivers: <Widget>[
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 96),
@@ -94,25 +119,40 @@ class _SyncMergeScreenState extends ConsumerState<SyncMergeScreen> {
                 'until you merge, and a merge can be undone.',
               ),
               const SizedBox(height: AppSpacing.md),
-              _Summary(plan: plan, fromAccount: fromAccount),
+              _Summary(
+                plan: plan,
+                fromHere: _choices.length - fromAccount,
+                fromAccount: fromAccount,
+              ),
               if (plan.differing.isNotEmpty) ...<Widget>[
                 const SizedBox(height: AppSpacing.xl),
                 const SectionHeader('Where they disagree'),
-                const _Hint(
-                  'Each starts on whichever side was changed more recently.',
+                const _Hint('Choose a side for each one before merging.'),
+                const SizedBox(height: AppSpacing.sm),
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => _chooseAll(SyncSide.here),
+                        child: const Text('All from this device'),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => _chooseAll(SyncSide.there),
+                        child: const Text('All from your account'),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 for (final SyncMergeRow row in plan.differing)
                   _RowCard(
                     row: row,
                     name: _titleOf(row, names),
-                    side: _choices[row.localKey] ?? SyncSide.here,
-                    onChanged: (SyncSide side) => setState(
-                      () => _choices = <String, SyncSide>{
-                        ..._choices,
-                        row.localKey: side,
-                      },
-                    ),
+                    side: _choices[row.localKey],
+                    onChanged: (SyncSide side) => _choose(row.localKey, side),
                   ),
               ],
             ],
@@ -169,15 +209,21 @@ String _day(String dateKey) {
 }
 
 class _Summary extends StatelessWidget {
-  const _Summary({required this.plan, required this.fromAccount});
+  const _Summary({
+    required this.plan,
+    required this.fromHere,
+    required this.fromAccount,
+  });
 
   final SyncMergePlan plan;
+  final int fromHere;
   final int fromAccount;
 
   @override
   Widget build(BuildContext context) {
-    final int up = plan.onlyHere.length + plan.differing.length - fromAccount;
+    final int up = plan.onlyHere.length + fromHere;
     final int down = plan.onlyThere.length + fromAccount;
+    final int left = plan.differing.length - fromHere - fromAccount;
 
     return SurfaceCard(
       child: Column(
@@ -197,6 +243,13 @@ class _Summary extends StatelessWidget {
             _Line(
               icon: Icons.check,
               text: '${Words.plural(plan.agreed.length, 'row')} already match',
+            ),
+          ],
+          if (left > 0) ...<Widget>[
+            const SizedBox(height: AppSpacing.sm),
+            _Line(
+              icon: Icons.help_outline,
+              text: '${Words.plural(left, 'row')} still to choose',
             ),
           ],
         ],
@@ -236,12 +289,13 @@ class _RowCard extends StatelessWidget {
 
   final SyncMergeRow row;
   final String name;
-  final SyncSide side;
+  final SyncSide? side;
   final ValueChanged<SyncSide> onChanged;
 
   @override
   Widget build(BuildContext context) {
     final AppPalette p = context.palette;
+    final SyncSide? recent = _recent(row);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -262,6 +316,7 @@ class _RowCard extends StatelessWidget {
                   child: _Choice(
                     label: 'This device',
                     value: _describe(row, SyncSide.here),
+                    recent: recent == SyncSide.here,
                     selected: side == SyncSide.here,
                     onTap: () => onChanged(SyncSide.here),
                   ),
@@ -271,6 +326,7 @@ class _RowCard extends StatelessWidget {
                   child: _Choice(
                     label: 'Your account',
                     value: _describe(row, SyncSide.there),
+                    recent: recent == SyncSide.there,
                     selected: side == SyncSide.there,
                     onTap: () => onChanged(SyncSide.there),
                   ),
@@ -284,16 +340,32 @@ class _RowCard extends StatelessWidget {
   }
 }
 
+/// Only when both sides carry a time. [SyncMergeRow.newer] also settles
+/// undated rows and deletions, and calling either of those more recent would
+/// be a guess.
+SyncSide? _recent(SyncMergeRow row) {
+  final RemoteState? theirs = row.remote;
+  if (row.local?.changedAt == null ||
+      theirs == null ||
+      theirs.deleted ||
+      theirs.editedAt == null) {
+    return null;
+  }
+  return row.newer;
+}
+
 class _Choice extends StatelessWidget {
   const _Choice({
     required this.label,
     required this.value,
+    required this.recent,
     required this.selected,
     required this.onTap,
   });
 
   final String label;
   final String value;
+  final bool recent;
   final bool selected;
   final VoidCallback onTap;
 
@@ -327,6 +399,13 @@ class _Choice extends StatelessWidget {
             ),
             const SizedBox(height: 2),
             Text(value, style: Theme.of(context).textTheme.bodyMedium),
+            if (recent) ...<Widget>[
+              const SizedBox(height: 2),
+              Text(
+                'Changed more recently',
+                style: TextStyle(fontSize: 11, color: p.textTertiary),
+              ),
+            ],
           ],
         ),
       ),

@@ -90,25 +90,25 @@ void main() {
     );
 
     final SyncMergeRow row = plan.differing.single;
-    // Losing a mark is never the default, even when the deletion looks newer.
+    // A deletion is never the newer side, even when it looks it.
     expect(row.newer, SyncSide.here);
   });
 
-  test('the more recently edited side is what a row opens on', () {
+  test('the more recently edited side is the newer one', () {
     final SyncMergePlan plan = SyncMergePlan.from(
       local: <SyncItem>[_mine(changedAt: _early)],
       remote: <RemoteState>[_theirs(status: 'absent', editedAt: _late)],
     );
 
-    expect(plan.defaults[plan.differing.single.localKey], SyncSide.there);
+    expect(plan.differing.single.newer, SyncSide.there);
   });
 
-  test('an undated row from the account cannot win by default', () {
+  test('an undated row from the account is never the newer one', () {
     final SyncMergePlan plan = SyncMergePlan.from(
       local: <SyncItem>[_mine(changedAt: _early)],
       remote: <RemoteState>[_theirs(status: 'absent')],
     );
 
-    expect(plan.defaults[plan.differing.single.localKey], SyncSide.here);
+    expect(plan.differing.single.newer, SyncSide.here);
   });
 }

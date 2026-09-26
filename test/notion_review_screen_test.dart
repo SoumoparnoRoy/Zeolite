@@ -105,4 +105,38 @@ void main() {
 
     expect(find.text('Not marked on this device'), findsOneWidget);
   });
+
+  testWidgets('nothing is chosen until a row is answered',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(_app(
+      <SyncPull>[
+        _pull(key: SyncItem.keyFor(_uuid, _day, 540)),
+        _pull(key: SyncItem.keyFor(_uuid, _day, 600)),
+      ],
+      const <AttendanceRecord>[],
+    ));
+    await tester.pumpAndSettle();
+
+    FilledButton apply() =>
+        tester.widget<FilledButton>(find.byType(FilledButton));
+    String label() =>
+        (tester.widget<Text>(find.descendant(
+          of: find.byType(FilledButton),
+          matching: find.byType(Text),
+        ))).data!;
+
+    expect(apply().onPressed, isNull);
+    expect(find.text('2 rows left for the next sync'), findsOneWidget);
+
+    await tester.tap(find.text('Take theirs').first);
+    await tester.pump();
+    expect(label(), 'Apply — take 1');
+    expect(apply().onPressed, isNotNull);
+    expect(find.text('1 row left for the next sync'), findsOneWidget);
+
+    await tester.tap(find.text('Keep all mine'));
+    await tester.pump();
+    expect(label(), 'Apply — keep 2');
+    expect(find.textContaining('left for the next sync'), findsNothing);
+  });
 }

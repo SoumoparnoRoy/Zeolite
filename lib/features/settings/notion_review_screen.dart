@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
+import '../../core/words.dart';
 import '../../data/models/attendance_record.dart';
 import '../../data/models/attendance_status.dart';
 import '../../data/models/subject.dart';
@@ -30,13 +31,26 @@ class _NotionReviewScreenState extends ConsumerState<NotionReviewScreen> {
   late final List<SyncPull> _pulls =
       ref.read(notionSyncStatusProvider.notifier).review;
 
-  /// Defaults to keeping what is here. Taking a hand edit over a tap in the
-  /// app is the bigger claim, so it is the one that has to be chosen.
-  late final Map<String, SyncSide> _choices = <String, SyncSide>{
-    for (final SyncPull pull in _pulls) pull.remote.localKey: SyncSide.here,
-  };
+  /// Starts empty. A default of "keep mine" meant answering one row wrote
+  /// every other one back over Notion; a row with no answer is left alone and
+  /// offered again on the next sync.
+  final Map<String, SyncSide> _choices = <String, SyncSide>{};
 
   bool _applying = false;
+
+  void _choose(String key, SyncSide side) => setState(() {
+        if (_choices[key] == side) {
+          _choices.remove(key);
+        } else {
+          _choices[key] = side;
+        }
+      });
+
+  void _chooseAll(SyncSide side) => setState(() {
+        for (final SyncPull pull in _pulls) {
+          _choices[pull.remote.localKey] = side;
+        }
+      });
 
   Future<void> _apply() async {
     setState(() => _applying = true);
@@ -45,6 +59,14 @@ class _NotionReviewScreenState extends ConsumerState<NotionReviewScreen> {
         .read(notionSyncStatusProvider.notifier)
         .applyReview(Map<String, SyncSide>.from(_choices));
     if (mounted) navigator.pop();
+  }
+
+  static String _applyLabel(int keeping, int taking) {
+    final List<String> parts = <String>[
+      if (keeping > 0) 'keep $keeping',
+      if (taking > 0) 'take $taking',
+    ];
+    return parts.isEmpty ? 'Apply' : 'Apply — ${parts.join(', ')}';
   }
 
   @override
@@ -56,6 +78,8 @@ class _NotionReviewScreenState extends ConsumerState<NotionReviewScreen> {
     final int taking = _choices.values
         .where((SyncSide side) => side == SyncSide.there)
         .length;
+    final int keeping = _choices.length - taking;
+    final int left = _pulls.length - _choices.length;
 
     return PushScaffold(
       title: 'Changed in Notion',
@@ -83,28 +107,48 @@ class _NotionReviewScreenState extends ConsumerState<NotionReviewScreen> {
                     style: TextStyle(color: context.palette.textSecondary),
                   ),
                   const SizedBox(height: AppSpacing.lg),
+                  Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () => _chooseAll(SyncSide.here),
+                          child: const Text('Keep all mine'),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () => _chooseAll(SyncSide.there),
+                          child: const Text('Take all theirs'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
                   for (final SyncPull pull in _pulls) ...<Widget>[
                     _Row(
                       pull: pull,
                       subjects: subjects,
                       records: records,
                       tags: data?.tags ?? const <Tag>[],
-                      side: _choices[pull.remote.localKey] ?? SyncSide.here,
-                      onChanged: (SyncSide side) => setState(
-                        () => _choices[pull.remote.localKey] = side,
-                      ),
+                      side: _choices[pull.remote.localKey],
+                      onChanged: (SyncSide side) =>
+                          _choose(pull.remote.localKey, side),
                     ),
                     const SizedBox(height: AppSpacing.sm),
                   ],
                   const SizedBox(height: AppSpacing.lg),
                   FilledButton(
-                    onPressed: _applying ? null : _apply,
-                    child: Text(
-                      taking == 0
-                          ? 'Keep all of mine'
-                          : 'Apply — take $taking from Notion',
-                    ),
+                    onPressed: _applying || _choices.isEmpty ? null : _apply,
+                    child: Text(_applyLabel(keeping, taking)),
                   ),
+                  if (left > 0) ...<Widget>[
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      '${Words.plural(left, 'row')} left for the next sync',
+                      style: TextStyle(color: context.palette.textSecondary),
+                    ),
+                  ],
                   const SizedBox(height: AppSpacing.sm),
                   Text(
                     'Anything you keep is written back over the Notion row on '
@@ -143,7 +187,7 @@ class _Row extends StatelessWidget {
   final List<Subject> subjects;
   final List<AttendanceRecord> records;
   final List<Tag> tags;
-  final SyncSide side;
+  final SyncSide? side;
   final ValueChanged<SyncSide> onChanged;
 
   @override

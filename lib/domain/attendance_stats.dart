@@ -329,17 +329,29 @@ class OverallStats {
     final List<SubjectStats> lost = subjects
         .where((SubjectStats s) => s.health == AttendanceHealth.lost)
         .toList();
-    if (lost.isNotEmpty) {
-      return lost.length == 1
-          ? 'One out of reach'
-          : '${Words.count(lost.length)} out of reach';
-    }
+    if (lost.isNotEmpty) return '${_subjects(lost.length)} out of reach';
 
-    if (atRisk.isNotEmpty) return '${Words.count(needToAttend)} to make up';
+    // Subjects first: the class count is a sum of per-subject runs, which
+    // reads as nonsense beside the overall percentage unless it is said
+    // whose runs they are.
+    if (atRisk.isNotEmpty) return '${_subjects(atRisk.length)} below target';
 
     final int spare = canSkip;
-    return spare == 0 ? 'None to spare' : '${Words.count(spare)} to spare';
+    return '${Words.count(spare)} ${spare == 1 ? 'class' : 'classes'} to spare';
   }
+
+  /// The line under [verdict], where it needs one to be understood.
+  String? get verdictDetail {
+    final bool anyLost =
+        subjects.any((SubjectStats s) => s.health == AttendanceHealth.lost);
+    if (!hasData || anyLost || atRisk.isEmpty) return null;
+    final String whose = atRisk.length == 1 ? 'its' : 'their';
+    return 'Attend $whose next ${Words.plural(needToAttend, 'class', 'classes')}'
+        ' to catch up';
+  }
+
+  static String _subjects(int n) =>
+      '${Words.count(n)} ${n == 1 ? 'subject' : 'subjects'}';
 
   SubjectStats? get weakest {
     final List<SubjectStats> withData =

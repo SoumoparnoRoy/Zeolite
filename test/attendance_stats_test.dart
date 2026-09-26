@@ -246,7 +246,7 @@ void main() {
 
       expect(overall.percent, greaterThan(90));
       expect(overall.canSkip, 0);
-      expect(overall.verdict, 'None to spare');
+      expect(overall.verdict, 'No classes to spare');
     });
 
     test('ignores subjects with nothing marked', () {
@@ -259,7 +259,7 @@ void main() {
       );
 
       expect(overall.canSkip, 2);
-      expect(overall.verdict, 'Two to spare');
+      expect(overall.verdict, 'Two classes to spare');
     });
 
     test('sums the recovery runs when subjects are below target', () {
@@ -272,7 +272,8 @@ void main() {
       );
 
       expect(overall.needToAttend, 4 + 3);
-      expect(overall.verdict, 'Seven to make up');
+      expect(overall.verdict, 'Two subjects below target');
+      expect(overall.verdictDetail, 'Attend their next 7 classes to catch up');
     });
 
     test('an unreachable target is reported as such', () {
@@ -281,7 +282,8 @@ void main() {
         target: 0.75,
       );
 
-      expect(overall.verdict, 'One out of reach');
+      expect(overall.verdict, 'One subject out of reach');
+      expect(overall.verdictDetail, isNull);
     });
 
     test('says nothing rather than zero before anything is marked', () {

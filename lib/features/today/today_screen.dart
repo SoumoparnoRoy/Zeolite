@@ -566,6 +566,10 @@ class _DayHeader extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     HeaderTitle(stats.verdict),
+                    if (stats.verdictDetail case final String detail) ...<Widget>[
+                      const SizedBox(height: 4),
+                      HeaderCaption(detail),
+                    ],
                   ],
                 ),
               ),

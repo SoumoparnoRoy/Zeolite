@@ -1,6 +1,6 @@
-/// Number-to-words for headline copy, so "Two to spare" does not compete with
-/// the "94%" beside it. Falls back to digits past ten, where the word is
-/// longer than the figure.
+/// Number-to-words for headline copy, so "Two classes to spare" does not
+/// compete with the "94%" beside it. Falls back to digits past ten, where the
+/// word is longer than the figure.
 class Words {
   const Words._();
 

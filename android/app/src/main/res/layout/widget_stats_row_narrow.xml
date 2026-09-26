@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- widget_stats_row at two columns: the name gets the full width and the
+     percentage moves to the end of the counts line. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/stat_row"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginBottom="6dp"
-    android:orientation="horizontal"
-    android:gravity="center_vertical">
+    android:orientation="horizontal">
 
     <FrameLayout
         android:id="@+id/stat_stripe"
@@ -19,9 +20,7 @@
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:orientation="vertical"
-        android:gravity="center_vertical"
         android:paddingStart="10dp"
-        android:paddingEnd="8dp"
         android:paddingTop="3dp"
         android:paddingBottom="3dp">
 
@@ -32,11 +31,27 @@
             android:textSize="13.5sp"
             android:textStyle="bold" />
 
-        <TextView
-            android:id="@+id/stat_counts"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textSize="10.5sp" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/stat_counts"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textSize="10.5sp" />
+
+            <TextView
+                android:id="@+id/stat_percent"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingStart="6dp"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+        </LinearLayout>
 
         <TextView
             android:id="@+id/stat_headline"
@@ -46,13 +61,4 @@
             android:textSize="10.5sp"
             android:textStyle="bold" />
     </LinearLayout>
-
-    <TextView
-        android:id="@+id/stat_percent"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:minWidth="48dp"
-        android:gravity="end"
-        android:textSize="16sp"
-        android:textStyle="bold" />
 </LinearLayout>

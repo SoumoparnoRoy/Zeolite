@@ -40,7 +40,13 @@ class StatsWidgetProvider : ZeoliteWidgetProvider() {
         val next = standing?.optJSONObject("next")
 
         appWidgetIds.forEach { widgetId ->
-            val views = RemoteViews(context.packageName, R.layout.widget_stats).apply {
+            val layout =
+                if (isNarrowCell(appWidgetManager.getAppWidgetOptions(widgetId))) {
+                    R.layout.widget_stats_narrow
+                } else {
+                    R.layout.widget_stats
+                }
+            val views = RemoteViews(context.packageName, layout).apply {
                 setTintedBackground(R.id.stats_root, theme.canvas)
                 setTextColor(R.id.stats_verdict, theme.textPrimary)
                 setTextColor(R.id.stats_next, theme.textSecondary)

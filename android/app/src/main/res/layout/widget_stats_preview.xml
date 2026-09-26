@@ -104,7 +104,7 @@
                 android:maxLines="1"
                 android:ellipsize="end"
                 android:paddingTop="1dp"
-                android:text="2 to spare"
+                android:text="Two classes to spare"
                 android:textColor="@color/widget_present"
                 android:textSize="10.5sp"
                 android:textStyle="bold" />
@@ -236,7 +236,7 @@
                 android:maxLines="1"
                 android:ellipsize="end"
                 android:paddingTop="1dp"
-                android:text="1 to spare"
+                android:text="One class to spare"
                 android:textColor="@color/widget_present"
                 android:textSize="10.5sp"
                 android:textStyle="bold" />

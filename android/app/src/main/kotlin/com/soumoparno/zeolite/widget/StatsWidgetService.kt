@@ -1,5 +1,6 @@
 package com.soumoparno.zeolite.widget
 
+import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.Intent
 import android.view.View
@@ -18,22 +19,32 @@ import org.json.JSONObject
  */
 class StatsWidgetService : RemoteViewsService() {
     override fun onGetViewFactory(intent: Intent): RemoteViewsFactory =
-        StatsRowFactory(applicationContext)
+        StatsRowFactory(
+            applicationContext,
+            intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID),
+        )
 }
 
-class StatsRowFactory(private val context: Context) :
+class StatsRowFactory(private val context: Context, private val widgetId: Int) :
     RemoteViewsService.RemoteViewsFactory {
 
     private var subjects: List<JSONObject> = emptyList()
     private var theme: WidgetTheme = WidgetTheme.of(context)
+    private var rowLayout = R.layout.widget_stats_row
 
     override fun onCreate() = reload()
 
-    /** Called by the launcher after every push, so this is where the data lands. */
+    /**
+     * Called by the launcher after every push, and after a resize too, since
+     * the provider redraws and notifies on one.
+     */
     override fun onDataSetChanged() = reload()
 
     private fun reload() {
         theme = WidgetTheme.of(context)
+        val options = AppWidgetManager.getInstance(context).getAppWidgetOptions(widgetId)
+        rowLayout =
+            if (isNarrowCell(options)) R.layout.widget_stats_row_narrow else R.layout.widget_stats_row
         val array = WidgetData.read(context, "subjects")?.optJSONArray("subjects")
         subjects = (0 until (array?.length() ?: 0)).map { array!!.getJSONObject(it) }
     }
@@ -49,7 +60,7 @@ class StatsRowFactory(private val context: Context) :
         val hasData = subject.optBoolean("hasData")
         val tint = health(theme, subject.optString("health"))
 
-        return RemoteViews(context.packageName, R.layout.widget_stats_row).apply {
+        return RemoteViews(context.packageName, rowLayout).apply {
             setInt(R.id.stat_stripe, "setBackgroundColor", subject.optInt("colour", theme.accent))
             setTextColor(R.id.stat_name, theme.textPrimary)
             setTextColor(R.id.stat_counts, theme.textTertiary)
@@ -82,7 +93,7 @@ class StatsRowFactory(private val context: Context) :
 
     /** Blank rather than Android's own "Loading…" — see [TodayRowFactory]. */
     override fun getLoadingView(): RemoteViews =
-        RemoteViews(context.packageName, R.layout.widget_stats_row).apply {
+        RemoteViews(context.packageName, rowLayout).apply {
             setInt(R.id.stat_stripe, "setBackgroundColor", theme.canvas)
             setTextViewText(R.id.stat_name, "")
             setTextViewText(R.id.stat_counts, "")
@@ -90,7 +101,9 @@ class StatsRowFactory(private val context: Context) :
             setViewVisibility(R.id.stat_headline, View.GONE)
         }
 
-    override fun getViewTypeCount(): Int = 1
+    // One per row layout: the list is told this once and keeps it, and a
+    // resize can swap the layout under it.
+    override fun getViewTypeCount(): Int = 2
 
     override fun getItemId(position: Int): Long = position.toLong()
 

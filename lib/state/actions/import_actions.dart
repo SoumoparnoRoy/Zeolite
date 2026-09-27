@@ -38,19 +38,29 @@ class ImportActions {
   /// [weighByBlocks] gives a class that fills two blocks a weight of two, for
   /// an institution that counts it that way. Off by default, so a paste
   /// behaves exactly as it always has unless the user asks.
+  ///
+  /// [into] is the preview's answer, by subject key, for which existing
+  /// subject each sheet subject is; a key it leaves out becomes a new subject.
+  /// Without it, subjects are matched by name alone.
   Future<void> importTimetable(
     TimetableImportResult result, {
     bool weighByBlocks = false,
+    Map<String, int>? into,
   }) async {
     final TimetableData? data = _core.ref.read(timetableProvider).value;
     if (data == null || result.classes.isEmpty) return;
 
     final DatabaseSnapshot before = await _core.repo.snapshot();
 
-    final Map<String, int> idByName = <String, int>{
-      for (final Subject subject in data.subjects)
-        if (subject.id != null) subject.name.trim().toLowerCase(): subject.id!,
-    };
+    final Map<String, int> idByName = into != null
+        ? <String, int>{...into}
+        : <String, int>{
+            for (final Subject subject in data.subjects)
+              if (subject.id != null)
+                subject.name.trim().toLowerCase(): subject.id!,
+          };
+    final Map<String, int?> typeOf = _typesByLetter(data.categories);
+    int? typeOfClass(ImportedClass c) => typeOf[c.letter];
 
     final List<String> fresh = result.subjectNames
         .where((String name) => !idByName.containsKey(name.toLowerCase()))
@@ -63,14 +73,27 @@ class ImportActions {
 
     await _core.repo.transaction((ZeoliteRepository repository) async {
       final List<int> palette = AppColors.subjectPalette;
+      final List<int?> freshTypes = <int?>[
+        for (final String name in fresh)
+          _commonest(<int?>[
+            for (final ImportedClass c in result.classes)
+              if (c.subjectKey == name.toLowerCase()) typeOfClass(c),
+          ]),
+      ];
       final List<int> ids = await repository.insertSubjects(<Subject>[
         for (int i = 0; i < fresh.length; i++)
           Subject(
             name: fresh[i],
             teacher: _teacherFor(result, fresh[i]),
             colorValue: palette[(data.subjects.length + i) % palette.length],
+            categoryId: freshTypes[i],
           ),
       ]);
+      final Map<int, int?> subjectType = <int, int?>{
+        for (final Subject subject in data.subjects)
+          if (subject.id != null) subject.id!: subject.categoryId,
+        for (int i = 0; i < fresh.length; i++) ids[i]: freshTypes[i],
+      };
       for (int i = 0; i < fresh.length; i++) {
         idByName[fresh[i].toLowerCase()] = ids[i];
       }
@@ -84,6 +107,11 @@ class ImportActions {
             endMinutes: c.endMinutes,
             room: c.room,
             weight: weighByBlocks ? c.blocks : 1,
+            // Stored only where it differs from the subject's, so a tutorial
+            // filed under a lecture course is still written out as one.
+            categoryId: typeOfClass(c) == subjectType[idByName[c.subjectKey]]
+                ? null
+                : typeOfClass(c),
             startDate: start,
           ),
       ]);
@@ -373,6 +401,33 @@ class ImportActions {
     _core.arm(before, settings: switches ? settings : null);
     unawaited(_core.analytics.timetableImported('notion'));
     return records.length;
+  }
+
+  /// A code's component letter to the type of that name, where the user has
+  /// one. Matched on the full word, so a type renamed to anything else is
+  /// simply not guessed at.
+  static Map<String, int?> _typesByLetter(List<ClassCategory> categories) {
+    int? named(String word) => categories
+        .where((ClassCategory c) => c.name.trim().toLowerCase() == word)
+        .firstOrNull
+        ?.id;
+    return <String, int?>{
+      'L': named('lecture'),
+      'T': named('tutorial'),
+      'P': named('practical'),
+    };
+  }
+
+  static int? _commonest(List<int?> types) {
+    final Map<int, int> counts = <int, int>{};
+    for (final int? type in types) {
+      if (type != null) counts[type] = (counts[type] ?? 0) + 1;
+    }
+    if (counts.isEmpty) return null;
+    return counts.entries
+        .reduce((MapEntry<int, int> a, MapEntry<int, int> b) =>
+            b.value > a.value ? b : a)
+        .key;
   }
 
   /// The first teacher named against the subject anywhere in the paste. A

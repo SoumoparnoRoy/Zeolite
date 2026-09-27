@@ -8,6 +8,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../core/words.dart';
+import '../../data/models/class_slot.dart';
+import '../../data/models/subject.dart';
 import '../../domain/attendance_totals_ocr.dart';
 import '../../domain/day_grid.dart';
 import '../../domain/grid_lines.dart';
@@ -27,6 +29,7 @@ import '../../widgets/undo_snack.dart';
 import '../subjects/totals_import_screen.dart';
 import '../subjects/untimed_match_dialog.dart';
 import 'import_choices_screen.dart';
+import 'import_subjects.dart';
 
 /// Types a whole timetable in one paste instead of twenty trips through the
 /// class sheet.
@@ -55,6 +58,29 @@ class _ImportTimetableScreenState extends ConsumerState<ImportTimetableScreen> {
   /// A lab kept inside its course is what the choice exists for, so a sheet
   /// that names both starts that way.
   bool _byCourse = true;
+
+  /// Subjects placed by hand, by subject key; null is a new subject. Kept
+  /// apart from the suggestion so editing the text or the split never
+  /// overrules an answer.
+  final Map<String, int?> _picked = <String, int?>{};
+
+  int? _targetOf(String name, List<ExistingSubject> existing) {
+    final String key = name.trim().toLowerCase();
+    return _picked.containsKey(key)
+        ? _picked[key]
+        : TimetableImport.existingFor(name, existing);
+  }
+
+  Future<void> _pick(String name, List<Subject> subjects, int? current) async {
+    final ({int? id})? answer = await pickImportSubject(
+      context,
+      sheetName: name,
+      subjects: subjects,
+      current: current,
+    );
+    if (answer == null || !mounted) return;
+    setState(() => _picked[name.trim().toLowerCase()] = answer.id);
+  }
 
   @override
   void dispose() {
@@ -168,7 +194,10 @@ class _ImportTimetableScreenState extends ConsumerState<ImportTimetableScreen> {
     }
   }
 
-  Future<void> _import(TimetableImportResult result) async {
+  Future<void> _import(
+    TimetableImportResult result,
+    Map<String, int> into,
+  ) async {
     setState(() => _saving = true);
     // The screen pops on success, so the offer is raised on the messenger
     // rather than through this route's context.
@@ -176,7 +205,11 @@ class _ImportTimetableScreenState extends ConsumerState<ImportTimetableScreen> {
     final ActionCore core = ref.read(actionCoreProvider);
     final ImportActions imports = ref.read(importActionsProvider);
     final int count = result.classes.length;
-    await imports.importTimetable(result, weighByBlocks: _weighByBlocks);
+    await imports.importTimetable(
+      result,
+      weighByBlocks: _weighByBlocks,
+      into: into,
+    );
     // Asked before the pop, while this route still has a context to ask from.
     // A match replaces the import's Undo offer with its own.
     final bool matched = mounted && await offerUntimedMatch(context, ref);
@@ -422,7 +455,35 @@ class _ImportTimetableScreenState extends ConsumerState<ImportTimetableScreen> {
                 grid: grid, byCourse: !_byCourse)
             .subjectNames
             .length;
-    final bool ready = !result.isEmpty && !result.hasProblems && !_saving;
+    final TimetableData? data = ref.watch(timetableProvider).value;
+    final List<Subject> subjects = data?.subjects ?? const <Subject>[];
+    final List<ExistingSubject> existing = <ExistingSubject>[
+      for (final Subject s in subjects)
+        if (s.id != null) (id: s.id!, name: s.name, code: s.code),
+    ];
+    final Map<String, int> into = <String, int>{
+      for (final String name in result.subjectNames)
+        if (_targetOf(name, existing) case final int id)
+          name.toLowerCase(): id,
+    };
+    Subject? subjectOf(int? id) =>
+        subjects.where((Subject s) => s.id == id).firstOrNull;
+    final List<ImportedClass> clashes = TimetableImport.clashesInto(
+      result,
+      into,
+      held: <({int subjectId, int weekday, int startMinutes})>[
+        for (final ClassSlot slot in data?.slots ?? const <ClassSlot>[])
+          (
+            subjectId: slot.subjectId,
+            weekday: slot.weekday,
+            startMinutes: slot.startMinutes,
+          ),
+      ],
+    );
+    final bool ready = !result.isEmpty &&
+        !result.hasProblems &&
+        clashes.isEmpty &&
+        !_saving;
 
     return PushScaffold(
       title: 'Import timetable',
@@ -435,7 +496,7 @@ class _ImportTimetableScreenState extends ConsumerState<ImportTimetableScreen> {
       floatingActionButton: ready
           ? GradientFab(
               label: 'Add ${result.classes.length} to my timetable',
-              onPressed: () => _import(result),
+              onPressed: () => _import(result, into),
             )
           : null,
       slivers: <Widget>[
@@ -469,11 +530,18 @@ class _ImportTimetableScreenState extends ConsumerState<ImportTimetableScreen> {
                 onChanged: (_) => setState(() {}),
               ),
             ),
-            if (result.hasProblems) ...<Widget>[
+            if (result.hasProblems || clashes.isNotEmpty) ...<Widget>[
               const SizedBox(height: AppSpacing.xl),
               const SectionHeader('Fix these first'),
               for (final ImportLine line in result.problems)
                 _ProblemRow(line: line),
+              for (final ImportedClass c in clashes)
+                _ClashRow(
+                  name: c.subjectName,
+                  subject: subjectOf(into[c.subjectKey])?.name ?? '',
+                  weekday: c.weekday,
+                  start: Clock.format(c.startMinutes, use24Hour: use24Hour),
+                ),
             ],
             if (result.lookalikes.isNotEmpty) ...<Widget>[
               const SizedBox(height: AppSpacing.xl),
@@ -508,6 +576,17 @@ class _ImportTimetableScreenState extends ConsumerState<ImportTimetableScreen> {
                 onChanged: (bool v) => setState(() => _weighByBlocks = v),
               ),
             ],
+            if (result.classes.isNotEmpty && subjects.isNotEmpty) ...<Widget>[
+              const SizedBox(height: AppSpacing.xl),
+              const SectionHeader('Subjects'),
+              for (final String name in result.subjectNames)
+                ImportSubjectRow(
+                  name: name,
+                  target: subjectOf(into[name.toLowerCase()]),
+                  onTap: () =>
+                      _pick(name, subjects, into[name.toLowerCase()]),
+                ),
+            ],
             if (result.classes.isNotEmpty) ...<Widget>[
               const SizedBox(height: AppSpacing.xl),
               const SectionHeader('What will be added'),
@@ -516,6 +595,8 @@ class _ImportTimetableScreenState extends ConsumerState<ImportTimetableScreen> {
                   weekday: weekday,
                   result: result,
                   use24Hour: use24Hour,
+                  nameOf: (ImportedClass c) =>
+                      subjectOf(into[c.subjectKey])?.name ?? c.subjectName,
                 ),
             ],
           ]),
@@ -590,9 +671,10 @@ class _FormatHelp extends StatelessWidget {
       '${grid.isConfigured ? 'Block numbers count against the teaching day you '
           'set up, and a time like "14:20-15:20" works too.' : 'The teaching '
           'day has no blocks yet, so write times like "14:20-15:20".'} '
-      'Subjects are matched by name, so the same one typed twice is one '
-      'subject. Nothing is written until you say so, and importing adds to '
-      'what you already have.',
+      'The same subject typed twice is one subject, and one you already have '
+      'is found by its name or code — change where each goes under Subjects. '
+      'Nothing is written until you say so, and importing adds to what you '
+      'already have.',
     );
   }
 }
@@ -689,6 +771,33 @@ class _LookalikeRow extends StatelessWidget {
   }
 }
 
+/// A sheet class landing on one the chosen subject already has.
+class _ClashRow extends StatelessWidget {
+  const _ClashRow({
+    required this.name,
+    required this.subject,
+    required this.weekday,
+    required this.start,
+  });
+
+  final String name;
+  final String subject;
+  final int weekday;
+  final String start;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Text(
+        '$name, ${kWeekdayNamesLong[weekday - 1]} $start: $subject already '
+        'has a class then. Send $name to another subject under Subjects.',
+        style: TextStyle(fontSize: 13, color: context.palette.absent),
+      ),
+    );
+  }
+}
+
 class _ProblemRow extends StatelessWidget {
   const _ProblemRow({required this.line});
 
@@ -745,11 +854,13 @@ class _DayGroup extends StatelessWidget {
     required this.weekday,
     required this.result,
     required this.use24Hour,
+    required this.nameOf,
   });
 
   final int weekday;
   final TimetableImportResult result;
   final bool use24Hour;
+  final String Function(ImportedClass) nameOf;
 
   @override
   Widget build(BuildContext context) {
@@ -784,7 +895,7 @@ class _DayGroup extends StatelessWidget {
                   ),
                   Expanded(
                     child: Text(
-                      c.subjectName,
+                      nameOf(c),
                       style: const TextStyle(
                         fontSize: 13.5,
                         fontWeight: FontWeight.w600,

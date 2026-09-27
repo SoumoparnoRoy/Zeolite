@@ -40,14 +40,69 @@ class TimetableImport {
   static final RegExp _component =
       RegExp(r'^([A-Za-z]{2,5}-?\d{2,5})([LPTlpt])?$');
 
+  /// Null for a name that is not a code.
+  static String? courseOf(String name) =>
+      _component.firstMatch(name.trim())?.group(1)?.toUpperCase();
+
+  static String? letterOf(String name) =>
+      _component.firstMatch(name.trim())?.group(2)?.toUpperCase();
+
+  /// The subject already on the device that a sheet's [name] most likely is:
+  /// one of the same name, then of the same code, then of the same code once
+  /// the component letter is dropped (`ABC101T` to a subject coded
+  /// `ABC101`). Each rule has to single out one subject; two that fit it
+  /// equally leave the choice to the student rather than to a guess.
+  static int? existingFor(String name, List<ExistingSubject> subjects) {
+    final String key = name.trim().toLowerCase();
+    final String? course = courseOf(name);
+    final List<bool Function(ExistingSubject)> rules =
+        <bool Function(ExistingSubject)>[
+      (ExistingSubject s) => s.name.trim().toLowerCase() == key,
+      (ExistingSubject s) => s.code?.trim().toLowerCase() == key,
+      (ExistingSubject s) =>
+          course != null && s.code != null && courseOf(s.code!) == course,
+    ];
+    for (final bool Function(ExistingSubject) rule in rules) {
+      final List<ExistingSubject> fits = subjects.where(rule).toList();
+      if (fits.length == 1) return fits.single.id;
+      if (fits.length > 1) return null;
+    }
+    return null;
+  }
+
+  /// Classes that would share an attendance key once filed under [into]'s
+  /// subjects: with a weekly class the subject already [held], or with a class
+  /// of another sheet subject sent to the same one. Either way marking one
+  /// would mark the other.
+  static List<ImportedClass> clashesInto(
+    TimetableImportResult result,
+    Map<String, int> into, {
+    required List<({int subjectId, int weekday, int startMinutes})> held,
+  }) {
+    final Map<String, String> taken = <String, String>{
+      for (final ({int subjectId, int weekday, int startMinutes}) h in held)
+        '${h.subjectId}:${h.weekday}:${h.startMinutes}': '',
+    };
+    final List<ImportedClass> out = <ImportedClass>[];
+    for (final ImportedClass c in result.classes) {
+      final int? subject = into[c.subjectKey];
+      if (subject == null) continue;
+      final String key = '$subject:${c.weekday}:${c.startMinutes}';
+      final String? by = taken[key];
+      if (by != null && by != c.subjectKey) {
+        out.add(c);
+      } else {
+        taken[key] = c.subjectKey;
+      }
+    }
+    return out;
+  }
+
   /// Only a code that really has components moves. A lone `ABC101L` has
   /// nothing to share a subject with, and renaming it would just lose the
   /// letter.
   static List<ImportLine> _underCourses(List<ImportLine> lines) {
-    String? courseOf(ImportedClass c) => _component
-        .firstMatch(c.subjectName.trim())
-        ?.group(1)
-        ?.toUpperCase();
+    String? courseOf(ImportedClass c) => TimetableImport.courseOf(c.subjectName);
 
     final Map<String, Set<String>> spellings = <String, Set<String>>{};
     for (final ImportedClass c in lines.map((ImportLine l) => l.parsed).nonNulls) {
@@ -61,7 +116,7 @@ class TimetableImport {
       final ImportedClass? c = line.parsed;
       final String? course = c == null ? null : courseOf(c);
       out.add(course != null && spellings[course]!.length > 1
-          ? line.withClass(c!.copyWith(subjectName: course))
+          ? line.withClass(c!.copyWith(subjectName: course, letter: c.letter))
           : line);
     }
     return out;
@@ -237,7 +292,8 @@ class ImportedClass {
     this.room,
     this.teacher,
     this.blocks = 1,
-  });
+    String? letter,
+  }) : _letter = letter;
 
   final String subjectName;
   final int weekday;
@@ -254,7 +310,13 @@ class ImportedClass {
   /// code typed twice attaches to one subject rather than making two.
   String get subjectKey => subjectName.trim().toLowerCase();
 
-  ImportedClass copyWith({String? subjectName, int? blocks}) => ImportedClass(
+  /// The component letter the sheet gave this class, kept when grouping
+  /// files it under its bare course code.
+  String? get letter => _letter ?? TimetableImport.letterOf(subjectName);
+  final String? _letter;
+
+  ImportedClass copyWith({String? subjectName, int? blocks, String? letter}) =>
+      ImportedClass(
         subjectName: subjectName ?? this.subjectName,
         weekday: weekday,
         startMinutes: startMinutes,
@@ -262,6 +324,7 @@ class ImportedClass {
         room: room,
         teacher: teacher,
         blocks: blocks ?? this.blocks,
+        letter: letter ?? _letter,
       );
 
   bool sharesKeyWith(ImportedClass other) =>
@@ -269,6 +332,9 @@ class ImportedClass {
       other.weekday == weekday &&
       other.startMinutes == startMinutes;
 }
+
+/// A subject already on the device, as far as matching a sheet needs it.
+typedef ExistingSubject = ({int id, String name, String? code});
 
 @immutable
 class ImportLine {

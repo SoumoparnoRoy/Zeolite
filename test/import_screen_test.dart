@@ -39,10 +39,10 @@ final TimetableData _empty = TimetableData(
   records: <AttendanceRecord>[],
 );
 
-Widget _app() {
+Widget _app({TimetableData? data}) {
   return ProviderScope(
     overrides: [
-      timetableProvider.overrideWith((Ref ref) async => _empty),
+      timetableProvider.overrideWith((Ref ref) async => data ?? _empty),
       settingsProvider.overrideWith(() => _StaticSettings(_settings)),
     ],
     child: MaterialApp(
@@ -54,11 +54,11 @@ Widget _app() {
 
 /// The preview sits under an eight-line text field and a sliver list only
 /// builds what fits, so the default surface never reaches it.
-Future<void> _open(WidgetTester tester) async {
+Future<void> _open(WidgetTester tester, {TimetableData? data}) async {
   tester.view.physicalSize = const Size(1200, 2600);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
-  await tester.pumpWidget(_app());
+  await tester.pumpWidget(_app(data: data));
   await tester.pumpAndSettle();
 }
 
@@ -102,5 +102,36 @@ void main() {
 
     await _paste(tester, 'GEN201, Mo, 5');
     expect(find.textContaining('Add 1 to my timetable'), findsOneWidget);
+  });
+
+  testWidgets('a sheet code joins its subject, and a choice survives edits',
+      (WidgetTester tester) async {
+    await _open(
+      tester,
+      data: TimetableData(
+        categories: const <ClassCategory>[],
+        subjects: const <Subject>[
+          Subject(id: 1, name: 'Course 1', code: 'GEN201L', colorValue: 0),
+          Subject(id: 2, name: 'Course 2', colorValue: 0),
+        ],
+        slots: const <ClassSlot>[],
+        extras: <ExtraClass>[],
+        holidays: const <Holiday>[],
+        records: <AttendanceRecord>[],
+      ),
+    );
+
+    await _paste(tester, 'GEN201L, Mo, 5\nGEN203, Tu, 9');
+    expect(find.text('Added to Course 1'), findsOneWidget);
+    expect(find.text('New subject'), findsOneWidget);
+
+    await tester.tap(find.text('GEN203').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Course 2').last);
+    await tester.pumpAndSettle();
+    await _paste(tester, 'GEN201L, Mo, 5\nGEN203, Tu, 9\nGEN203, We, 2');
+
+    expect(find.text('Added to Course 2'), findsOneWidget);
+    expect(find.text('New subject'), findsNothing);
   });
 }

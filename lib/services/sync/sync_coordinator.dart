@@ -484,9 +484,14 @@ class SyncCoordinator {
       if (push.kind == SyncPushKind.conflict) tally.overwritten++;
 
       final String? remoteId = push.remoteId;
+      final SyncOrigin origin = push.link?.origin ?? _originFor(push.kind);
       final SyncOutcome outcome = remoteId == null
           ? await target.create(push.item)
-          : await target.update(push.item, remoteId);
+          : await target.update(
+              push.item,
+              remoteId,
+              theirs: origin == SyncOrigin.remote,
+            );
       if (!outcome.ok) {
         tally.message ??= outcome.message;
         if (_endsRun(outcome.failure!)) {
@@ -504,7 +509,7 @@ class SyncCoordinator {
           remoteId: outcome.remoteId!,
           localHash: push.item.hash,
           remoteHash: outcome.remoteHash!,
-          origin: push.link?.origin ?? _originFor(push.kind),
+          origin: origin,
           syncedAt: _now(),
         ),
       );

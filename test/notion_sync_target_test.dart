@@ -17,7 +17,8 @@ NotionProperty _p(String id, String name, String type,
     NotionProperty(id: id, name: name, type: type, options: options);
 
 /// The schema the app's own template ships with.
-NotionMapping _mapping({bool withKey = true}) => NotionMapping(
+NotionMapping _mapping({bool withKey = true, bool withName = false}) =>
+    NotionMapping(
       databaseId: 'db-1',
       dataSourceId: 'ds-1',
       title: 'Attendance',
@@ -32,6 +33,7 @@ NotionMapping _mapping({bool withKey = true}) => NotionMapping(
         NotionField.credit: _p('p6', 'Attendance Credit', 'number'),
         if (withKey) NotionField.key: _p('p7', 'Zeolite ID', 'rich_text'),
         NotionField.time: _p('p8', 'Time', 'rich_text'),
+        if (withName) NotionField.component: _p('p9', 'Name', 'title'),
       },
       statusMeanings: const <String, LogVerdict>{
         'Present': LogVerdict.present,
@@ -63,6 +65,7 @@ NotionSyncTarget _target(
   bool withKey = true,
   String? category = 'Lab',
   bool cancelledCounts = false,
+  bool withName = false,
 }) =>
     NotionSyncTarget(
       client: NotionClient(
@@ -72,7 +75,7 @@ NotionSyncTarget _target(
         baseUri: Uri.parse('https://notion.test'),
         minimumGap: Duration.zero,
       ),
-      mapping: _mapping(withKey: withKey),
+      mapping: _mapping(withKey: withKey, withName: withName),
       course: (String uuid) => uuid == _uuid
           ? const NotionCourse(uuid: _uuid, name: 'Generic Course')
           : null,
@@ -135,6 +138,28 @@ void main() {
     expect(props['p5'], <String, Object?>{'number': 1});
     expect(outcome.ok, isTrue);
     expect(outcome.remoteId, 'page-9');
+  });
+
+  test('a row a person made keeps its name when the mark is written', () async {
+    final List<Map<String, Object?>> sent = <Map<String, Object?>>[];
+    final NotionSyncTarget target = _target(
+      MockClient((http.Request r) async {
+        sent.add(jsonDecode(r.body) as Map<String, Object?>);
+        return http.Response('{"id":"page-1"}', 200);
+      }),
+      withName: true,
+    );
+
+    await target.update(_mark(status: 'absent'), 'page-1', theirs: true);
+    await target.update(_mark(status: 'absent'), 'page-2');
+
+    Map<String, Object?> props(int i) =>
+        sent[i]['properties']! as Map<String, Object?>;
+    expect(props(0).containsKey('p9'), isFalse);
+    expect(props(0)['p3'], <String, Object?>{
+      'select': <String, Object?>{'name': 'Absent'},
+    });
+    expect(props(1).containsKey('p9'), isTrue);
   });
 
   test('the hash written after a push is the one the next read produces',

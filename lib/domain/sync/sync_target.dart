@@ -501,7 +501,13 @@ abstract class SyncTarget {
 
   Future<SyncOutcome> create(SyncItem item);
 
-  Future<SyncOutcome> update(SyncItem item, String remoteId);
+  /// [theirs] is a row a person made rather than this app. What they named it
+  /// is theirs to word, so only the cells that describe the mark are written.
+  Future<SyncOutcome> update(
+    SyncItem item,
+    String remoteId, {
+    bool theirs = false,
+  });
 
   /// Puts [localKey] on a claimed row and changes nothing else. For a row
   /// settled in the far side's favour: it already holds the right values, but

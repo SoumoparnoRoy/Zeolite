@@ -243,6 +243,7 @@ void main() {
     final SyncRunResult result = await coordinator().run(force: true);
 
     expect(target.calls, <String>['fetch', 'update $page']);
+    expect(target.updatedTheirs, isEmpty);
     expect(result.archived, 0);
     expect(result.review, isEmpty);
     final RemoteLink link =
@@ -600,6 +601,53 @@ void main() {
     final RemoteLink link =
         (await repo.getRemoteLinks(target.id, SyncKind.attendance)).single;
     expect(link.origin, SyncOrigin.remote);
+  });
+
+  test('a mark changed here is written into their row as theirs', () async {
+    final Subject subject = await seed(status: AttendanceStatus.present);
+    final String key = SyncItem.keyFor(subject.uuid!, _day, 540);
+    target
+      ..trustsPulls = false
+      ..kinds = <SyncKind>{SyncKind.attendance}
+      ..claimable = <SyncClaim>[
+        SyncClaim(
+          agrees: true,
+          state: RemoteState(
+            kind: SyncKind.attendance,
+            localKey: key,
+            remoteId: 'their-page',
+            hash: 'theirs',
+            fields: const <String, Object?>{'status': 'present'},
+          ),
+        ),
+      ];
+    await coordinator().run(force: true);
+    final RemoteLink link =
+        (await repo.getRemoteLinks(target.id, SyncKind.attendance)).single;
+    target
+      ..claimable = <SyncClaim>[]
+      ..remote = <RemoteState>[
+        RemoteState(
+          kind: SyncKind.attendance,
+          localKey: key,
+          remoteId: 'their-page',
+          hash: link.remoteHash,
+        ),
+      ]
+      ..updatedTheirs.clear();
+
+    await repo.setAttendance(
+      AttendanceRecord(
+        subjectId: subject.id!,
+        date: _day,
+        startMinutes: 540,
+        status: AttendanceStatus.absent,
+        markedAt: _late,
+      ),
+    );
+    await coordinator().run(force: true);
+
+    expect(target.updatedTheirs, <String>['their-page']);
   });
 
   /// Their own row, recognised in a mark of this device's but saying

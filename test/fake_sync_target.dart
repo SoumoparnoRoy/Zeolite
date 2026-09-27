@@ -35,6 +35,9 @@ class FakeSyncTarget implements SyncTarget {
 
   final List<String> calls = <String>[];
 
+  /// Pages [update] was told a person made.
+  final List<String> updatedTheirs = <String>[];
+
   /// Blocks the start of every run, so two can be put in flight at once.
   Future<void>? hold;
 
@@ -101,8 +104,13 @@ class FakeSyncTarget implements SyncTarget {
   }
 
   @override
-  Future<SyncOutcome> update(SyncItem item, String remoteId) async {
+  Future<SyncOutcome> update(
+    SyncItem item,
+    String remoteId, {
+    bool theirs = false,
+  }) async {
     calls.add('update $remoteId');
+    if (theirs) updatedTheirs.add(remoteId);
     final SyncOutcome? failure = _takeFailure();
     if (failure != null) return failure;
     pages = <String, String>{...pages, remoteId: item.hash};

@@ -285,7 +285,11 @@ class NotionSyncTarget implements SyncTarget {
   }
 
   @override
-  Future<SyncOutcome> update(SyncItem item, String remoteId) async {
+  Future<SyncOutcome> update(
+    SyncItem item,
+    String remoteId, {
+    bool theirs = false,
+  }) async {
     if (!_canBeFoundAgain) {
       return const SyncOutcome.failed(
         SyncFailure.rejected,
@@ -299,7 +303,11 @@ class NotionSyncTarget implements SyncTarget {
       remoteId,
       keyOnly
           ? _keyAndMissingType(item.localKey, remoteId, item)
-          : await _encode(item, relate: !await _keepsCourse(remoteId)),
+          : await _encode(
+              item,
+              relate: !await _keepsCourse(remoteId),
+              named: !theirs,
+            ),
     );
     if (!result.ok) return _failure(result);
     return SyncOutcome.done(
@@ -345,6 +353,7 @@ class NotionSyncTarget implements SyncTarget {
   Future<Map<String, Object?>> _encode(
     SyncItem item, {
     bool relate = true,
+    bool named = true,
   }) async {
     final String uuid = _subjectOf(item.localKey);
     final NotionCourse? course = _course(uuid);
@@ -352,6 +361,7 @@ class NotionSyncTarget implements SyncTarget {
       item,
       courseName: course?.name,
       categoryName: _typeOf(item.localKey, item),
+      named: named,
       courseRelationId: course == null || !relate
           ? null
           : await _courses?.pageIdFor(course, usual: _usualCourseOf(uuid)),

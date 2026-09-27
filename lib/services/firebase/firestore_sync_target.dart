@@ -127,7 +127,11 @@ class FirestoreSyncTarget implements SyncTarget {
   /// The document id is the sync key, so an update is the same call as a
   /// create and re-running a half-finished push cannot double anything.
   @override
-  Future<SyncOutcome> update(SyncItem item, String remoteId) =>
+  Future<SyncOutcome> update(
+    SyncItem item,
+    String remoteId, {
+    bool theirs = false,
+  }) =>
       _write(item, remoteId);
 
   // The key is the document id, so there is never one missing to write.

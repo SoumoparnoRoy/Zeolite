@@ -23,11 +23,15 @@ class NotionProperties {
   /// [courseName] comes from the caller because a mark carries its subject as
   /// a uuid — meaningless in a workspace — and adding the name to the item
   /// itself would change the hash of every mark and re-push all of Firestore.
+  ///
+  /// [named] false leaves the row's name as it stands, for a row somebody
+  /// titled their own way.
   Map<String, Object?> encode(
     SyncItem item, {
     required String? courseName,
     String? categoryName,
     String? courseRelationId,
+    bool named = true,
   }) {
     final String status = (item.fields['status'] as String?) ?? 'present';
     final String? tag = item.fields['tag'] as String?;
@@ -48,9 +52,11 @@ class NotionProperties {
           'date': <String, Object?>{'start': _dayOf(item.localKey)},
         });
     put(NotionField.time, (NotionProperty p) => _named(p, _timeOf(item.localKey)));
-    put(NotionField.component, (NotionProperty p) => p.type == 'title'
-        ? _title(courseName ?? '')
-        : _text(courseName ?? ''));
+    if (named) {
+      put(NotionField.component, (NotionProperty p) => p.type == 'title'
+          ? _title(courseName ?? '')
+          : _text(courseName ?? ''));
+    }
     put(
       NotionField.course,
       (NotionProperty p) => p.type == 'relation'

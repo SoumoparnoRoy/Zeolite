@@ -201,6 +201,74 @@ void main() {
     expect(await repo.getAttendanceAt(written.id!, _day, untimed), isNotNull);
   });
 
+  /// A mark imported with no time, synced, then matched to a 10:00 class.
+  Future<(Subject, String, String)> syncThenMatch() async {
+    final int untimed = AttendanceRecord.untimed(1);
+    final int id = await repo.insertSubject(
+      const Subject(name: 'Generic Course', colorValue: 0xFF336699),
+    );
+    final AttendanceRecord record = AttendanceRecord(
+      subjectId: id,
+      date: _day,
+      startMinutes: untimed,
+      status: AttendanceStatus.present,
+      markedAt: _early,
+    );
+    await repo.setAttendance(record);
+    final Subject subject = (await repo.getSubjects()).single;
+    await coordinator().run(force: true);
+
+    final RemoteLink link =
+        (await repo.getRemoteLinks(target.id, SyncKind.attendance)).single;
+    target.remote = <RemoteState>[
+      RemoteState(
+        kind: SyncKind.attendance,
+        localKey: link.localKey,
+        remoteId: link.remoteId,
+        hash: link.remoteHash,
+      ),
+    ];
+    await repo.clearAttendance(id, _day, untimed);
+    await repo.setAttendance(record.copyWith(startMinutes: 600));
+    target.calls.clear();
+    return (subject, link.remoteId, SyncItem.keyFor(subject.uuid!, _day, 600));
+  }
+
+  test('a matched mark updates its row on a table a person keeps', () async {
+    target
+      ..trustsPulls = false
+      ..kinds = <SyncKind>{SyncKind.attendance};
+    final (_, String page, String moved) = await syncThenMatch();
+
+    final SyncRunResult result = await coordinator().run(force: true);
+
+    expect(target.calls, <String>['fetch', 'update $page']);
+    expect(result.archived, 0);
+    expect(result.review, isEmpty);
+    final RemoteLink link =
+        (await repo.getRemoteLinks(target.id, SyncKind.attendance)).single;
+    expect((link.localKey, link.remoteId), (moved, page));
+
+    target.remote = <RemoteState>[
+      RemoteState(
+        kind: SyncKind.attendance,
+        localKey: moved,
+        remoteId: page,
+        hash: link.remoteHash,
+      ),
+    ];
+    expect((await coordinator().run(force: true)).pushed, 0);
+  });
+
+  test('a matched mark replaces its row in a store the app owns', () async {
+    target.ownsEveryRow = true;
+    final (_, String page, String moved) = await syncThenMatch();
+
+    await coordinator().run(force: true);
+
+    expect(target.calls, containsAll(<String>['archive $page', 'create $moved']));
+  });
+
   test('a tombstone removes the mark instead of importing it', () async {
     final Subject subject = await seed(status: AttendanceStatus.present);
     await coordinator().run();

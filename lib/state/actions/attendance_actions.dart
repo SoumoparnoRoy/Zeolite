@@ -4,6 +4,7 @@ import '../../data/db/zeolite_repository.dart';
 import '../../data/models/attendance_record.dart';
 import '../../data/models/attendance_status.dart';
 import '../../data/models/class_session.dart';
+import '../../domain/untimed_match.dart';
 import '../providers.dart';
 
 import 'action_core.dart';
@@ -137,6 +138,27 @@ class AttendanceActions {
       date: session.date,
       startMinutes: session.startMinutes,
     );
+  }
+
+  /// Files each untimed mark under the class it was matched to. Only the
+  /// time changes; the date, status, weight, type and tag were the source's.
+  Future<int> matchUntimed(List<UntimedMatch> matches) async {
+    if (matches.isEmpty) return 0;
+    final DatabaseSnapshot before = await _core.repo.snapshot();
+    await _core.repo.transaction((ZeoliteRepository repository) async {
+      for (final UntimedMatch match in matches) {
+        final AttendanceRecord record = match.record;
+        await repository.clearAttendance(
+          record.subjectId,
+          record.date,
+          record.startMinutes,
+        );
+        await repository.setAttendance(match.moved);
+      }
+    });
+    await _core.refresh();
+    _core.arm(before);
+    return matches.length;
   }
 
   /// Marks every unmarked class in [sessions] with [status] in one batch.

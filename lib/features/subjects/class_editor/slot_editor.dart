@@ -12,6 +12,7 @@ import '../../../domain/class_weight.dart';
 import '../../../state/providers.dart';
 import '../../../widgets/common.dart';
 
+import '../untimed_match_dialog.dart';
 import 'editor_fields.dart';
 
 /// Create or edit a weekly recurring class.
@@ -79,6 +80,10 @@ class _SlotFormState extends ConsumerState<_SlotForm> {
   int _lastEnd = 10 * 60;
 
   late DateTime _startDate;
+
+  /// Set once the first class has been picked by hand, after which changing
+  /// the subject no longer moves it.
+  bool _startTouched = false;
   DateTime? _endDate;
   String? _error;
   bool _saving = false;
@@ -294,6 +299,7 @@ class _SlotFormState extends ConsumerState<_SlotForm> {
     setState(() {
       if (isStart) {
         _startDate = Dates.dayOf(picked);
+        _startTouched = true;
       } else {
         _endDate = Dates.dayOf(picked);
       }
@@ -456,6 +462,8 @@ class _SlotFormState extends ConsumerState<_SlotForm> {
     }
 
     if (!mounted) return;
+    await offerUntimedMatch(context, ref, subjects: <int>{_subjectId!});
+    if (!mounted) return;
     Navigator.of(context).pop();
   }
 
@@ -476,6 +484,13 @@ class _SlotFormState extends ConsumerState<_SlotForm> {
           value: _subjectId,
           onChanged: (int? id) => setState(() {
             _subjectId = id;
+            if (!_isEditing && !_startTouched) {
+              _startDate = firstClassFor(
+                ref,
+                id,
+                widget.initialDate ?? Dates.today(),
+              );
+            }
             // Adopt the new category's length, unless the user set an end
             // time by hand.
             if (!_durationTouched) _applyDefaultDurationToAll();

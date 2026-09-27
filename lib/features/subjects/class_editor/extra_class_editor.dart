@@ -12,6 +12,7 @@ import '../../../domain/class_weight.dart';
 import '../../../state/providers.dart';
 import '../../../widgets/common.dart';
 
+import '../untimed_match_dialog.dart';
 import 'editor_fields.dart';
 
 Future<void> showExtraClassEditor(
@@ -210,6 +211,8 @@ class _ExtraClassFormState extends ConsumerState<_ExtraClassForm> {
       await schedule.addExtraClass(value);
     }
 
+    if (!mounted) return;
+    await offerUntimedMatch(context, ref, subjects: <int>{_subjectId!});
     if (!mounted) return;
     Navigator.of(context).pop();
   }

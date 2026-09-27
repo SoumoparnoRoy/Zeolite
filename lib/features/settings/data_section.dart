@@ -7,6 +7,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
+import '../../core/words.dart';
+import '../../data/models/attendance_record.dart';
 import '../../data/settings/app_settings.dart';
 import '../../services/backup_folder.dart';
 import '../../services/backup_service.dart';
@@ -15,6 +17,7 @@ import '../../widgets/common.dart';
 import '../../widgets/undo_snack.dart';
 
 import 'settings_rows.dart';
+import 'untimed_match_screen.dart';
 
 class DataSection extends ConsumerWidget {
   const DataSection({super.key});
@@ -26,6 +29,11 @@ class DataSection extends ConsumerWidget {
     final SettingsController controller = ref.read(settingsProvider.notifier);
     final bool folderUsable =
         ref.watch(backupFolderUsableProvider).value ?? false;
+    final bool anyUntimed = ref.watch(timetableProvider).value?.records.any(
+              (AttendanceRecord r) => !AttendanceRecord.isTimed(r.startMinutes),
+            ) ??
+        false;
+    final int matchable = ref.watch(untimedMatchesProvider).length;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -75,6 +83,22 @@ class DataSection extends ConsumerWidget {
                       )
                     : null,
               ),
+              if (anyUntimed) ...<Widget>[
+                const Divider(indent: 58),
+                SettingsRow(
+                  icon: Icons.schedule_rounded,
+                  title: 'Match classes with no time',
+                  value: matchable == 0
+                      ? 'Nothing to match yet'
+                      : '${Words.plural(matchable, 'class', 'classes')} can be '
+                          'matched',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const UntimedMatchScreen(),
+                    ),
+                  ),
+                ),
+              ],
               const Divider(indent: 58),
               SettingsRow(
                 icon: Icons.delete_forever_outlined,

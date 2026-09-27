@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../data/db/zeolite_repository.dart';
 import '../../data/settings/app_settings.dart';
 import '../../domain/sync/sync_merge.dart';
+import '../../domain/sync/sync_moves.dart';
 import '../../domain/sync/sync_plan.dart';
 import '../../domain/sync/sync_status.dart';
 import '../../domain/sync/sync_target.dart';
@@ -302,6 +303,9 @@ class SyncCoordinator {
 
     final SyncLocalRows read = await SyncLocalRows.read(_repository, _settings);
     final Map<SyncKind, List<SyncItem>> local = read.items;
+    // Before claiming, which would otherwise offer a moved mark some other
+    // unkeyed row of that day.
+    await _followMovedMarks(local, links, remote);
     final Map<SyncKind, List<RemoteState>> disputed =
         await _claimUnkeyedRows(local, links, remote);
 
@@ -698,6 +702,33 @@ class SyncCoordinator {
   ) async {
     if (_kinds.any((SyncKind k) => links[k]!.isNotEmpty)) return;
     await _adoption.adopt(remote);
+  }
+
+  /// See [SyncMoves]. Where this app owns every row, a moved mark archives
+  /// the old row and makes a new one, as before.
+  Future<void> _followMovedMarks(
+    Map<SyncKind, List<SyncItem>> local,
+    Map<SyncKind, List<RemoteLink>> links,
+    Map<SyncKind, List<RemoteState>?> remote,
+  ) async {
+    const SyncKind kind = SyncKind.attendance;
+    final List<RemoteState>? known = remote[kind];
+    if (target.ownsEveryRow || known == null || links[kind] == null) return;
+    final SyncMoves moves = SyncMoves.find(
+      local: local[kind]!,
+      links: links[kind]!,
+      remote: known,
+    );
+    if (!moves.isEmpty) {
+      await _commit(kind, moves.moved, moves.forget);
+      final Set<String> forgotten = moves.forget.toSet();
+      links[kind] = <RemoteLink>[
+        for (final RemoteLink link in links[kind]!)
+          if (!forgotten.contains(link.localKey)) link,
+        ...moves.moved,
+      ];
+    }
+    remote[kind] = SyncMoves.rekey(known, links[kind]!);
   }
 
   /// Folds into [remote] the rows a person kept on the far side before this

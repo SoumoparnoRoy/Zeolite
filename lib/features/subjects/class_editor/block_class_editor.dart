@@ -12,6 +12,7 @@ import '../../../domain/day_grid.dart';
 import '../../../state/providers.dart';
 import '../../../widgets/common.dart';
 
+import '../untimed_match_dialog.dart';
 import 'editor_fields.dart';
 
 /// Fills one cell of the block grid: choose a subject, how many blocks it runs
@@ -62,6 +63,9 @@ class _BlockClassFormState extends ConsumerState<_BlockClassForm> {
   /// is how a timetable usually gets built.
   int _weight = 1;
   bool _weightTouched = false;
+
+  /// As `_SlotFormState._startTouched`.
+  bool _startTouched = false;
 
   /// As `_SlotFormState._categoryId`.
   int? _categoryId;
@@ -131,6 +135,8 @@ class _BlockClassFormState extends ConsumerState<_BlockClassForm> {
       });
       await ref.read(scheduleActionsProvider).addExtraClass(proposed);
       if (!mounted) return;
+      await offerUntimedMatch(context, ref, subjects: <int>{_subjectId!});
+      if (!mounted) return;
       Navigator.of(context).pop();
       return;
     }
@@ -179,6 +185,8 @@ class _BlockClassFormState extends ConsumerState<_BlockClassForm> {
     await ref.read(scheduleActionsProvider).addSlot(proposed);
 
     if (!mounted) return;
+    await offerUntimedMatch(context, ref, subjects: <int>{_subjectId!});
+    if (!mounted) return;
     Navigator.of(context).pop();
   }
 
@@ -215,6 +223,9 @@ class _BlockClassFormState extends ConsumerState<_BlockClassForm> {
             _subjectId = id;
             _error = null;
             if (!_weightTouched) _weight = _defaultWeight;
+            if (!_startTouched) {
+              _startDate = firstClassFor(ref, id, widget.date);
+            }
           }),
         ),
         const SizedBox(height: AppSpacing.xl),
@@ -296,7 +307,10 @@ class _BlockClassFormState extends ConsumerState<_BlockClassForm> {
                 lastDate: DateTime(DateTime.now().year + 3),
               );
               if (picked == null || !mounted) return;
-              setState(() => _startDate = Dates.dayOf(picked));
+              setState(() {
+                _startDate = Dates.dayOf(picked);
+                _startTouched = true;
+              });
             },
           )
         else

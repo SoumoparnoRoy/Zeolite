@@ -12,6 +12,7 @@ import '../../../domain/schedule_engine.dart';
 import '../../../state/providers.dart';
 import '../../../widgets/common.dart';
 
+import '../untimed_match_dialog.dart';
 import 'editor_fields.dart';
 
 /// Edits a single week of a weekly rule.
@@ -156,6 +157,8 @@ class _OccurrenceFormState extends ConsumerState<_OccurrenceForm> {
     await ref
         .read(scheduleActionsProvider)
         .setSlotOverride(widget.slot, widget.date, override);
+    if (!mounted) return;
+    await offerUntimedMatch(context, ref, subjects: <int>{subjectId});
     if (!mounted) return;
     Navigator.of(context).pop();
   }

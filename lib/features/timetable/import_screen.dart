@@ -25,6 +25,7 @@ import '../../widgets/course_split_choice.dart';
 import '../../widgets/gradient_header.dart';
 import '../../widgets/undo_snack.dart';
 import '../subjects/totals_import_screen.dart';
+import '../subjects/untimed_match_dialog.dart';
 import 'import_choices_screen.dart';
 
 /// Types a whole timetable in one paste instead of twenty trips through the
@@ -176,7 +177,11 @@ class _ImportTimetableScreenState extends ConsumerState<ImportTimetableScreen> {
     final ImportActions imports = ref.read(importActionsProvider);
     final int count = result.classes.length;
     await imports.importTimetable(result, weighByBlocks: _weighByBlocks);
+    // Asked before the pop, while this route still has a context to ask from.
+    // A match replaces the import's Undo offer with its own.
+    final bool matched = mounted && await offerUntimedMatch(context, ref);
     if (mounted) Navigator.of(context).pop();
+    if (matched) return;
     showUndoSnack(
       messenger,
       core,

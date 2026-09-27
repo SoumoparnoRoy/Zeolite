@@ -26,6 +26,7 @@ import '../domain/day_grid.dart';
 import '../domain/schedule_engine.dart';
 import '../domain/sync/sync_target.dart';
 import '../domain/tag_stats.dart';
+import '../domain/untimed_match.dart';
 import '../services/analytics_service.dart';
 import '../services/backup_folder.dart';
 import '../services/backup_service.dart';
@@ -580,6 +581,14 @@ final attendanceLogProvider =
     pastSessions: past,
     records: data.records,
   );
+});
+
+/// Marks kept with no time that a class on the timetable could now take.
+final untimedMatchesProvider = Provider<List<UntimedMatch>>((ref) {
+  final ScheduleEngine? engine = ref.watch(scheduleEngineProvider);
+  final TimetableData? data = ref.watch(timetableProvider).value;
+  if (engine == null || data == null) return const <UntimedMatch>[];
+  return matchUntimed(engine: engine, records: data.records);
 });
 
 // ------------------------------------------------------------ navigation

@@ -56,6 +56,14 @@ void main() {
           <String>['L', 'T']);
     });
 
+    test('the split starts the way the subjects here are already split', () {
+      // AAA101L and AAA101P are one course kept apart, which outweighs
+      // BBB202 being coded bare.
+      expect(TimetableImport.groupedLike(_held), isFalse);
+      expect(TimetableImport.groupedLike(_held.sublist(2)), isTrue);
+      expect(TimetableImport.groupedLike(const <ExistingSubject>[]), isNull);
+    });
+
     test('two sheet subjects sent to one subject cannot share a slot', () {
       final TimetableImportResult result = _parse(
         'BBB202L, Mo, 09:00-10:00\nBBB202T, Mo, 09:00-10:00\n'

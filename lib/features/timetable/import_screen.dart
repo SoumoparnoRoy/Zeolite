@@ -53,11 +53,15 @@ class _ImportTimetableScreenState extends ConsumerState<ImportTimetableScreen> {
 
   /// Off unless asked for: most timetables count every class once, and turning
   /// this on by default would silently double every lab already being pasted.
+  /// Only asked where a lab sits inside its course; kept apart, every class
+  /// counts once.
   bool _weighByBlocks = false;
 
-  /// A lab kept inside its course is what the choice exists for, so a sheet
-  /// that names both starts that way.
-  bool _byCourse = true;
+  /// Null until the student picks. Before that the split follows the subjects
+  /// already here, so a sheet joins them instead of doubling each course; with
+  /// nothing to go on, a lab kept inside its course is what the choice exists
+  /// for.
+  bool? _byCourse;
 
   /// Subjects placed by hand, by subject key; null is a new subject. Kept
   /// apart from the suggestion so editing the text or the split never
@@ -196,8 +200,9 @@ class _ImportTimetableScreenState extends ConsumerState<ImportTimetableScreen> {
 
   Future<void> _import(
     TimetableImportResult result,
-    Map<String, int> into,
-  ) async {
+    Map<String, int> into, {
+    required bool weighByBlocks,
+  }) async {
     setState(() => _saving = true);
     // The screen pops on success, so the offer is raised on the messenger
     // rather than through this route's context.
@@ -207,7 +212,7 @@ class _ImportTimetableScreenState extends ConsumerState<ImportTimetableScreen> {
     final int count = result.classes.length;
     await imports.importTimetable(
       result,
-      weighByBlocks: _weighByBlocks,
+      weighByBlocks: weighByBlocks,
       into: into,
     );
     // Asked before the pop, while this route still has a context to ask from.
@@ -445,22 +450,25 @@ class _ImportTimetableScreenState extends ConsumerState<ImportTimetableScreen> {
     final DayGrid grid = ref.watch(dayGridProvider);
     final bool use24Hour =
         ref.watch(settingsProvider).value?.use24HourTime ?? false;
-    final TimetableImportResult result = TimetableImport.parse(
-      _controller.text,
-      grid: grid,
-      byCourse: _byCourse,
-    );
-    final bool splits = result.subjectNames.length !=
-        TimetableImport.parse(_controller.text,
-                grid: grid, byCourse: !_byCourse)
-            .subjectNames
-            .length;
     final TimetableData? data = ref.watch(timetableProvider).value;
     final List<Subject> subjects = data?.subjects ?? const <Subject>[];
     final List<ExistingSubject> existing = <ExistingSubject>[
       for (final Subject s in subjects)
         if (s.id != null) (id: s.id!, name: s.name, code: s.code),
     ];
+    final bool byCourse =
+        _byCourse ?? TimetableImport.groupedLike(existing) ?? true;
+    final bool weighByBlocks = byCourse && _weighByBlocks;
+    final TimetableImportResult result = TimetableImport.parse(
+      _controller.text,
+      grid: grid,
+      byCourse: byCourse,
+    );
+    final bool splits = result.subjectNames.length !=
+        TimetableImport.parse(_controller.text,
+                grid: grid, byCourse: !byCourse)
+            .subjectNames
+            .length;
     final Map<String, int> into = <String, int>{
       for (final String name in result.subjectNames)
         if (_targetOf(name, existing) case final int id)
@@ -496,7 +504,8 @@ class _ImportTimetableScreenState extends ConsumerState<ImportTimetableScreen> {
       floatingActionButton: ready
           ? GradientFab(
               label: 'Add ${result.classes.length} to my timetable',
-              onPressed: () => _import(result, into),
+              onPressed: () =>
+                  _import(result, into, weighByBlocks: weighByBlocks),
             )
           : null,
       slivers: <Widget>[
@@ -559,7 +568,7 @@ class _ImportTimetableScreenState extends ConsumerState<ImportTimetableScreen> {
               const SizedBox(height: AppSpacing.xl),
               const SectionHeader('How the courses split'),
               CourseSplitChoice(
-                grouped: _byCourse,
+                grouped: byCourse,
                 source: 'sheet',
                 onChanged: (bool grouped) => setState(() {
                   _byCourse = grouped;
@@ -567,12 +576,12 @@ class _ImportTimetableScreenState extends ConsumerState<ImportTimetableScreen> {
                 }),
               ),
             ],
-            if (result.classes.isNotEmpty &&
+            if (byCourse &&
                 result.classes
                     .any((ImportedClass c) => c.blocks > 1)) ...<Widget>[
               const SizedBox(height: AppSpacing.xl),
               _BlockWeightChoice(
-                value: _weighByBlocks,
+                value: weighByBlocks,
                 onChanged: (bool v) => setState(() => _weighByBlocks = v),
               ),
             ],

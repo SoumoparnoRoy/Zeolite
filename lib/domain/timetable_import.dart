@@ -70,6 +70,28 @@ class TimetableImport {
     return null;
   }
 
+  /// Whether the subjects already here keep each course whole, read from
+  /// their codes: two of one course with different letters say its parts are
+  /// kept apart, one coded by the bare course says it is whole. Split wins, as
+  /// a course with no lab of its own is coded bare either way. Null when the
+  /// codes say neither.
+  static bool? groupedLike(List<ExistingSubject> subjects) {
+    final Map<String, Set<String>> letters = <String, Set<String>>{};
+    bool bare = false;
+    for (final ExistingSubject s in subjects) {
+      final String? course = s.code == null ? null : courseOf(s.code!);
+      if (course == null) continue;
+      final String? letter = letterOf(s.code!);
+      if (letter == null) {
+        bare = true;
+      } else {
+        letters.putIfAbsent(course, () => <String>{}).add(letter);
+      }
+    }
+    if (letters.values.any((Set<String> l) => l.length > 1)) return false;
+    return bare ? true : null;
+  }
+
   /// Classes that would share an attendance key once filed under [into]'s
   /// subjects: with a weekly class the subject already [held], or with a class
   /// of another sheet subject sent to the same one. Either way marking one

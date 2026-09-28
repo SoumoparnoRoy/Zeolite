@@ -58,8 +58,6 @@ macos/Flutter/ephemeral/
 ios/Flutter/ephemeral/
 
 # ------------------------------------------------------------- Local scratch
-# Old source snapshots kept locally; not part of the project.
-_to_delete/
 # Leftover hooks from a VS Code Java-modernization extension, unrelated to this
 # Flutter project.
 .github/modernize/

@@ -197,13 +197,21 @@ void main() {
 
     await _target(
       client,
-      course: const NotionCourse(uuid: _uuid, name: 'Thermodynamics'),
+      course: const NotionCourse(
+        uuid: _uuid,
+        name: 'Thermodynamics',
+        code: 'HIS1L',
+        priorHeld: 6,
+      ),
     ).create(_mark());
 
     expect(writes.where((String w) => w == 'POST /v1/pages'), hasLength(1),
         reason: 'the only page made is the mark');
     expect(_textOf(patched['c1']), '${NotionCoursesWriter.adoptedMark}$_uuid');
+    // His code stays even where the app's differs; what he left empty is
+    // filled.
     expect(_textOf(patched['c4']), 'HIS1');
+    expect(patched['c2'], <String, Object?>{'number': 6});
   });
 
   test('a subject with no page of its own goes where its classes already are',

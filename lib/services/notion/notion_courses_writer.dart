@@ -64,8 +64,8 @@ class NotionCoursesWriter {
       existing = pages[course.uuid] = named.single;
     }
 
-    // Filled rather than overwritten on a page taken over: an empty field here
-    // is one the app never had, not one somebody cleared.
+    // A page taken over stays its owner's: only what they left empty is filled,
+    // on every run, or the next one would overwrite what this one kept.
     final NotionCourse wanted =
         existing.adopted ? _filled(course, existing.course) : course;
     if (existing.course != wanted) {
@@ -95,18 +95,18 @@ class NotionCoursesWriter {
   }
 
   static NotionCourse _filled(NotionCourse ours, NotionCourse theirs) {
-    String? text(String? mine, String? other) =>
-        (mine == null || mine.isEmpty) ? other : mine;
+    String? text(String? held, String? mine) =>
+        (held == null || held.isEmpty) ? mine : held;
     return NotionCourse(
       uuid: ours.uuid,
-      name: ours.name,
-      code: text(ours.code, theirs.code),
-      teacher: text(ours.teacher, theirs.teacher),
-      targetPercent: ours.targetPercent ?? theirs.targetPercent,
-      expectedTotal: ours.expectedTotal ?? theirs.expectedTotal,
-      priorHeld: ours.priorHeld == 0 ? theirs.priorHeld : ours.priorHeld,
+      name: text(theirs.name, ours.name)!,
+      code: text(theirs.code, ours.code),
+      teacher: text(theirs.teacher, ours.teacher),
+      targetPercent: theirs.targetPercent ?? ours.targetPercent,
+      expectedTotal: theirs.expectedTotal ?? ours.expectedTotal,
+      priorHeld: theirs.priorHeld == 0 ? ours.priorHeld : theirs.priorHeld,
       priorAttended:
-          ours.priorAttended == 0 ? theirs.priorAttended : ours.priorAttended,
+          theirs.priorAttended == 0 ? ours.priorAttended : theirs.priorAttended,
     );
   }
 

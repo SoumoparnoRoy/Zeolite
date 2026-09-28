@@ -223,7 +223,20 @@ class NotionProperties {
       fields: fields,
       editedAt: DateTime.tryParse((page['last_edited_time'] as String?) ?? ''),
       deleted: page['in_trash'] == true || page['archived'] == true,
+      category: _categoryOf(properties),
     );
+  }
+
+  /// The type cell as the category it is paired with, or as written where
+  /// nothing is paired to it.
+  String? _categoryOf(Map<String, Object?> properties) {
+    final String? option =
+        optionNameOf(valueOf(properties, mapping.fields[NotionField.kind]));
+    if (option == null) return null;
+    for (final MapEntry<String, String> entry in mapping.kindValues.entries) {
+      if (entry.value == option) return entry.key;
+    }
+    return option;
   }
 
   /// The workspace's word back to one of ours, so a renamed option does not

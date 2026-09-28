@@ -392,6 +392,7 @@ class RemoteState {
     this.fields = const <String, Object?>{},
     this.editedAt,
     this.deleted = false,
+    this.category,
   });
 
   final SyncKind kind;
@@ -415,6 +416,10 @@ class RemoteState {
   /// outright would leave every other device holding a row and a link with
   /// nothing to compare against, and the next push would put it straight back.
   final bool deleted;
+
+  /// The class type the row shows, by name. Kept out of [fields] so a pull
+  /// applies nothing new; see [SyncMoves].
+  final String? category;
 }
 
 /// A row on the far side that a local row has been recognised in.

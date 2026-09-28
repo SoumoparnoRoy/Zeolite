@@ -8,8 +8,10 @@ import 'sync_target.dart';
 /// longer names anything, for the same subject and day. On a table a person
 /// keeps that is the same class, and its page has to be updated in place:
 /// archiving it would take their other columns with it, and leaving it would
-/// file the class twice. Pairs go in start order, the way the marks were
-/// matched. A store that files rows under the key itself needs none of this.
+/// file the class twice. A page goes to a mark of the type it shows first, so
+/// a lecture and a tutorial moved on one day keep their own pages; the rest
+/// pair in start order, the way the marks were matched. A store that files
+/// rows under the key itself needs none of this.
 class SyncMoves {
   const SyncMoves({required this.moved, required this.forget});
 
@@ -38,15 +40,19 @@ class SyncMoves {
     final Set<String> linkedKeys = <String>{
       for (final RemoteLink link in links) link.localKey,
     };
-    final Set<String> pages = <String>{
+    final Map<String, String?> pages = <String, String?>{
       for (final RemoteState state in remote)
-        if (!state.deleted) state.remoteId,
+        if (!state.deleted) state.remoteId: state.category?.toLowerCase(),
+    };
+    final Map<String, String?> typeOf = <String, String?>{
+      for (final SyncItem item in local)
+        item.localKey: (item.fields['category'] as String?)?.toLowerCase(),
     };
 
     final Map<String, List<RemoteLink>> gone = <String, List<RemoteLink>>{};
     for (final RemoteLink link in links) {
       if (localKeys.contains(link.localKey)) continue;
-      if (!pages.contains(link.remoteId)) continue;
+      if (!pages.containsKey(link.remoteId)) continue;
       final String? day = _dayOf(link.localKey);
       if (day == null) continue;
       gone.putIfAbsent(day, () => <RemoteLink>[]).add(link);
@@ -69,20 +75,39 @@ class SyncMoves {
       final List<RemoteLink> old = entry.value
         ..sort((RemoteLink a, RemoteLink b) => _byStart(a.localKey, b.localKey));
       keys.sort(_byStart);
-      for (int i = 0; i < old.length && i < keys.length; i++) {
-        forget.add(old[i].localKey);
+
+      void pair(RemoteLink link, String key) {
+        keys.remove(key);
+        forget.add(link.localKey);
         moved.add(
           RemoteLink(
-            target: old[i].target,
-            kind: old[i].kind,
-            localKey: keys[i],
-            remoteId: old[i].remoteId,
+            target: link.target,
+            kind: link.kind,
+            localKey: key,
+            remoteId: link.remoteId,
             localHash: '',
-            remoteHash: old[i].remoteHash,
-            origin: old[i].origin,
-            syncedAt: old[i].syncedAt,
+            remoteHash: link.remoteHash,
+            origin: link.origin,
+            syncedAt: link.syncedAt,
           ),
         );
+      }
+
+      final List<RemoteLink> waiting = <RemoteLink>[];
+      for (final RemoteLink link in old) {
+        final String? type = pages[link.remoteId];
+        final String? key = type == null
+            ? null
+            : keys.where((String k) => typeOf[k] == type).firstOrNull;
+        if (key == null) {
+          waiting.add(link);
+        } else {
+          pair(link, key);
+        }
+      }
+      for (final RemoteLink link in waiting) {
+        if (keys.isEmpty) break;
+        pair(link, keys.first);
       }
     }
     return SyncMoves(moved: moved, forget: forget);
@@ -109,6 +134,7 @@ class SyncMoves {
               fields: state.fields,
               editedAt: state.editedAt,
               deleted: state.deleted,
+              category: state.category,
             ),
           _ => state,
         },

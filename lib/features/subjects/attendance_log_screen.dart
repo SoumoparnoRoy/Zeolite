@@ -264,14 +264,30 @@ class _LogTile extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text(
-                      Dates.formatFull(entry.date),
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        height: 1.2,
-                        fontWeight: FontWeight.w700,
-                        color: p.textPrimary,
-                      ),
+                    Row(
+                      children: <Widget>[
+                        Text(
+                          Dates.formatFull(entry.date),
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            height: 1.2,
+                            fontWeight: FontWeight.w700,
+                            color: p.textPrimary,
+                          ),
+                        ),
+                        // The tint alone never said what it meant.
+                        if (entry.needsMarking) ...<Widget>[
+                          const SizedBox(width: 8),
+                          Text(
+                            'Not marked',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: p.warning,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 4),
                     Text(

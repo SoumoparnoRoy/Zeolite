@@ -20,6 +20,10 @@ import 'state/notion_sync_providers.dart';
 import 'state/sync_providers.dart';
 import 'widgets/nav_bar_scroll.dart';
 
+/// Lets the shell hear a pushed page closing, so it can give the tab bar back.
+final RouteObserver<ModalRoute<void>> shellRoutes =
+    RouteObserver<ModalRoute<void>>();
+
 class ZeoliteApp extends ConsumerWidget {
   const ZeoliteApp({super.key});
 
@@ -47,6 +51,7 @@ class ZeoliteApp extends ConsumerWidget {
       // `RouteSettings` name — the tabs are an [IndexedStack], so [RootShell]
       // reports those itself.
       navigatorObservers: <NavigatorObserver>[
+        shellRoutes,
         if (observer != null) observer,
       ],
       theme: AppTheme.light(accent),
@@ -138,6 +143,7 @@ class RootShell extends ConsumerStatefulWidget {
     required int depth,
     required Axis axis,
     required double maxExtent,
+    bool atTop = false,
   }) {
     if (depth != 0 || axis != Axis.vertical) return null;
     return switch (direction) {
@@ -146,7 +152,8 @@ class RootShell extends ConsumerStatefulWidget {
       ScrollDirection.forward => true,
       // A screen that already fits has no room to win.
       ScrollDirection.reverse => maxExtent > 0 ? false : null,
-      ScrollDirection.idle => null,
+      // A fling back to the top can end before any forward drag is reported.
+      ScrollDirection.idle => atTop ? true : null,
     };
   }
 
@@ -183,7 +190,7 @@ class RootShell extends ConsumerStatefulWidget {
   ConsumerState<RootShell> createState() => _RootShellState();
 }
 
-class _RootShellState extends ConsumerState<RootShell> {
+class _RootShellState extends ConsumerState<RootShell> with RouteAware {
   static const List<Widget> _screens = <Widget>[
     TodayScreen(),
     TimetableScreen(),
@@ -225,7 +232,20 @@ class _RootShellState extends ConsumerState<RootShell> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final ModalRoute<void>? route = ModalRoute.of(context);
+    if (route != null) shellRoutes.subscribe(this, route);
+  }
+
+  /// Back from a pushed page with the bar still tucked away, the bottom of the
+  /// screen takes taps meant for a tab.
+  @override
+  void didPopNext() => _showNav(true);
+
+  @override
   void dispose() {
+    shellRoutes.unsubscribe(this);
     _tapped.removeListener(_openTappedNotification);
     unawaited(_linkSub?.cancel());
     _lifecycle?.dispose();
@@ -283,6 +303,7 @@ class _RootShellState extends ConsumerState<RootShell> {
       depth: notification.depth,
       axis: notification.metrics.axis,
       maxExtent: notification.metrics.maxScrollExtent,
+      atTop: notification.metrics.pixels <= notification.metrics.minScrollExtent,
     );
     if (visible != null) _showNav(visible);
     return false;

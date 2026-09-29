@@ -283,6 +283,12 @@ class SettingsItemRow extends ConsumerWidget {
     return '${Words.plural(rooms, 'room')} · ${Words.plural(tags, 'tag')}';
   }
 
+  /// The year is said once, unless the term straddles two.
+  static String _termStart(DateTime start, DateTime end) =>
+      start.year == end.year
+          ? '${start.day} ${kMonthNamesShort[start.month - 1]}'
+          : Dates.formatFull(start);
+
   static String _termLine(AppSettings settings, TimetableData? timetable) {
     final DateTime? start = settings.semesterStart;
     final DateTime? end = settings.semesterEnd;
@@ -291,7 +297,7 @@ class SettingsItemRow extends ConsumerWidget {
       if (start == null || end == null)
         'Dates not set'
       else
-        '${Dates.formatDayMonth(start)} – ${Dates.formatDayMonth(end)}',
+        '${_termStart(start, end)} – ${Dates.formatFull(end)}',
       if (breaks > 0) Words.plural(breaks, 'holiday'),
     ].join(' · ');
   }

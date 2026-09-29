@@ -114,7 +114,7 @@ void main() {
 
     // The code leads, in mono, so a theory course and its lab stop reading as
     // duplicates of each other. Per-subject counts moved to the header.
-    expect(find.text('PH101 · LAB'), findsOneWidget);
+    expect(find.text('PH101 · Lab'), findsOneWidget);
     // Two weekly slots; the one-off is not a weekly class.
     expect(find.text('2 subjects · 2 weekly classes'), findsOneWidget);
     // Nothing scheduled is the one count still worth saying inline.

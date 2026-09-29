@@ -269,24 +269,31 @@ class _ExtraClassFormState extends ConsumerState<_ExtraClassForm> {
         const SectionHeader('Room'),
         RoomField(controller: _room),
         const SizedBox(height: AppSpacing.xl),
-        TypePicker(
-          subjectId: _subjectId,
-          value: _categoryId,
-          onChanged: (int? id) => setState(() {
-            _categoryId = id;
-            if (!_durationTouched) {
-              _end = Clock.endFromStart(_start, _defaultDuration);
-            }
-            if (!_weightTouched) _weight = _defaultWeight;
-          }),
-        ),
-        const SizedBox(height: AppSpacing.xl),
-        WeightPicker(
-          value: _weight,
-          onChanged: (int n) => setState(() {
-            _weight = n;
-            _weightTouched = true;
-          }),
+        MoreOptions(
+          summary: '${classTypeName(ref, _subjectId, _categoryId)} · counts '
+              'as ${classWeightLabel(_weight).toLowerCase()}',
+          initiallyOpen: _categoryId != null || _weight != _defaultWeight,
+          children: <Widget>[
+            TypePicker(
+              subjectId: _subjectId,
+              value: _categoryId,
+              onChanged: (int? id) => setState(() {
+                _categoryId = id;
+                if (!_durationTouched) {
+                  _end = Clock.endFromStart(_start, _defaultDuration);
+                }
+                if (!_weightTouched) _weight = _defaultWeight;
+              }),
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            WeightPicker(
+              value: _weight,
+              onChanged: (int n) => setState(() {
+                _weight = n;
+                _weightTouched = true;
+              }),
+            ),
+          ],
         ),
         if (_error != null) ...<Widget>[
           const SizedBox(height: AppSpacing.md),

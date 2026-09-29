@@ -78,9 +78,12 @@ class _SimulateSheetState extends State<SimulateSheet> {
             Padding(
               padding: const EdgeInsets.only(bottom: 4),
               child: Text(
-                now.hasData
-                    ? 'Now ${now.percent.toStringAsFixed(0)}%'
-                    : 'Nothing marked yet',
+                !now.hasData
+                    ? 'Nothing marked yet'
+                    // Until a class is added the big number already is "now".
+                    : _attended == 0 && _missed == 0
+                        ? 'Where you are now'
+                        : 'Now ${now.percent.toStringAsFixed(0)}%',
                 style: monoStyle(color: p.textTertiary, size: 11),
               ),
             ),

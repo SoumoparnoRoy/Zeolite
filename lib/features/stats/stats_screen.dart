@@ -144,48 +144,51 @@ class _OverallHeader extends StatelessWidget {
           padding: EdgeInsets.fromLTRB(20, 16, 20, 0),
           child: HeaderEyebrow('Attendance · this term'),
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: <Widget>[
-              HeaderNumber(
-                stats.hasData ? '${stats.percent.round()}' : '—',
-                size: 60,
-                unit: stats.hasData ? '%' : '',
-              ),
-              const SizedBox(width: 16),
-              // Capped, not just Expanded: on a wide column a label/value pair
-              // stretched to the full width leaves the count stranded half a
-              // screen from the word it belongs to.
-              Flexible(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 190),
-                  child: Column(
-                    children: <Widget>[
-                      _LegendLine(label: 'Attended', value: stats.attended),
-                      const SizedBox(height: 7),
-                      _LegendLine(
-                        label: 'Missed',
-                        value: stats.held - stats.attended,
-                      ),
-                      const SizedBox(height: 7),
-                      _LegendLine(
-                        label: 'Cancelled',
-                        value: stats.cancelled,
-                        // Cancelled counts towards neither side of the
-                        // percentage, so its line reads quieter than the two
-                        // that do.
-                        dimmed: true,
-                      ),
-                    ],
+        // A dash at this size reads as a bar, and three zeros say nothing.
+        if (!stats.hasData)
+          const Padding(
+            padding: EdgeInsets.fromLTRB(20, 7, 20, 0),
+            child: HeaderTitle('Nothing marked yet'),
+          )
+        else
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: <Widget>[
+                HeaderNumber('${stats.percent.round()}', size: 60),
+                const SizedBox(width: 16),
+                // Capped, not just Expanded: on a wide column a label/value
+                // pair stretched to the full width leaves the count stranded
+                // half a screen from the word it belongs to.
+                Flexible(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 190),
+                    child: Column(
+                      children: <Widget>[
+                        _LegendLine(label: 'Attended', value: stats.attended),
+                        const SizedBox(height: 7),
+                        _LegendLine(
+                          label: 'Missed',
+                          value: stats.held - stats.attended,
+                        ),
+                        const SizedBox(height: 7),
+                        _LegendLine(
+                          label: 'Cancelled',
+                          value: stats.cancelled,
+                          // Cancelled counts towards neither side of the
+                          // percentage, so its line reads quieter than the two
+                          // that do.
+                          dimmed: true,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              const Spacer(),
-            ],
+                const Spacer(),
+              ],
+            ),
           ),
-        ),
         // Shown so a student cross-checking against their portal does not
         // think one of the two is broken; dropped once they agree.
         if (stats.termPercent != null && stats.expectedTotal > stats.held)
@@ -459,7 +462,8 @@ class _SubjectDetail extends ConsumerWidget {
             Expanded(
               child: _MetricTile(
                 label: 'Must attend',
-                value: '${stats.needToAttend}',
+                // More than is left in the term, once the target is gone.
+                value: stats.isUnrecoverable ? '—' : '${stats.needToAttend}',
                 color: p.warning,
               ),
             ),

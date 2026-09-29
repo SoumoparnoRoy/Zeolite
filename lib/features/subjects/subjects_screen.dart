@@ -215,7 +215,7 @@ class _SubjectRow extends ConsumerWidget {
     final String detail = <String>[
       if (subject.code != null && subject.code!.isNotEmpty)
         subject.code!.toUpperCase(),
-      if (category != null) category.name.toUpperCase(),
+      if (category != null) category.name,
       if (subject.teacher != null && subject.teacher!.isNotEmpty)
         subject.teacher!,
       if (classCount == 0) 'no classes',

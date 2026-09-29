@@ -17,6 +17,7 @@ import 'package:zeolite/data/models/subject.dart';
 import 'package:zeolite/data/settings/app_settings.dart';
 import 'package:zeolite/features/subjects/attendance_log_screen.dart';
 import 'package:zeolite/state/providers.dart';
+import 'package:zeolite/widgets/common.dart';
 
 import 'fake_notifications.dart';
 
@@ -310,7 +311,7 @@ void main() {
     // rather than write the same value again.
     final Finder row = find.ancestor(
       of: find.text(Dates.formatFull(target)),
-      matching: find.byType(Row),
+      matching: find.byType(SurfaceCard),
     );
     await tester.tap(
       find.descendant(

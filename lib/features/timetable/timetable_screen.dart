@@ -76,10 +76,12 @@ class TimetableScreen extends ConsumerWidget {
           ),
         ],
       ),
-      floatingActionButton: GradientFab(
-        label: 'Add class',
-        onPressed: () => showAddClassSheet(context, ref),
-      ),
+      floatingActionButton: slots.isEmpty && weekTotal == 0
+          ? null
+          : GradientFab(
+              label: 'Add class',
+              onPressed: () => showAddClassSheet(context, ref),
+            ),
       slivers: <Widget>[
         if (slots.isEmpty && weekTotal == 0)
           SliverFillRemaining(
@@ -292,9 +294,18 @@ class _SessionRow extends StatelessWidget {
                   ],
                 ),
               ),
+              // Named rather than a coloured dot, which nobody could read as
+              // "you were marked absent" without being told.
               if (status != null && !isCancelled) ...<Widget>[
                 const SizedBox(width: 8),
-                StatusDot(color: status.colorIn(p), size: 18),
+                Text(
+                  status.label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: status.colorIn(p),
+                  ),
+                ),
               ],
             ],
           ),

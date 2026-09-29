@@ -199,6 +199,109 @@ class TypePicker extends ConsumerWidget {
   }
 }
 
+/// The type a class ends up with: its own, else its subject's.
+String classTypeName(WidgetRef ref, int? subjectId, int? categoryId) {
+  final TimetableData? data = ref.watch(timetableProvider).value;
+  return (data?.categoryById(categoryId) ??
+              data?.categoryFor(data.subjectById(subjectId)))
+          ?.name ??
+      'No type';
+}
+
+/// Settings most classes never need, folded behind one row that says what they
+/// are set to. Starts open when one of them is already away from its default,
+/// so nothing set is ever hidden.
+class MoreOptions extends StatefulWidget {
+  const MoreOptions({
+    super.key,
+    required this.summary,
+    required this.initiallyOpen,
+    required this.children,
+  });
+
+  final String summary;
+  final bool initiallyOpen;
+  final List<Widget> children;
+
+  @override
+  State<MoreOptions> createState() => _MoreOptionsState();
+}
+
+class _MoreOptionsState extends State<MoreOptions> {
+  late bool _open = widget.initiallyOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final AppPalette p = context.palette;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Material(
+          color: p.surfaceHigher,
+          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+            onTap: () => setState(() => _open = !_open),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+              child: Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          'More options',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: p.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          widget.summary,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            height: 1.35,
+                            color: p.textTertiary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  AnimatedRotation(
+                    turns: _open ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: Icon(
+                      Icons.expand_more_rounded,
+                      color: p.textTertiary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.topCenter,
+          child: _open
+              ? Padding(
+                  padding: const EdgeInsets.only(top: AppSpacing.xl),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: widget.children,
+                  ),
+                )
+              : const SizedBox(width: double.infinity),
+        ),
+      ],
+    );
+  }
+}
+
 /// A room entry: free text, plus one-tap chips for the rooms saved in Settings.
 ///
 /// The chips only fill the text field in — the room is still stored on the

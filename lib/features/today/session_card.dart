@@ -351,9 +351,16 @@ class _StatusButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final AppPalette p = context.palette;
     final Color color = status.colorIn(p);
+    // Outlined and in secondary ink: these are the most-tapped controls in
+    // the app, and grey-on-grey read as disabled on the light card.
     return Material(
       color: selected ? color.withValues(alpha: 0.12) : p.surfaceHigh,
-      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+        side: BorderSide(
+          color: selected ? color.withValues(alpha: 0.45) : p.outline,
+        ),
+      ),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
@@ -371,7 +378,7 @@ class _StatusButton extends StatelessWidget {
                 fontSize: 10.5,
                 height: 1,
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                color: selected ? color : p.textTertiary,
+                color: selected ? color : p.textSecondary,
               ),
             ),
           ),
@@ -397,7 +404,12 @@ class _TagButton extends StatelessWidget {
     final Color accent = p.cyan;
     return Material(
       color: active ? accent.withValues(alpha: 0.14) : p.surfaceHigh,
-      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+        side: BorderSide(
+          color: active ? accent.withValues(alpha: 0.45) : p.outline,
+        ),
+      ),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
@@ -406,7 +418,7 @@ class _TagButton extends StatelessWidget {
           child: Icon(
             Icons.sell_outlined,
             size: 14,
-            color: active ? accent : p.textTertiary,
+            color: active ? accent : p.textSecondary,
           ),
         ),
       ),

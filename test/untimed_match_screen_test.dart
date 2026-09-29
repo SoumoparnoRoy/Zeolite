@@ -162,6 +162,11 @@ void main() {
     await tester.tap(find.text('Course 1'));
     await tester.pumpAndSettle();
 
+    // Said in the folded summary, and on the field once it is opened.
+    expect(find.textContaining('from 27 Jul 2026'), findsOneWidget);
+    await tester.ensureVisible(find.text('More options'));
+    await tester.tap(find.text('More options'));
+    await tester.pumpAndSettle();
     final Finder first = find.text('27 Jul 2026');
     await tester.ensureVisible(first);
     expect(first, findsOneWidget);

@@ -506,14 +506,18 @@ class _SlotFormState extends ConsumerState<_SlotForm> {
         const SizedBox(height: AppSpacing.xl),
         SectionHeader(
           _isEditing ? 'Time and room' : 'Class times',
-          trailing: Text(
-            durationLabel,
-            style: TextStyle(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w600,
-              color: context.palette.textTertiary,
-            ),
-          ),
+          // The default length only matters while a start time is being
+          // picked; beside a saved class it reads as a second, wrong length.
+          trailing: _isEditing
+              ? null
+              : Text(
+                  durationLabel,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: context.palette.textTertiary,
+                  ),
+                ),
         ),
         for (final int weekday in days)
           _DayGroup(
@@ -541,47 +545,65 @@ class _SlotFormState extends ConsumerState<_SlotForm> {
           ),
         ],
         const SizedBox(height: AppSpacing.xl),
-        TypePicker(
-          subjectId: _subjectId,
-          value: _categoryId,
-          onChanged: (int? id) => setState(() {
-            _categoryId = id;
-            if (!_durationTouched) _applyDefaultDurationToAll();
-            if (!_weightTouched) _weight = _defaultWeight;
-          }),
-        ),
-        const SizedBox(height: AppSpacing.xl),
-        WeightPicker(
-          value: _weight,
-          onChanged: (int n) => setState(() {
-            _weight = n;
-            _weightTouched = true;
-          }),
-        ),
-        const SizedBox(height: AppSpacing.xl),
-        const SectionHeader('Runs from'),
-        Row(
+        MoreOptions(
+          summary: <String>[
+            classTypeName(ref, _subjectId, _categoryId),
+            'counts as ${classWeightLabel(_weight).toLowerCase()}',
+            // The first class can move on its own (a subject with untimed
+            // marks starts at the term), so the summary says where it went.
+            'from ${Dates.formatFull(_startDate)}',
+            _endDate == null
+                ? 'to term end'
+                : 'to ${Dates.formatFull(_endDate!)}',
+          ].join(' · '),
+          initiallyOpen: _categoryId != null ||
+              _weight != _defaultWeight ||
+              _endDate != null,
           children: <Widget>[
-            Expanded(
-              child: FieldButton(
-                label: 'First class',
-                value: Dates.formatFull(_startDate),
-                icon: Icons.play_arrow_rounded,
-                onTap: () => _pickDate(isStart: true),
-              ),
+            TypePicker(
+              subjectId: _subjectId,
+              value: _categoryId,
+              onChanged: (int? id) => setState(() {
+                _categoryId = id;
+                if (!_durationTouched) _applyDefaultDurationToAll();
+                if (!_weightTouched) _weight = _defaultWeight;
+              }),
             ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: FieldButton(
-                label: 'Until',
-                value:
-                    _endDate == null ? 'Term end' : Dates.formatFull(_endDate!),
-                icon: Icons.stop_rounded,
-                onTap: () => _pickDate(isStart: false),
-                onClear: _endDate == null
-                    ? null
-                    : () => setState(() => _endDate = null),
-              ),
+            const SizedBox(height: AppSpacing.xl),
+            WeightPicker(
+              value: _weight,
+              onChanged: (int n) => setState(() {
+                _weight = n;
+                _weightTouched = true;
+              }),
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            const SectionHeader('Runs from'),
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: FieldButton(
+                    label: 'First class',
+                    value: Dates.formatFull(_startDate),
+                    icon: Icons.play_arrow_rounded,
+                    onTap: () => _pickDate(isStart: true),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: FieldButton(
+                    label: 'Until',
+                    value: _endDate == null
+                        ? 'Term end'
+                        : Dates.formatFull(_endDate!),
+                    icon: Icons.stop_rounded,
+                    onTap: () => _pickDate(isStart: false),
+                    onClear: _endDate == null
+                        ? null
+                        : () => setState(() => _endDate = null),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

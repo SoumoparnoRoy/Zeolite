@@ -36,7 +36,7 @@ void main() {
       ),
     );
     expect(find.text('50%'), findsOneWidget);
-    expect(find.text('Now 50%'), findsOneWidget);
+    expect(find.text('Where you are now'), findsOneWidget);
     expect(
       find.text('Attending the next 4 brings you back to target'),
       findsOneWidget,

@@ -9,9 +9,10 @@ bool? _decide(
   int depth = 0,
   Axis axis = Axis.vertical,
   double maxExtent = 900,
+  bool atTop = false,
 }) =>
     RootShell.navVisibleFor(direction,
-        depth: depth, axis: axis, maxExtent: maxExtent);
+        depth: depth, axis: axis, maxExtent: maxExtent, atTop: atTop);
 
 void main() {
   group('the tab bar on scroll', () {
@@ -20,8 +21,10 @@ void main() {
       expect(_decide(ScrollDirection.forward), isTrue);
     });
 
-    test('a list settling leaves it as it was', () {
+    test('a list settling leaves it as it was, unless it is back at the top',
+        () {
       expect(_decide(ScrollDirection.idle), isNull);
+      expect(_decide(ScrollDirection.idle, atTop: true), isTrue);
     });
 
     // The week strip on Today.

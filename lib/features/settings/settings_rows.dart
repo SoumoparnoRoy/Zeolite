@@ -133,6 +133,138 @@ class SettingsSwitchRow extends StatelessWidget {
   }
 }
 
+/// One choice of several, with the reason to pick it under its name.
+class SettingsRadioRow extends StatelessWidget {
+  const SettingsRadioRow({
+    super.key,
+    required this.leading,
+    required this.title,
+    this.subtitle,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final Widget leading;
+  final String title;
+  final String? subtitle;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final AppPalette p = context.palette;
+    return Semantics(
+      selected: selected,
+      inMutuallyExclusiveGroup: true,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 13, 16, 13),
+          child: Row(
+            children: <Widget>[
+              leading,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        height: 1.15,
+                        fontWeight: FontWeight.w700,
+                        color: p.textPrimary,
+                      ),
+                    ),
+                    if (subtitle != null) ...<Widget>[
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle!,
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          height: 1.35,
+                          color: p.textTertiary,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: selected ? p.accent : Colors.transparent,
+                  border: Border.all(
+                    color: selected ? p.accent : p.textFaint,
+                    width: 2,
+                  ),
+                ),
+                child: Center(
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    width: selected ? 8 : 0,
+                    height: selected ? 8 : 0,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The icon tile [AppRow] draws, for rows that are not an [AppRow].
+class SettingsIconTile extends StatelessWidget {
+  const SettingsIconTile(this.icon, {super.key});
+
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final AppPalette p = context.palette;
+    return Container(
+      width: 32,
+      height: 32,
+      decoration: BoxDecoration(
+        color: p.accent.withValues(alpha: p.isDark ? 0.18 : 0.12),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Icon(icon, size: 16, color: AppColors.inkOn(p.accent, p)),
+    );
+  }
+}
+
+/// A card with the note that explains it directly underneath, close enough
+/// that it reads as the card's and not the next one's.
+class SettingsNoted extends StatelessWidget {
+  const SettingsNoted({super.key, required this.child, this.note});
+
+  final Widget child;
+  final String? note;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        child,
+        if (note != null) GroupNote(note!),
+      ],
+    );
+  }
+}
+
 class SettingsHint extends StatelessWidget {
   const SettingsHint(this.text, {super.key});
 
@@ -146,6 +278,53 @@ class SettingsHint extends StatelessWidget {
         fontSize: 10.5,
         height: 1.4,
         color: context.palette.textTertiary,
+      ),
+    );
+  }
+}
+
+class SettingsSearchField extends StatelessWidget {
+  const SettingsSearchField({
+    super.key,
+    required this.controller,
+    required this.hint,
+  });
+
+  final TextEditingController controller;
+  final String hint;
+
+  @override
+  Widget build(BuildContext context) {
+    final AppPalette p = context.palette;
+    final OutlineInputBorder border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+      borderSide: BorderSide(color: p.outline),
+    );
+    return TextField(
+      controller: controller,
+      textInputAction: TextInputAction.search,
+      decoration: InputDecoration(
+        hintText: hint,
+        prefixIcon: const Icon(Icons.search_rounded, size: 20),
+        suffixIcon: ValueListenableBuilder<TextEditingValue>(
+          valueListenable: controller,
+          builder: (BuildContext context, TextEditingValue value, _) =>
+              value.text.isEmpty
+                  ? const SizedBox.shrink()
+                  : IconButton(
+                      tooltip: 'Clear',
+                      onPressed: controller.clear,
+                      icon: const Icon(Icons.cancel_rounded, size: 18),
+                    ),
+        ),
+        filled: true,
+        fillColor: p.surfaceHigher,
+        isDense: true,
+        border: border,
+        enabledBorder: border,
+        focusedBorder: border.copyWith(
+          borderSide: BorderSide(color: p.accent, width: 1.5),
+        ),
       ),
     );
   }

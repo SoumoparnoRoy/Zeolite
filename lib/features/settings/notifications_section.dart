@@ -44,7 +44,6 @@ class NotificationsSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        const SectionHeader('Notifications'),
         SurfaceCard(
           padding: EdgeInsets.zero,
           child: Column(

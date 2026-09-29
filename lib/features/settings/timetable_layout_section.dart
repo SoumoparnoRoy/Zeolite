@@ -33,7 +33,6 @@ class DayGridSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        const SectionHeader('The teaching day'),
         SurfaceCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -542,9 +541,8 @@ class TagsSection extends ConsumerWidget {
         if (tags.isEmpty)
           SurfaceCard(
             child: Text(
-              'A tag records how a class went, next to Present or Absent — '
-              '"Proxy", "Online", "Makeup". Marking works exactly as it does '
-              'now; a tag is optional and added afterwards.',
+              'A tag notes how a class went, like "Proxy" or "Online". It is '
+              'optional, and added after you mark the class.',
               style: TextStyle(
                 fontSize: 12,
                 height: 1.4,

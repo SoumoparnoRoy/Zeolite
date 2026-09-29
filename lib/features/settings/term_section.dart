@@ -26,45 +26,44 @@ class TermSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        const SectionHeader('Term'),
-        SurfaceCard(
-          padding: EdgeInsets.zero,
-          child: Column(
-            children: <Widget>[
-              SettingsRow(
-                icon: Icons.play_circle_outline_rounded,
-                title: 'Starts',
-                value: settings.semesterStart == null
-                    ? 'Not set'
-                    : Dates.formatFull(settings.semesterStart!),
-                onTap: () => _pickSemesterDate(
-                  context,
-                  controller,
-                  settings,
-                  isStart: true,
+        const SectionHeader('Dates'),
+        SettingsNoted(
+          note: 'Weekly classes run between these dates, and "classes left" '
+              'counts up to the end.',
+          child: SurfaceCard(
+            padding: EdgeInsets.zero,
+            child: Column(
+              children: <Widget>[
+                SettingsRow(
+                  icon: Icons.play_circle_outline_rounded,
+                  title: 'Starts',
+                  value: settings.semesterStart == null
+                      ? 'Not set'
+                      : Dates.formatFull(settings.semesterStart!),
+                  onTap: () => _pickSemesterDate(
+                    context,
+                    controller,
+                    settings,
+                    isStart: true,
+                  ),
                 ),
-              ),
-              const Divider(indent: 58),
-              SettingsRow(
-                icon: Icons.stop_circle_outlined,
-                title: 'Ends',
-                value: settings.semesterEnd == null
-                    ? 'Not set'
-                    : Dates.formatFull(settings.semesterEnd!),
-                onTap: () => _pickSemesterDate(
-                  context,
-                  controller,
-                  settings,
-                  isStart: false,
+                const Divider(indent: 58),
+                SettingsRow(
+                  icon: Icons.stop_circle_outlined,
+                  title: 'Ends',
+                  value: settings.semesterEnd == null
+                      ? 'Not set'
+                      : Dates.formatFull(settings.semesterEnd!),
+                  onTap: () => _pickSemesterDate(
+                    context,
+                    controller,
+                    settings,
+                    isStart: false,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        const SettingsHint(
-          'Recurring classes only appear between these dates, and the '
-          '"classes left" figures are counted up to the end date.',
         ),
       ],
     );
@@ -119,27 +118,23 @@ class CountingSection extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         const SectionHeader('Counting'),
-        SurfaceCard(
-          padding: EdgeInsets.zero,
-          child: SettingsRow(
-            icon: Icons.event_busy_outlined,
-            title: 'Cancelled classes count as attended',
-            value: 'Some institutions count them, most do not',
-            trailing: Switch(
-              value: settings.cancelledCountsAsAttended,
-              onChanged: (bool on) => controller.save(
-                settings.copyWith(cancelledCountsAsAttended: on),
+        SettingsNoted(
+          note: 'On, a cancelled class counts as held and attended. Rows '
+              'already in Notion change only when you rewrite them.',
+          child: SurfaceCard(
+            padding: EdgeInsets.zero,
+            child: SettingsRow(
+              icon: Icons.event_busy_outlined,
+              title: 'Cancelled classes count as attended',
+              value: 'Some institutions count them, most do not',
+              trailing: Switch(
+                value: settings.cancelledCountsAsAttended,
+                onChanged: (bool on) => controller.save(
+                  settings.copyWith(cancelledCountsAsAttended: on),
+                ),
               ),
             ),
           ),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        const SettingsHint(
-          'Off, a cancelled class leaves your percentage alone. On, it '
-          'counts as one held and one attended, which pulls the '
-          'percentage up. Your figures change straight away; rows '
-          'already in Notion keep their old numbers until you rewrite '
-          'them.',
         ),
       ],
     );

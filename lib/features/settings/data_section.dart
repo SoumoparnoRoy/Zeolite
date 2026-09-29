@@ -38,7 +38,6 @@ class DataSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        const SectionHeader('Your data'),
         SurfaceCard(
           padding: EdgeInsets.zero,
           child: Column(
@@ -99,15 +98,18 @@ class DataSection extends ConsumerWidget {
                   ),
                 ),
               ],
-              const Divider(indent: 58),
-              SettingsRow(
-                icon: Icons.delete_forever_outlined,
-                title: 'Reset everything',
-                value: 'Delete all subjects and history',
-                danger: true,
-                onTap: () => _reset(context, ref),
-              ),
             ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xl),
+        SurfaceCard(
+          padding: EdgeInsets.zero,
+          child: SettingsRow(
+            icon: Icons.delete_forever_outlined,
+            title: 'Reset everything',
+            value: 'Delete all subjects and history',
+            danger: true,
+            onTap: () => _reset(context, ref),
           ),
         ),
       ],

@@ -13,72 +13,18 @@ import '../../domain/sync/sync_target.dart';
 import '../../services/notion/notion_connection_store.dart';
 import '../../services/notion/notion_database_reader.dart';
 import '../../services/sync/sync_coordinator.dart';
-import '../../state/auth_providers.dart';
 import '../../state/notion_providers.dart';
 import '../../state/notion_sync_providers.dart';
 import '../../state/providers.dart';
 import '../../widgets/common.dart';
 import '../subjects/notion_import_screen.dart';
 
-import 'account_screen.dart';
 import 'notion_connect_screen.dart';
 import 'notion_mapping_screen.dart';
 import 'notion_review_screen.dart';
 import 'notion_template_migration.dart';
 import 'settings_rows.dart';
 import 'sync_status_line.dart';
-
-class AccountSection extends ConsumerWidget {
-  const AccountSection({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final AppSettings settings =
-        ref.watch(settingsProvider).value ?? const AppSettings();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        const SectionHeader('Account'),
-        SurfaceCard(
-          padding: EdgeInsets.zero,
-          child: Column(
-            children: <Widget>[
-              SettingsRow(
-                icon: Icons.cloud_outlined,
-                title: 'Backup and sync',
-                value: ref.watch(signedInUserProvider).value?.email ??
-                    'Not signed in — nothing is backed up',
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    settings: const RouteSettings(name: 'account'),
-                    builder: (BuildContext context) => const AccountScreen(),
-                  ),
-                ),
-              ),
-              // Signing in is consent to have an account, not consent to
-              // upload; nothing leaves the device until this is on.
-              if (ref.watch(signedInUserProvider).value != null) ...[
-                const Divider(indent: 58),
-                SettingsRow(
-                  icon: Icons.schedule_rounded,
-                  title: 'Sync automatically',
-                  value: 'About 15 seconds after you mark a class',
-                  trailing: Switch(
-                    value: settings.accountAutoSync,
-                    onChanged: (bool on) => ref
-                        .read(settingsProvider.notifier)
-                        .save(settings.copyWith(accountAutoSync: on)),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
 
 class NotionSection extends ConsumerWidget {
   const NotionSection({super.key});
@@ -87,51 +33,85 @@ class NotionSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final AppSettings settings =
         ref.watch(settingsProvider).value ?? const AppSettings();
+    final NotionMapping? mapping = ref.watch(notionMappingProvider).value;
+    final List<RetiredNotionDatabase> retired =
+        ref.watch(retiredNotionDatabasesProvider).value ??
+            const <RetiredNotionDatabase>[];
+    final bool syncing = ref.watch(notionSyncTargetProvider) != null;
+    final bool running =
+        ref.watch(notionSyncStatusProvider).state == SyncState.running;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        const SectionHeader('Notion'),
-        SurfaceCard(
-          padding: EdgeInsets.zero,
-          child: Column(
-            children: <Widget>[
+        GroupedRows(
+          children: <Widget>[
+            SettingsRow(
+              icon: Icons.sync_alt_rounded,
+              title: 'Notion sync',
+              value: ref.watch(notionConnectionProvider).value?.workspaceName ??
+                  'Not connected',
+              onTap: () {
+                // The connect screen wakes the host too, but not until it is
+                // built, so the push transition is spent idle.
+                unawaited(ref.read(notionAuthClientProvider).health());
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    settings: const RouteSettings(name: 'notion_connect'),
+                    builder: (BuildContext context) =>
+                        const NotionConnectScreen(),
+                  ),
+                );
+              },
+            ),
+            // A mapping the app chose itself has to be visible.
+            if (ref.watch(notionConnectionProvider).value != null)
               SettingsRow(
-                icon: Icons.sync_alt_rounded,
-                title: 'Notion sync',
-                value:
-                    ref.watch(notionConnectionProvider).value?.workspaceName ??
-                        'Not connected',
-                onTap: () {
-                  // The connect screen wakes the host too, but not until
-                  // it is built, so the push transition is spent idle.
-                  unawaited(ref.read(notionAuthClientProvider).health());
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      settings: const RouteSettings(name: 'notion_connect'),
-                      builder: (BuildContext context) =>
-                          const NotionConnectScreen(),
-                    ),
-                  );
-                },
-              ),
-              // A mapping the app chose itself has to be visible.
-              if (ref.watch(notionConnectionProvider).value != null)
-                SettingsRow(
-                  icon: Icons.table_chart_outlined,
-                  title: 'Table',
-                  value: ref.watch(notionMappingProvider).value?.title ??
-                      'Not set up',
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      settings: const RouteSettings(name: 'notion_mapping'),
-                      builder: (BuildContext context) =>
-                          const NotionMappingScreen(),
-                    ),
+                icon: Icons.table_chart_outlined,
+                title: 'Table',
+                value: mapping?.title ?? 'Not set up',
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    settings: const RouteSettings(name: 'notion_mapping'),
+                    builder: (BuildContext context) =>
+                        const NotionMappingScreen(),
                   ),
                 ),
+              ),
+            // Sync's own pull drops these rows, so this is the way in.
+            if (mapping != null)
+              SettingsRow(
+                icon: Icons.download_for_offline_outlined,
+                title: 'Import from your table',
+                value: 'Bring in classes already recorded in Notion',
+                onTap: () => _importFromNotion(context, ref),
+              ),
+            if (syncing)
+              SettingsRow(
+                icon: Icons.schedule_rounded,
+                title: 'Sync automatically',
+                value: 'About 15 seconds after you mark a class',
+                trailing: Switch(
+                  value: settings.notionAutoSync,
+                  onChanged: (bool on) => ref
+                      .read(settingsProvider.notifier)
+                      .save(settings.copyWith(notionAutoSync: on)),
+                ),
+              ),
+          ],
+        ),
+        // A failing sync has to be visible, or the app reads as working.
+        if (syncing) ...<Widget>[
+          const SizedBox(height: AppSpacing.sm),
+          const _NotionSyncCard(),
+        ],
+        if (mapping != null || retired.isNotEmpty) ...<Widget>[
+          const SizedBox(height: AppSpacing.xl),
+          const SectionHeader('Advanced'),
+          GroupedRows(
+            children: <Widget>[
               // A new schema only arrives by taking the template again.
-              if (ref.watch(notionMappingProvider).value != null)
+              if (mapping != null)
                 SettingsRow(
                   icon: Icons.auto_awesome_motion_outlined,
                   title: 'Take the latest template',
@@ -140,9 +120,7 @@ class NotionSection extends ConsumerWidget {
                 ),
               // Several wait whenever a template was retaken without
               // answering the prompt.
-              if (ref.watch(retiredNotionDatabasesProvider).value
-                  case final List<RetiredNotionDatabase> retired
-                  when retired.isNotEmpty)
+              if (retired.isNotEmpty)
                 SettingsRow(
                   icon: Icons.delete_outline_rounded,
                   title: 'Move an old table to trash',
@@ -152,33 +130,21 @@ class NotionSection extends ConsumerWidget {
                   onTap: () => NotionTemplateMigration(ref)
                       .trashRetired(context, retired),
                 ),
-              // Sync's own pull drops these rows, so this is the way in.
-              if (ref.watch(notionMappingProvider).value != null)
+              // For when what the app writes has changed rather than what
+              // the marks say — see `resyncEverything`.
+              if (syncing)
                 SettingsRow(
-                  icon: Icons.download_for_offline_outlined,
-                  title: 'Import from your table',
-                  value: 'Bring in classes already recorded in Notion',
-                  onTap: () => _importFromNotion(context, ref),
-                ),
-              if (ref.watch(notionSyncTargetProvider) != null)
-                SettingsRow(
-                  icon: Icons.schedule_rounded,
-                  title: 'Sync automatically',
-                  value: 'About 15 seconds after you mark a class',
-                  trailing: Switch(
-                    value: settings.notionAutoSync,
-                    onChanged: (bool on) => ref
-                        .read(settingsProvider.notifier)
-                        .save(settings.copyWith(notionAutoSync: on)),
-                  ),
+                  icon: Icons.restart_alt_rounded,
+                  title: 'Rewrite every row',
+                  value: 'Send every class to Notion again',
+                  onTap: running
+                      ? null
+                      : () => ref
+                          .read(notionSyncStatusProvider.notifier)
+                          .resyncEverything(),
                 ),
             ],
           ),
-        ),
-        // A failing sync has to be visible, or the app reads as working.
-        if (ref.watch(notionSyncTargetProvider) != null) ...<Widget>[
-          const SizedBox(height: AppSpacing.sm),
-          const _NotionSyncCard(),
         ],
       ],
     );
@@ -342,17 +308,6 @@ class _NotionSyncCard extends ConsumerWidget {
                     .read(notionSyncStatusProvider.notifier)
                     .run(force: true),
             child: Text(status.failures > 0 ? 'Try again' : 'Sync now'),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          // For when what the app writes has changed rather than what the
-          // marks say — see `resyncEverything`.
-          TextButton(
-            onPressed: running
-                ? null
-                : () => ref
-                    .read(notionSyncStatusProvider.notifier)
-                    .resyncEverything(),
-            child: const Text('Rewrite every row'),
           ),
         ],
       ),

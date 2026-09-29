@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -9,10 +7,33 @@ import '../../services/launcher_icon_service.dart';
 import '../../state/providers.dart';
 import '../../widgets/common.dart';
 
+import 'launcher_icon_screen.dart';
 import 'settings_rows.dart';
 
 class AppearanceSection extends ConsumerWidget {
   const AppearanceSection({super.key});
+
+  static const Map<AppThemeMode, (IconData, String)> _themes =
+      <AppThemeMode, (IconData, String)>{
+    AppThemeMode.system: (
+      Icons.brightness_auto_rounded,
+      'Follows your device, switching when it does',
+    ),
+    AppThemeMode.light: (Icons.light_mode_rounded, 'Always light'),
+    AppThemeMode.dark: (Icons.dark_mode_rounded, 'Always dark'),
+  };
+
+  static const Map<LaunchAnimation, (IconData, String)> _launches =
+      <LaunchAnimation, (IconData, String)>{
+    LaunchAnimation.full: (
+      Icons.auto_awesome_rounded,
+      'The whole crystal animation',
+    ),
+    LaunchAnimation.short: (
+      Icons.bolt_rounded,
+      'The wordmark only, about a second',
+    ),
+  };
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -23,66 +44,57 @@ class AppearanceSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        const SectionHeader('Appearance'),
-        SurfaceCard(
-          child: _SegmentedRow(
-            count: AppThemeMode.values.length,
-            itemBuilder: (BuildContext context, int i) => _ThemeOption(
-              mode: AppThemeMode.values[i],
-              selected: settings.themeMode == AppThemeMode.values[i],
-              onTap: () => controller.save(
-                settings.copyWith(themeMode: AppThemeMode.values[i]),
+        const SectionHeader('Theme'),
+        GroupedRows(
+          children: <Widget>[
+            for (final AppThemeMode mode in AppThemeMode.values)
+              SettingsRadioRow(
+                leading: SettingsIconTile(_themes[mode]!.$1),
+                title: mode.label,
+                subtitle: _themes[mode]!.$2,
+                selected: settings.themeMode == mode,
+                onTap: () => controller.save(settings.copyWith(themeMode: mode)),
               ),
-            ),
-          ),
+          ],
         ),
-        const SizedBox(height: AppSpacing.sm),
-        SettingsHint(
-          settings.themeMode == AppThemeMode.system
-              ? 'Follows your device setting, switching automatically when '
-                  'it does.'
-              : 'Always ${settings.themeMode.label.toLowerCase()}, whatever '
-                  'your device is set to.',
-        ),
-        const SizedBox(height: AppSpacing.md),
-        SurfaceCard(
-          child: _SegmentedRow(
-            count: AccentColour.values.length,
-            phoneColumns: 4,
-            itemBuilder: (BuildContext context, int i) => _AccentOption(
-              accent: AccentColour.values[i],
-              selected: settings.accentColour == AccentColour.values[i],
-              onTap: () => controller.save(
-                settings.copyWith(accentColour: AccentColour.values[i]),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        SettingsHint('${settings.accentColour.label} tints the headers, the '
-            'buttons and every highlight. It stays on this device.'),
-        const SizedBox(height: AppSpacing.md),
-        SurfaceCard(
-          child: _SegmentedRow(
-            count: LaunchAnimation.values.length,
-            itemBuilder: (BuildContext context, int i) => _LaunchOption(
-              animation: LaunchAnimation.values[i],
-              selected: settings.launchAnimation == LaunchAnimation.values[i],
-              onTap: () => controller.save(
-                settings.copyWith(
-                  launchAnimation: LaunchAnimation.values[i],
+        const SizedBox(height: AppSpacing.xl),
+        const SectionHeader('Accent colour'),
+        SettingsNoted(
+          note: '${settings.accentColour.label} tints the headers, the '
+              'buttons and every highlight. It stays on this device.',
+          child: SurfaceCard(
+            child: _SegmentedRow(
+              count: AccentColour.values.length,
+              phoneColumns: 4,
+              itemBuilder: (BuildContext context, int i) => _AccentOption(
+                accent: AccentColour.values[i],
+                selected: settings.accentColour == AccentColour.values[i],
+                onTap: () => controller.save(
+                  settings.copyWith(accentColour: AccentColour.values[i]),
                 ),
               ),
             ),
           ),
         ),
-        const SizedBox(height: AppSpacing.sm),
-        // Not a switch reading "Skip launch animation": it skips
-        // nothing, and a control that lies about what it does is worse
-        // than a longer label.
-        const SettingsHint('The launch animation. Short plays the wordmark '
-            'only, about a second.'),
-        const SizedBox(height: AppSpacing.sm),
+        const SizedBox(height: AppSpacing.xl),
+        // Not a switch reading "Skip launch animation": it skips nothing, and
+        // a control that lies about what it does is worse than a longer label.
+        const SectionHeader('Launch animation'),
+        GroupedRows(
+          children: <Widget>[
+            for (final LaunchAnimation animation in LaunchAnimation.values)
+              SettingsRadioRow(
+                leading: SettingsIconTile(_launches[animation]!.$1),
+                title: animation.label,
+                subtitle: _launches[animation]!.$2,
+                selected: settings.launchAnimation == animation,
+                onTap: () => controller.save(
+                  settings.copyWith(launchAnimation: animation),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xl),
         SurfaceCard(
           padding: EdgeInsets.zero,
           child: SettingsRow(
@@ -90,63 +102,16 @@ class AppearanceSection extends ConsumerWidget {
             title: 'Launcher icon',
             value: ref.watch(launcherIconProvider).value?.label ??
                 LauncherIcon.standard.label,
-            onTap: () => _pickLauncherIcon(context, ref),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                settings: const RouteSettings(name: 'launcher_icon'),
+                builder: (BuildContext context) => const LauncherIconScreen(),
+              ),
+            ),
           ),
         ),
       ],
     );
-  }
-
-  /// Deliberately its own picker rather than following the accent: swapping
-  /// the alias can take the app down with it, and the accent swatches are
-  /// tapped through freely.
-  Future<void> _pickLauncherIcon(BuildContext context, WidgetRef ref) async {
-    final LauncherIcon inForce =
-        ref.read(launcherIconProvider).value ?? LauncherIcon.standard;
-    final LauncherIcon? chosen = await showDialog<LauncherIcon>(
-      context: context,
-      builder: (BuildContext context) => AlertDialog(
-        backgroundColor: context.palette.surfaceHigh,
-        title: const Text('Launcher icon'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Wrap(
-              spacing: AppSpacing.xs,
-              runSpacing: AppSpacing.sm,
-              children: <Widget>[
-                for (final LauncherIcon icon in LauncherIcon.values)
-                  _LauncherIconOption(
-                    icon: icon,
-                    selected: icon == inForce,
-                    onTap: () => Navigator.of(context).pop(icon),
-                  ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              'Zeolite may close while the icon changes, and your home screen '
-              'can take a moment to catch up. A shortcut you pinned to the old '
-              'icon stops working.',
-              style: TextStyle(
-                fontSize: 12,
-                height: 1.4,
-                color: context.palette.textTertiary,
-              ),
-            ),
-          ],
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
-    );
-    if (chosen == null) return;
-    await ref.read(launcherIconProvider.notifier).select(chosen);
   }
 }
 
@@ -175,68 +140,6 @@ class DisplaySection extends ConsumerWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-/// One of the three theme choices, shown as a tappable tile.
-class _LauncherIconOption extends StatelessWidget {
-  const _LauncherIconOption({
-    required this.icon,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final LauncherIcon icon;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final AppPalette p = context.palette;
-    return Semantics(
-      label: icon.label,
-      selected: selected,
-      button: true,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.xs),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Container(
-                padding: const EdgeInsets.all(3),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                  border: Border.all(
-                    color: selected ? p.accent : Colors.transparent,
-                    width: 2,
-                  ),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                  child: Image.asset(
-                    icon.preview,
-                    width: 52,
-                    height: 52,
-                    filterQuality: FilterQuality.medium,
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                icon.label,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: selected ? p.accent : p.textTertiary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
@@ -442,106 +345,6 @@ class _AccentOption extends StatelessWidget {
             ),
           );
         },
-      ),
-    );
-  }
-}
-
-class _LaunchOption extends StatelessWidget {
-  const _LaunchOption({
-    required this.animation,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final LaunchAnimation animation;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final AppPalette p = context.palette;
-    return _SegmentedCell(
-      selected: selected,
-      onTap: onTap,
-      child: Column(
-        children: <Widget>[
-          TweenAnimationBuilder<Color?>(
-            duration: _toggleDuration,
-            curve: _toggleCurve,
-            tween: ColorTween(end: selected ? p.accent : p.textSecondary),
-            builder: (BuildContext context, Color? tone, Widget? _) => Icon(
-              animation == LaunchAnimation.full
-                  ? Icons.auto_awesome_rounded
-                  : Icons.bolt_rounded,
-              size: 22,
-              color: tone,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          AnimatedDefaultTextStyle(
-            duration: _toggleDuration,
-            curve: _toggleCurve,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-              color: selected ? p.accent : p.textTertiary,
-            ),
-            child: Text(animation.label),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ThemeOption extends StatelessWidget {
-  const _ThemeOption({
-    required this.mode,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final AppThemeMode mode;
-  final bool selected;
-  final VoidCallback onTap;
-
-  IconData get _icon => switch (mode) {
-        AppThemeMode.system => Icons.brightness_auto_rounded,
-        AppThemeMode.light => Icons.light_mode_rounded,
-        AppThemeMode.dark => Icons.dark_mode_rounded,
-      };
-
-  @override
-  Widget build(BuildContext context) {
-    final AppPalette p = context.palette;
-    return _SegmentedCell(
-      selected: selected,
-      onTap: onTap,
-      child: Column(
-        children: <Widget>[
-          TweenAnimationBuilder<Color?>(
-            duration: _toggleDuration,
-            curve: _toggleCurve,
-            tween: ColorTween(end: selected ? p.accent : p.textSecondary),
-            builder: (BuildContext context, Color? tone, Widget? _) =>
-                Icon(_icon, size: 22, color: tone),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          AnimatedDefaultTextStyle(
-            duration: _toggleDuration,
-            curve: _toggleCurve,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-              color: selected ? p.accent : p.textTertiary,
-            ),
-            child: Text(
-              // "Match system" is too wide for a third of the row.
-              mode == AppThemeMode.system ? 'System' : mode.label,
-            ),
-          ),
-        ],
       ),
     );
   }

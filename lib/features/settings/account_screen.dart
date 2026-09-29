@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
+import '../../data/settings/app_settings.dart';
 import '../../domain/sync/sync_merge.dart';
 import '../../domain/sync/sync_status.dart';
 import '../../services/auth_service.dart';
@@ -11,6 +12,7 @@ import '../../state/auth_providers.dart';
 import '../../state/providers.dart';
 import '../../state/sync_providers.dart';
 import 'auth_form.dart';
+import 'settings_rows.dart';
 import 'sync_status_line.dart';
 import 'sync_merge_screen.dart';
 import '../../widgets/common.dart';
@@ -30,7 +32,6 @@ class AccountScreen extends ConsumerWidget {
 
     return PushScaffold(
       title: 'Account',
-      subtitle: user.value?.email,
       slivers: <Widget>[
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
@@ -101,41 +102,40 @@ class _SignedIn extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        SurfaceCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text('Signed in', style: Theme.of(context).textTheme.labelMedium),
-              const SizedBox(height: 4),
-              Text(
-                user.email ?? 'this device',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        OutlinedButton(
-          onPressed: () => ref.read(authServiceProvider).signOut(),
-          child: const Text('Sign out'),
+        const SectionHeader('Signed in as'),
+        GroupedRows(
+          children: <Widget>[
+            SettingsRow(
+              icon: Icons.person_outline_rounded,
+              title: user.email ?? 'This device',
+              value: 'Backups go to this account',
+            ),
+            SettingsRow(
+              icon: Icons.logout_rounded,
+              title: 'Sign out',
+              value: 'Attendance on this device stays here',
+              onTap: () => ref.read(authServiceProvider).signOut(),
+            ),
+          ],
         ),
         const SizedBox(height: AppSpacing.xl),
         const SectionHeader('Sync'),
         const _SyncSection(),
         const SizedBox(height: AppSpacing.xl),
         const SectionHeader('Deleting your account'),
-        const _Hint(
-          'Deletion removes the account and everything backed up to it. '
-          'You can also do this from the web without reinstalling — the '
-          'address is in the Privacy Policy.',
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        TextButton(
-          onPressed: () => _delete(context, ref),
-          style: TextButton.styleFrom(
-            foregroundColor: Theme.of(context).colorScheme.error,
+        SettingsNoted(
+          note: 'You can also do this from the web without reinstalling — '
+              'the address is in the Privacy Policy.',
+          child: SurfaceCard(
+            padding: EdgeInsets.zero,
+            child: SettingsRow(
+              icon: Icons.delete_forever_outlined,
+              title: 'Delete my account',
+              value: 'Removes the account and everything backed up to it',
+              danger: true,
+              onTap: () => _delete(context, ref),
+            ),
           ),
-          child: const Text('Delete my account'),
         ),
       ],
     );
@@ -152,53 +152,55 @@ class _SyncSection extends ConsumerWidget {
     final SyncStatus status = ref.watch(syncStatusProvider);
     final SyncRunResult? last = ref.read(syncStatusProvider.notifier).lastResult;
     final bool running = status.state == SyncState.running;
+    final AppSettings settings =
+        ref.watch(settingsProvider).value ?? const AppSettings();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    final bool review = last?.outcome == SyncRunOutcome.reviewNeeded;
+
+    return GroupedRows(
       children: <Widget>[
-        SurfaceCard(
-          child: Row(
-            children: <Widget>[
-              SizedBox.square(
-                dimension: 20,
-                child: running
-                    ? const CircularProgressIndicator(strokeWidth: 2)
-                    : Icon(
-                        _iconFor(status, last),
-                        size: 20,
-                        color: status.state == SyncState.idle
-                            ? context.palette.textTertiary
-                            : Theme.of(context).colorScheme.error,
-                      ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Text(
-                  syncStatusLine(
-                    status,
-                    last,
-                    storedLastSyncAt:
-                        ref.watch(settingsProvider).value?.lastSyncAt,
-                  ),
-                  style: Theme.of(context).textTheme.bodyMedium,
+        SettingsRow(
+          icon: running ? Icons.sync_rounded : _iconFor(status, last),
+          title: running
+              ? 'Syncing…'
+              : syncStatusLine(
+                  status,
+                  last,
+                  storedLastSyncAt:
+                      ref.watch(settingsProvider).value?.lastSyncAt,
                 ),
-              ),
-            ],
+          value: '',
+          danger: !running && status.state != SyncState.idle,
+        ),
+        // Signing in is consent to have an account, not consent to upload;
+        // nothing leaves the device until this is on.
+        SettingsRow(
+          icon: Icons.schedule_rounded,
+          title: 'Sync automatically',
+          value: 'About 15 seconds after you mark a class',
+          trailing: Switch(
+            value: settings.accountAutoSync,
+            onChanged: (bool on) => ref
+                .read(settingsProvider.notifier)
+                .save(settings.copyWith(accountAutoSync: on)),
           ),
         ),
-        const SizedBox(height: AppSpacing.sm),
-        if (last?.outcome == SyncRunOutcome.reviewNeeded)
-          FilledButton(
-            onPressed: running ? null : () => _review(context, ref),
-            child: const Text('Review and merge'),
+        if (review)
+          SettingsRow(
+            icon: Icons.merge_rounded,
+            title: 'Review and merge',
+            value: 'This account already holds data — choose what to keep',
+            onTap: running ? null : () => _review(context, ref),
           )
         else
-          OutlinedButton(
-            onPressed: running
+          SettingsRow(
+            icon: Icons.cloud_sync_outlined,
+            title: status.failures > 0 ? 'Try again' : 'Sync now',
+            value: 'Back up and bring in changes straight away',
+            onTap: running
                 ? null
                 // Forced: a Retry that honours the backoff is not a Retry.
                 : () => ref.read(syncStatusProvider.notifier).run(force: true),
-            child: Text(status.failures > 0 ? 'Try again' : 'Sync now'),
           ),
       ],
     );

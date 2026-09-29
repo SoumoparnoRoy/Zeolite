@@ -4,22 +4,33 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/app_theme.dart';
 import '../../data/settings/app_settings.dart';
 import '../../state/providers.dart';
+import '../../widgets/common.dart';
 import '../../widgets/gradient_header.dart';
 
-import 'appearance_section.dart';
-import 'data_section.dart';
-import 'notifications_section.dart';
-import 'subjects_section.dart';
-import 'sync_section.dart';
-import 'term_section.dart';
-import 'timetable_layout_section.dart';
+import 'settings_pages.dart';
+import 'settings_rows.dart';
+import 'settings_search.dart';
 
-/// Semester setup, attendance target, notifications, holidays and backup.
-class SettingsScreen extends ConsumerWidget {
+/// The menu: the attendance target, then a row per page, grouped the way a
+/// student would guess where something lives.
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  final TextEditingController _search = TextEditingController();
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final AppSettings settings =
         ref.watch(settingsProvider).value ?? const AppSettings();
     final SettingsController controller = ref.read(settingsProvider.notifier);
@@ -35,33 +46,21 @@ class SettingsScreen extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 96),
           sliver: SliverList.list(
             children: <Widget>[
-              const TermSection(),
+              SettingsSearchField(controller: _search, hint: 'Search settings'),
               const SizedBox(height: AppSpacing.xl),
-              const CountingSection(),
-              const SizedBox(height: AppSpacing.xl),
-              const SubjectsSection(),
-              const SizedBox(height: AppSpacing.xl),
-              const DayGridSection(),
-              const SizedBox(height: AppSpacing.xl),
-              const RoomsSection(),
-              const SizedBox(height: AppSpacing.xl),
-              const TagsSection(),
-              const SizedBox(height: AppSpacing.xl),
-              const CategoriesSection(),
-              const SizedBox(height: AppSpacing.xl),
-              const AppearanceSection(),
-              const SizedBox(height: AppSpacing.xl),
-              const NotificationsSection(),
-              const SizedBox(height: AppSpacing.xl),
-              const HolidaysSection(),
-              const SizedBox(height: AppSpacing.xl),
-              const DisplaySection(),
-              const SizedBox(height: AppSpacing.xl),
-              const AccountSection(),
-              const SizedBox(height: AppSpacing.xl),
-              const NotionSection(),
-              const SizedBox(height: AppSpacing.xl),
-              const DataSection(),
+              ValueListenableBuilder<TextEditingValue>(
+                valueListenable: _search,
+                builder: (BuildContext context, TextEditingValue value, _) =>
+                    value.text.trim().isEmpty
+                        ? const _Menu()
+                        : _Results(
+                            query: value.text,
+                            onTarget: () {
+                              _search.clear();
+                              FocusScope.of(context).unfocus();
+                            },
+                          ),
+              ),
               const SizedBox(height: AppSpacing.xl),
               Center(
                 child: Text(
@@ -80,6 +79,66 @@ class SettingsScreen extends ConsumerWidget {
             ],
           ),
         ),
+      ],
+    );
+  }
+}
+
+class _Menu extends StatelessWidget {
+  const _Menu();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        for (final SettingsGroup group in SettingsGroup.values) ...<Widget>[
+          if (group.index > 0) const SizedBox(height: AppSpacing.xl),
+          SectionHeader(group.label),
+          GroupedRows(
+            children: <Widget>[
+              for (final SettingsItem item in SettingsItem.values)
+                if (item.group == group) SettingsItemRow(item),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _Results extends ConsumerWidget {
+  const _Results({required this.query, required this.onTarget});
+
+  final String query;
+  final VoidCallback onTarget;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final List<SettingsTopic> found = searchSettings(query);
+    if (found.isEmpty) {
+      return SurfaceCard(
+        child: SettingsHint('Nothing in Settings matches "${query.trim()}".'),
+      );
+    }
+    return GroupedRows(
+      children: <Widget>[
+        for (final SettingsTopic topic in found)
+          SettingsRow(
+            icon: topic.item?.icon ?? Icons.percent_rounded,
+            title: topic.title,
+            // Where it lives, so the next visit can go straight there.
+            value: switch (topic.item) {
+              null => 'Top of Settings',
+              final SettingsItem item when item.title == topic.title =>
+                item.group.label,
+              final SettingsItem item => item.title,
+            },
+            onTap: () {
+              FocusScope.of(context).unfocus();
+              topic.item == null ? onTarget() : topic.item!.open(context, ref);
+            },
+          ),
       ],
     );
   }

@@ -727,7 +727,10 @@ class _InAppAlertDialog extends StatelessWidget {
         size: 28,
       ),
       title: Text(NotificationService.dangerTitle(alerts.length)),
-      content: Column(
+      // One row per subject, so a phone can run out of height; the list
+      // scrolls and the title and Got it stay put.
+      content: SingleChildScrollView(
+        child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -766,6 +769,7 @@ class _InAppAlertDialog extends StatelessWidget {
             ),
           ),
         ],
+        ),
       ),
       actions: <Widget>[
         TextButton(

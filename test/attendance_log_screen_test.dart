@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -93,7 +95,11 @@ TimetableData _fixture() {
   );
 }
 
-Widget _app(TimetableData data, {_FakeRepository? repo}) {
+Widget _app(
+  TimetableData data, {
+  _FakeRepository? repo,
+  Subject subject = _physics,
+}) {
   final DateTime today = Dates.today();
   return ProviderScope(
     overrides: [
@@ -112,12 +118,23 @@ Widget _app(TimetableData data, {_FakeRepository? repo}) {
     ],
     child: MaterialApp(
       theme: AppTheme.dark(),
-      home: const AttendanceLogScreen(subject: _physics),
+      home: AttendanceLogScreen(subject: subject),
     ),
   );
 }
 
 void main() {
+  setUpAll(() async {
+    // The test font's square glyphs would make the phone-width check below
+    // measure text that is far wider than the real thing.
+    final FontLoader loader = FontLoader(AppFonts.sans);
+    for (final String weight in <String>['Medium', 'SemiBold', 'ExtraBold']) {
+      loader.addFont(rootBundle
+          .load('assets/fonts/PlusJakartaSans-$weight.ttf'));
+    }
+    await loader.load();
+  });
+
   testWidgets('lists every past class and every stray mark',
       (WidgetTester tester) async {
     await tester.pumpWidget(_app(_fixture()));
@@ -126,8 +143,8 @@ void main() {
     final DateTime today = Dates.today();
 
     // 3 generated occurrences + 1 mark with no occurrence behind it.
-    expect(find.text('4 of 4 marked'), findsNothing);
-    expect(find.text('2 of 4 marked'), findsOneWidget);
+    expect(find.textContaining('4 of 4 marked'), findsNothing);
+    expect(find.textContaining('2 of 4 marked'), findsOneWidget);
 
     expect(find.text(Dates.formatFull(today)), findsOneWidget);
     expect(
@@ -137,6 +154,41 @@ void main() {
     // The stray mark's day has no scheduled class, but must still be reachable.
     expect(
         find.text(Dates.formatFull(Dates.addDays(today, -3))), findsOneWidget);
+  });
+
+  testWidgets('the bar carries the percentage for the subject',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(_app(_fixture()));
+    await tester.pumpAndSettle();
+
+    // One present and one absent inside the term.
+    expect(find.text('50%', findRichText: true), findsOneWidget);
+    expect(find.text('2 of 4 marked · 1 of 2 attended'), findsOneWidget);
+  });
+
+  testWidgets('a long name gives way to the percentage on a phone',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2424);
+    tester.view.devicePixelRatio = 2.625;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(_app(
+      _fixture(),
+      subject: const Subject(
+        id: 1,
+        name: 'Subject 1 with a name far too long for one line',
+        colorValue: AppColors.defaultSubjectColor,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('50%', findRichText: true), findsOneWidget);
+    // The name may shorten; the counts under it must not.
+    final RenderParagraph counts = tester.renderObject(
+      find.text('2 of 4 marked · 1 of 2 attended'),
+    );
+    expect(counts.didExceedMaxLines, isFalse);
   });
 
   testWidgets('explains a mark with no class sitting under it',

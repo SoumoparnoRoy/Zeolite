@@ -8,6 +8,7 @@ import '../../data/models/attendance_status.dart';
 import '../../data/models/subject.dart';
 import '../../data/settings/app_settings.dart';
 import '../../domain/attendance_log.dart';
+import '../../domain/attendance_stats.dart';
 import '../../state/providers.dart';
 import '../../widgets/common.dart';
 import '../../widgets/gradient_header.dart';
@@ -40,6 +41,12 @@ class AttendanceLogScreen extends ConsumerWidget {
 
     final List<AttendanceLogEntry> entries =
         ref.watch(attendanceLogProvider(subjectId));
+    // Watched, not passed in, so it moves as a mark is corrected below it.
+    final SubjectStats? stats = ref.watch(subjectStatsProvider(subjectId));
+    final List<Widget> figure = <Widget>[_LogFigure(stats: stats)];
+    final String? attended = stats != null && stats.hasData
+        ? '${stats.attended} of ${stats.held} attended'
+        : null;
     final AppSettings settings =
         ref.watch(settingsProvider).value ?? const AppSettings();
     final int marked =
@@ -48,6 +55,8 @@ class AttendanceLogScreen extends ConsumerWidget {
     if (entries.isEmpty) {
       return PushScaffold(
         title: subject.name,
+        subtitle: attended,
+        actions: figure,
         slivers: <Widget>[
           if (subject.priorHeld > 0)
             SliverPadding(
@@ -69,7 +78,11 @@ class AttendanceLogScreen extends ConsumerWidget {
 
     return PushScaffold(
       title: subject.name,
-      subtitle: '$marked of ${entries.length} marked',
+      subtitle: <String>[
+        '$marked of ${entries.length} marked',
+        if (attended != null) attended,
+      ].join(' · '),
+      actions: figure,
       slivers: <Widget>[
         if (subject.priorHeld > 0)
           SliverPadding(
@@ -117,6 +130,32 @@ class AttendanceLogScreen extends ConsumerWidget {
       rows.add(_Row.entry(entry));
     }
     return rows;
+  }
+}
+
+/// The subject's percentage, in the same type as every other figure on a
+/// gradient.
+class _LogFigure extends StatelessWidget {
+  const _LogFigure({required this.stats});
+
+  final SubjectStats? stats;
+
+  @override
+  Widget build(BuildContext context) {
+    final SubjectStats? s = stats;
+    final bool known = s != null && s.hasData;
+    return Padding(
+      padding: const EdgeInsets.only(left: 12),
+      child: Semantics(
+        label: known ? '${s.percent.round()} percent attended' : null,
+        excludeSemantics: known,
+        child: HeaderNumber(
+          known ? '${s.percent.round()}' : '—',
+          size: 30,
+          unit: known ? '%' : '',
+        ),
+      ),
+    );
   }
 }
 

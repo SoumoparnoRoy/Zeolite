@@ -9,6 +9,7 @@ import '../../state/providers.dart';
 import '../../domain/notion/notion_mapping.dart';
 import '../../domain/sync/sync_target.dart';
 import '../../services/notion/notion_client.dart';
+import '../../services/notion/notion_places.dart';
 import '../../state/notion_providers.dart';
 import '../../widgets/common.dart';
 import '../../widgets/gradient_header.dart';
@@ -38,6 +39,10 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
   bool _busy = false;
 
   final List<_Choice> _sources = <_Choice>[];
+
+  /// Filled in after the list shows, since it costs a read or two per table.
+  final Map<String, String?> _places = <String, String?>{};
+  late final NotionPlaces _lookup = NotionPlaces(_client);
   String? _cursor;
   bool _hasMore = false;
   int _retries = 0;
@@ -56,6 +61,10 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
   /// Shown next to the link. [NotionCourses] holds ids, not a name, and a
   /// table identified only by an id is not something anyone can check.
   String? _coursesTitle;
+
+  /// Linking this one would add a column to it, which waits for a tap rather
+  /// than happening by itself.
+  _Choice? _suggestedCourses;
 
   /// Saved from, not rebuilt, so a field this screen does not edit survives.
   NotionMapping? _loaded;
@@ -140,6 +149,7 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
       _hasMore = result.body?['has_more'] == true;
       _cursor = result.body?['next_cursor'] as String?;
     });
+    unawaited(_findPlaces());
 
     // Notion's search index lags a write, so "No tables shared" is a wrong
     // answer, not a slow one. A timer, so `dispose` can cancel it.
@@ -150,6 +160,24 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
         if (mounted) _loadSources();
       });
     }
+  }
+
+  /// One at a time, since the client already spaces its calls to Notion's
+  /// rate limit and the list is readable before any of this lands.
+  Future<void> _findPlaces() async {
+    for (final _Choice choice in List<_Choice>.of(_sources)) {
+      final String id = choice.databaseId;
+      if (id.isEmpty || _places.containsKey(id)) continue;
+      _places[id] = null;
+      final String? page = await _lookup.pageTitleOf(id);
+      if (!mounted) return;
+      if (page != null) setState(() => _places[id] = page);
+    }
+  }
+
+  String? _placeOf(_Choice choice) {
+    final String? page = _places[choice.databaseId];
+    return page == null ? null : 'In $page';
   }
 
   static const int _searchRetries = 3;
@@ -187,6 +215,7 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
       if (moved) {
         _courses = null;
         _coursesTitle = null;
+        _suggestedCourses = null;
         _loaded = null;
       }
     });
@@ -257,6 +286,41 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
         if (keepChoices) ..._kindValues,
       };
       if (widget.onlyUnmapped) _captureGaps();
+    });
+    await _findCourses();
+  }
+
+  /// The Course relation already names the table it points at, so asking
+  /// the student to pick it again is a question with one right answer.
+  Future<void> _findCourses() async {
+    final NotionRelationTarget? target =
+        _fields[NotionField.course]?.relatesTo;
+    if (_courses != null || target == null) return;
+    if (target.databaseId == _databaseId) return;
+
+    final NotionResult result = await _client.dataSource(target.dataSourceId);
+    if (!mounted || !result.ok || result.body == null) return;
+    // The student may have linked one by hand while this was in flight.
+    if (_courses != null) return;
+
+    final _Choice choice = _Choice(
+      target.dataSourceId,
+      notionTitleOf(result.body) ?? 'Untitled',
+      target.databaseId,
+    );
+    final NotionCourses courses = NotionCourses.match(
+      databaseId: choice.databaseId,
+      dataSourceId: choice.id,
+      properties: notionPropertiesOf(result.body!),
+    );
+    setState(() {
+      if (courses.isComplete) {
+        _courses = courses;
+        _coursesTitle = choice.title;
+        _suggestedCourses = null;
+      } else {
+        _suggestedCourses = choice;
+      }
     });
   }
 
@@ -368,8 +432,31 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
           onTap: _busy ? null : _pickCourses,
         ),
       ),
+      if (_courses == null && _suggestedCourses != null)
+        ..._linkSuggestedOffer(context, _suggestedCourses!),
     ];
   }
+
+  List<Widget> _linkSuggestedOffer(BuildContext context, _Choice choice) =>
+      <Widget>[
+        const SizedBox(height: AppSpacing.sm),
+        OutlinedButton.icon(
+          onPressed: _busy ? null : () => _linkCourses(choice),
+          icon: const Icon(Icons.link_rounded, size: 18),
+          label: Text('Link ${choice.title}'),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          'Your Course column points at ${choice.title}. Linking it adds a '
+          'text column called Zeolite ID there, so each course page can be '
+          'found again.',
+          style: TextStyle(
+            fontSize: 12,
+            height: 1.3,
+            color: context.palette.textTertiary,
+          ),
+        ),
+      ];
 
   Future<void> _pickCourses() async {
     // Reopening an existing mapping lands straight on the fields, so the table
@@ -392,6 +479,10 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
                 ListTile(
                   leading: const Icon(Icons.table_chart_outlined),
                   title: Text(option.title),
+                  subtitle: switch (_placeOf(option)) {
+                    final String place => Text(place),
+                    null => null,
+                  },
                   onTap: () => Navigator.of(context).pop(option),
                 ),
           ],
@@ -446,6 +537,7 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
       _busy = false;
       _courses = courses;
       _coursesTitle = choice.title;
+      _suggestedCourses = null;
     });
   }
 
@@ -470,6 +562,7 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
       if (courses.isComplete) {
         _courses = courses;
         _coursesTitle = choice.title;
+        _suggestedCourses = null;
       } else {
         _error = 'That table needs a title column and a Zeolite ID column '
             'before courses can be kept in it.';
@@ -627,6 +720,7 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
           child: AppRow(
             icon: Icons.table_chart_outlined,
             title: choice.title,
+            value: _placeOf(choice),
             onTap: _busy ? null : () => _chooseSource(choice),
           ),
         ),
@@ -669,19 +763,23 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
           field: field,
           properties: _properties,
           chosen: _fields[field],
-          onChanged: (NotionProperty? property) => setState(() {
-            if (property == null) {
-              _fields.remove(field);
-            } else {
-              _fields[field] = property;
-            }
-            // The words belong to the column, so a different Status column
-            // leaves the old workspace's spellings behind.
-            if (field == NotionField.status) {
-              _statusMeanings = NotionMapping.guessMeanings(property);
-            }
-            if (field == NotionField.kind) _kindValues = <String, String>{};
-          }),
+          onChanged: (NotionProperty? property) {
+            setState(() {
+              if (property == null) {
+                _fields.remove(field);
+              } else {
+                _fields[field] = property;
+              }
+              // The words belong to the column, so a different Status column
+              // leaves the old workspace's spellings behind.
+              if (field == NotionField.status) {
+                _statusMeanings = NotionMapping.guessMeanings(property);
+              }
+              if (field == NotionField.kind) _kindValues = <String, String>{};
+              if (field == NotionField.course) _suggestedCourses = null;
+            });
+            if (field == NotionField.course) _findCourses();
+          },
         ),
         const SizedBox(height: AppSpacing.sm),
         if (field == NotionField.key && _fields[field] == null)

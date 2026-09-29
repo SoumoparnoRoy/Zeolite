@@ -428,4 +428,169 @@ void main() {
       'property': 'object',
     });
   });
+
+  testWidgets('two tables of one name say which page holds each',
+      (WidgetTester tester) async {
+    Map<String, Object?> table(String id, String database) => <String, Object?>{
+          'id': id,
+          'title': <Object?>[
+            <String, Object?>{'plain_text': 'Classes'},
+          ],
+          'parent': <String, Object?>{
+            'type': 'database_id',
+            'database_id': database,
+          },
+        };
+    Map<String, Object?> page(String title) => <String, Object?>{
+          'properties': <String, Object?>{
+            'title': <String, Object?>{
+              'type': 'title',
+              'title': <Object?>[
+                <String, Object?>{'plain_text': title},
+              ],
+            },
+          },
+        };
+    final Map<String, Object?> answers = <String, Object?>{
+      '/v1/search': <String, Object?>{
+        'results': <Object?>[table('ds-1', 'db-1'), table('ds-2', 'db-2')],
+        'has_more': false,
+      },
+      '/v1/databases/db-1': <String, Object?>{
+        'parent': <String, Object?>{'type': 'page_id', 'page_id': 'pg-1'},
+      },
+      // An inline table names the block it sits in, and the block is the page.
+      '/v1/databases/db-2': <String, Object?>{
+        'parent': <String, Object?>{'type': 'block_id', 'block_id': 'pg-2'},
+      },
+      '/v1/blocks/pg-2': <String, Object?>{'type': 'child_page'},
+      '/v1/pages/pg-1': page('Page 1'),
+      '/v1/pages/pg-2': page('Page 2'),
+    };
+    await tester.pumpWidget(_app(MockClient((http.Request request) async {
+      final Object? body = answers[request.url.path];
+      return body == null
+          ? http.Response('{}', 404)
+          : http.Response(jsonEncode(body), 200);
+    })));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Classes'), findsNWidgets(2));
+    expect(find.text('In Page 1'), findsOneWidget);
+    expect(find.text('In Page 2'), findsOneWidget);
+  });
+
+  group('the Courses table the relation points at', () {
+    Map<String, Object?> courses({required bool keyed}) => <String, Object?>{
+          'name': 'Courses',
+          'properties': <String, Object?>{
+            'Name': <String, Object?>{'id': 'c0', 'type': 'title'},
+            if (keyed)
+              'Zeolite ID': <String, Object?>{'id': 'c1', 'type': 'rich_text'},
+          },
+        };
+
+    MockClient notion(List<String> patched, {required bool keyed}) {
+      bool added = false;
+      return MockClient((http.Request request) async {
+        final String path = request.url.path;
+        if (path == '/v1/data_sources/ds-c') {
+          if (request.method == 'PATCH') {
+            patched.add(path);
+            added = true;
+            return http.Response('{}', 200);
+          }
+          return http.Response(
+            jsonEncode(courses(keyed: keyed || added)),
+            200,
+          );
+        }
+        if (path.startsWith('/v1/data_sources/')) {
+          return http.Response(
+            jsonEncode(<String, Object?>{
+              'properties': <String, Object?>{
+                ..._schema(),
+                'Course': <String, Object?>{
+                  'id': 'p1',
+                  'type': 'relation',
+                  'relation': <String, Object?>{
+                    'database_id': 'db-c',
+                    'data_source_id': 'ds-c',
+                  },
+                },
+              },
+            }),
+            200,
+          );
+        }
+        if (path == '/v1/search') {
+          return http.Response(
+            jsonEncode(<String, Object?>{
+              'results': <Object?>[
+                <String, Object?>{
+                  'id': 'ds-1',
+                  'title': <Object?>[
+                    <String, Object?>{'plain_text': 'Zeolite Attendance'},
+                  ],
+                  'parent': <String, Object?>{
+                    'type': 'database_id',
+                    'database_id': 'db-1',
+                  },
+                },
+              ],
+              'has_more': false,
+            }),
+            200,
+          );
+        }
+        return http.Response('{}', 404);
+      });
+    }
+
+    Future<NotionMapping?> save(WidgetTester tester) async {
+      final Finder save = find.widgetWithText(FilledButton, 'Save');
+      await tester.ensureVisible(save);
+      await tester.pumpAndSettle();
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+      return NotionConnectionStore(storage: const FlutterSecureStorage())
+          .readMapping();
+    }
+
+    testWidgets('is linked without being asked when it is ready',
+        (WidgetTester tester) async {
+      final List<String> patched = <String>[];
+      await tester.pumpWidget(_app(notion(patched, keyed: true)));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Zeolite Attendance'));
+      await tester.pumpAndSettle();
+
+      final NotionMapping? saved = await save(tester);
+      expect(saved!.courses!.dataSourceId, 'ds-c');
+      expect(patched, isEmpty);
+    });
+
+    testWidgets('gets a column only when the student taps to link it',
+        (WidgetTester tester) async {
+      final List<String> patched = <String>[];
+      await tester.pumpWidget(_app(notion(patched, keyed: false)));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Zeolite Attendance'));
+      await tester.pumpAndSettle();
+
+      // Offered, and nothing written to their table yet.
+      expect(find.text('Not linked'), findsOneWidget);
+      expect(patched, isEmpty);
+
+      final Finder link = find.text('Link Courses');
+      await tester.ensureVisible(link);
+      await tester.pumpAndSettle();
+      await tester.tap(link);
+      await tester.pumpAndSettle();
+
+      expect(patched, <String>['/v1/data_sources/ds-c']);
+      final NotionMapping? saved = await save(tester);
+      expect(saved!.courses!.dataSourceId, 'ds-c');
+    });
+  });
 }

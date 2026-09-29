@@ -13,6 +13,7 @@ class NotionProperty {
     required this.name,
     required this.type,
     this.options = const <String>[],
+    this.relatesTo,
   });
 
   /// Reads one entry of a data source's `properties` map.
@@ -23,6 +24,7 @@ class NotionProperty {
       name: name,
       type: type,
       options: _optionsOf(type, json),
+      relatesTo: _targetOf(type, json),
     );
   }
 
@@ -33,6 +35,25 @@ class NotionProperty {
   /// The choices a select or status column offers, which are free text in
   /// every workspace and so have to be mapped rather than assumed.
   final List<String> options;
+
+  /// The table a relation points into, read off the live schema and never
+  /// saved: the mapping screen only needs it to find the Courses table.
+  final NotionRelationTarget? relatesTo;
+
+  static NotionRelationTarget? _targetOf(
+    String type,
+    Map<String, Object?> json,
+  ) {
+    if (type != 'relation') return null;
+    final Object? relation = json['relation'];
+    if (relation is! Map<String, Object?>) return null;
+    final Object? dataSourceId = relation['data_source_id'];
+    if (dataSourceId is! String || dataSourceId.isEmpty) return null;
+    return NotionRelationTarget(
+      databaseId: (relation['database_id'] as String?) ?? '',
+      dataSourceId: dataSourceId,
+    );
+  }
 
   static List<String> _optionsOf(String type, Map<String, Object?> json) {
     final Object? holder = json[type];
@@ -63,6 +84,17 @@ class NotionProperty {
             if (o is String) o,
         ],
       );
+}
+
+@immutable
+class NotionRelationTarget {
+  const NotionRelationTarget({
+    required this.databaseId,
+    required this.dataSourceId,
+  });
+
+  final String databaseId;
+  final String dataSourceId;
 }
 
 /// What Zeolite needs a column for.

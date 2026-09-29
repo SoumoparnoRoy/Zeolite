@@ -22,6 +22,9 @@ void showUndoSnack(
     SnackBar(
       content: Text(message),
       duration: const Duration(seconds: 6),
+      // Flutter keeps a snackbar with an action up until it is tapped, and
+      // this one follows the user onto every screen they open next.
+      persist: false,
       action: token == null
           ? null
           : SnackBarAction(

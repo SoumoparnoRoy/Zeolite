@@ -65,8 +65,7 @@ Future<SubjectStats> _statsFor(
 
 void main() {
   group('a mark only counts inside the term', () {
-    final AppSettings term =
-        AppSettings(termStart: _start, termEnd: _end);
+    final AppSettings term = AppSettings(termStart: _start, termEnd: _end);
 
     test('one from before the term started is left out', () async {
       final SubjectStats stats = await _statsFor(
@@ -102,8 +101,7 @@ void main() {
   });
 
   group('the window itself', () {
-    final AppSettings term =
-        AppSettings(termStart: _start, termEnd: _end);
+    final AppSettings term = AppSettings(termStart: _start, termEnd: _end);
 
     test('is inclusive at both ends', () {
       expect(term.countsInTerm(_start), isTrue);

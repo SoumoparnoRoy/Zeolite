@@ -39,19 +39,29 @@ const ClassCategory _weightedLab = ClassCategory(
 
 final DateTime _day = Dates.addDays(Dates.today(), -7);
 
-String _dayCell(DateTime date) =>
-    '${_months[date.month - 1]} ${date.day}';
+String _dayCell(DateTime date) => '${_months[date.month - 1]} ${date.day}';
 
 const List<String> _months = <String>[
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
 ];
 
 /// The lab is stored and already marked; the course it belongs to is not
 /// stored at all. So nothing conflicts until the courses are split apart.
 TimetableData _fixture({bool weighted = true}) => TimetableData(
-      categories:
-          weighted ? const <ClassCategory>[_weightedLab] : const <ClassCategory>[],
+      categories: weighted
+          ? const <ClassCategory>[_weightedLab]
+          : const <ClassCategory>[],
       subjects: const <Subject>[
         Subject(id: 1, name: 'Thermodynamics Lab', colorValue: 0xFF7C6BFF),
       ],
@@ -119,7 +129,8 @@ void main() {
     expect(find.text('Thermodynamics'), findsOneWidget);
   });
 
-  testWidgets('a conflict that only exists once the courses are split '
+  testWidgets(
+      'a conflict that only exists once the courses are split '
       'still starts unticked', (WidgetTester tester) async {
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();

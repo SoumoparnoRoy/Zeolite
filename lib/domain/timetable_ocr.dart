@@ -142,7 +142,8 @@ class TimetableGrid {
   /// The weekday and period a box sits in, or null when it sits outside the
   /// table — a title, a legend, a footer.
   ({GridBand day, GridBand period})? cellFor(OcrBox box) {
-    final double dayAt = axis == GridAxis.daysAsRows ? box.centreY : box.centreX;
+    final double dayAt =
+        axis == GridAxis.daysAsRows ? box.centreY : box.centreX;
     final double periodAt =
         axis == GridAxis.daysAsRows ? box.centreX : box.centreY;
 
@@ -718,7 +719,7 @@ class ElectiveBasket {
 
   bool holds(OcrEntry e) =>
       subjects.contains(e.subject) &&
-      slots.any((( int, int, int) s) =>
+      slots.any(((int, int, int) s) =>
           s.$1 == e.weekday && s.$2 == e.from && s.$3 == e.to);
 }
 
@@ -780,7 +781,15 @@ class OcrEntry {
 
   /// The line the paste format already parses.
   String toLine() {
-    const List<String> days = <String>['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+    const List<String> days = <String>[
+      'Mo',
+      'Tu',
+      'We',
+      'Th',
+      'Fr',
+      'Sa',
+      'Su'
+    ];
     final List<String> fields = <String>[
       subject,
       days[weekday - 1],
@@ -877,9 +886,8 @@ class TimetableOcr {
         <(int, int, int), Set<String>>{};
     for (final OcrEntry e in entries) {
       if (e.group != null) continue;
-      bySlot
-          .putIfAbsent((e.weekday, e.from, e.to), () => <String>{})
-          .add(e.subject);
+      bySlot.putIfAbsent(
+          (e.weekday, e.from, e.to), () => <String>{}).add(e.subject);
     }
 
     final Map<String, List<String>> subjects = <String, List<String>>{};
@@ -948,8 +956,7 @@ class TimetableOcr {
   static bool _isGuessed(int? raw, (int, int)? got) =>
       got == null || raw == null || (got.$1 != raw && got.$1 != raw + 720);
 
-  static int _guessedPeriods(TimetableGrid grid) =>
-      doubtedPeriods(grid).length;
+  static int _guessedPeriods(TimetableGrid grid) => doubtedPeriods(grid).length;
 
   /// How many names must carry a shape before it is the sheet's own, and how
   /// much of a minority may break it.
@@ -979,11 +986,11 @@ class TimetableOcr {
         if (e.room != null) e.room!,
     };
     final bool coded = isConvention(subjects, isCode);
-    final bool blocked =
-        isConvention(rooms, namesBlockFirst);
+    final bool blocked = isConvention(rooms, namesBlockFirst);
 
     return <({OcrEntry entry, bool room, String text})>[
-      for (final OcrEntry e in entries) ...<({OcrEntry entry, bool room, String text})>[
+      for (final OcrEntry e
+          in entries) ...<({OcrEntry entry, bool room, String text})>[
         if (coded && !_code.hasMatch(e.subject))
           (entry: e, room: false, text: e.subject),
         if (blocked && e.room != null && !_blockThenNumber.hasMatch(e.room!))
@@ -1009,8 +1016,8 @@ class TimetableOcr {
       if (shape != null) shapes[shape] = (shapes[shape] ?? 0) + 1;
     }
     if (subjects.length < _shapeFloor || shapes.isEmpty) return entries;
-    final MapEntry<(int, int), int> usual = shapes.entries
-        .reduce((MapEntry<(int, int), int> a, MapEntry<(int, int), int> b) =>
+    final MapEntry<(int, int), int> usual = shapes.entries.reduce(
+        (MapEntry<(int, int), int> a, MapEntry<(int, int), int> b) =>
             b.value > a.value ? b : a);
     if (usual.value * 2 <= subjects.length) return entries;
 
@@ -1248,8 +1255,8 @@ class TimetableOcr {
       if (cell == null || cell.day.weekday == null) continue;
       // A lab across two periods is one cell, so its room and its code file
       // together even though their boxes sit either side of the join.
-      final GridBand at = grid
-          .periods[opens[dayAt[cell.day]!][periodAt[cell.period]!]];
+      final GridBand at =
+          grid.periods[opens[dayAt[cell.day]!][periodAt[cell.period]!]];
       final String key = '${cell.day.weekday}@${at.start}';
       cells.putIfAbsent(key, () => <OcrLine>[]).add(line);
       dayOf[key] = cell.day;
@@ -1289,9 +1296,8 @@ class TimetableOcr {
     for (int d = 0; d < grid.days.length; d++) {
       final List<int> row = <int>[];
       for (int p = 0; p < grid.periods.length; p++) {
-        final bool joined = p > 0 &&
-            grid.spansOn(d, p - 1) &&
-            _crosses(grid, lines, d, p - 1);
+        final bool joined =
+            p > 0 && grid.spansOn(d, p - 1) && _crosses(grid, lines, d, p - 1);
         row.add(joined ? row[p - 1] : p);
       }
       out.add(row);
@@ -1400,7 +1406,8 @@ class TimetableOcr {
     Set<String> categories,
   ) {
     final List<List<OcrLine>> rows = _rowsOf(cell);
-    final List<({String text, OcrBox box})> lines = <({String text, OcrBox box})>[
+    final List<({String text, OcrBox box})> lines =
+        <({String text, OcrBox box})>[
       for (final List<OcrLine> row in rows)
         (
           text: row.map((OcrLine l) => l.text).join(' ').trim(),
@@ -1419,7 +1426,9 @@ class TimetableOcr {
       final List<_Candidate> found = <_Candidate>[];
       for (final ({String text, OcrBox box}) line in lines) {
         if (!_isPacked(line.text)) {
-          if (found.isNotEmpty) _attach(found.last, line.text.split(_splitTokens));
+          if (found.isNotEmpty) {
+            _attach(found.last, line.text.split(_splitTokens));
+          }
           continue;
         }
         final List<String> parts =
@@ -1464,8 +1473,9 @@ class TimetableOcr {
               !_allDetail(l.text.split(_splitTokens), rooms))
           .toList();
       if (naming.isEmpty) return const <_Candidate>[];
-      naming.sort((({String text, OcrBox box}) a, ({String text, OcrBox box}) b) =>
-          b.text.length.compareTo(a.text.length));
+      naming.sort(
+          (({String text, OcrBox box}) a, ({String text, OcrBox box}) b) =>
+              b.text.length.compareTo(a.text.length));
       subject = naming.first.text;
     }
 

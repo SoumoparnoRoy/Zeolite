@@ -122,8 +122,8 @@ void main() {
     test('joins the chosen subject, makes only the rest, and types by letter',
         () async {
       for (final ClassCategory c in ClassCategory.defaults) {
-        if ((await repo.getCategories()).every((ClassCategory x) =>
-            x.name != c.name)) {
+        if ((await repo.getCategories())
+            .every((ClassCategory x) => x.name != c.name)) {
           await repo.insertCategory(c);
         }
       }
@@ -146,10 +146,10 @@ void main() {
       await container.read(timetableProvider.future);
 
       await container.read(importActionsProvider).importTimetable(
-            _parse('BBB202L, Mo, 09:00-10:00\nBBB202T, Tu, 09:00-10:00\n'
-                'CCC303P, We, 09:00-11:00'),
-            into: <String, int>{'bbb202l': course, 'bbb202t': course},
-          );
+        _parse('BBB202L, Mo, 09:00-10:00\nBBB202T, Tu, 09:00-10:00\n'
+            'CCC303P, We, 09:00-11:00'),
+        into: <String, int>{'bbb202l': course, 'bbb202t': course},
+      );
 
       final List<Subject> subjects = await repo.getSubjects();
       expect(subjects.map((Subject s) => s.name),

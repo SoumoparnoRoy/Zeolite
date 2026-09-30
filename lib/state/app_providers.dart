@@ -35,7 +35,6 @@ import '../services/notification_service.dart';
 
 // ---------------------------------------------------------------- singletons
 
-
 final repositoryProvider = Provider<ZeoliteRepository>(
   (ref) => ZeoliteRepository(),
 );
@@ -595,7 +594,8 @@ final selectedTabProvider =
 /// tray is already handling it, so the two can never both fire.
 final inAppAlertsProvider = Provider<List<SubjectStats>>((ref) {
   final AppSettings? settings = ref.watch(settingsProvider).value;
-  final TrayAccess tray = ref.watch(trayAccessProvider).value ?? TrayAccess.open;
+  final TrayAccess tray =
+      ref.watch(trayAccessProvider).value ?? TrayAccess.open;
   if (settings == null ||
       !settings.showDangerInApp(
         alertsReachTray: tray.allows(TrayChannel.alerts),

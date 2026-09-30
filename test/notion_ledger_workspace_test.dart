@@ -108,9 +108,9 @@ void main() {
     return container;
   }
 
-  Future<int> notionLinks() async =>
-      (await repo.getRemoteLinks(NotionSyncTarget.targetId, SyncKind.attendance))
-          .length;
+  Future<int> notionLinks() async => (await repo.getRemoteLinks(
+          NotionSyncTarget.targetId, SyncKind.attendance))
+      .length;
 
   test('connecting a different database forgets the old ledger', () async {
     final ProviderContainer first = connectedTo('db-first');

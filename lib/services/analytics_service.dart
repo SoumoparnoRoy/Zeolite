@@ -86,7 +86,8 @@ class NoAnalytics implements Analytics {
   Future<void> attendanceMarked() async {}
 
   @override
-  Future<void> syncRan({required String target, required String outcome}) async {}
+  Future<void> syncRan(
+      {required String target, required String outcome}) async {}
 
   @override
   Future<void> notionConnected() async {}

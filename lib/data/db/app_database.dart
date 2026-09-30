@@ -73,7 +73,8 @@ class AppDatabase {
             // Nothing is seeded: the three statuses already cover the common
             // case and an empty tag list costs nothing on screen.
             await db.execute(_tagsTable);
-            await db.execute('ALTER TABLE attendance ADD COLUMN tag_id INTEGER');
+            await db
+                .execute('ALTER TABLE attendance ADD COLUMN tag_id INTEGER');
           }
           if (oldVersion < 5) {
             // v5 lets a subject carry attendance that predates the app, and say
@@ -163,7 +164,8 @@ class AppDatabase {
             // settle which name was newer. Left null rather than backfilled,
             // and the ledger survives: `changedAt` is outside the hash, so no
             // row looks changed by this.
-            await db.execute('ALTER TABLE subjects ADD COLUMN updated_at INTEGER');
+            await db
+                .execute('ALTER TABLE subjects ADD COLUMN updated_at INTEGER');
           }
           if (oldVersion < 11) {
             // v11 lets a category say what its classes are worth. Existing

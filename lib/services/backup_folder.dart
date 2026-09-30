@@ -70,7 +70,8 @@ class BackupFolder {
     // pickers take the folder to open in as one.
     final SafDocumentFile? ours = await _ourFolder(treeUri);
     if (ours != null) return ours.uri;
-    final SafDocumentFile dir = await _util.mkdirp(treeUri, <String>[folderName]);
+    final SafDocumentFile dir =
+        await _util.mkdirp(treeUri, <String>[folderName]);
     return dir.uri;
   }
 
@@ -78,7 +79,8 @@ class BackupFolder {
   /// is what the user reads in the picker.
   Future<SafDocumentFile?> _ourFolder(String treeUri) async {
     try {
-      final SafDocumentFile? dir = await _util.documentFileFromUri(treeUri, true);
+      final SafDocumentFile? dir =
+          await _util.documentFileFromUri(treeUri, true);
       return dir?.name == folderName ? dir : null;
     } catch (_) {
       return null;
@@ -87,14 +89,16 @@ class BackupFolder {
 
   /// A backup to restore, chosen from [initialUri].
   Future<BackupFile?> pickFile({String? initialUri}) async {
-    final SafDocumentFile? picked = await _util.pickFile(initialUri: initialUri);
+    final SafDocumentFile? picked =
+        await _util.pickFile(initialUri: initialUri);
     if (picked == null) return null;
     return BackupFile(name: picked.name, uri: picked.uri);
   }
 
   Future<Uint8List> readBytes(String uri) => _stream.readFileBytes(uri);
 
-  Future<String> writeJson(String folderUri, String fileName, String json) async {
+  Future<String> writeJson(
+      String folderUri, String fileName, String json) async {
     final Uint8List bytes = Uint8List.fromList(utf8.encode(json));
     final SafNewFile written = await _stream.writeFileBytes(
       folderUri,

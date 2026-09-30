@@ -6,7 +6,8 @@ import 'package:zeolite/data/models/subject.dart';
 import 'package:zeolite/domain/attendance_stats.dart';
 import 'package:zeolite/services/notification_service.dart';
 
-ClassSession _session({String? room, String? teacher, String name = 'Physics'}) {
+ClassSession _session(
+    {String? room, String? teacher, String name = 'Physics'}) {
   return ClassSession(
     subject: Subject(
       id: 1,
@@ -104,14 +105,14 @@ void main() {
     });
 
     test('reports recovery when below target', () {
-      final String? line =
-          NotificationService.reminderStandingLine(_stats(present: 1, absent: 3));
+      final String? line = NotificationService.reminderStandingLine(
+          _stats(present: 1, absent: 3));
       expect(line, contains('brings you back to target'));
     });
 
     test('reports the skip allowance when comfortably above', () {
-      final String? line =
-          NotificationService.reminderStandingLine(_stats(present: 20, absent: 1));
+      final String? line = NotificationService.reminderStandingLine(
+          _stats(present: 20, absent: 1));
       expect(line, contains('skip'));
     });
   });
@@ -140,20 +141,23 @@ void main() {
   group('the class-end title', () {
     test('leads with the percentage, then the subject', () {
       expect(
-        NotificationService.classEndTitle(_session(), _stats(present: 8, absent: 1)),
+        NotificationService.classEndTitle(
+            _session(), _stats(present: 8, absent: 1)),
         '89% Physics',
       );
     });
 
     test('is the subject alone when nothing has been marked yet', () {
-      expect(NotificationService.classEndTitle(_session(), _stats()), 'Physics');
+      expect(
+          NotificationService.classEndTitle(_session(), _stats()), 'Physics');
       expect(NotificationService.classEndTitle(_session(), null), 'Physics');
     });
 
     test('leaves a subject name exactly as the student typed it', () {
       // It reaches the tray unparsed, so punctuation must survive untouched.
       expect(
-        NotificationService.classEndTitle(_session(name: 'Maths & Stats (B2)'), null),
+        NotificationService.classEndTitle(
+            _session(name: 'Maths & Stats (B2)'), null),
         'Maths & Stats (B2)',
       );
     });

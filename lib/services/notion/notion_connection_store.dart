@@ -193,8 +193,7 @@ class NotionConnectionStore {
         key: _pendingKey,
         value: jsonEncode(<String, Object?>{
           'verifier': verifier,
-          'startedAt':
-              (startedAt ?? DateTime.now()).millisecondsSinceEpoch,
+          'startedAt': (startedAt ?? DateTime.now()).millisecondsSinceEpoch,
         }),
       );
 

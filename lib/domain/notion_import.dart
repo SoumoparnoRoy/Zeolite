@@ -95,8 +95,7 @@ class NotionPlanSubject {
       placements.where((NotionPlacement p) => !p.scheduled).length;
 
   /// A zero is not a longer class, so it does not make the figures periods.
-  bool get hasWeighted =>
-      placements.any((NotionPlacement p) => p.weight > 1);
+  bool get hasWeighted => placements.any((NotionPlacement p) => p.weight > 1);
 
   int get suspect =>
       placements.where((NotionPlacement p) => p.row.creditDisagrees).length;
@@ -215,8 +214,7 @@ class NotionPlan {
   }) {
     // Only a table that gives its rows a type can have left one out; where
     // none has a type, a zero is the table's own reason, not a missing cell.
-    final bool typed =
-        export.rows.any((NotionRow r) => r.kindLabel != null);
+    final bool typed = export.rows.any((NotionRow r) => r.kindLabel != null);
     bool untyped(NotionRow r) =>
         typed &&
         r.kindLabel == null &&
@@ -275,8 +273,8 @@ class NotionPlan {
       );
     }
 
-    out.sort((NotionPlanSubject a, NotionPlanSubject b) =>
-        a.name.compareTo(b.name));
+    out.sort(
+        (NotionPlanSubject a, NotionPlanSubject b) => a.name.compareTo(b.name));
     return NotionPlan(
       subjects: out,
       grouping: grouping,

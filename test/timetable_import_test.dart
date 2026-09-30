@@ -70,8 +70,7 @@ void main() {
     });
 
     test('an unrecognised day names the token', () {
-      expect(_parse('GEN201, Moon, 1').problems.single.error,
-          contains('Moon'));
+      expect(_parse('GEN201, Moon, 1').problems.single.error, contains('Moon'));
     });
 
     test('a block past the end of the day is refused', () {

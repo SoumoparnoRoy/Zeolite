@@ -47,7 +47,8 @@ void main() {
         .resolveFolder('content://tree/primary%3AZeolite');
 
     // The folder's own document uri, which is what a picker can open at.
-    expect(resolved, 'content://tree/primary%3AZeolite/document/primary%3AZeolite');
+    expect(resolved,
+        'content://tree/primary%3AZeolite/document/primary%3AZeolite');
     expect(saf.made, isEmpty);
   });
 

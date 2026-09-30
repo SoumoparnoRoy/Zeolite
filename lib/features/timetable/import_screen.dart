@@ -465,14 +465,12 @@ class _ImportTimetableScreenState extends ConsumerState<ImportTimetableScreen> {
       byCourse: byCourse,
     );
     final bool splits = result.subjectNames.length !=
-        TimetableImport.parse(_controller.text,
-                grid: grid, byCourse: !byCourse)
+        TimetableImport.parse(_controller.text, grid: grid, byCourse: !byCourse)
             .subjectNames
             .length;
     final Map<String, int> into = <String, int>{
       for (final String name in result.subjectNames)
-        if (_targetOf(name, existing) case final int id)
-          name.toLowerCase(): id,
+        if (_targetOf(name, existing) case final int id) name.toLowerCase(): id,
     };
     Subject? subjectOf(int? id) =>
         subjects.where((Subject s) => s.id == id).firstOrNull;
@@ -488,10 +486,8 @@ class _ImportTimetableScreenState extends ConsumerState<ImportTimetableScreen> {
           ),
       ],
     );
-    final bool ready = !result.isEmpty &&
-        !result.hasProblems &&
-        clashes.isEmpty &&
-        !_saving;
+    final bool ready =
+        !result.isEmpty && !result.hasProblems && clashes.isEmpty && !_saving;
 
     return PushScaffold(
       title: 'Import timetable',
@@ -592,8 +588,7 @@ class _ImportTimetableScreenState extends ConsumerState<ImportTimetableScreen> {
                 ImportSubjectRow(
                   name: name,
                   target: subjectOf(into[name.toLowerCase()]),
-                  onTap: () =>
-                      _pick(name, subjects, into[name.toLowerCase()]),
+                  onTap: () => _pick(name, subjects, into[name.toLowerCase()]),
                 ),
             ],
             if (result.classes.isNotEmpty) ...<Widget>[

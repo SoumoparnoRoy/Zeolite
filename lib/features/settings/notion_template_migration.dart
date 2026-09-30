@@ -79,8 +79,7 @@ class NotionTemplateMigration {
     BuildContext context,
     NotionMapping before,
   ) async {
-    final NotionConnectionStore store =
-        ref.read(notionConnectionStoreProvider);
+    final NotionConnectionStore store = ref.read(notionConnectionStoreProvider);
     // Resolved before the prompt, because it decides what the prompt can
     // honestly say is going: the page, or only the one table inside it.
     final String? page = await _retirement.pageOf(
@@ -116,9 +115,7 @@ class NotionTemplateMigration {
       if (!context.mounted) return;
       _say(
         context,
-        renamed.result.ok
-            ? 'Renamed to "${renamed.title}"'
-            : _changeFailed,
+        renamed.result.ok ? 'Renamed to "${renamed.title}"' : _changeFailed,
       );
       return;
     }
@@ -233,9 +230,7 @@ class NotionTemplateMigration {
       // Already gone is the outcome that was asked for, so the row goes too.
       if (result.ok || result.message == 'object_not_found') {
         moved++;
-        await ref
-            .read(notionConnectionStoreProvider)
-            .removeRetired(old.key.id);
+        await ref.read(notionConnectionStoreProvider).removeRetired(old.key.id);
       }
     }
     ref.invalidate(retiredNotionDatabasesProvider);

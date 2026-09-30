@@ -3,7 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zeolite/data/db/zeolite_repository.dart';
 import 'package:zeolite/state/undo.dart';
 
-DatabaseSnapshot _snapshot(String marker) => <String, List<Map<String, Object?>>>{
+DatabaseSnapshot _snapshot(String marker) =>
+    <String, List<Map<String, Object?>>>{
       'subjects': <Map<String, Object?>>[
         <String, Object?>{'id': 1, 'name': marker},
       ],

@@ -59,7 +59,8 @@ class SettingsSwitchRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color link = warning ? context.palette.absent : context.palette.accent;
+    final Color link =
+        warning ? context.palette.absent : context.palette.accent;
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 6, 14, 6),
       child: Row(

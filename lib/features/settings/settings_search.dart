@@ -139,8 +139,10 @@ List<SettingsTopic> searchSettings(String query) {
     }
   }
   return <SettingsTopic>[
-    for (final (SettingsTopic, bool) h in hits) if (h.$2) h.$1,
-    for (final (SettingsTopic, bool) h in hits) if (!h.$2) h.$1,
+    for (final (SettingsTopic, bool) h in hits)
+      if (h.$2) h.$1,
+    for (final (SettingsTopic, bool) h in hits)
+      if (!h.$2) h.$1,
   ];
 }
 

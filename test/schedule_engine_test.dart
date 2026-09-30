@@ -229,8 +229,8 @@ void main() {
       );
 
       expect(engine.sessionsOn(monday).single.status, AttendanceStatus.present);
-      expect(engine.sessionsOn(Dates.addDays(monday, 7)).single.isMarked,
-          isFalse);
+      expect(
+          engine.sessionsOn(Dates.addDays(monday, 7)).single.isMarked, isFalse);
     });
 
     test('two subjects at the same time do not share a mark', () {

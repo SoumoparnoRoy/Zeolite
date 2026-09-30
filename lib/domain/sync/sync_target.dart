@@ -178,8 +178,7 @@ class SyncItem {
           'weight': slot.weight,
           'category': categoryName,
           'startDate': Dates.keyOf(slot.startDate),
-          'endDate':
-              slot.endDate == null ? null : Dates.keyOf(slot.endDate!),
+          'endDate': slot.endDate == null ? null : Dates.keyOf(slot.endDate!),
         },
       );
 
@@ -244,9 +243,8 @@ class SyncItem {
           'semesterStart': settings.termStart == null
               ? null
               : Dates.keyOf(settings.termStart!),
-          'semesterEnd': settings.termEnd == null
-              ? null
-              : Dates.keyOf(settings.termEnd!),
+          'semesterEnd':
+              settings.termEnd == null ? null : Dates.keyOf(settings.termEnd!),
           'targetPercent': settings.targetPercent,
           'defaultClassMinutes': settings.defaultClassDurationMinutes,
           'dayStartMinutes': settings.dayStartMinutes,
@@ -281,10 +279,8 @@ class SyncItem {
   /// lets the payload gain a field — a subject's category, a mark's tag —
   /// without every row that does not use it looking changed on both sides.
   String get _canonical {
-    final List<String> keys = fields.keys
-        .where((String k) => fields[k] != null)
-        .toList()
-      ..sort();
+    final List<String> keys =
+        fields.keys.where((String k) => fields[k] != null).toList()..sort();
     return keys.map((String k) => '$k=${fields[k]}').join(' ');
   }
 }

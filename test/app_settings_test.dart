@@ -82,8 +82,7 @@ void main() {
     });
 
     test('take over when the attendance alert type is switched off', () {
-      const AppSettings settings =
-          AppSettings(notifyAttendanceDanger: false);
+      const AppSettings settings = AppSettings(notifyAttendanceDanger: false);
       expect(settings.showDangerInApp(alertsReachTray: true), isTrue);
     });
 

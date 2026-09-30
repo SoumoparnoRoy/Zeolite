@@ -267,7 +267,8 @@ void main() {
 
     await coordinator().run(force: true);
 
-    expect(target.calls, containsAll(<String>['archive $page', 'create $moved']));
+    expect(
+        target.calls, containsAll(<String>['archive $page', 'create $moved']));
   });
 
   test('a tombstone removes the mark instead of importing it', () async {

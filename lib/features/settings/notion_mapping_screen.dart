@@ -91,7 +91,8 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
   /// An existing mapping reopens on its own columns, so Change is an edit
   /// rather than starting again from the database list.
   Future<void> _open() async {
-    final NotionMapping? existing = await ref.read(notionMappingProvider.future);
+    final NotionMapping? existing =
+        await ref.read(notionMappingProvider.future);
     if (!mounted) return;
     if (existing == null) {
       await _loadSources();
@@ -116,7 +117,8 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
       _busy = true;
       _error = null;
     });
-    final NotionResult result = await _client.searchDataSources(cursor: _cursor);
+    final NotionResult result =
+        await _client.searchDataSources(cursor: _cursor);
     if (!mounted) return;
 
     if (!result.ok) {
@@ -229,7 +231,8 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
     if (_sources.isEmpty) await _loadSources();
   }
 
-  Future<void> _loadSchema(String dataSourceId, {bool keepChoices = false}) async {
+  Future<void> _loadSchema(String dataSourceId,
+      {bool keepChoices = false}) async {
     setState(() {
       _busy = true;
       _error = null;
@@ -293,8 +296,7 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
   /// The Course relation already names the table it points at, so asking
   /// the student to pick it again is a question with one right answer.
   Future<void> _findCourses() async {
-    final NotionRelationTarget? target =
-        _fields[NotionField.course]?.relatesTo;
+    final NotionRelationTarget? target = _fields[NotionField.course]?.relatesTo;
     if (_courses != null || target == null) return;
     if (target.databaseId == _databaseId) return;
 
@@ -655,7 +657,8 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
                 if (_error != null) ...<Widget>[
-                  Text(_error!, style: TextStyle(color: context.palette.absent)),
+                  Text(_error!,
+                      style: TextStyle(color: context.palette.absent)),
                   const SizedBox(height: AppSpacing.lg),
                 ],
                 ..._stageBody(context),
@@ -759,34 +762,34 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
       const SizedBox(height: AppSpacing.lg),
       for (final NotionField field in NotionField.values)
         if (!_narrowed || _gapFields!.contains(field)) ...<Widget>[
-        _PropertyPicker(
-          field: field,
-          properties: _properties,
-          chosen: _fields[field],
-          onChanged: (NotionProperty? property) {
-            setState(() {
-              if (property == null) {
-                _fields.remove(field);
-              } else {
-                _fields[field] = property;
-              }
-              // The words belong to the column, so a different Status column
-              // leaves the old workspace's spellings behind.
-              if (field == NotionField.status) {
-                _statusMeanings = NotionMapping.guessMeanings(property);
-              }
-              if (field == NotionField.kind) _kindValues = <String, String>{};
-              if (field == NotionField.course) _suggestedCourses = null;
-            });
-            if (field == NotionField.course) _findCourses();
-          },
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        if (field == NotionField.key && _fields[field] == null)
-          _addKeyColumnOffer(context),
-        if (field == NotionField.course && _hiddenRelation)
-          _shareCoursesNote(context),
-      ],
+          _PropertyPicker(
+            field: field,
+            properties: _properties,
+            chosen: _fields[field],
+            onChanged: (NotionProperty? property) {
+              setState(() {
+                if (property == null) {
+                  _fields.remove(field);
+                } else {
+                  _fields[field] = property;
+                }
+                // The words belong to the column, so a different Status column
+                // leaves the old workspace's spellings behind.
+                if (field == NotionField.status) {
+                  _statusMeanings = NotionMapping.guessMeanings(property);
+                }
+                if (field == NotionField.kind) _kindValues = <String, String>{};
+                if (field == NotionField.course) _suggestedCourses = null;
+              });
+              if (field == NotionField.course) _findCourses();
+            },
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          if (field == NotionField.key && _fields[field] == null)
+            _addKeyColumnOffer(context),
+          if (field == NotionField.course && _hiddenRelation)
+            _shareCoursesNote(context),
+        ],
       ..._coursesSection(context),
       if (kind != null &&
           kind.options.isNotEmpty &&
@@ -795,23 +798,23 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
         const SizedBox(height: AppSpacing.lg),
         const SectionHeader('What each class type is called'),
         for (final ClassCategory category in _categories)
-          if (!_narrowed || _gapKinds!.contains(category.name.toLowerCase()))
-            ...<Widget>[
-          _ValuePicker(
-            word: category.name.toLowerCase(),
-            label: category.name,
-            options: kind.options,
-            chosen: _kindValues[category.name.toLowerCase()],
-            onChanged: (String? option) => setState(() {
-              if (option == null) {
-                _kindValues.remove(category.name.toLowerCase());
-              } else {
-                _kindValues[category.name.toLowerCase()] = option;
-              }
-            }),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-        ],
+          if (!_narrowed ||
+              _gapKinds!.contains(category.name.toLowerCase())) ...<Widget>[
+            _ValuePicker(
+              word: category.name.toLowerCase(),
+              label: category.name,
+              options: kind.options,
+              chosen: _kindValues[category.name.toLowerCase()],
+              onChanged: (String? option) => setState(() {
+                if (option == null) {
+                  _kindValues.remove(category.name.toLowerCase());
+                } else {
+                  _kindValues[category.name.toLowerCase()] = option;
+                }
+              }),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+          ],
       ],
       if (status != null &&
           status.options.isNotEmpty &&
@@ -825,19 +828,19 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
         const SizedBox(height: AppSpacing.sm),
         for (final String option in status.options)
           if (!_narrowed || _gapStatus!.contains(option)) ...<Widget>[
-          _MeaningPicker(
-            option: option,
-            chosen: _statusMeanings[option],
-            onChanged: (LogVerdict? meaning) => setState(() {
-              if (meaning == null) {
-                _statusMeanings.remove(option);
-              } else {
-                _statusMeanings[option] = meaning;
-              }
-            }),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-        ],
+            _MeaningPicker(
+              option: option,
+              chosen: _statusMeanings[option],
+              onChanged: (LogVerdict? meaning) => setState(() {
+                if (meaning == null) {
+                  _statusMeanings.remove(option);
+                } else {
+                  _statusMeanings[option] = meaning;
+                }
+              }),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+          ],
       ],
       const SizedBox(height: AppSpacing.lg),
       FilledButton(
@@ -846,8 +849,8 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
       ),
       // Only where every gap is optional — adoption guarantees that, but a
       // required field left unmapped still has to be answered.
-      if (_narrowed && !_gapFields!.any((NotionField f) => f.isRequired))
-        ...<Widget>[
+      if (_narrowed &&
+          !_gapFields!.any((NotionField f) => f.isRequired)) ...<Widget>[
         const SizedBox(height: AppSpacing.sm),
         OutlinedButton(
           onPressed: _busy ? null : () => Navigator.of(context).maybePop(),

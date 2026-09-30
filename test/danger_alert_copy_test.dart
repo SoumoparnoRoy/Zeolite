@@ -42,13 +42,15 @@ void main() {
     });
 
     test('rounds the way every other screen does', () {
-      final SubjectStats stats = _stats(id: 1, name: 'Alpha', present: 2, absent: 1);
+      final SubjectStats stats =
+          _stats(id: 1, name: 'Alpha', present: 2, absent: 1);
       expect(stats.percent, closeTo(66.67, 0.01));
       expect(NotificationService.dangerMessage(stats), startsWith('67% · '));
     });
 
     test('is the sentence the rest of the app already shows', () {
-      final SubjectStats stats = _stats(id: 1, name: 'Alpha', present: 1, absent: 3);
+      final SubjectStats stats =
+          _stats(id: 1, name: 'Alpha', present: 1, absent: 3);
       expect(
         NotificationService.dangerMessage(stats),
         endsWith(stats.headline),
@@ -65,7 +67,8 @@ void main() {
 
   group('the tray line', () {
     test('carries the name the dialog puts in its own row', () {
-      final SubjectStats stats = _stats(id: 1, name: 'Alpha', present: 1, absent: 3);
+      final SubjectStats stats =
+          _stats(id: 1, name: 'Alpha', present: 1, absent: 3);
       expect(
         NotificationService.dangerLine(stats),
         'Alpha · ${NotificationService.dangerMessage(stats)}',

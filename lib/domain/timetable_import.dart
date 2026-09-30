@@ -124,10 +124,12 @@ class TimetableImport {
   /// nothing to share a subject with, and renaming it would just lose the
   /// letter.
   static List<ImportLine> _underCourses(List<ImportLine> lines) {
-    String? courseOf(ImportedClass c) => TimetableImport.courseOf(c.subjectName);
+    String? courseOf(ImportedClass c) =>
+        TimetableImport.courseOf(c.subjectName);
 
     final Map<String, Set<String>> spellings = <String, Set<String>>{};
-    for (final ImportedClass c in lines.map((ImportLine l) => l.parsed).nonNulls) {
+    for (final ImportedClass c
+        in lines.map((ImportLine l) => l.parsed).nonNulls) {
       final String? course = courseOf(c);
       if (course == null) continue;
       spellings.putIfAbsent(course, () => <String>{}).add(c.subjectKey);
@@ -454,7 +456,8 @@ class TimetableImportResult {
       if (TimetableOcr.isConvention(subjects.toSet(), TimetableOcr.isCode))
         for (final String name in subjects)
           if (!TimetableOcr.isCode(name)) name,
-      if (TimetableOcr.isConvention(rooms.toSet(), TimetableOcr.namesBlockFirst))
+      if (TimetableOcr.isConvention(
+          rooms.toSet(), TimetableOcr.namesBlockFirst))
         for (final String name in rooms)
           if (!TimetableOcr.namesBlockFirst(name)) name,
     ];
@@ -483,7 +486,10 @@ extension _FirstOrNull<T> on List<T> {
 @immutable
 class _Span {
   const _Span(this.start, this.end, {this.blocks = 1}) : error = null;
-  const _Span.bad(this.error) : start = 0, end = 0, blocks = 1;
+  const _Span.bad(this.error)
+      : start = 0,
+        end = 0,
+        blocks = 1;
 
   final int start;
   final int end;

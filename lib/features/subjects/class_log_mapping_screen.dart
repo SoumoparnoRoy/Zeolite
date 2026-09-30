@@ -94,7 +94,8 @@ class _ClassLogMappingScreenState extends State<ClassLogMappingScreen> {
               ),
               const SizedBox(height: AppSpacing.lg),
               const SectionHeader('Columns'),
-              for (final NotionField field in ClassLogMapping.fields) ...<Widget>[
+              for (final NotionField field
+                  in ClassLogMapping.fields) ...<Widget>[
                 _Choice<int>(
                   title: field.isRequired ? '${field.label} *' : field.label,
                   subtitle: _descriptions[field] ?? field.description,
@@ -129,7 +130,8 @@ class _ClassLogMappingScreenState extends State<ClassLogMappingScreen> {
                   style: TextStyle(fontSize: 12, color: p.textTertiary),
                 ),
                 const SizedBox(height: AppSpacing.sm),
-                for (final String word in _table.valuesOf(statusColumn)) ...<Widget>[
+                for (final String word
+                    in _table.valuesOf(statusColumn)) ...<Widget>[
                   _Choice<LogVerdict>(
                     title: word,
                     value: _mapping.statuses[word.toLowerCase()],
@@ -159,7 +161,8 @@ class _ClassLogMappingScreenState extends State<ClassLogMappingScreen> {
                   style: TextStyle(fontSize: 12, color: p.textTertiary),
                 ),
                 const SizedBox(height: AppSpacing.sm),
-                for (final String word in _table.valuesOf(kindColumn)) ...<Widget>[
+                for (final String word
+                    in _table.valuesOf(kindColumn)) ...<Widget>[
                   _Choice<NotionKind>(
                     title: word,
                     value: _mapping.types[word.toLowerCase()],
@@ -218,7 +221,8 @@ class _Choice<T> extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+                Text(title,
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
                 if (subtitle != null) ...<Widget>[
                   const SizedBox(height: 2),
                   Text(
@@ -243,8 +247,7 @@ class _Choice<T> extends StatelessWidget {
                 style: TextStyle(color: context.palette.textTertiary),
               ),
               items: <DropdownMenuItem<T>>[
-                if (allowEmpty)
-                  DropdownMenuItem<T>(child: Text(emptyLabel)),
+                if (allowEmpty) DropdownMenuItem<T>(child: Text(emptyLabel)),
                 for (final MapEntry<T, String> option in options.entries)
                   DropdownMenuItem<T>(
                     value: option.key,
@@ -293,7 +296,8 @@ class _DateOrder extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               '"$sample" could be either.',
-              style: TextStyle(fontSize: 12, color: context.palette.textTertiary),
+              style:
+                  TextStyle(fontSize: 12, color: context.palette.textTertiary),
             ),
             const SizedBox(height: AppSpacing.sm),
             Wrap(

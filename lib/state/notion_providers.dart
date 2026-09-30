@@ -96,8 +96,7 @@ class NotionConnectionController extends AsyncNotifier<NotionTokens?> {
   }
 
   Future<bool> _renew() async {
-    final NotionConnectionStore store =
-        ref.read(notionConnectionStoreProvider);
+    final NotionConnectionStore store = ref.read(notionConnectionStoreProvider);
     final NotionTokens? current = state.value ?? await store.read();
     final String? token = current?.refreshToken;
     if (current == null || token == null || token.isEmpty) {
@@ -263,7 +262,9 @@ class NotionMappingController extends AsyncNotifier<NotionMapping?> {
     final List<String> found = <String>[];
     final List<String> toVisit = <String>[pageId];
 
-    for (int calls = 0; toVisit.isNotEmpty && calls < _blockScanLimit; calls++) {
+    for (int calls = 0;
+        toVisit.isNotEmpty && calls < _blockScanLimit;
+        calls++) {
       final NotionResult result =
           await client.blockChildren(toVisit.removeAt(0));
       final Object? blocks = result.body?['results'];
@@ -283,7 +284,8 @@ class NotionMappingController extends AsyncNotifier<NotionMapping?> {
     return found;
   }
 
-  Future<bool> _adoptDatabase(String databaseId, {String? templatePageId}) async {
+  Future<bool> _adoptDatabase(String databaseId,
+      {String? templatePageId}) async {
     final NotionClient client = ref.read(notionClientProvider);
 
     final NotionResult database = await client.database(databaseId);
@@ -346,6 +348,7 @@ List<NotionProperty> notionPropertiesOf(Map<String, Object?> dataSource) {
   return <NotionProperty>[
     for (final MapEntry<String, Object?> entry in properties.entries)
       if (entry.value is Map<String, Object?>)
-        NotionProperty.fromJson(entry.key, entry.value! as Map<String, Object?>),
+        NotionProperty.fromJson(
+            entry.key, entry.value! as Map<String, Object?>),
   ];
 }

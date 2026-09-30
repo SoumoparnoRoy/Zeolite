@@ -101,8 +101,8 @@ enum SettingsItem {
             mode: LaunchMode.inAppBrowserView));
         return;
       case terms:
-        unawaited(launchUrl(WelcomeCopy.termsUrl,
-            mode: LaunchMode.inAppBrowserView));
+        unawaited(
+            launchUrl(WelcomeCopy.termsUrl, mode: LaunchMode.inAppBrowserView));
         return;
       default:
         break;
@@ -154,7 +154,9 @@ enum SettingsItem {
         // The fonts' OFL texts are registered in `main.dart`; this is the only
         // place a user can read them.
         licences => const LicencesScreen(),
-        importClassLog || privacy || terms =>
+        importClassLog ||
+        privacy ||
+        terms =>
           throw StateError('$name does not open a page'),
       };
 }
@@ -202,9 +204,9 @@ class SettingsItemRow extends ConsumerWidget {
     final String value = switch (item) {
       SettingsItem.subjects => _subjectsLine(timetable),
       SettingsItem.categories => (timetable?.categories ?? const [])
-              .map((c) => c.name)
-              .join(', ')
-              .ifEmpty('None yet'),
+          .map((c) => c.name)
+          .join(', ')
+          .ifEmpty('None yet'),
       SettingsItem.term => _termLine(settings, timetable),
       SettingsItem.teachingDay => settings.dayGrid.isConfigured
           ? '${Clock.format(settings.dayStartMinutes, use24Hour: settings.use24HourTime)} – '
@@ -221,9 +223,8 @@ class SettingsItemRow extends ConsumerWidget {
           settings,
           ref.watch(trayAccessProvider).value ?? TrayAccess.open,
         ),
-      SettingsItem.account =>
-        ref.watch(signedInUserProvider).value?.email ??
-            'Not signed in — nothing is backed up',
+      SettingsItem.account => ref.watch(signedInUserProvider).value?.email ??
+          'Not signed in — nothing is backed up',
       SettingsItem.notion =>
         ref.watch(notionConnectionProvider).value?.workspaceName ??
             'Not connected',
@@ -240,8 +241,7 @@ class SettingsItemRow extends ConsumerWidget {
       title: item.title,
       value: value,
       // The one state on the menu that is stopping something from working.
-      danger: item == SettingsItem.notifications &&
-          value == _blocked,
+      danger: item == SettingsItem.notifications && value == _blocked,
       onTap: () => item.open(context, ref),
       trailing: item.isLink
           ? Icon(

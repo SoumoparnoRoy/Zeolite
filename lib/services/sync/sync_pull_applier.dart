@@ -288,7 +288,8 @@ class SyncPullApplier {
     SyncLocalRows local,
   ) {
     final String? name = readString(fields['category']);
-    final ClassCategory? type = name == null ? null : local.categoryByName[name];
+    final ClassCategory? type =
+        name == null ? null : local.categoryByName[name];
     return type?.id == null ? null : type;
   }
 
@@ -393,8 +394,8 @@ class SyncPullApplier {
   Future<int?> _tagIdFor(String name, SyncLocalRows local) async {
     final Tag? known = local.tagByName[name] ??
         local.tagByName.values
-            .where((Tag t) => t.name.trim().toLowerCase() ==
-                name.trim().toLowerCase())
+            .where((Tag t) =>
+                t.name.trim().toLowerCase() == name.trim().toLowerCase())
             .firstOrNull;
     if (known != null) return known.id;
     final Tag made = Tag(name: name, position: local.tagByName.length);

@@ -354,10 +354,30 @@ class AppPalette extends ThemeExtension<AppPalette> {
   /// palette, and without this an untinted theme stopped comparing equal to
   /// the constant it was built from.
   List<Object?> get _values => <Object?>[
-        brightness, canvas, surface, surfaceHigh, surfaceHigher, navSurface,
-        outline, outlineSoft, hairline, accent, accentSoft, cyan, gradientTop,
-        gradientMid, gradientBottom, cardShadow, textPrimary, textSecondary,
-        textTertiary, textFaint, present, absent, cancelled, warning,
+        brightness,
+        canvas,
+        surface,
+        surfaceHigh,
+        surfaceHigher,
+        navSurface,
+        outline,
+        outlineSoft,
+        hairline,
+        accent,
+        accentSoft,
+        cyan,
+        gradientTop,
+        gradientMid,
+        gradientBottom,
+        cardShadow,
+        textPrimary,
+        textSecondary,
+        textTertiary,
+        textFaint,
+        present,
+        absent,
+        cancelled,
+        warning,
       ];
 
   @override
@@ -370,9 +390,8 @@ class AppPalette extends ThemeExtension<AppPalette> {
   /// The base palette tinted. Only the five identity colours move — surfaces,
   /// text and the status colours are the same whichever accent is chosen.
   AppPalette withAccent(AccentColour accent) {
-    final _AccentSet set = (brightness == Brightness.dark
-        ? _darkAccents
-        : _lightAccents)[accent]!;
+    final _AccentSet set =
+        (brightness == Brightness.dark ? _darkAccents : _lightAccents)[accent]!;
     return copyWith(
       accent: set.accent,
       accentSoft: set.soft,
@@ -899,9 +918,8 @@ class AppTheme {
               : p.surfaceHigher,
         ),
         hourMinuteTextColor: WidgetStateColor.resolveWith(
-          (Set<WidgetState> states) => states.contains(WidgetState.selected)
-              ? p.accent
-              : p.textPrimary,
+          (Set<WidgetState> states) =>
+              states.contains(WidgetState.selected) ? p.accent : p.textPrimary,
         ),
         hourMinuteShape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppSpacing.radiusMd),

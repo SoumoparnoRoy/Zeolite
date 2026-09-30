@@ -148,7 +148,8 @@ void main() {
 
   test('a table that cannot be read gives back why', () async {
     final NotionDatabaseReader reader = _reader(
-      MockClient((_) async => http.Response('{"code":"object_not_found"}', 404)),
+      MockClient(
+          (_) async => http.Response('{"code":"object_not_found"}', 404)),
     );
 
     final NotionReadResult result = await reader.read();

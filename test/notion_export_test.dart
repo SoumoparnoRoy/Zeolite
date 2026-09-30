@@ -142,7 +142,8 @@ void main() {
 
     test('a year printed in the cell wins', () {
       final NotionExport export = NotionExport.read(
-        _bytes(_csv(<String>['A,1,Course,"Jul 27, 2024",1,Yes,Lecture,Present'])),
+        _bytes(
+            _csv(<String>['A,1,Course,"Jul 27, 2024",1,Yes,Lecture,Present'])),
         today: _today,
       );
       expect(export.rows.single.date, DateTime(2024, 7, 27));

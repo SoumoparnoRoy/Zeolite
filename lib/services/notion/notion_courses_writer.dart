@@ -183,8 +183,7 @@ class NotionCoursesWriter {
             ),
           )?.round(),
           priorHeld: _numberOf(properties, NotionCourseField.priorHeld),
-          priorAttended:
-              _numberOf(properties, NotionCourseField.priorAttended),
+          priorAttended: _numberOf(properties, NotionCourseField.priorAttended),
         ),
         adopted: adopted || uuid.isEmpty,
       );

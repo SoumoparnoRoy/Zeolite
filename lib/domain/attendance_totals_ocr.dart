@@ -253,9 +253,8 @@ class AttendanceTotalsOcr {
     // A cell peeled off a name is one the sharper read did not return either,
     // or the name would not have carried it, so it joins [cells] rather than
     // competing with it.
-    final List<OcrLine> read = cells == null
-        ? body
-        : <OcrLine>[...cells, ...peeled];
+    final List<OcrLine> read =
+        cells == null ? body : <OcrLine>[...cells, ...peeled];
     final List<OcrLine> numbers = <OcrLine>[
       for (final OcrLine line in read)
         if (line.box.centreY > headerBottom &&
@@ -281,8 +280,7 @@ class AttendanceTotalsOcr {
       final double bottom = i == rowCentres.length - 1
           ? double.infinity
           : (rowCentres[i] + rowCentres[i + 1]) / 2;
-      bool inBand(OcrLine l) =>
-          l.box.centreY > top && l.box.centreY <= bottom;
+      bool inBand(OcrLine l) => l.box.centreY > top && l.box.centreY <= bottom;
 
       final TotalsRow? row = _rowFrom(
         band: <OcrLine>[
@@ -517,9 +515,7 @@ class AttendanceTotalsOcr {
     // A wrapped course name can end in digits of its own — a term stamp broken
     // across lines leaves a bare `27` in the name column — so the numbers are
     // taken from the right.
-    return centres.length <= 3
-        ? centres
-        : centres.sublist(centres.length - 3);
+    return centres.length <= 3 ? centres : centres.sublist(centres.length - 3);
   }
 
   /// The digits in a cell, whatever rule was glued to them.
@@ -603,8 +599,8 @@ class AttendanceTotalsOcr {
     // figures stay editable on the subject. A dash *with* digits is ambiguous —
     // an unread cell and a printed zero look the same here — so it is refused.
     if (held == null || attended == null) {
-      final bool blank = digits.isEmpty &&
-          cells.any((OcrLine l) => _isBlankCell(l.text));
+      final bool blank =
+          digits.isEmpty && cells.any((OcrLine l) => _isBlankCell(l.text));
       if (!blank) {
         return TotalsRow(
           subject: name,

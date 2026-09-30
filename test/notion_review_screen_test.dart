@@ -64,7 +64,8 @@ TimetableData _data({required List<AttendanceRecord> records}) => TimetableData(
 Widget _app(List<SyncPull> pulls, List<AttendanceRecord> records) =>
     ProviderScope(
       overrides: [
-        timetableProvider.overrideWith((Ref ref) async => _data(records: records)),
+        timetableProvider
+            .overrideWith((Ref ref) async => _data(records: records)),
         notionSyncStatusProvider.overrideWith(() => _StaticSync(pulls)),
       ],
       child: MaterialApp(
@@ -119,8 +120,7 @@ void main() {
 
     FilledButton apply() =>
         tester.widget<FilledButton>(find.byType(FilledButton));
-    String label() =>
-        (tester.widget<Text>(find.descendant(
+    String label() => (tester.widget<Text>(find.descendant(
           of: find.byType(FilledButton),
           matching: find.byType(Text),
         ))).data!;

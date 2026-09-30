@@ -150,8 +150,8 @@ void main() {
       final String slot = (await repo.getSlots()).single.uuid!;
       final String extra = (await repo.getExtraClasses()).single.uuid!;
 
-      final String json = await BackupService(repo, settings)
-          .exportToJsonString();
+      final String json =
+          await BackupService(repo, settings).exportToJsonString();
       await BackupService(repo, settings).importFromJsonString(json);
 
       expect((await repo.getSlots()).single.uuid, slot);

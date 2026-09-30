@@ -303,7 +303,8 @@ class _RootShellState extends ConsumerState<RootShell> with RouteAware {
       depth: notification.depth,
       axis: notification.metrics.axis,
       maxExtent: notification.metrics.maxScrollExtent,
-      atTop: notification.metrics.pixels <= notification.metrics.minScrollExtent,
+      atTop:
+          notification.metrics.pixels <= notification.metrics.minScrollExtent,
     );
     if (visible != null) _showNav(visible);
     return false;

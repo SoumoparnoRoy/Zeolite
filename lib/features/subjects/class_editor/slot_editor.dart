@@ -471,10 +471,9 @@ class _SlotFormState extends ConsumerState<_SlotForm> {
   Widget build(BuildContext context) {
     final bool use24Hour =
         ref.watch(settingsProvider).value?.use24HourTime ?? false;
-    final String durationLabel =
-        ref.watch(classLengthLabelProvider(
-          (subjectId: _subjectId, categoryId: _categoryId),
-        ));
+    final String durationLabel = ref.watch(classLengthLabelProvider(
+      (subjectId: _subjectId, categoryId: _categoryId),
+    ));
     final List<int> days = _days;
 
     return Column(

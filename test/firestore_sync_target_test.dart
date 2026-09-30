@@ -34,8 +34,7 @@ void main() {
     expect(outcome.ok, isTrue);
     expect(outcome.remoteId, item.localKey);
 
-    final List<RemoteState>? states =
-        await target.fetch(SyncKind.attendance);
+    final List<RemoteState>? states = await target.fetch(SyncKind.attendance);
     final RemoteState state = states!.single;
     expect(state.localKey, item.localKey);
     expect(state.deleted, isFalse);
@@ -48,8 +47,7 @@ void main() {
     await target.create(_mark());
     await target.update(_mark(status: 'absent'), _mark().localKey);
 
-    final List<RemoteState> states =
-        (await target.fetch(SyncKind.attendance))!;
+    final List<RemoteState> states = (await target.fetch(SyncKind.attendance))!;
     expect(states, hasLength(1));
     expect(states.single.hash, _mark(status: 'absent').hash);
   });
@@ -57,11 +55,11 @@ void main() {
   test('archiving leaves a tombstone a stale device can still see', () async {
     final SyncItem item = _mark();
     await target.create(item);
-    final SyncOutcome outcome = await target.archive(SyncKind.attendance, item.localKey);
+    final SyncOutcome outcome =
+        await target.archive(SyncKind.attendance, item.localKey);
     expect(outcome.ok, isTrue);
 
-    final List<RemoteState> states =
-        (await target.fetch(SyncKind.attendance))!;
+    final List<RemoteState> states = (await target.fetch(SyncKind.attendance))!;
     // Still present, and flagged. A removed document would read as "never
     // pushed", and the next run would put the deleted mark straight back.
     expect(states, hasLength(1));
@@ -75,8 +73,7 @@ void main() {
     await target.archive(SyncKind.attendance, item.localKey);
     await target.update(item, item.localKey);
 
-    final RemoteState state =
-        (await target.fetch(SyncKind.attendance))!.single;
+    final RemoteState state = (await target.fetch(SyncKind.attendance))!.single;
     expect(state.deleted, isFalse);
     expect(state.hash, item.hash);
   });

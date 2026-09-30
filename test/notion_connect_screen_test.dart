@@ -128,7 +128,8 @@ void main() {
     expect(find.textContaining('tap Connect Notion first'), findsNothing);
 
     // Back here with the attempt outstanding is the hijack's signature.
-    expect(find.textContaining('Did not get back from Notion?'), findsOneWidget);
+    expect(
+        find.textContaining('Did not get back from Notion?'), findsOneWidget);
     expect(find.textContaining('using Email'), findsOneWidget);
   });
 

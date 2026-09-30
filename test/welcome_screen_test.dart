@@ -63,8 +63,8 @@ void main() {
     // meaningless.
     final FontLoader loader = FontLoader(AppFonts.sans);
     for (final String weight in <String>['Medium', 'SemiBold', 'ExtraBold']) {
-      loader.addFont(rootBundle
-          .load('assets/fonts/PlusJakartaSans-$weight.ttf'));
+      loader
+          .addFont(rootBundle.load('assets/fonts/PlusJakartaSans-$weight.ttf'));
     }
     await loader.load();
   });
@@ -74,7 +74,8 @@ void main() {
         InMemorySharedPreferencesAsync.empty();
   });
 
-  testWidgets('a first run ends on the three ways in', (WidgetTester tester) async {
+  testWidgets('a first run ends on the three ways in',
+      (WidgetTester tester) async {
     await tester.pumpWidget(_app(_FirstRun.new, () {}));
     await _playOut(tester);
 
@@ -102,7 +103,8 @@ void main() {
     expect((await SettingsService().load()).onboarded, isFalse);
   });
 
-  testWidgets('the bottom stack fits a short phone', (WidgetTester tester) async {
+  testWidgets('the bottom stack fits a short phone',
+      (WidgetTester tester) async {
     // The three buttons, the terms couplet and the caption are the part of
     // this screen most likely to run off the bottom, and a tablet never shows
     // it. An overflow fails this test on its own.
@@ -117,11 +119,13 @@ void main() {
     expect(find.text(WelcomeCopy.caption), findsOneWidget);
   });
 
-  testWidgets('a device with animations off gets the last frame, not a scramble',
+  testWidgets(
+      'a device with animations off gets the last frame, not a scramble',
       (WidgetTester tester) async {
     tester.binding.platformDispatcher.accessibilityFeaturesTestValue =
         const FakeAccessibilityFeatures(disableAnimations: true);
-    addTearDown(tester.binding.platformDispatcher.clearAccessibilityFeaturesTestValue);
+    addTearDown(
+        tester.binding.platformDispatcher.clearAccessibilityFeaturesTestValue);
 
     await tester.pumpWidget(_app(_FirstRun.new, () {}));
     // One frame past the settings load: the choices are already there, rather

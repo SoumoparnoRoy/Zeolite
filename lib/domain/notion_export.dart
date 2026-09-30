@@ -20,7 +20,9 @@ enum NotionKind {
     final String v = value.trim().toLowerCase();
     if (v.startsWith('lec')) return NotionKind.lecture;
     if (v.startsWith('tut')) return NotionKind.tutorial;
-    if (v.startsWith('prac') || v.startsWith('lab')) return NotionKind.practical;
+    if (v.startsWith('prac') || v.startsWith('lab')) {
+      return NotionKind.practical;
+    }
     return null;
   }
 
@@ -341,8 +343,18 @@ class NotionExport {
   }
 
   static const List<String> _months = <String>[
-    'jan', 'feb', 'mar', 'apr', 'may', 'jun',
-    'jul', 'aug', 'sep', 'oct', 'nov', 'dec',
+    'jan',
+    'feb',
+    'mar',
+    'apr',
+    'may',
+    'jun',
+    'jul',
+    'aug',
+    'sep',
+    'oct',
+    'nov',
+    'dec',
   ];
 
   /// Reads `Jul 27`, `July 27, 2025`, an ISO date, or a numeric one such as
@@ -391,7 +403,6 @@ class NotionExport {
         : DateTime(today.year - 1, month, day);
   }
 }
-
 
 /// Splits CSV text into rows of cells, honouring quotes.
 ///

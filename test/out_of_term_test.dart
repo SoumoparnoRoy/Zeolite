@@ -10,8 +10,7 @@ import 'package:zeolite/domain/attendance_stats.dart';
 final DateTime _start = DateTime(2026, 8, 18);
 final DateTime _end = DateTime(2026, 12, 16);
 
-final AppSettings _term =
-    AppSettings(termStart: _start, termEnd: _end);
+final AppSettings _term = AppSettings(termStart: _start, termEnd: _end);
 
 AttendanceRecord _on(DateTime date) => AttendanceRecord(
       subjectId: 1,

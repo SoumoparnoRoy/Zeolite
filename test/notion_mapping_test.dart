@@ -39,7 +39,8 @@ Map<String, Object?> _template() => <String, Object?>{
       'Time': <String, Object?>{'id': 'p8', 'type': 'rich_text'},
     };
 
-List<NotionProperty> _properties(Map<String, Object?> schema) => <NotionProperty>[
+List<NotionProperty> _properties(Map<String, Object?> schema) =>
+    <NotionProperty>[
       for (final MapEntry<String, Object?> e in schema.entries)
         NotionProperty.fromJson(e.key, e.value! as Map<String, Object?>),
     ];

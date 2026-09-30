@@ -63,8 +63,8 @@ void main() {
     // One second inside the service's session window, and one second past it.
     expect(
       await store.readPending(
-        now: began.add(NotionConnectionStore.pendingLifetime -
-            const Duration(seconds: 1)),
+        now: began.add(
+            NotionConnectionStore.pendingLifetime - const Duration(seconds: 1)),
       ),
       'a-verifier',
     );

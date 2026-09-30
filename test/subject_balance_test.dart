@@ -213,7 +213,9 @@ void main() {
     test('stays silent while any subject is still being projected', () {
       final OverallStats stats = OverallStats(
         subjects: <SubjectStats>[
-          statsOf(of: subject(id: 1, priorHeld: 18, priorAttended: 12, expectedTotal: 20)),
+          statsOf(
+              of: subject(
+                  id: 1, priorHeld: 18, priorAttended: 12, expectedTotal: 20)),
           statsOf(of: subject(id: 2, name: 'Maths'), present: 1, fromSlots: 17),
         ],
         target: 0.75,

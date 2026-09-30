@@ -143,6 +143,7 @@ enum NotionField {
     description: 'The category the class sits in, such as Lecture or Lab.',
     types: <String>{'select'},
   ),
+
   /// A formula is offered too: a tracker built by hand works its weight out
   /// from the class type, and importing it at 1 counts every lab once. Sync
   /// only reads one, never writes it.

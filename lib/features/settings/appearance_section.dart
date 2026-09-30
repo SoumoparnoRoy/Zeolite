@@ -53,7 +53,8 @@ class AppearanceSection extends ConsumerWidget {
                 title: mode.label,
                 subtitle: _themes[mode]!.$2,
                 selected: settings.themeMode == mode,
-                onTap: () => controller.save(settings.copyWith(themeMode: mode)),
+                onTap: () =>
+                    controller.save(settings.copyWith(themeMode: mode)),
               ),
           ],
         ),

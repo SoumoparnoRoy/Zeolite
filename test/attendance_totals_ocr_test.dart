@@ -46,7 +46,8 @@ class _Row {
   final bool merged;
 }
 
-List<OcrLine> _sheet(List<_Row> rows, {String? footer, String? footerAttended}) {
+List<OcrLine> _sheet(List<_Row> rows,
+    {String? footer, String? footerAttended}) {
   final List<OcrLine> lines = <OcrLine>[
     // The header wraps: "Total Sessions" is drawn as two lines, and the second
     // one sits lower than "Percentage" beside it.
@@ -65,8 +66,7 @@ List<OcrLine> _sheet(List<_Row> rows, {String? footer, String? footerAttended}) 
     final double centre = _firstRow + i * _rowHeight;
     for (int n = 0; n < row.nameLines.length; n++) {
       // Wrapped name lines straddle the centre the numbers sit on.
-      final double offset =
-          (n - (row.nameLines.length - 1) / 2) * 22;
+      final double offset = (n - (row.nameLines.length - 1) / 2) * 22;
       final bool last = n == row.nameLines.length - 1;
       if (row.merged && last) {
         // One line from the name column to the far side of the total's, which
@@ -155,7 +155,8 @@ void main() {
     });
 
     test('names the number columns for a second look at them', () {
-      final OcrBox band = AttendanceTotalsOcr.numberColumns(_sheet(_threeRows))!;
+      final OcrBox band =
+          AttendanceTotalsOcr.numberColumns(_sheet(_threeRows))!;
       // Wide enough for the three number headers, and short of the percentage.
       expect(band.left, lessThan(_total));
       expect(band.right, greaterThan(_attended));
@@ -288,7 +289,9 @@ void main() {
       ];
       final AttendanceTotals totals = AttendanceTotalsOcr.read(
         _sheet(sheet),
-        cells: _cells(sheet, missing: <int, Set<int>>{3: <int>{2}}),
+        cells: _cells(sheet, missing: <int, Set<int>>{
+          3: <int>{2}
+        }),
       )!;
       final TotalsRow row = totals.rows.last;
       expect(row.held, 7);
@@ -304,7 +307,9 @@ void main() {
       ];
       final AttendanceTotals totals = AttendanceTotalsOcr.read(
         _sheet(sheet),
-        cells: _cells(sheet, missing: <int, Set<int>>{3: <int>{1}}),
+        cells: _cells(sheet, missing: <int, Set<int>>{
+          3: <int>{1}
+        }),
       )!;
       final TotalsRow row = totals.rows.last;
       expect(row.held, 7);
@@ -321,7 +326,9 @@ void main() {
       ];
       final AttendanceTotals totals = AttendanceTotalsOcr.read(
         _sheet(sheet),
-        cells: _cells(sheet, missing: <int, Set<int>>{3: <int>{1}}),
+        cells: _cells(sheet, missing: <int, Set<int>>{
+          3: <int>{1}
+        }),
       )!;
 
       expect(totals.rows, hasLength(4));
@@ -340,7 +347,9 @@ void main() {
       // 18 + 5 + 20 read, so the page's 49 leaves exactly 6 for the last row.
       final AttendanceTotals totals = AttendanceTotalsOcr.read(
         _sheet(sheet, footer: 'Total Session:49'),
-        cells: _cells(sheet, missing: <int, Set<int>>{3: <int>{0}}),
+        cells: _cells(sheet, missing: <int, Set<int>>{
+          3: <int>{0}
+        }),
       )!;
       expect(totals.rows.last.expectedTotal, 6);
       expect(totals.addsUp, isTrue);
@@ -356,8 +365,10 @@ void main() {
       ];
       final AttendanceTotals totals = AttendanceTotalsOcr.read(
         _sheet(sheet, footer: 'Total Session:55'),
-        cells: _cells(sheet,
-            missing: <int, Set<int>>{3: <int>{0}, 4: <int>{0}}),
+        cells: _cells(sheet, missing: <int, Set<int>>{
+          3: <int>{0},
+          4: <int>{0}
+        }),
       )!;
       expect(totals.rows[3].expectedTotal, isNull);
       expect(totals.rows[4].expectedTotal, isNull);
@@ -463,7 +474,8 @@ void main() {
 
     test('a total percentage line stays out of the last course name', () {
       final List<OcrLine> lines = _sheet(_threeRows,
-          footer: 'Total Session:43', footerAttended: 'Total Attended Session: 34')
+          footer: 'Total Session:43',
+          footerAttended: 'Total Attended Session: 34')
         ..add(_at('Total Percentage: 79.06%', 500, 400, w: 400));
       final AttendanceTotals totals = AttendanceTotalsOcr.read(lines)!;
       expect(totals.rows.last.subject, 'Control Systems');
@@ -568,8 +580,8 @@ void main() {
         }),
       )!;
 
-      expect(page.rows.map((TotalsRow r) => r.expectedTotal),
-          <int>[21, 7, 5, 21]);
+      expect(
+          page.rows.map((TotalsRow r) => r.expectedTotal), <int>[21, 7, 5, 21]);
       expect(page.totalSum, 54);
       expect(page.addsUp, isTrue);
       expect(page.suspect, isEmpty);
@@ -729,7 +741,8 @@ void main() {
         'Signal Theory',
       );
       expect(
-        AttendanceTotalsOcr.cleanName('3D Printing and Prototyping _0dd_2026-27'),
+        AttendanceTotalsOcr.cleanName(
+            '3D Printing and Prototyping _0dd_2026-27'),
         '3D Printing and Prototyping',
       );
     });

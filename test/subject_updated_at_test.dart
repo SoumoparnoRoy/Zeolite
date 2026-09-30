@@ -58,7 +58,8 @@ void main() {
     final Subject after = await only();
     expect(after.name, 'Renamed Course');
     expect(after.updatedAt, isNotNull);
-    expect(after.createdAt, DateTime(2026, 1, 1), reason: 'creation is not an edit');
+    expect(after.createdAt, DateTime(2026, 1, 1),
+        reason: 'creation is not an edit');
   });
 
   test('an unedited subject is dated from when it was created', () {

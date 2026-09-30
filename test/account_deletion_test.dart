@@ -41,17 +41,15 @@ void main() {
   Future<int> documentsUnderUser() async {
     int total = 0;
     for (final String name in FirestoreSyncTarget.collectionNames) {
-      final QuerySnapshot<Map<String, Object?>> page = await firestore
-          .collection('users')
-          .doc(_uid)
-          .collection(name)
-          .get();
+      final QuerySnapshot<Map<String, Object?>> page =
+          await firestore.collection('users').doc(_uid).collection(name).get();
       total += page.docs.length;
     }
     return total;
   }
 
-  test('deletion clears a document from every collection sync writes', () async {
+  test('deletion clears a document from every collection sync writes',
+      () async {
     final FirestoreSyncTarget target =
         FirestoreSyncTarget(uid: _uid, firestore: firestore);
     for (final SyncKind kind in SyncKind.values) {

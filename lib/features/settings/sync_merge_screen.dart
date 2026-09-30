@@ -103,9 +103,7 @@ class _SyncMergeScreenState extends ConsumerState<SyncMergeScreen> {
       floatingActionButton: _merging
           ? const _Merging()
           : GradientFab(
-              label: left == 0
-                  ? 'Merge'
-                  : 'Merge — $left left to choose',
+              label: left == 0 ? 'Merge' : 'Merge — $left left to choose',
               onPressed: left == 0 ? _merge : null,
             ),
       slivers: <Widget>[

@@ -164,7 +164,8 @@ void main() {
       () async {
     final NotionClient client = _client(
       MockClient(
-        (http.Request r) async => http.Response(_error('object_not_found'), 404),
+        (http.Request r) async =>
+            http.Response(_error('object_not_found'), 404),
       ),
     );
 

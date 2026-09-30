@@ -37,7 +37,9 @@ Future<void> importClassLogFile(BuildContext context, WidgetRef ref) async {
   final ClassLogTable? table = ClassLogTable.of(await picked.readAsBytes());
   if (!context.mounted) return;
   if (table == null) {
-    _say(context, 'No rows could be found in that file. It needs to be a '
+    _say(
+        context,
+        'No rows could be found in that file. It needs to be a '
         'CSV, or a Notion export holding one.');
     return;
   }

@@ -287,7 +287,8 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                         // width so a swipe anywhere still turns the day.
                         for (final Widget sliver in <Widget>[
                           SliverPadding(
-                            padding: const EdgeInsets.fromLTRB(_pad, 0, _pad, 0),
+                            padding:
+                                const EdgeInsets.fromLTRB(_pad, 0, _pad, 0),
                             sliver: SliverToBoxAdapter(
                               child: Row(
                                 children: <Widget>[
@@ -307,8 +308,8 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                                   ),
                                   if (unmarkedToday > 1)
                                     InkWell(
-                                      onTap: () =>
-                                          _markAllPresent(context, ref, sessions),
+                                      onTap: () => _markAllPresent(
+                                          context, ref, sessions),
                                       borderRadius: BorderRadius.circular(8),
                                       child: Padding(
                                         padding: const EdgeInsets.symmetric(
@@ -380,7 +381,8 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                               !outsideTerm)
                             SliverToBoxAdapter(
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 36),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 36),
                                 // A timetable with nothing in it at all is a first
                                 // run, not a free day — "enjoy the free day" told
                                 // someone who had just finished setting up that the
@@ -399,8 +401,8 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                                             initialDate: date,
                                           ),
                                           icon: const Icon(Icons.add_rounded),
-                                          label:
-                                              const Text('Add your first class'),
+                                          label: const Text(
+                                              'Add your first class'),
                                         ),
                                       )
                                     : EmptyState(
@@ -417,7 +419,8 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                               ),
                             ),
                           SliverPadding(
-                            padding: const EdgeInsets.fromLTRB(_pad, 0, _pad, 96),
+                            padding:
+                                const EdgeInsets.fromLTRB(_pad, 0, _pad, 96),
                             sliver: SliverList.separated(
                               itemCount: sessions.length,
                               separatorBuilder: (_, __) =>
@@ -435,17 +438,18 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                                           context.palette,
                                         )
                                       : null,
-                                  categoryName:
-                                      data
-                                          ?.categoryById(
-                                            session.effectiveCategoryId,
-                                          )
-                                          ?.name,
-                                  tagName:
-                                      data?.tagById(session.record?.tagId)?.name,
+                                  categoryName: data
+                                      ?.categoryById(
+                                        session.effectiveCategoryId,
+                                      )
+                                      ?.name,
+                                  tagName: data
+                                      ?.tagById(session.record?.tagId)
+                                      ?.name,
                                   isNext: next != null &&
                                       next.date == session.date &&
-                                      next.startMinutes == session.startMinutes &&
+                                      next.startMinutes ==
+                                          session.startMinutes &&
                                       next.subject.id == session.subject.id,
                                   onMark: (AttendanceStatus status) => ref
                                       .read(attendanceActionsProvider)
@@ -582,7 +586,8 @@ class _DayHeader extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     HeaderTitle(stats.verdict),
-                    if (stats.verdictDetail case final String detail) ...<Widget>[
+                    if (stats.verdictDetail
+                        case final String detail) ...<Widget>[
                       const SizedBox(height: 4),
                       HeaderCaption(detail),
                     ],
@@ -747,44 +752,44 @@ class _InAppAlertDialog extends StatelessWidget {
       // scrolls and the title and Got it stay put.
       content: SingleChildScrollView(
         child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          for (final SubjectStats s in alerts)
-            Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.md),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    s.subject.name,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            for (final SubjectStats s in alerts)
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      s.subject.name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    NotificationService.dangerMessage(s),
-                    style: TextStyle(
-                      color: p.textSecondary,
-                      fontSize: 12.5,
-                      height: 1.35,
+                    const SizedBox(height: 2),
+                    Text(
+                      NotificationService.dangerMessage(s),
+                      style: TextStyle(
+                        color: p.textSecondary,
+                        fontSize: 12.5,
+                        height: 1.35,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
+              ),
+            Text(
+              'Notifications for these are off, so Zeolite is telling you '
+              'here instead. Change this in Settings → Notifications.',
+              style: TextStyle(
+                color: p.textTertiary,
+                fontSize: 11.5,
+                height: 1.35,
               ),
             ),
-          Text(
-            'Notifications for these are off, so Zeolite is telling you '
-            'here instead. Change this in Settings → Notifications.',
-            style: TextStyle(
-              color: p.textTertiary,
-              fontSize: 11.5,
-              height: 1.35,
-            ),
-          ),
-        ],
+          ],
         ),
       ),
       actions: <Widget>[

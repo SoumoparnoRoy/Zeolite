@@ -8,8 +8,10 @@ import 'package:zeolite/data/models/class_session.dart';
 import 'package:zeolite/data/models/subject.dart';
 import 'package:zeolite/features/today/session_card.dart';
 
-const Subject _signals = Subject(id: 1, name: 'Signal Theory', colorValue: 0xFF7C6BFF);
-const Subject _control = Subject(id: 2, name: 'Control Systems', colorValue: 0xFF3DD68C);
+const Subject _signals =
+    Subject(id: 1, name: 'Signal Theory', colorValue: 0xFF7C6BFF);
+const Subject _control =
+    Subject(id: 2, name: 'Control Systems', colorValue: 0xFF3DD68C);
 
 ClassSession _session(Subject subject, {AttendanceStatus? status}) {
   final DateTime date = DateTime(2026, 8, 26);

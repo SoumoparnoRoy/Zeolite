@@ -93,7 +93,8 @@ class ClassLogMapping {
   ClassLogMapping withGuessedWords(ClassLogTable table) {
     final Map<String, LogVerdict> statuses = <String, LogVerdict>{
       for (final String word in table.valuesOf(columns[NotionField.status]))
-        if (LogVerdict.guess(word) case final LogVerdict v) word.toLowerCase(): v,
+        if (LogVerdict.guess(word) case final LogVerdict v)
+          word.toLowerCase(): v,
       ...this.statuses,
     };
     final Map<String, NotionKind> types = <String, NotionKind>{
@@ -105,8 +106,8 @@ class ClassLogMapping {
     return copyWith(
       statuses: statuses,
       types: types,
-      dayFirst: dayFirst ??
-          _dateOrder(table.valuesOf(columns[NotionField.date])),
+      dayFirst:
+          dayFirst ?? _dateOrder(table.valuesOf(columns[NotionField.date])),
     );
   }
 

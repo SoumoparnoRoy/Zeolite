@@ -134,8 +134,7 @@ void main() {
           cancelledCounts: plan.countsCancelled,
         );
     expect(
-      (await container.read(settingsProvider.future))
-          .cancelledCountsAsAttended,
+      (await container.read(settingsProvider.future)).cancelledCountsAsAttended,
       isTrue,
     );
     expect(
@@ -148,8 +147,7 @@ void main() {
 
     expect(await repo.getAttendance(), isEmpty);
     expect(
-      (await container.read(settingsProvider.future))
-          .cancelledCountsAsAttended,
+      (await container.read(settingsProvider.future)).cancelledCountsAsAttended,
       isFalse,
     );
   });

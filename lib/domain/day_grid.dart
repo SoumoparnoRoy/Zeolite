@@ -121,8 +121,9 @@ class DayGrid {
     return blocks < 1 ? 1 : blocks;
   }
 
-  int snapDuration(int durationMinutes) =>
-      isConfigured ? blocksFor(durationMinutes) * blockMinutes : durationMinutes;
+  int snapDuration(int durationMinutes) => isConfigured
+      ? blocksFor(durationMinutes) * blockMinutes
+      : durationMinutes;
 
   /// Lets the UI say "2 blocks" only when that is exactly true, rather than
   /// rounding on the user's behalf.

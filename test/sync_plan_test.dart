@@ -76,7 +76,8 @@ void main() {
     });
 
     test('holds still for a tag, which is a local label', () {
-      expect(SyncItem.attendance(_mark(tagId: 7), _subjectUuid).hash, present.hash);
+      expect(SyncItem.attendance(_mark(tagId: 7), _subjectUuid).hash,
+          present.hash);
     });
 
     test('does not depend on the order fields were built in', () {
@@ -285,8 +286,7 @@ void main() {
     });
 
     test('a run offline is a state of its own, not an error', () {
-      final SyncStatus status =
-          const SyncStatus().failed(SyncFailure.offline);
+      final SyncStatus status = const SyncStatus().failed(SyncFailure.offline);
 
       expect(status.state, SyncState.offline);
       expect(backoff.delayFor(status.failures), const Duration(seconds: 30));

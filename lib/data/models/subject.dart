@@ -124,8 +124,7 @@ class Subject {
         'target_percent': targetPercent,
         'category_id': categoryId,
         'created_at': (createdAt ?? DateTime.now()).millisecondsSinceEpoch,
-        if (updatedAt != null)
-          'updated_at': updatedAt!.millisecondsSinceEpoch,
+        if (updatedAt != null) 'updated_at': updatedAt!.millisecondsSinceEpoch,
         'prior_held': priorHeld,
         'prior_attended': priorAttended,
         'expected_total': expectedTotal,

@@ -128,8 +128,10 @@ void main() {
         );
       }
       if (path == '/v1/databases/courses') {
-        return http.Response('{"id":"courses","data_sources":'
-            '[{"id":"ds-c"}],"title":[{"plain_text":"Zeolite Courses"}]}', 200);
+        return http.Response(
+            '{"id":"courses","data_sources":'
+            '[{"id":"ds-c"}],"title":[{"plain_text":"Zeolite Courses"}]}',
+            200);
       }
       if (path == '/v1/databases/db-1') return http.Response(_ready, 200);
       return http.Response(
@@ -143,7 +145,9 @@ void main() {
     await container.read(notionMappingProvider.future);
 
     expect(
-      await container.read(notionMappingProvider.notifier).adoptTemplate('page-1'),
+      await container
+          .read(notionMappingProvider.notifier)
+          .adoptTemplate('page-1'),
       isTrue,
     );
     // Courses comes first in the page and has no Date or Status, so it cannot
@@ -191,8 +195,8 @@ void main() {
 
     final List<String> missing =
         container.read(notionMappingProvider).value!.unmapped(
-              categoryNames: <String>['Lab'],
-            );
+      categoryNames: <String>['Lab'],
+    );
     expect(missing, contains('Attendance Credit'));
     // Only the column's own options are asked about, and only the one whose
     // name does not say what it means.
@@ -230,8 +234,7 @@ void main() {
     await container.read(notionMappingProvider.future);
     await container.read(notionMappingProvider.notifier).adoptTemplate('db-1');
 
-    final NotionMapping mapping =
-        container.read(notionMappingProvider).value!;
+    final NotionMapping mapping = container.read(notionMappingProvider).value!;
     expect(mapping.unmapped(), isEmpty);
   });
 
@@ -261,8 +264,7 @@ void main() {
     await container.read(notionMappingProvider.future);
     await container.read(notionMappingProvider.notifier).adoptTemplate('db-1');
 
-    final NotionMapping mapping =
-        container.read(notionMappingProvider).value!;
+    final NotionMapping mapping = container.read(notionMappingProvider).value!;
     expect(mapping.kindValues['lab'], 'Lab');
 
     // Seminar has no option spelled that way, so it is left for the user —
@@ -303,7 +305,9 @@ void main() {
     await container.read(notionMappingProvider.future);
 
     expect(
-      await container.read(notionMappingProvider.notifier).adoptTemplate('page-1'),
+      await container
+          .read(notionMappingProvider.notifier)
+          .adoptTemplate('page-1'),
       isTrue,
     );
     expect(container.read(notionMappingProvider).value?.databaseId, 'db-1');
@@ -330,7 +334,8 @@ void main() {
     name = 'Zeolite Classes';
     await container.read(notionMappingProvider.notifier).refreshTitle();
 
-    expect(container.read(notionMappingProvider).value?.title, 'Zeolite Classes');
+    expect(
+        container.read(notionMappingProvider).value?.title, 'Zeolite Classes');
     // Written through as well, or the old name is back on the next launch.
     final NotionConnectionStore store =
         container.read(notionConnectionStoreProvider);

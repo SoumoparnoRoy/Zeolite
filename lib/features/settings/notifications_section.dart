@@ -48,7 +48,8 @@ class NotificationsSection extends ConsumerWidget {
           padding: EdgeInsets.zero,
           child: Column(
             children: <Widget>[
-              if (settings.notificationsEnabled && !tray.appAllowed) ...<Widget>[
+              if (settings.notificationsEnabled &&
+                  !tray.appAllowed) ...<Widget>[
                 SettingsRow(
                   icon: Icons.notifications_off_outlined,
                   title: 'Blocked in Android settings',

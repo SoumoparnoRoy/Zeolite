@@ -38,7 +38,8 @@ AttendanceRecord _on(DateTime date) => AttendanceRecord(
 TimetableData _data(List<AttendanceRecord> records) => TimetableData(
       categories: const <ClassCategory>[],
       subjects: const <Subject>[
-        Subject(id: 1, name: 'Physics', colorValue: AppColors.defaultSubjectColor),
+        Subject(
+            id: 1, name: 'Physics', colorValue: AppColors.defaultSubjectColor),
       ],
       slots: const <ClassSlot>[],
       extras: const <ExtraClass>[],

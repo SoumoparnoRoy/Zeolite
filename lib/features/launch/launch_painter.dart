@@ -586,8 +586,8 @@ class LaunchPainter extends CustomPainter {
       );
       // An unmarked day has no colour of its own, so it settles as an accent
       // node rather than losing its outline to nothing.
-      _fill.color = (filled ? colors.forMark(n.mark) : colors.accent)
-          .withValues(
+      _fill.color =
+          (filled ? colors.forMark(n.mark) : colors.accent).withValues(
         alpha: lerpd(filled ? 0.92 : 0, colors.lift(dot), o) * opacity,
       );
       canvas.drawRRect(box, _fill);

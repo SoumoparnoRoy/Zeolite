@@ -12,10 +12,10 @@ void main() {
       AuthService.reasonFor('requires-recent-login'),
       AuthFailure.needsRecentLogin,
     );
-    expect(AuthService.reasonFor('invalid-credential'),
-        AuthFailure.wrongPassword);
-    expect(AuthService.reasonFor('network-request-failed'),
-        AuthFailure.network);
+    expect(
+        AuthService.reasonFor('invalid-credential'), AuthFailure.wrongPassword);
+    expect(
+        AuthService.reasonFor('network-request-failed'), AuthFailure.network);
     expect(AuthService.reasonFor('something-new'), AuthFailure.unknown);
   });
 }

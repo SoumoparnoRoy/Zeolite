@@ -14,7 +14,8 @@ class _Armed extends ActionCore {
 final Provider<ActionCore> _core = Provider<ActionCore>(_Armed.new);
 
 void main() {
-  testWidgets('the undo offer goes away on its own', (WidgetTester tester) async {
+  testWidgets('the undo offer goes away on its own',
+      (WidgetTester tester) async {
     await tester.pumpWidget(
       ProviderScope(
         child: MaterialApp(

@@ -202,9 +202,8 @@ void main() {
 
     await target.create(_mark(tag: 'Proxy'));
 
-    final Map<String, Object?> props =
-        (jsonDecode(sent.body) as Map<String, Object?>)['properties']!
-            as Map<String, Object?>;
+    final Map<String, Object?> props = (jsonDecode(sent.body)
+        as Map<String, Object?>)['properties']! as Map<String, Object?>;
     // Writing "Present" would lose the distinction the user recorded, and the
     // export has always spelled this one out.
     expect(props['p3'], <String, Object?>{
@@ -221,9 +220,8 @@ void main() {
 
     await target.create(_mark());
 
-    final Map<String, Object?> props =
-        (jsonDecode(sent.body) as Map<String, Object?>)['properties']!
-            as Map<String, Object?>;
+    final Map<String, Object?> props = (jsonDecode(sent.body)
+        as Map<String, Object?>)['properties']! as Map<String, Object?>;
     // The category is `Lab` here and the option is `Practical`; the category
     // name itself is not a value this Type column offers.
     expect(props['p4'], <String, Object?>{
@@ -249,9 +247,8 @@ void main() {
       ),
     );
 
-    final Map<String, Object?> props =
-        (jsonDecode(sent.body) as Map<String, Object?>)['properties']!
-            as Map<String, Object?>;
+    final Map<String, Object?> props = (jsonDecode(sent.body)
+        as Map<String, Object?>)['properties']! as Map<String, Object?>;
     expect(props['p4'], <String, Object?>{
       'select': <String, Object?>{'name': 'Practical'},
     });
@@ -269,9 +266,8 @@ void main() {
 
     await target.create(_mark());
 
-    final Map<String, Object?> props =
-        (jsonDecode(sent.body) as Map<String, Object?>)['properties']!
-            as Map<String, Object?>;
+    final Map<String, Object?> props = (jsonDecode(sent.body)
+        as Map<String, Object?>)['properties']! as Map<String, Object?>;
     expect(props.containsKey('p4'), isFalse);
   });
 
@@ -285,9 +281,8 @@ void main() {
 
     await target.create(_mark(status: 'absent', weight: 2));
 
-    final Map<String, Object?> props =
-        (jsonDecode(sent.body) as Map<String, Object?>)['properties']!
-            as Map<String, Object?>;
+    final Map<String, Object?> props = (jsonDecode(sent.body)
+        as Map<String, Object?>)['properties']! as Map<String, Object?>;
     expect(props['p5'], <String, Object?>{'number': 2});
     expect(props['p6'], <String, Object?>{'number': 0});
   });
@@ -323,7 +318,8 @@ void main() {
     expect(read!.single.remoteId, 'page-1');
   });
 
-  test('a claimed row gets its key and keeps every other cell unless it '
+  test(
+      'a claimed row gets its key and keeps every other cell unless it '
       'disagrees', () async {
     Map<String, Object?> handMade(String id, String status) =>
         <String, Object?>{
@@ -360,9 +356,8 @@ void main() {
             200,
           );
         }
-        written[r.url.pathSegments.last] =
-            (jsonDecode(r.body) as Map<String, Object?>)['properties']!
-                as Map<String, Object?>;
+        written[r.url.pathSegments.last] = (jsonDecode(r.body)
+            as Map<String, Object?>)['properties']! as Map<String, Object?>;
         return http.Response('{}', 200);
       }),
     );
@@ -480,9 +475,8 @@ void main() {
 
     await target.create(_mark());
 
-    final Map<String, Object?> props =
-        (jsonDecode(sent.body) as Map<String, Object?>)['properties']!
-            as Map<String, Object?>;
+    final Map<String, Object?> props = (jsonDecode(sent.body)
+        as Map<String, Object?>)['properties']! as Map<String, Object?>;
     // 540 is the third part of the key. Written in its own column and never
     // onto the date, which Notion would treat as an instant and shift.
     expect(
@@ -506,17 +500,15 @@ void main() {
 
     await target.create(_mark(status: 'cancelled', weight: 2));
 
-    final Map<String, Object?> props =
-        (jsonDecode(sent.body) as Map<String, Object?>)['properties']!
-            as Map<String, Object?>;
+    final Map<String, Object?> props = (jsonDecode(sent.body)
+        as Map<String, Object?>)['properties']! as Map<String, Object?>;
     // The reader already treats held 0 as cancelled, and the dashboard sums
     // this column: held 2 would read as two classes you missed.
     expect(props['p5'], <String, Object?>{'number': 0});
     expect(props['p6'], <String, Object?>{'number': 0});
   });
 
-  test('unless the institution counts a cancelled class as attended',
-      () async {
+  test('unless the institution counts a cancelled class as attended', () async {
     late http.Request sent;
     final NotionSyncTarget target = _target(
       MockClient((http.Request r) async {
@@ -528,9 +520,8 @@ void main() {
 
     await target.create(_mark(status: 'cancelled', weight: 2));
 
-    final Map<String, Object?> props =
-        (jsonDecode(sent.body) as Map<String, Object?>)['properties']!
-            as Map<String, Object?>;
+    final Map<String, Object?> props = (jsonDecode(sent.body)
+        as Map<String, Object?>)['properties']! as Map<String, Object?>;
     // Both sides, so the dashboard's fraction moves the way the app's does.
     expect(props['p5'], <String, Object?>{'number': 2});
     expect(props['p6'], <String, Object?>{'number': 2});

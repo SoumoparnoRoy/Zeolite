@@ -151,8 +151,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('which these numbers do not give'),
-        findsOneWidget);
+    expect(
+        find.textContaining('which these numbers do not give'), findsOneWidget);
     expect(find.text('Bring in 1'), findsOneWidget);
   });
 

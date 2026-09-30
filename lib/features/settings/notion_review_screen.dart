@@ -75,9 +75,8 @@ class _NotionReviewScreenState extends ConsumerState<NotionReviewScreen> {
     final List<Subject> subjects = data?.subjects ?? const <Subject>[];
     final List<AttendanceRecord> records =
         data?.records ?? const <AttendanceRecord>[];
-    final int taking = _choices.values
-        .where((SyncSide side) => side == SyncSide.there)
-        .length;
+    final int taking =
+        _choices.values.where((SyncSide side) => side == SyncSide.there).length;
     final int keeping = _choices.length - taking;
     final int left = _pulls.length - _choices.length;
 
@@ -269,10 +268,8 @@ class _Row extends StatelessWidget {
     final int? start = int.tryParse(parts[2]);
     if (key == null || start == null) return null;
 
-    final int? subjectId = subjects
-        .where((Subject s) => s.uuid == parts.first)
-        .firstOrNull
-        ?.id;
+    final int? subjectId =
+        subjects.where((Subject s) => s.uuid == parts.first).firstOrNull?.id;
     if (subjectId == null) return null;
 
     return records
@@ -303,9 +300,8 @@ class _Row extends StatelessWidget {
     return weight is int && weight != 1 ? '$label, counts as $weight' : label;
   }
 
-  static String _capitalise(String value) => value.isEmpty
-      ? value
-      : '${value[0].toUpperCase()}${value.substring(1)}';
+  static String _capitalise(String value) =>
+      value.isEmpty ? value : '${value[0].toUpperCase()}${value.substring(1)}';
 }
 
 class _Choice extends StatelessWidget {

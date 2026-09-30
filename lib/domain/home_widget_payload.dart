@@ -57,7 +57,8 @@ class HomeWidgetPayload {
     required ScheduleEngine engine,
     DateTime? on,
   }) {
-    final DateTime monday = Dates.startOfWeek(Dates.dayOf(on ?? DateTime.now()));
+    final DateTime monday =
+        Dates.startOfWeek(Dates.dayOf(on ?? DateTime.now()));
     final Map<int, List<ClassSession>> byDay = engine.sessionsForWeekOf(monday);
     return <String, Object?>{
       'monday': Dates.keyOf(monday),
@@ -65,7 +66,8 @@ class HomeWidgetPayload {
           '${Dates.formatDayMonth(Dates.addDays(monday, 6))}',
       'unmarked': <int>[
         for (int i = 0; i < 7; i++)
-          (byDay[Dates.keyOf(Dates.addDays(monday, i))] ?? const <ClassSession>[])
+          (byDay[Dates.keyOf(Dates.addDays(monday, i))] ??
+                  const <ClassSession>[])
               .where((ClassSession s) => s.needsMarking)
               .length,
       ],
@@ -151,8 +153,8 @@ class HomeWidgetPayload {
   /// system would otherwise get a white widget beside a dark app.
   static Map<String, Object?> theme(AppSettings settings) {
     final AppPalette p = widgetBrightness(settings) == Brightness.light
-            ? AppPalette.light
-            : AppPalette.dark;
+        ? AppPalette.light
+        : AppPalette.dark;
     return <String, Object?>{
       'canvas': p.canvas.toARGB32(),
       'surface': p.surface.toARGB32(),

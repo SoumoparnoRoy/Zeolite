@@ -93,7 +93,8 @@ class _SignedIn extends ConsumerWidget {
     final AuthResult result =
         await ref.read(authServiceProvider).deleteAccount();
     if (!result.ok) {
-      messenger.showSnackBar(SnackBar(content: Text(authFailureMessage(result.failure!))));
+      messenger.showSnackBar(
+          SnackBar(content: Text(authFailureMessage(result.failure!))));
     }
   }
 
@@ -150,7 +151,8 @@ class _SyncSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final SyncStatus status = ref.watch(syncStatusProvider);
-    final SyncRunResult? last = ref.read(syncStatusProvider.notifier).lastResult;
+    final SyncRunResult? last =
+        ref.read(syncStatusProvider.notifier).lastResult;
     final bool running = status.state == SyncState.running;
     final AppSettings settings =
         ref.watch(settingsProvider).value ?? const AppSettings();

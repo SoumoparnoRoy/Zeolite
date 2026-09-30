@@ -41,8 +41,7 @@ class TrayAccess {
   final bool appAllowed;
   final Set<TrayChannel> blocked;
 
-  bool allows(TrayChannel channel) =>
-      appAllowed && !blocked.contains(channel);
+  bool allows(TrayChannel channel) => appAllowed && !blocked.contains(channel);
 
   /// Blocked on its own, while the app as a whole is allowed. With the app
   /// blocked the per-channel answer tells the user nothing new.
@@ -671,8 +670,8 @@ class NotificationService {
     List<ClassSession> sessions,
     AndroidScheduleMode mode,
   ) async {
-    final Map<int, int> counts =
-        eveningCounts(sessions, reminderMinutes: settings.eveningReminderMinutes);
+    final Map<int, int> counts = eveningCounts(sessions,
+        reminderMinutes: settings.eveningReminderMinutes);
     final Set<int> shown = <int>{
       for (final ActiveNotification n in await _activeNotifications())
         if (n.id != null) n.id!,

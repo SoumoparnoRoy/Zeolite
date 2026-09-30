@@ -5,10 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 /// Settings now promises the data stays put *unless Notion is connected*. The
 /// manifest decides half of that; the absence of any other caller decides the rest.
 void main() {
-  final File manifest =
-      File('android/app/src/main/AndroidManifest.xml');
-  final File settings =
-      File('lib/features/settings/settings_screen.dart');
+  final File manifest = File('android/app/src/main/AndroidManifest.xml');
+  final File settings = File('lib/features/settings/settings_screen.dart');
 
   /// Takes a full permission name: the ones a dependency drags in are not all
   /// under `android.permission`.
@@ -21,7 +19,8 @@ void main() {
 
     expect(xml, contains('android:allowBackup="false"'));
     // Android 12+ transfers device to device, which allowBackup does not cover.
-    expect(xml, contains('android:dataExtractionRules="@xml/data_extraction_rules"'));
+    expect(xml,
+        contains('android:dataExtractionRules="@xml/data_extraction_rules"'));
 
     final File rules =
         File('android/app/src/main/res/xml/data_extraction_rules.xml');
@@ -36,8 +35,10 @@ void main() {
   test('the release build asks for INTERNET and nothing more', () {
     final String xml = manifest.readAsStringSync();
 
-    expect(xml,
-        contains('<uses-permission android:name="android.permission.INTERNET" />'));
+    expect(
+        xml,
+        contains(
+            '<uses-permission android:name="android.permission.INTERNET" />'));
     expect(removed('android.permission.INTERNET').hasMatch(xml), isFalse,
         reason: 'Notion sync cannot reach the network without it');
     // Analytics disables itself without this and says so only in logcat.

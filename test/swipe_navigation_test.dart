@@ -17,17 +17,17 @@ void main() {
   group('the home pager', () {
     test('the day view moves a day at a time', () {
       expect(_page(HomeView.day, _origin), TodayScreen.basePage);
-      expect(_page(HomeView.day, DateTime(2026, 9, 2)),
-          TodayScreen.basePage + 2);
-      expect(_date(HomeView.day, TodayScreen.basePage + 2),
-          DateTime(2026, 9, 2));
+      expect(
+          _page(HomeView.day, DateTime(2026, 9, 2)), TodayScreen.basePage + 2);
+      expect(
+          _date(HomeView.day, TodayScreen.basePage + 2), DateTime(2026, 9, 2));
     });
 
     test('the grid moves a week, since a day there shows the same block', () {
-      expect(_page(HomeView.grid, DateTime(2026, 9, 7)),
-          TodayScreen.basePage + 1);
-      expect(_date(HomeView.grid, TodayScreen.basePage + 1),
-          DateTime(2026, 9, 7));
+      expect(
+          _page(HomeView.grid, DateTime(2026, 9, 7)), TodayScreen.basePage + 1);
+      expect(
+          _date(HomeView.grid, TodayScreen.basePage + 1), DateTime(2026, 9, 7));
     });
 
     test('every day of a week sits on that week\'s page', () {

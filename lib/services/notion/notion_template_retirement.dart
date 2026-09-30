@@ -43,7 +43,8 @@ class NotionTemplateRetirement {
 
     // Read first, because the name to append to is the page's own.
     final NotionResult page = await _client.page(pageId);
-    final String name = '${NotionPlaces.titleOf(page.body) ?? databaseTitle} (old)';
+    final String name =
+        '${NotionPlaces.titleOf(page.body) ?? databaseTitle} (old)';
     return NotionRename(await _client.renamePage(pageId, name), name);
   }
 
@@ -60,7 +61,9 @@ class NotionTemplateRetirement {
 
     // Nothing above them, so the tables are all there is to take.
     final NotionResult result = await _client.trashDatabase(databaseId);
-    if (result.ok && coursesDatabaseId != null && coursesDatabaseId.isNotEmpty) {
+    if (result.ok &&
+        coursesDatabaseId != null &&
+        coursesDatabaseId.isNotEmpty) {
       await _client.trashDatabase(coursesDatabaseId);
     }
     return result;

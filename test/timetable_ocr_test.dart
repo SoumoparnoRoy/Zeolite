@@ -452,9 +452,11 @@ void main() {
       expect(entries, isNotEmpty);
       expect(entries.every((OcrEntry e) => e.to > e.from), isTrue);
       expect(
-        entries.any((OcrEntry e) =>
-            const <String>{'LECTURE', 'PRACTICAL', 'TUTORIAL'}
-                .contains(e.subject.toUpperCase())),
+        entries.any((OcrEntry e) => const <String>{
+              'LECTURE',
+              'PRACTICAL',
+              'TUTORIAL'
+            }.contains(e.subject.toUpperCase())),
         isFalse,
       );
     });
@@ -478,7 +480,8 @@ void main() {
         ..removeWhere((OcrLine l) => l.text == 'PQR4022');
       final List<OcrEntry> entries =
           TimetableOcr.read(lines, TimetableGridReader.read(lines)!);
-      final OcrEntry orphan = entries.firstWhere((OcrEntry e) => e.weekday == 2);
+      final OcrEntry orphan =
+          entries.firstWhere((OcrEntry e) => e.weekday == 2);
       expect(orphan.subject, 'Structures');
       expect(orphan.room, 'LT201');
     });
@@ -580,8 +583,7 @@ void main() {
         ..build()
         ..put(0, 0, 'AAA1001', room: 'R101', teacher: 'AB')
         ..put(0, 5, 'BBB2002', room: 'R102', teacher: 'CD');
-      sheet.lines
-          .add(_at('Lunch', sheet.colX(3), sheet.rowY(2), w: 60, h: 20));
+      sheet.lines.add(_at('Lunch', sheet.colX(3), sheet.rowY(2), w: 60, h: 20));
 
       final List<OcrEntry> entries = TimetableOcr.read(
           sheet.lines, TimetableGridReader.read(sheet.lines)!);
@@ -840,8 +842,8 @@ void main() {
         ..build()
         ..put(0, 0, 'AAA1001', room: 'R101', teacher: 'AB');
       final TimetableGrid grid = TimetableGridReader.read(sheet.lines)!;
-      final ReadConfidence c = TimetableOcr.confidenceOf(
-          grid, TimetableOcr.read(sheet.lines, grid));
+      final ReadConfidence c =
+          TimetableOcr.confidenceOf(grid, TimetableOcr.read(sheet.lines, grid));
       expect(c.doubts, contains(ReadDoubt.sparse));
     });
 
@@ -885,8 +887,7 @@ void main() {
         TimetableGrid? grid,
         List<OcrEntry> entries,
         List<OcrLine> lines,
-      }) best =
-          TimetableOcr.bestOf(<List<OcrLine>>[noise, _weekOfClasses()]);
+      }) best = TimetableOcr.bestOf(<List<OcrLine>>[noise, _weekOfClasses()]);
       expect(best.grid, isNotNull);
       expect(best.entries, hasLength(21));
       expect(TimetableOcr.bestOf(<List<OcrLine>>[noise]).grid, isNull);
@@ -900,8 +901,7 @@ void main() {
         TimetableGrid? grid,
         List<OcrEntry> entries,
         List<OcrLine> lines,
-      }) best =
-          TimetableOcr.bestOf(<List<OcrLine>>[empty]);
+      }) best = TimetableOcr.bestOf(<List<OcrLine>>[empty]);
       expect(best.grid, isNotNull);
       expect(best.entries, isEmpty);
     });
@@ -924,8 +924,7 @@ void main() {
         dividedRight: <List<bool>>[
           for (int r = 0; r + 1 < y.length; r++)
             <bool>[
-              for (int c = 1; c + 1 < x.length; c++)
-                !undrawn.contains((r, c)),
+              for (int c = 1; c + 1 < x.length; c++) !undrawn.contains((r, c)),
             ],
         ],
         dividedBelow: <List<bool>>[
@@ -1029,9 +1028,9 @@ void main() {
         lattice: lattice(undrawn: <(int, int)>{(1, 5)}),
       )!;
 
-      final List<OcrEntry> monday =
-          TimetableOcr.read(lines, grid).where((OcrEntry e) => e.weekday == 1)
-              .toList();
+      final List<OcrEntry> monday = TimetableOcr.read(lines, grid)
+          .where((OcrEntry e) => e.weekday == 1)
+          .toList();
       expect(monday.map((OcrEntry e) => e.subject),
           containsAll(<String>['BBB2002', 'CCC3003']));
       expect(monday.firstWhere((OcrEntry e) => e.subject == 'CCC3003').room,
@@ -1139,7 +1138,8 @@ void main() {
 
       expect(TimetableOcr.namedInShape(read('B204'), room: true), 'B204');
       expect(TimetableOcr.namedInShape(read('8204'), room: true), isNull);
-      expect(TimetableOcr.namedInShape(read('AAA1001'), room: false), 'AAA1001');
+      expect(
+          TimetableOcr.namedInShape(read('AAA1001'), room: false), 'AAA1001');
       expect(
         TimetableOcr.namedInShape(read('Example Course'), room: false),
         isNull,

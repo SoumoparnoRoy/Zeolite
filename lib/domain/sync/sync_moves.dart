@@ -73,7 +73,8 @@ class SyncMoves {
       final List<String> keys = fresh[entry.key] ?? const <String>[];
       if (keys.isEmpty) continue;
       final List<RemoteLink> old = entry.value
-        ..sort((RemoteLink a, RemoteLink b) => _byStart(a.localKey, b.localKey));
+        ..sort(
+            (RemoteLink a, RemoteLink b) => _byStart(a.localKey, b.localKey));
       keys.sort(_byStart);
 
       void pair(RemoteLink link, String key) {

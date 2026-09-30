@@ -198,9 +198,8 @@ class FirestoreSyncTarget implements SyncTarget {
     );
   }
 
-  static DateTime? _timeOf(Object? millis) => millis is int
-      ? DateTime.fromMillisecondsSinceEpoch(millis)
-      : null;
+  static DateTime? _timeOf(Object? millis) =>
+      millis is int ? DateTime.fromMillisecondsSinceEpoch(millis) : null;
 
   /// One value for every tombstone, so a delete looks like a change exactly
   /// once and a device that has already applied it sees no further difference.

@@ -123,7 +123,8 @@ void main() {
 
     // What "rewrite every row" does before it runs.
     await repo.deleteRemoteLinksFor('fake');
-    final SyncRunResult rewritten = await make().run(force: true, rewrite: true);
+    final SyncRunResult rewritten =
+        await make().run(force: true, rewrite: true);
 
     expect(rewritten.outcome, SyncRunOutcome.synced);
     expect(rewritten.pushed, greaterThan(0));

@@ -39,6 +39,5 @@ class TimetableChoices {
 
   /// Whether the axis [group] belongs to was answered at all. The letter is
   /// the axis, so answering `B1` says nothing about a `G` marker.
-  bool _answered(String group) =>
-      groups.any((String g) => g[0] == group[0]);
+  bool _answered(String group) => groups.any((String g) => g[0] == group[0]);
 }

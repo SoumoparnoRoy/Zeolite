@@ -143,8 +143,7 @@ class SubjectStats {
   /// True when even a perfect run from here cannot reach the target.
   bool get isUnrecoverable =>
       !meetsTarget &&
-      (termSpent ||
-          remainingPlanned > 0 && maxAchievableRatio < target - 1e-9);
+      (termSpent || remainingPlanned > 0 && maxAchievableRatio < target - 1e-9);
 
   AttendanceHealth get health {
     if (!hasData) return AttendanceHealth.empty;
@@ -286,9 +285,8 @@ class OverallStats {
   /// over what has been held, so it counts classes that have not happened yet
   /// as missed. Always the lower of the two, and shown alongside [percent]
   /// rather than instead of it — the subject cards are all [ratio].
-  double? get termPercent => !knowsTerm || expectedTotal == 0
-      ? null
-      : attended * 100 / expectedTotal;
+  double? get termPercent =>
+      !knowsTerm || expectedTotal == 0 ? null : attended * 100 / expectedTotal;
 
   bool get meetsTarget => held == 0 || ratio >= target - 1e-9;
 

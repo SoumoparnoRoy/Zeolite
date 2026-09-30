@@ -385,8 +385,7 @@ class AppSettings {
   }
 
   Map<String, Object?> toJson() => <String, Object?>{
-        'semesterStart':
-            termStart == null ? null : Dates.keyOf(termStart!),
+        'semesterStart': termStart == null ? null : Dates.keyOf(termStart!),
         'semesterEnd': termEnd == null ? null : Dates.keyOf(termEnd!),
         'countOutsideTerm': countOutsideTerm,
         'targetPercent': targetPercent,
@@ -610,8 +609,7 @@ class SettingsService {
     await prefs.setBool(_kNotifyBefore, settings.notifyBeforeClass);
     await prefs.setInt(_kLead, settings.notifyLeadMinutes);
     await prefs.setBool(_kNotifyAtEnd, settings.notifyAtClassEnd);
-    await prefs.setBool(
-        _kCancelledCounts, settings.cancelledCountsAsAttended);
+    await prefs.setBool(_kCancelledCounts, settings.cancelledCountsAsAttended);
     await prefs.setBool(_kNotifyEvening, settings.notifyEveningReminder);
     await prefs.setInt(_kEveningMinutes, settings.eveningReminderMinutes);
     await prefs.setBool(_kNotifyDanger, settings.notifyAttendanceDanger);

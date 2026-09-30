@@ -99,9 +99,8 @@ class NotionAuthClient {
   /// that connecting will fail.
   Future<bool> health() async {
     try {
-      final http.Response response = await _http
-          .get(_base.resolve('/health'))
-          .timeout(_wakeTimeout);
+      final http.Response response =
+          await _http.get(_base.resolve('/health')).timeout(_wakeTimeout);
       return response.statusCode == 200;
     } catch (_) {
       return false;
@@ -130,7 +129,8 @@ class NotionAuthClient {
   }) {
     final String? code =
         pairingCode?.replaceAll(RegExp(r'\s'), '').toUpperCase();
-    if ((session == null || session.isEmpty) && (code == null || code.isEmpty)) {
+    if ((session == null || session.isEmpty) &&
+        (code == null || code.isEmpty)) {
       return Future<NotionAuthResult>.value(
         const NotionAuthResult.failed(SyncFailure.rejected),
       );

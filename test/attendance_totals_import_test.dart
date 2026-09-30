@@ -3,7 +3,8 @@ import 'package:zeolite/data/models/subject.dart';
 import 'package:zeolite/domain/attendance_totals_import.dart';
 import 'package:zeolite/domain/attendance_totals_ocr.dart';
 
-TotalsRow _row(String name, {int total = 18, int held = 16, int attended = 14}) {
+TotalsRow _row(String name,
+    {int total = 18, int held = 16, int attended = 14}) {
   return TotalsRow(
     subject: name,
     expectedTotal: total,
@@ -48,8 +49,7 @@ void main() {
       expect(plan.rows.single.subject?.id, 1);
     });
 
-    test('a course already being marked here is an overlap, not an update',
-        () {
+    test('a course already being marked here is an overlap, not an update', () {
       final TotalsPlan plan = TotalsPlan.from(
         rows: <TotalsRow>[_row('Signal Theory')],
         subjects: const <Subject>[_signals],

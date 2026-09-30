@@ -89,13 +89,10 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
     // A browser tab, never `externalApplication`: the Notion app claims
     // api.notion.com and, handed the authorize URL, swallows the client id and
     // state and shows its own login screen. RFC 8252 says the same thing.
-    final bool opened =
-        await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+    final bool opened = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
     // Written before the browser can come back, not after.
     if (opened) {
-      await ref
-          .read(notionConnectionStoreProvider)
-          .writePending(pair.verifier);
+      await ref.read(notionConnectionStoreProvider).writePending(pair.verifier);
     }
     if (!mounted) return;
     setState(() {
@@ -114,20 +111,17 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
       _error = null;
     });
 
-    final NotionAuthResult result = await ref
-        .read(notionAuthClientProvider)
-        .claim(
-          session: session,
-          pairingCode: pairingCode,
-          verifier: verifier,
-        );
+    final NotionAuthResult result =
+        await ref.read(notionAuthClientProvider).claim(
+              session: session,
+              pairingCode: pairingCode,
+              verifier: verifier,
+            );
 
     if (!mounted) return;
     if (result.ok) {
       await ref.read(notionConnectionStoreProvider).clearPending();
-      await ref
-          .read(notionConnectionProvider.notifier)
-          .connect(result.tokens!);
+      await ref.read(notionConnectionProvider.notifier).connect(result.tokens!);
       if (!mounted) return;
       await _settleMapping(result.tokens!);
       return;

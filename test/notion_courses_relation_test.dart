@@ -38,8 +38,7 @@ NotionMapping _mapping() => NotionMapping(
           NotionCourseField.key: _p('c1', 'Zeolite ID', 'rich_text'),
           NotionCourseField.code: _p('c4', 'Code', 'rich_text'),
           NotionCourseField.priorHeld: _p('c2', 'Prior Held', 'number'),
-          NotionCourseField.priorAttended:
-              _p('c3', 'Prior Attended', 'number'),
+          NotionCourseField.priorAttended: _p('c3', 'Prior Attended', 'number'),
         },
       ),
     );
@@ -83,10 +82,10 @@ void main() {
       final Map<String, Object?> body =
           jsonDecode(r.body) as Map<String, Object?>;
       created.add(body);
-      final String parent = ((body['parent']! as Map<String, Object?>)
-          ['data_source_id'])! as String;
-      return http.Response('{"id":"${parent == 'ds-2' ? 'course' : 'mark'}"}',
-          200);
+      final String parent = ((body['parent']!
+          as Map<String, Object?>)['data_source_id'])! as String;
+      return http.Response(
+          '{"id":"${parent == 'ds-2' ? 'course' : 'mark'}"}', 200);
     });
 
     final SyncOutcome outcome = await _target(client).create(_mark());
@@ -189,8 +188,8 @@ void main() {
         );
       }
       if (r.method == 'PATCH') {
-        patched.addAll((jsonDecode(r.body) as Map<String, Object?>)
-            ['properties']! as Map<String, Object?>);
+        patched.addAll((jsonDecode(r.body)
+            as Map<String, Object?>)['properties']! as Map<String, Object?>);
       }
       return http.Response('{"id":"mark"}', 200);
     });
@@ -232,10 +231,11 @@ void main() {
         final Map<String, Object?> earlier =
             _classRow('earlier', relatedTo: 'his-page');
         ((earlier['properties']! as Map<String, Object?>)['Zeolite ID']!
-                as Map<String, Object?>)['rich_text'] = <Object?>[
+            as Map<String, Object?>)['rich_text'] = <Object?>[
           <String, Object?>{'plain_text': '$_uuid:20260303:540'},
         ];
-        return http.Response(_coursePages(<Map<String, Object?>>[earlier]), 200);
+        return http.Response(
+            _coursePages(<Map<String, Object?>>[earlier]), 200);
       }
       if (r.method == 'POST') {
         created.add(jsonDecode(r.body) as Map<String, Object?>);
@@ -284,13 +284,13 @@ void main() {
 
     expect(created, hasLength(1));
     expect(
-      (created.single['properties']! as Map<String, Object?>)
-          .containsKey('p1'),
+      (created.single['properties']! as Map<String, Object?>).containsKey('p1'),
       isFalse,
     );
   });
 
-  test('an update keeps a row on a course the table holds, and moves it off '
+  test(
+      'an update keeps a row on a course the table holds, and moves it off '
       'a trashed one', () async {
     final Map<String, Map<String, Object?>> rows =
         <String, Map<String, Object?>>{};

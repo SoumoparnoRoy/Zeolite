@@ -140,7 +140,8 @@ void main() {
       },
       statusMeanings: base.statusMeanings,
     );
-    final Map<String, Object?> page = _page(kind: 'Practical', status: 'Absent');
+    final Map<String, Object?> page =
+        _page(kind: 'Practical', status: 'Absent');
     final Map<String, Object?> cells =
         page['properties']! as Map<String, Object?>;
     cells['Held (1/2/0)'] = <String, Object?>{
@@ -153,9 +154,12 @@ void main() {
       'formula': <String, Object?>{'type': 'string', 'string': '0'},
     };
 
-    final NotionRow row = NotionPageRows(mapping).read(
-      <Map<String, Object?>>[page],
-    ).rows.single;
+    final NotionRow row = NotionPageRows(mapping)
+        .read(
+          <Map<String, Object?>>[page],
+        )
+        .rows
+        .single;
 
     expect(row.weight, 2);
     expect(row.status, AttendanceStatus.absent);
@@ -232,7 +236,8 @@ void main() {
   });
 
   test('a related course is named from the pages that were read', () {
-    final NotionPageRows rows = NotionPageRows(_mapping(courseType: 'relation'));
+    final NotionPageRows rows =
+        NotionPageRows(_mapping(courseType: 'relation'));
     final List<Map<String, Object?>> pages = <Map<String, Object?>>[
       _page(course: null, relatedTo: <String>['course-a']),
       _page(course: null, relatedTo: <String>['course-b'], component: 'GEN202'),

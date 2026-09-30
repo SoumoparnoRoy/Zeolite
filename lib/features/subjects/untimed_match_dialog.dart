@@ -26,8 +26,7 @@ Future<bool> offerUntimedMatch(
   ];
   if (matches.isEmpty) return false;
   final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
-  final String classes =
-      Words.plural(matches.length, 'class', 'classes');
+  final String classes = Words.plural(matches.length, 'class', 'classes');
 
   final bool? confirmed = await showDialog<bool>(
     context: context,

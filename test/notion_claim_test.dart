@@ -32,8 +32,7 @@ NotionUnkeyedRow _row(
       ),
     );
 
-SyncItem _mark(String uuid, int start, {String status = 'present'}) =>
-    SyncItem(
+SyncItem _mark(String uuid, int start, {String status = 'present'}) => SyncItem(
       kind: SyncKind.attendance,
       localKey: '$uuid:20260304:$start',
       fields: <String, Object?>{'status': status},

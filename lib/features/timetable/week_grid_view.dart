@@ -174,8 +174,8 @@ class _BreakBand extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final AppPalette p = context.palette;
-    final String from = Clock.format(grid.breakStartMinutes,
-        use24Hour: use24Hour);
+    final String from =
+        Clock.format(grid.breakStartMinutes, use24Hour: use24Hour);
     final String to = Clock.format(grid.breakEndMinutes, use24Hour: use24Hour);
 
     return Container(
@@ -443,8 +443,9 @@ class _DayColumn extends ConsumerWidget {
                       offGrid: !grid.isAligned(session.startMinutes),
                       use24Hour: use24Hour,
                       onTap: () => showSessionEditor(context, ref, session),
-                      onLongPress: () =>
-                          showSessionOptions(context, ref, session, tapOpensEditor: true),
+                      onLongPress: () => showSessionOptions(
+                          context, ref, session,
+                          tapOpensEditor: true),
                     ),
                   ),
                 ),

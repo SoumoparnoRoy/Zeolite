@@ -17,8 +17,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('finding the page a template arrived in', () {
-    test('the id the mapping recorded is used without asking Notion',
-        () async {
+    test('the id the mapping recorded is used without asking Notion', () async {
       int calls = 0;
       final NotionTemplateRetirement retirement =
           NotionTemplateRetirement(_client(MockClient((http.Request r) async {

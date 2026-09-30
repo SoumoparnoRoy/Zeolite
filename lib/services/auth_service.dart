@@ -30,7 +30,9 @@ enum AuthFailure {
 
 @immutable
 class AuthResult {
-  const AuthResult.ok() : failure = null, message = null;
+  const AuthResult.ok()
+      : failure = null,
+        message = null;
   const AuthResult.failed(this.failure, {this.message});
 
   final AuthFailure? failure;

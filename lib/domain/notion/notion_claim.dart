@@ -97,9 +97,8 @@ class NotionClaim {
     }
     for (final NotionUnkeyedRow row in rows) {
       if (used.contains(row.pageId)) continue;
-      final _Mark? mark = marks
-          .where((_Mark m) => m.status == row.row.status.name)
-          .firstOrNull;
+      final _Mark? mark =
+          marks.where((_Mark m) => m.status == row.row.status.name).firstOrNull;
       if (mark != null) take(row, mark);
     }
     for (final NotionUnkeyedRow row in rows) {

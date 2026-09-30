@@ -130,8 +130,8 @@ void main() {
     // measure text that is far wider than the real thing.
     final FontLoader loader = FontLoader(AppFonts.sans);
     for (final String weight in <String>['Medium', 'SemiBold', 'ExtraBold']) {
-      loader.addFont(rootBundle
-          .load('assets/fonts/PlusJakartaSans-$weight.ttf'));
+      loader
+          .addFont(rootBundle.load('assets/fonts/PlusJakartaSans-$weight.ttf'));
     }
     await loader.load();
   });

@@ -38,8 +38,7 @@ enum LauncherIcon {
 class LauncherIconService {
   const LauncherIconService();
 
-  static const MethodChannel _channel =
-      MethodChannel('zeolite/launcher_icon');
+  static const MethodChannel _channel = MethodChannel('zeolite/launcher_icon');
 
   /// The default on any platform that has no aliases — which is every one but
   /// Android, and the test host.

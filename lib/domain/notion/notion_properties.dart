@@ -48,14 +48,19 @@ class NotionProperties {
     }
 
     put(NotionField.key, (_) => _text(item.localKey));
-    put(NotionField.date, (_) => <String, Object?>{
-          'date': <String, Object?>{'start': _dayOf(item.localKey)},
-        });
-    put(NotionField.time, (NotionProperty p) => _named(p, _timeOf(item.localKey)));
+    put(
+        NotionField.date,
+        (_) => <String, Object?>{
+              'date': <String, Object?>{'start': _dayOf(item.localKey)},
+            });
+    put(NotionField.time,
+        (NotionProperty p) => _named(p, _timeOf(item.localKey)));
     if (named) {
-      put(NotionField.component, (NotionProperty p) => p.type == 'title'
-          ? _title(courseName ?? '')
-          : _text(courseName ?? ''));
+      put(
+          NotionField.component,
+          (NotionProperty p) => p.type == 'title'
+              ? _title(courseName ?? '')
+              : _text(courseName ?? ''));
     }
     put(
       NotionField.course,
@@ -63,7 +68,8 @@ class NotionProperties {
           ? _relation(courseRelationId)
           : _named(p, courseName),
     );
-    put(NotionField.status, (NotionProperty p) => _named(p, _word(status, tag)));
+    put(NotionField.status,
+        (NotionProperty p) => _named(p, _word(status, tag)));
     // Only a category the user has paired with an option. Sending the category
     // name itself would have Notion invent a new option beside the ones the
     // workspace already uses.
@@ -80,18 +86,22 @@ class NotionProperties {
     // `NotionExport._statusOf` calls `held == 0` cancelled outright. It also
     // makes the column summable — the Courses dashboard totals it, and a
     // cancelled class counted as held would read as one you missed.
-    put(NotionField.held, (_) => <String, Object?>{
-          'number': status == 'cancelled' && !cancelledCounts ? 0 : weight,
-        });
+    put(
+        NotionField.held,
+        (_) => <String, Object?>{
+              'number': status == 'cancelled' && !cancelledCounts ? 0 : weight,
+            });
     // The credit is what decides whether a class counted, and the reader
     // trusts it over the word beside it — so an absence has to say zero
     // rather than leave it unset and read as agreement.
-    put(NotionField.credit, (_) => <String, Object?>{
-          'number':
-              status == 'present' || (status == 'cancelled' && cancelledCounts)
+    put(
+        NotionField.credit,
+        (_) => <String, Object?>{
+              'number': status == 'present' ||
+                      (status == 'cancelled' && cancelledCounts)
                   ? weight
                   : 0,
-        });
+            });
 
     return out;
   }
@@ -162,7 +172,8 @@ class NotionProperties {
 
   /// Held is then the workspace's own sum, which this app never wrote and so
   /// cannot predict; comparing it would flag every row as changed.
-  bool get _heldIsFormula => mapping.fields[NotionField.held]?.type == 'formula';
+  bool get _heldIsFormula =>
+      mapping.fields[NotionField.held]?.type == 'formula';
 
   String? _word(String status, String? tag) => mapping.optionFor(status, tag);
 

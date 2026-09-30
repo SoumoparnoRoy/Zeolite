@@ -64,7 +64,8 @@ void main() {
     final int lecture = await typeNamed('Lecture');
     final int practical = await typeNamed('Practical');
     final int subject = await repo.insertSubject(
-      Subject(name: 'Generic Course', colorValue: 0xFF336699, categoryId: lecture),
+      Subject(
+          name: 'Generic Course', colorValue: 0xFF336699, categoryId: lecture),
     );
     final DateTime day = DateTime(2026, 9, 1);
     await repo.insertSlot(

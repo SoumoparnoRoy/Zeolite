@@ -185,8 +185,7 @@ void main() {
       );
     });
 
-    test('with no class that day the mark lands with no time, unscheduled',
-        () {
+    test('with no class that day the mark lands with no time, unscheduled', () {
       final NotionPlan plan = _plan(
         _read(<String>['ABC101L,1,Thermodynamics,Aug 3,1,Yes,Lecture,Present']),
         subjects: <Subject>[stored],
@@ -287,8 +286,7 @@ void main() {
     });
 
     test('a known course with nothing marked in the range is an update', () {
-      final NotionPlan plan =
-          _plan(twoComponents, subjects: <Subject>[stored]);
+      final NotionPlan plan = _plan(twoComponents, subjects: <Subject>[stored]);
       expect(plan.subjects.single.match, NotionMatch.update);
     });
 
@@ -444,5 +442,4 @@ void main() {
     expect(plan.subjects.single.attended, 1);
     expect(plan.subjects.single.held, 1);
   });
-
 }

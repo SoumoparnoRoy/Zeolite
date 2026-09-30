@@ -163,7 +163,9 @@ class ScheduleEngine {
   ) {
     final Map<int, List<ClassSession>> byDay = <int, List<ClassSession>>{};
     for (final ClassSession session in sessionsBetween(from, to)) {
-      byDay.putIfAbsent(Dates.keyOf(session.date), () => <ClassSession>[]).add(session);
+      byDay
+          .putIfAbsent(Dates.keyOf(session.date), () => <ClassSession>[])
+          .add(session);
     }
     return byDay;
   }
@@ -184,7 +186,8 @@ class ScheduleEngine {
     final List<ClassSession> pending = sessionsBetween(from, today)
         .where((ClassSession s) => s.needsMarking)
         .toList();
-    pending.sort((ClassSession a, ClassSession b) => ClassSession.compare(b, a));
+    pending
+        .sort((ClassSession a, ClassSession b) => ClassSession.compare(b, a));
     return pending;
   }
 

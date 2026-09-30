@@ -9,7 +9,7 @@ import '../domain/sync/sync_target.dart';
 import '../services/notion/notion_auth_client.dart';
 import '../services/notion/notion_client.dart';
 import '../services/notion/notion_connection_store.dart';
-import 'providers.dart';
+import 'app_providers.dart';
 
 final notionAuthClientProvider =
     Provider<NotionAuthClient>((ref) => NotionAuthClient());

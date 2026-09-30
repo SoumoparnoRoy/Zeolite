@@ -8,7 +8,7 @@ import '../../state/providers.dart';
 import '../../widgets/common.dart';
 import '../../widgets/gradient_header.dart';
 
-/// First-run setup: semester dates and the attendance requirement.
+/// First-run setup: term dates and the attendance requirement.
 ///
 /// Kept to a single screen deliberately — the app is useful the moment these
 /// two things are known, and everything else can be changed later in Settings.
@@ -72,8 +72,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
     await ref.read(settingsProvider.notifier).save(
           current.copyWith(
-            semesterStart: _start,
-            semesterEnd: _end,
+            termStart: _start,
+            termEnd: _end,
             targetPercent: _target,
             notifyBeforeClass: _notifications,
             notifyEveningReminder: _notifications,

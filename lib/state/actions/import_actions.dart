@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../data/db/zeolite_repository.dart';
@@ -17,7 +19,8 @@ import '../../domain/class_weight.dart';
 import '../../domain/notion_export.dart';
 import '../../domain/notion_import.dart';
 import '../../domain/timetable_import.dart';
-import '../providers.dart';
+import '../app_providers.dart';
+import 'action_core.dart';
 
 /// The bulk writes: a pasted timetable, a portal's totals, a Notion log, and
 /// re-weighting a term from its categories. Each one sits under a single Undo
@@ -67,7 +70,7 @@ class ImportActions {
         .toList();
 
     final DateTime start =
-        _core.ref.read(settingsProvider).value?.semesterStart ?? Dates.today();
+        _core.ref.read(settingsProvider).value?.termStart ?? Dates.today();
     final Set<String> known =
         data.rooms.map((Room room) => room.name.toLowerCase()).toSet();
 
@@ -231,8 +234,8 @@ class ImportActions {
           // dates set everything counts, so everything goes.
           await repository.clearAttendanceBetween(
             id,
-            settings.semesterStart ?? DateTime.utc(1970),
-            settings.semesterEnd ?? DateTime.utc(2999),
+            settings.termStart ?? DateTime.utc(1970),
+            settings.termEnd ?? DateTime.utc(2999),
           );
         }
         final Subject? existing =
@@ -441,3 +444,7 @@ class ImportActions {
     return null;
   }
 }
+
+final importActionsProvider = Provider<ImportActions>(
+  (ref) => ImportActions(ref.read(actionCoreProvider)),
+);

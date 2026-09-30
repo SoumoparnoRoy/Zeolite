@@ -89,8 +89,8 @@ void main() {
   /// What onboarding leaves behind: dates chosen just now, nothing else.
   Future<void> onboard() => settings.save(
         AppSettings(
-          semesterStart: DateTime(2026, 8, 29),
-          semesterEnd: DateTime(2026, 12, 27),
+          termStart: DateTime(2026, 8, 29),
+          termEnd: DateTime(2026, 12, 27),
           onboarded: true,
           scheduleChangedAt: DateTime.now(),
         ),
@@ -104,7 +104,7 @@ void main() {
     await coordinator().run(force: true);
 
     final AppSettings after = await settings.load();
-    expect(after.semesterStart, DateTime(2026, 1, 12));
+    expect(after.termStart, DateTime(2026, 1, 12));
     expect(after.targetPercent, 80.0);
     expect(after.blockMinutes, 50);
   });
@@ -118,7 +118,7 @@ void main() {
     await coordinator().run(force: true);
 
     final AppSettings after = await settings.load();
-    expect(after.semesterStart, DateTime(2026, 1, 12));
+    expect(after.termStart, DateTime(2026, 1, 12));
     expect(after.onboarded, isTrue);
   });
 
@@ -152,6 +152,6 @@ void main() {
     await coordinator().run(force: true);
 
     final AppSettings after = await settings.load();
-    expect(after.semesterStart, DateTime(2026, 8, 29));
+    expect(after.termStart, DateTime(2026, 8, 29));
   });
 }

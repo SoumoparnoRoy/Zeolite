@@ -110,8 +110,8 @@ Widget _app(
         () => _StaticSettings(
           AppSettings(
             onboarded: true,
-            semesterStart: Dates.addDays(today, -14),
-            semesterEnd: Dates.addDays(today, 60),
+            termStart: Dates.addDays(today, -14),
+            termEnd: Dates.addDays(today, 60),
           ),
         ),
       ),

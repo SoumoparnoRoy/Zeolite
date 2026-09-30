@@ -241,12 +241,12 @@ class SyncItem {
         kind: SyncKind.settings,
         localKey: settingsKey,
         fields: <String, Object?>{
-          'semesterStart': settings.semesterStart == null
+          'semesterStart': settings.termStart == null
               ? null
-              : Dates.keyOf(settings.semesterStart!),
-          'semesterEnd': settings.semesterEnd == null
+              : Dates.keyOf(settings.termStart!),
+          'semesterEnd': settings.termEnd == null
               ? null
-              : Dates.keyOf(settings.semesterEnd!),
+              : Dates.keyOf(settings.termEnd!),
           'targetPercent': settings.targetPercent,
           'defaultClassMinutes': settings.defaultClassDurationMinutes,
           'dayStartMinutes': settings.dayStartMinutes,

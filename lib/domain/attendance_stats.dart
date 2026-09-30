@@ -18,7 +18,7 @@ enum AttendanceHealth {
   /// At or just above target — one miss could break it.
   tight,
 
-  /// Below target but still recoverable before the semester ends.
+  /// Below target but still recoverable before the term ends.
   atRisk,
 
   /// Below target and mathematically impossible to recover.
@@ -58,7 +58,7 @@ class SubjectStats {
   /// Required attendance as a fraction, e.g. 0.75.
   final double target;
 
-  /// Classes still scheduled before the semester ends, projected from the
+  /// Classes still scheduled before the term ends, projected from the
   /// slots. Only used when the subject does not say its own term total.
   final int plannedFromSlots;
 
@@ -363,7 +363,7 @@ class OverallStats {
   }
 }
 
-/// The marks sitting outside the semester dates, which the figures above them
+/// The marks sitting outside the term dates, which the figures above them
 /// otherwise say nothing about.
 ///
 /// Reported whether or not they are being counted, because the point is that
@@ -404,8 +404,8 @@ class OutOfTermMarks {
   /// The dates a term would need in order to take these marks in. Only the end
   /// that has strays beyond it moves, so widening never shrinks the term.
   (DateTime, DateTime)? widenedTerm(AppSettings term) {
-    final DateTime? start = term.semesterStart;
-    final DateTime? end = term.semesterEnd;
+    final DateTime? start = term.termStart;
+    final DateTime? end = term.termEnd;
     if (start == null || end == null || isEmpty) return null;
     return (
       earliest!.isBefore(start) ? earliest! : start,

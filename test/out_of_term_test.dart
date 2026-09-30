@@ -4,14 +4,14 @@ import 'package:zeolite/data/models/attendance_status.dart';
 import 'package:zeolite/data/settings/app_settings.dart';
 import 'package:zeolite/domain/attendance_stats.dart';
 
-/// Marks dated outside the semester used to be dropped from every figure on
+/// Marks dated outside the term used to be dropped from every figure on
 /// the stats screen without a word, which cost a full debugging round. These
 /// pin what the screen now has to say about them.
 final DateTime _start = DateTime(2026, 8, 18);
 final DateTime _end = DateTime(2026, 12, 16);
 
 final AppSettings _term =
-    AppSettings(semesterStart: _start, semesterEnd: _end);
+    AppSettings(termStart: _start, termEnd: _end);
 
 AttendanceRecord _on(DateTime date) => AttendanceRecord(
       subjectId: 1,
@@ -52,7 +52,7 @@ void main() {
     expect(marks.count, 1);
   });
 
-  test('with no semester set nothing is outside it', () {
+  test('with no term set nothing is outside it', () {
     final OutOfTermMarks marks = OutOfTermMarks.from(
       <AttendanceRecord>[_on(DateTime(1999, 1, 1))],
       const AppSettings(),

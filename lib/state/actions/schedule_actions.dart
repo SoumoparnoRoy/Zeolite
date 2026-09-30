@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../core/date_utils.dart';
 import '../../data/db/zeolite_repository.dart';
 import '../../data/models/attendance_record.dart';
@@ -7,7 +9,8 @@ import '../../data/models/class_slot.dart';
 import '../../data/models/extra_class.dart';
 import '../../data/models/holiday.dart';
 import '../../data/models/slot_override.dart';
-import '../providers.dart';
+import '../app_providers.dart';
+import 'action_core.dart';
 
 /// The timetable itself: weekly rules, their exceptions, one-off classes and
 /// holidays.
@@ -311,3 +314,7 @@ class ScheduleActions {
     _core.arm(before);
   }
 }
+
+final scheduleActionsProvider = Provider<ScheduleActions>(
+  (ref) => ScheduleActions(ref.read(actionCoreProvider)),
+);

@@ -14,7 +14,9 @@ import '../domain/home_widget_payload.dart';
 import '../domain/schedule_engine.dart';
 import '../services/home_widget_service.dart';
 import '../services/notification_service.dart';
-import 'providers.dart';
+import 'actions/action_core.dart';
+import 'actions/attendance_actions.dart';
+import 'app_providers.dart';
 
 final homeWidgetServiceProvider = Provider<HomeWidgetService>(
   (ref) => const HomeWidgetService(),

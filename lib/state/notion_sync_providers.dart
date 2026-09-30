@@ -14,8 +14,9 @@ import '../domain/sync/sync_target.dart';
 import '../services/notion/notion_sync_target.dart';
 import '../services/sync/sync_coordinator.dart';
 import '../services/sync/sync_scheduler.dart';
+import 'actions/action_core.dart';
+import 'app_providers.dart';
 import 'notion_providers.dart';
-import 'providers.dart';
 
 /// Notion as somewhere to mirror to, or null until it can be written to.
 ///
@@ -109,6 +110,7 @@ final notionSchedulerProvider = Provider<SyncScheduler?>((ref) {
     lastSyncAt: () => ref.read(settingsProvider).value?.lastNotionSyncAt,
   );
   ref.onDispose(scheduler.dispose);
+  ref.listen<int>(localChangesProvider, (_, __) => scheduler.onLocalChange());
   scheduler.start();
   return scheduler;
 });

@@ -43,7 +43,7 @@ class StatsScreen extends ConsumerWidget {
       header: _OverallHeader(stats: stats, settings: settings),
       slivers: <Widget>[
         // Before the empty state: "no data yet" over a term of marks dated
-        // outside the semester is the confusion this exists to end.
+        // outside the term is the confusion this exists to end.
         if (!strays.isEmpty)
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(_pad, 0, _pad, 16),
@@ -205,16 +205,16 @@ class _OverallHeader extends StatelessWidget {
               ),
             ),
           ),
-        if (settings.hasSemester) ...<Widget>[
+        if (settings.hasTerm) ...<Widget>[
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-            child: HeaderMeter(value: settings.semesterProgress),
+            child: HeaderMeter(value: settings.termProgress),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
             child: Text(
-              'Term ${(settings.semesterProgress * 100).round()}% done · '
-              '${Words.plural(settings.daysLeftInSemester, 'day')} left',
+              'Term ${(settings.termProgress * 100).round()}% done · '
+              '${Words.plural(settings.daysLeftInTerm, 'day')} left',
               style: TextStyle(
                 fontSize: 10.5,
                 height: 1,
@@ -837,7 +837,7 @@ class _TaggedMarkRow extends StatelessWidget {
   }
 }
 
-/// Names the marks that fall outside the semester and offers the ways out of
+/// Names the marks that fall outside the term and offers the ways out of
 /// it. Nothing here deletes anything — two of the three are views of the same
 /// marks, and the third edits dates that can be edited back.
 class _OutOfTermNotice extends ConsumerWidget {
@@ -931,6 +931,6 @@ class _OutOfTermNotice extends ConsumerWidget {
       ),
     );
     if (go != true) return;
-    await ref.read(settingsProvider.notifier).setSemester(start, end);
+    await ref.read(settingsProvider.notifier).setTerm(start, end);
   }
 }

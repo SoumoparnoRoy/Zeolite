@@ -60,8 +60,8 @@ class _StaticSettings extends SettingsController {
   @override
   Future<AppSettings> build() async => AppSettings(
         onboarded: true,
-        semesterStart: dated ? Dates.addDays(Dates.today(), -30) : null,
-        semesterEnd: dated ? Dates.addDays(Dates.today(), 60) : null,
+        termStart: dated ? Dates.addDays(Dates.today(), -30) : null,
+        termEnd: dated ? Dates.addDays(Dates.today(), 60) : null,
       );
 }
 
@@ -180,7 +180,7 @@ void main() {
     expect(container.read(actionCoreProvider).pendingUndoToken, isNotNull);
   });
 
-  test('clearing still happens when no semester dates are set', () async {
+  test('clearing still happens when no term dates are set', () async {
     // countsInTerm counts every mark when there are no dates, so the preview
     // weighs them all. Clearing has to cover the same marks or the balance is
     // written on top of them.

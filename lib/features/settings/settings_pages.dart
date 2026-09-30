@@ -290,8 +290,8 @@ class SettingsItemRow extends ConsumerWidget {
           : Dates.formatFull(start);
 
   static String _termLine(AppSettings settings, TimetableData? timetable) {
-    final DateTime? start = settings.semesterStart;
-    final DateTime? end = settings.semesterEnd;
+    final DateTime? start = settings.termStart;
+    final DateTime? end = settings.termEnd;
     final int breaks = buildHolidayRuns(timetable?.holidays ?? const []).length;
     return <String>[
       if (start == null || end == null)

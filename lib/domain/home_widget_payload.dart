@@ -30,7 +30,7 @@ class HomeWidgetPayload {
     final List<ClassSession> sessions = engine.sessionsOn(day);
 
     final String state;
-    if (engine.isOutsideSemester(day)) {
+    if (engine.isOutsideTerm(day)) {
       state = 'outside';
     } else if (holiday != null) {
       state = 'holiday';

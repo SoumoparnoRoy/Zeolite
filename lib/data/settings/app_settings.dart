@@ -47,14 +47,14 @@ enum LaunchAnimation {
       };
 }
 
-/// User preferences: semester bounds, attendance target and notification
+/// User preferences: term bounds, attendance target and notification
 /// choices. Small scalar values, so they live in SharedPreferences rather than
 /// the database.
 @immutable
 class AppSettings {
   const AppSettings({
-    this.semesterStart,
-    this.semesterEnd,
+    this.termStart,
+    this.termEnd,
     this.countOutsideTerm = false,
     this.targetPercent = 75,
     this.defaultClassDurationMinutes = 60,
@@ -91,8 +91,8 @@ class AppSettings {
     this.welcomeShown = false,
   });
 
-  final DateTime? semesterStart;
-  final DateTime? semesterEnd;
+  final DateTime? termStart;
+  final DateTime? termEnd;
 
   /// Global requirement, e.g. 75. Subjects may override this.
   final double targetPercent;
@@ -206,7 +206,7 @@ class AppSettings {
   /// When a setting that shapes the timetable was last changed here.
   ///
   /// Exists only so two signed-in devices can settle a disagreement about the
-  /// semester dates by time rather than by whichever syncs last. Device
+  /// term dates by time rather than by whichever syncs last. Device
   /// preferences do not move it, because they never travel.
   final DateTime? scheduleChangedAt;
 
@@ -257,7 +257,7 @@ class AppSettings {
   bool showDangerInApp({required bool alertsReachTray}) =>
       inAppAlerts && !(dangerAlertsActive && alertsReachTray);
 
-  bool get hasSemester => semesterStart != null && semesterEnd != null;
+  bool get hasTerm => termStart != null && termEnd != null;
 
   /// Whether marks dated outside the term still count towards the percentage.
   /// Kept off the synced settings row deliberately: it changes how this device
@@ -267,10 +267,10 @@ class AppSettings {
   /// Whether a mark on [date] counts towards this term. Inclusive at both
   /// ends, and with no dates set there is no window, so everything counts.
   bool countsInTerm(DateTime date) {
-    if (!hasSemester) return true;
+    if (!hasTerm) return true;
     final DateTime day = Dates.dayOf(date);
-    return !day.isBefore(Dates.dayOf(semesterStart!)) &&
-        !day.isAfter(Dates.dayOf(semesterEnd!));
+    return !day.isBefore(Dates.dayOf(termStart!)) &&
+        !day.isAfter(Dates.dayOf(termEnd!));
   }
 
   /// The window, unless the user has asked for the strays counted too.
@@ -278,24 +278,24 @@ class AppSettings {
       countOutsideTerm || countsInTerm(date);
 
   /// How far through the term you are, 0..1.
-  double get semesterProgress {
-    if (!hasSemester) return 0;
-    final int total = Dates.daysBetween(semesterStart!, semesterEnd!);
+  double get termProgress {
+    if (!hasTerm) return 0;
+    final int total = Dates.daysBetween(termStart!, termEnd!);
     if (total <= 0) return 1;
-    final int done = Dates.daysBetween(semesterStart!, Dates.today());
+    final int done = Dates.daysBetween(termStart!, Dates.today());
     return (done / total).clamp(0.0, 1.0);
   }
 
-  int get daysLeftInSemester {
-    if (semesterEnd == null) return 0;
-    final int days = Dates.daysBetween(Dates.today(), semesterEnd!);
+  int get daysLeftInTerm {
+    if (termEnd == null) return 0;
+    final int days = Dates.daysBetween(Dates.today(), termEnd!);
     return days < 0 ? 0 : days;
   }
 
   AppSettings copyWith({
     bool? countOutsideTerm,
-    DateTime? semesterStart,
-    DateTime? semesterEnd,
+    DateTime? termStart,
+    DateTime? termEnd,
     double? targetPercent,
     int? defaultClassDurationMinutes,
     int? dayStartMinutes,
@@ -333,8 +333,8 @@ class AppSettings {
     bool? welcomeShown,
   }) {
     return AppSettings(
-      semesterStart: semesterStart ?? this.semesterStart,
-      semesterEnd: semesterEnd ?? this.semesterEnd,
+      termStart: termStart ?? this.termStart,
+      termEnd: termEnd ?? this.termEnd,
       countOutsideTerm: countOutsideTerm ?? this.countOutsideTerm,
       targetPercent: targetPercent ?? this.targetPercent,
       defaultClassDurationMinutes:
@@ -386,8 +386,8 @@ class AppSettings {
 
   Map<String, Object?> toJson() => <String, Object?>{
         'semesterStart':
-            semesterStart == null ? null : Dates.keyOf(semesterStart!),
-        'semesterEnd': semesterEnd == null ? null : Dates.keyOf(semesterEnd!),
+            termStart == null ? null : Dates.keyOf(termStart!),
+        'semesterEnd': termEnd == null ? null : Dates.keyOf(termEnd!),
         'countOutsideTerm': countOutsideTerm,
         'targetPercent': targetPercent,
         'defaultClassDurationMinutes': defaultClassDurationMinutes,
@@ -416,8 +416,8 @@ class AppSettings {
     final int? start = (json['semesterStart'] as num?)?.toInt();
     final int? end = (json['semesterEnd'] as num?)?.toInt();
     return AppSettings(
-      semesterStart: start == null ? null : Dates.fromKey(start),
-      semesterEnd: end == null ? null : Dates.fromKey(end),
+      termStart: start == null ? null : Dates.fromKey(start),
+      termEnd: end == null ? null : Dates.fromKey(end),
       countOutsideTerm: json['countOutsideTerm'] as bool? ?? false,
       targetPercent: (json['targetPercent'] as num?)?.toDouble() ?? 75,
       defaultClassDurationMinutes:
@@ -474,8 +474,8 @@ class AppSettings {
 /// Reads and writes [AppSettings]. Keys are namespaced so a future feature can
 /// share the same preference store without collisions.
 class SettingsService {
-  static const String _kSemesterStart = 'ut.semesterStart';
-  static const String _kSemesterEnd = 'ut.semesterEnd';
+  static const String _kTermStart = 'ut.semesterStart';
+  static const String _kTermEnd = 'ut.semesterEnd';
   static const String _kTarget = 'ut.targetPercent';
   static const String _kDefaultDuration = 'ut.defaultClassDurationMinutes';
   static const String _kDayStart = 'ut.dayStartMinutes';
@@ -517,12 +517,12 @@ class SettingsService {
 
   Future<AppSettings> load() async {
     final SharedPreferencesAsync prefs = _prefs;
-    final int? start = await prefs.getInt(_kSemesterStart);
-    final int? end = await prefs.getInt(_kSemesterEnd);
+    final int? start = await prefs.getInt(_kTermStart);
+    final int? end = await prefs.getInt(_kTermEnd);
     final bool onboarded = await prefs.getBool(_kOnboarded) ?? false;
     return AppSettings(
-      semesterStart: start == null ? null : Dates.fromKey(start),
-      semesterEnd: end == null ? null : Dates.fromKey(end),
+      termStart: start == null ? null : Dates.fromKey(start),
+      termEnd: end == null ? null : Dates.fromKey(end),
       targetPercent: await prefs.getDouble(_kTarget) ?? 75,
       defaultClassDurationMinutes: await prefs.getInt(_kDefaultDuration) ?? 60,
       dayStartMinutes: await prefs.getInt(_kDayStart) ?? 9 * 60,
@@ -580,15 +580,15 @@ class SettingsService {
 
   Future<void> save(AppSettings settings) async {
     final SharedPreferencesAsync prefs = _prefs;
-    if (settings.semesterStart == null) {
-      await prefs.remove(_kSemesterStart);
+    if (settings.termStart == null) {
+      await prefs.remove(_kTermStart);
     } else {
-      await prefs.setInt(_kSemesterStart, Dates.keyOf(settings.semesterStart!));
+      await prefs.setInt(_kTermStart, Dates.keyOf(settings.termStart!));
     }
-    if (settings.semesterEnd == null) {
-      await prefs.remove(_kSemesterEnd);
+    if (settings.termEnd == null) {
+      await prefs.remove(_kTermEnd);
     } else {
-      await prefs.setInt(_kSemesterEnd, Dates.keyOf(settings.semesterEnd!));
+      await prefs.setInt(_kTermEnd, Dates.keyOf(settings.termEnd!));
     }
     await prefs.setDouble(_kTarget, settings.targetPercent);
     await prefs.setInt(

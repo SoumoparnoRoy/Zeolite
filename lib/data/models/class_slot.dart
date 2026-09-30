@@ -53,7 +53,7 @@ class ClassSlot {
   /// from here, which is exactly the "repeats every week from now on" model.
   final DateTime startDate;
 
-  /// Optional last date (inclusive). Null means "until the semester ends".
+  /// Optional last date (inclusive). Null means "until the term ends".
   final DateTime? endDate;
 
   int get durationMinutes => endMinutes - startMinutes;

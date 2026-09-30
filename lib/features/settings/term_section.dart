@@ -37,10 +37,10 @@ class TermSection extends ConsumerWidget {
                 SettingsRow(
                   icon: Icons.play_circle_outline_rounded,
                   title: 'Starts',
-                  value: settings.semesterStart == null
+                  value: settings.termStart == null
                       ? 'Not set'
-                      : Dates.formatFull(settings.semesterStart!),
-                  onTap: () => _pickSemesterDate(
+                      : Dates.formatFull(settings.termStart!),
+                  onTap: () => _pickTermDate(
                     context,
                     controller,
                     settings,
@@ -51,10 +51,10 @@ class TermSection extends ConsumerWidget {
                 SettingsRow(
                   icon: Icons.stop_circle_outlined,
                   title: 'Ends',
-                  value: settings.semesterEnd == null
+                  value: settings.termEnd == null
                       ? 'Not set'
-                      : Dates.formatFull(settings.semesterEnd!),
-                  onTap: () => _pickSemesterDate(
+                      : Dates.formatFull(settings.termEnd!),
+                  onTap: () => _pickTermDate(
                     context,
                     controller,
                     settings,
@@ -69,15 +69,15 @@ class TermSection extends ConsumerWidget {
     );
   }
 
-  Future<void> _pickSemesterDate(
+  Future<void> _pickTermDate(
     BuildContext context,
     SettingsController controller,
     AppSettings settings, {
     required bool isStart,
   }) async {
     final DateTime initial = isStart
-        ? (settings.semesterStart ?? Dates.today())
-        : (settings.semesterEnd ?? Dates.addDays(Dates.today(), 120));
+        ? (settings.termStart ?? Dates.today())
+        : (settings.termEnd ?? Dates.addDays(Dates.today(), 120));
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: initial,
@@ -88,14 +88,14 @@ class TermSection extends ConsumerWidget {
 
     final DateTime day = Dates.dayOf(picked);
     if (isStart) {
-      final DateTime end = settings.semesterEnd ?? Dates.addDays(day, 120);
-      await controller.setSemester(
+      final DateTime end = settings.termEnd ?? Dates.addDays(day, 120);
+      await controller.setTerm(
         day,
         Dates.keyOf(end) < Dates.keyOf(day) ? Dates.addDays(day, 120) : end,
       );
     } else {
-      final DateTime start = settings.semesterStart ?? Dates.today();
-      await controller.setSemester(
+      final DateTime start = settings.termStart ?? Dates.today();
+      await controller.setTerm(
         Dates.keyOf(start) > Dates.keyOf(day)
             ? Dates.addDays(day, -120)
             : start,

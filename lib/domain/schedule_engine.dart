@@ -10,7 +10,7 @@ import '../data/models/subject.dart';
 /// Turns recurrence *rules* into concrete class occurrences.
 ///
 /// Nothing about a specific week is stored. Given the weekly slots, the one-off
-/// extras, the holidays and the semester bounds, this expands any date range
+/// extras, the holidays and the term bounds, this expands any date range
 /// into the sessions that actually happen — then attaches whatever attendance
 /// mark exists for each one.
 ///
@@ -24,8 +24,8 @@ class ScheduleEngine {
     required List<Holiday> holidays,
     required List<AttendanceRecord> records,
     List<SlotOverride> overrides = const <SlotOverride>[],
-    this.semesterStart,
-    this.semesterEnd,
+    this.termStart,
+    this.termEnd,
   })  : _subjectsById = <int, Subject>{
           for (final Subject s in subjects)
             if (s.id != null) s.id!: s,
@@ -50,15 +50,15 @@ class ScheduleEngine {
   final Map<String, AttendanceRecord> _recordsByKey;
   final Map<({int slot, int date}), SlotOverride> _overrides;
 
-  /// Classes are only generated inside the semester. Null means unbounded.
-  final DateTime? semesterStart;
-  final DateTime? semesterEnd;
+  /// Classes are only generated inside the term. Null means unbounded.
+  final DateTime? termStart;
+  final DateTime? termEnd;
 
-  /// True when [date] falls outside the configured semester.
-  bool isOutsideSemester(DateTime date) {
+  /// True when [date] falls outside the configured term.
+  bool isOutsideTerm(DateTime date) {
     final int key = Dates.keyOf(date);
-    if (semesterStart != null && key < Dates.keyOf(semesterStart!)) return true;
-    if (semesterEnd != null && key > Dates.keyOf(semesterEnd!)) return true;
+    if (termStart != null && key < Dates.keyOf(termStart!)) return true;
+    if (termEnd != null && key > Dates.keyOf(termEnd!)) return true;
     return false;
   }
 
@@ -66,14 +66,14 @@ class ScheduleEngine {
 
   /// Every class happening on [date], sorted by start time.
   ///
-  /// Returns empty for holidays and for days outside the semester. One-off
+  /// Returns empty for holidays and for days outside the term. One-off
   /// extra classes are always included — an extra lecture scheduled on a
   /// holiday is a deliberate act, so it is honoured.
   List<ClassSession> sessionsOn(DateTime date) {
     final DateTime day = Dates.dayOf(date);
     final List<ClassSession> sessions = <ClassSession>[];
 
-    final bool blocked = isOutsideSemester(day) || holidayOn(day) != null;
+    final bool blocked = isOutsideTerm(day) || holidayOn(day) != null;
 
     if (!blocked) {
       for (final ClassSlot rule in _slots) {
@@ -144,7 +144,7 @@ class ScheduleEngine {
 
   /// Expands an inclusive date range.
   ///
-  /// Guarded at 400 days so a mis-typed semester end can never spin the UI.
+  /// Guarded at 400 days so a mis-typed term end can never spin the UI.
   List<ClassSession> sessionsBetween(DateTime from, DateTime to) {
     final List<ClassSession> all = <ClassSession>[];
     final int span = Dates.daysBetween(from, to);
@@ -188,7 +188,7 @@ class ScheduleEngine {
     return pending;
   }
 
-  /// Sessions still to come for a subject before the semester ends. Used to
+  /// Sessions still to come for a subject before the term ends. Used to
   /// work out whether a target is still mathematically reachable.
   ///
   /// A session already marked is not one of them — a cancelled class will not
@@ -198,10 +198,10 @@ class ScheduleEngine {
   /// twice contributes two. Mixing the units here would put a weighted class
   /// on both sides of `maxAchievableRatio` at different sizes.
   int remainingSessionsFor(int subjectId, {DateTime? from}) {
-    if (semesterEnd == null) return 0;
+    if (termEnd == null) return 0;
     final DateTime start = Dates.addDays(from ?? Dates.today(), 1);
-    if (Dates.keyOf(start) > Dates.keyOf(semesterEnd!)) return 0;
-    return sessionsBetween(start, semesterEnd!)
+    if (Dates.keyOf(start) > Dates.keyOf(termEnd!)) return 0;
+    return sessionsBetween(start, termEnd!)
         .where((ClassSession s) => s.subject.id == subjectId && !s.isMarked)
         .fold<int>(0, (int sum, ClassSession s) => sum + s.weight);
   }
@@ -210,10 +210,10 @@ class ScheduleEngine {
   /// calling [remainingSessionsFor] per subject.
   Map<int, int> remainingSessionsBySubject({DateTime? from}) {
     final Map<int, int> counts = <int, int>{};
-    if (semesterEnd == null) return counts;
+    if (termEnd == null) return counts;
     final DateTime start = Dates.addDays(from ?? Dates.today(), 1);
-    if (Dates.keyOf(start) > Dates.keyOf(semesterEnd!)) return counts;
-    for (final ClassSession session in sessionsBetween(start, semesterEnd!)) {
+    if (Dates.keyOf(start) > Dates.keyOf(termEnd!)) return counts;
+    for (final ClassSession session in sessionsBetween(start, termEnd!)) {
       final int? id = session.subject.id;
       if (id == null || session.isMarked) continue;
       counts[id] = (counts[id] ?? 0) + session.weight;

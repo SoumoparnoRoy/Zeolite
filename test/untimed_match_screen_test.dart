@@ -19,7 +19,7 @@ import 'package:zeolite/state/providers.dart';
 class _StaticSettings extends SettingsController {
   @override
   Future<AppSettings> build() async =>
-      AppSettings(onboarded: true, semesterStart: DateTime(2026, 7, 27));
+      AppSettings(onboarded: true, termStart: DateTime(2026, 7, 27));
 }
 
 class _MatchRecorder extends AttendanceActions {

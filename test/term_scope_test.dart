@@ -13,7 +13,7 @@ import 'package:zeolite/data/settings/app_settings.dart';
 import 'package:zeolite/domain/attendance_stats.dart';
 import 'package:zeolite/state/providers.dart';
 
-/// Semester dates the tests measure against.
+/// Term dates the tests measure against.
 final DateTime _start = DateTime(2026, 8, 18);
 final DateTime _end = DateTime(2026, 12, 16);
 
@@ -66,9 +66,9 @@ Future<SubjectStats> _statsFor(
 void main() {
   group('a mark only counts inside the term', () {
     final AppSettings term =
-        AppSettings(semesterStart: _start, semesterEnd: _end);
+        AppSettings(termStart: _start, termEnd: _end);
 
-    test('one from before the semester started is left out', () async {
+    test('one from before the term started is left out', () async {
       final SubjectStats stats = await _statsFor(
         <AttendanceRecord>[_present(DateTime(2026, 8, 4))],
         settings: term,
@@ -103,7 +103,7 @@ void main() {
 
   group('the window itself', () {
     final AppSettings term =
-        AppSettings(semesterStart: _start, semesterEnd: _end);
+        AppSettings(termStart: _start, termEnd: _end);
 
     test('is inclusive at both ends', () {
       expect(term.countsInTerm(_start), isTrue);
@@ -116,7 +116,7 @@ void main() {
       expect(term.countsInTerm(DateTime(2026, 8, 18, 23, 59)), isTrue);
     });
 
-    test('half a semester is no window at all', () {
+    test('half a term is no window at all', () {
       const AppSettings half = AppSettings();
       expect(half.countsInTerm(DateTime(1999, 1, 1)), isTrue);
     });
@@ -124,8 +124,8 @@ void main() {
 
   group('counting the marks outside it', () {
     final AppSettings counting = AppSettings(
-      semesterStart: _start,
-      semesterEnd: _end,
+      termStart: _start,
+      termEnd: _end,
       countOutsideTerm: true,
     );
 

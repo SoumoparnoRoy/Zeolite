@@ -243,7 +243,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
           final Holiday? holiday = engine?.holidayOn(date);
           final bool nothingScheduled =
               (data?.slots.isEmpty ?? true) && (data?.extras.isEmpty ?? true);
-          final bool outsideSemester = engine?.isOutsideSemester(date) ?? false;
+          final bool outsideTerm = engine?.isOutsideTerm(date) ?? false;
           final int unmarkedToday =
               sessions.where((ClassSession s) => s.needsMarking).length;
 
@@ -358,7 +358,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                                 ),
                               ),
                             )
-                          else if (outsideSemester)
+                          else if (outsideTerm)
                             SliverPadding(
                               padding:
                                   const EdgeInsets.fromLTRB(_pad, 0, _pad, 12),
@@ -366,10 +366,10 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                                 child: _NoticeCard(
                                   icon: Icons.event_busy_rounded,
                                   title: 'Outside the term',
-                                  message: settings.hasSemester
+                                  message: settings.hasTerm
                                       ? 'Your term runs '
-                                          '${Dates.formatFull(settings.semesterStart!)} – '
-                                          '${Dates.formatFull(settings.semesterEnd!)}.'
+                                          '${Dates.formatFull(settings.termStart!)} – '
+                                          '${Dates.formatFull(settings.termEnd!)}.'
                                       : 'Set your term dates in Settings.',
                                   color: p.textTertiary,
                                 ),
@@ -377,7 +377,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                             ),
                           if (sessions.isEmpty &&
                               holiday == null &&
-                              !outsideSemester)
+                              !outsideTerm)
                             SliverToBoxAdapter(
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(vertical: 36),
@@ -636,11 +636,11 @@ class _DayHeader extends StatelessWidget {
     );
   }
 
-  /// The second half of the caption, present only when there is a semester to
+  /// The second half of the caption, present only when there is a term to
   /// count down. Without dates the app has nothing to say here, and inventing
   /// a number would be worse than saying nothing.
   String _termTail(AppSettings settings) {
-    final DateTime? end = settings.semesterEnd;
+    final DateTime? end = settings.termEnd;
     if (end == null) return '';
     final int days = Dates.daysBetween(Dates.today(), end);
     if (days < 0) return ' · term over';

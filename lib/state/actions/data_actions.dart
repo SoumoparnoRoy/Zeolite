@@ -1,13 +1,15 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/db/zeolite_repository.dart';
 import '../../data/models/class_category.dart';
 import '../../data/settings/app_settings.dart';
 import '../../domain/sync/sync_merge.dart';
 import '../../services/sync/sync_coordinator.dart';
-import '../providers.dart';
+import '../app_providers.dart';
+import 'action_core.dart';
 
 /// Whole-database actions: the automatic backup, a first sync that had to be
 /// merged, and wiping everything.
@@ -88,3 +90,7 @@ class DataActions {
     _core.arm(before);
   }
 }
+
+final dataActionsProvider = Provider<DataActions>(
+  (ref) => DataActions(ref.read(actionCoreProvider)),
+);

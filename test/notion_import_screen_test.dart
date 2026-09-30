@@ -23,8 +23,8 @@ class _StaticSettings extends SettingsController {
   @override
   Future<AppSettings> build() async => AppSettings(
         onboarded: true,
-        semesterStart: Dates.addDays(Dates.today(), -60),
-        semesterEnd: Dates.addDays(Dates.today(), 60),
+        termStart: Dates.addDays(Dates.today(), -60),
+        termEnd: Dates.addDays(Dates.today(), 60),
       );
 }
 

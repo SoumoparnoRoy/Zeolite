@@ -9,10 +9,12 @@ import '../../domain/schedule_engine.dart';
 import '../../domain/sync/sync_target.dart';
 import '../../services/analytics_service.dart';
 import '../../services/notification_service.dart';
-import '../notion_sync_providers.dart';
-import '../providers.dart';
-import '../sync_providers.dart';
+import '../app_providers.dart';
 import '../undo.dart';
+
+/// Split by what they touch rather than gathered on one object: every action
+/// shares [ActionCore], so one refresh and one Undo offer still cover them all.
+final actionCoreProvider = Provider<ActionCore>((ref) => ActionCore(ref));
 
 /// The plumbing every action shares: the database, the one refresh that
 /// rebuilds the engine, the day lists and the stats, and the Undo store an
@@ -48,10 +50,7 @@ class ActionCore {
     // dropped: restoring it would throw away whatever the user did since.
     _dropUndo();
     await _reload();
-    // Every scheduler, or a change would reach one target and quietly never
-    // reach the other.
-    ref.read(syncSchedulerProvider)?.onLocalChange();
-    ref.read(notionSchedulerProvider)?.onLocalChange();
+    ref.read(localChangesProvider.notifier).announce();
   }
 
   /// A mark made from a home-screen widget is written by a second isolate, so
@@ -177,7 +176,7 @@ class ActionCore {
   }
 
   /// Awaited for the same reason as [reloadAfterSync], and it matters more
-  /// here: a restore can move the semester dates the reminders hang off.
+  /// here: a restore can move the term dates the reminders hang off.
   Future<void> reloadAfterImport() async {
     ref.invalidate(settingsProvider);
     await ref.read(settingsProvider.future);

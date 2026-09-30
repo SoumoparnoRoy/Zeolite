@@ -434,23 +434,4 @@ class AppDatabase {
     await _db?.close();
     _db = null;
   }
-
-  /// Wipes every table. Used by "reset all data" and by import.
-  Future<void> clearAll() async {
-    final Database db = await database;
-    final Batch batch = db.batch();
-    batch.delete('attendance');
-    batch.delete('extra_classes');
-    batch.delete('slot_overrides');
-    batch.delete('class_slots');
-    batch.delete('holidays');
-    batch.delete('subjects');
-    batch.delete('categories');
-    batch.delete('rooms');
-    batch.delete('tags');
-    // The ledger goes with the data it describes; a later run re-links to
-    // pages that are still there rather than duplicating them.
-    batch.delete('remote_links');
-    await batch.commit(noResult: true);
-  }
 }

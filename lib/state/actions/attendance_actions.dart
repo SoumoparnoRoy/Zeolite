@@ -1,11 +1,12 @@
 import 'dart:async';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../data/db/zeolite_repository.dart';
 import '../../data/models/attendance_record.dart';
 import '../../data/models/attendance_status.dart';
 import '../../data/models/class_session.dart';
 import '../../domain/untimed_match.dart';
-import '../providers.dart';
 
 import 'action_core.dart';
 
@@ -190,3 +191,7 @@ class AttendanceActions {
     return records.length;
   }
 }
+
+final attendanceActionsProvider = Provider<AttendanceActions>(
+  (ref) => AttendanceActions(ref.read(actionCoreProvider)),
+);

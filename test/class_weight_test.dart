@@ -111,8 +111,8 @@ void main() {
         extras: const <ExtraClass>[],
         holidays: const <Holiday>[],
         records: const <AttendanceRecord>[],
-        semesterStart: monday,
-        semesterEnd: Dates.addDays(monday, 14),
+        termStart: monday,
+        termEnd: Dates.addDays(monday, 14),
       );
       // Two Tuesdays fall in the window, each worth two.
       expect(engine.remainingSessionsFor(1, from: monday), 4);

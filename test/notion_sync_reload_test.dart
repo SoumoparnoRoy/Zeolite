@@ -7,6 +7,7 @@ import 'package:shared_preferences_platform_interface/shared_preferences_async_p
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:zeolite/data/db/app_database.dart';
 import 'package:zeolite/data/db/zeolite_repository.dart';
+import 'package:zeolite/data/models/room.dart';
 import 'package:zeolite/data/models/subject.dart';
 import 'package:zeolite/data/settings/app_settings.dart';
 import 'package:zeolite/domain/sync/sync_target.dart';
@@ -125,5 +126,40 @@ void main() {
 
     expect(container.read(notionSchedulerProvider), same(scheduler));
     expect(scheduler.hasPendingRun, isTrue);
+  });
+
+  group('a local write arms the pending run', () {
+    Future<SyncScheduler> scheduled(ProviderContainer container) async {
+      final AppSettings settings =
+          await container.read(settingsProvider.future);
+      await container
+          .read(settingsProvider.notifier)
+          .save(settings.copyWith(notionAutoSync: true));
+      final SyncScheduler scheduler = container.read(notionSchedulerProvider)!;
+      expect(scheduler.hasPendingRun, isFalse);
+      return scheduler;
+    }
+
+    test('from an action', () async {
+      final ProviderContainer container = build();
+      final SyncScheduler scheduler = await scheduled(container);
+
+      await container
+          .read(subjectActionsProvider)
+          .addRoom(const Room(name: 'Room 1'));
+
+      expect(scheduler.hasPendingRun, isTrue);
+    });
+
+    test('from a settings change that moves the schedule', () async {
+      final ProviderContainer container = build();
+      final SyncScheduler scheduler = await scheduled(container);
+
+      await container
+          .read(settingsProvider.notifier)
+          .setTerm(DateTime(2026, 1, 5), DateTime(2026, 5, 1));
+
+      expect(scheduler.hasPendingRun, isTrue);
+    });
   });
 }

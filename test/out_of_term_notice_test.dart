@@ -58,7 +58,7 @@ Widget _host(List<AttendanceRecord> records, AppSettings settings) {
 
 void main() {
   final AppSettings term =
-      AppSettings(semesterStart: _start, semesterEnd: _end, onboarded: true);
+      AppSettings(termStart: _start, termEnd: _end, onboarded: true);
 
   testWidgets('names the marks it is leaving out, and offers both ways out',
       (WidgetTester tester) async {

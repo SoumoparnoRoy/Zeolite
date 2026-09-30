@@ -45,8 +45,8 @@ ScheduleEngine buildEngine({
   List<Holiday>? holidays,
   List<AttendanceRecord>? records,
   List<SlotOverride>? overrides,
-  DateTime? semesterStart,
-  DateTime? semesterEnd,
+  DateTime? termStart,
+  DateTime? termEnd,
 }) {
   return ScheduleEngine(
     subjects: subjects ?? <Subject>[subjectFixture()],
@@ -55,8 +55,8 @@ ScheduleEngine buildEngine({
     holidays: holidays ?? <Holiday>[],
     records: records ?? <AttendanceRecord>[],
     overrides: overrides ?? <SlotOverride>[],
-    semesterStart: semesterStart,
-    semesterEnd: semesterEnd,
+    termStart: termStart,
+    termEnd: termEnd,
   );
 }
 
@@ -174,7 +174,7 @@ void main() {
     });
   });
 
-  group('holidays and semester bounds', () {
+  group('holidays and term bounds', () {
     test('holidays suppress recurring classes', () {
       final ScheduleEngine engine = buildEngine(
         holidays: <Holiday>[Holiday(date: monday, name: 'Founders Day')],
@@ -203,15 +203,15 @@ void main() {
       expect(sessions.single.isExtra, isTrue);
     });
 
-    test('nothing is generated outside the semester', () {
+    test('nothing is generated outside the term', () {
       final ScheduleEngine engine = buildEngine(
-        semesterStart: Dates.addDays(monday, 7),
-        semesterEnd: Dates.addDays(monday, 21),
+        termStart: Dates.addDays(monday, 7),
+        termEnd: Dates.addDays(monday, 21),
       );
       expect(engine.sessionsOn(monday), isEmpty);
       expect(engine.sessionsOn(Dates.addDays(monday, 7)), hasLength(1));
       expect(engine.sessionsOn(Dates.addDays(monday, 28)), isEmpty);
-      expect(engine.isOutsideSemester(monday), isTrue);
+      expect(engine.isOutsideTerm(monday), isTrue);
     });
   });
 
@@ -280,10 +280,10 @@ void main() {
       );
     });
 
-    test('remaining sessions are counted up to the semester end', () {
+    test('remaining sessions are counted up to the term end', () {
       final ScheduleEngine engine = buildEngine(
         slots: <ClassSlot>[slotFixture(startDate: Dates.addDays(monday, -70))],
-        semesterEnd: Dates.addDays(monday, 21),
+        termEnd: Dates.addDays(monday, 21),
       );
       // Counting forward from the Monday: +7, +14 and +21 remain.
       expect(engine.remainingSessionsFor(1, from: monday), 3);
@@ -301,7 +301,7 @@ void main() {
             status: AttendanceStatus.cancelled,
           ),
         ],
-        semesterEnd: Dates.addDays(monday, 21),
+        termEnd: Dates.addDays(monday, 21),
       );
       expect(engine.remainingSessionsFor(1, from: monday), 2);
       expect(engine.remainingSessionsBySubject(from: monday)[1], 2);
@@ -319,7 +319,7 @@ void main() {
             status: AttendanceStatus.present,
           ),
         ],
-        semesterEnd: Dates.addDays(monday, 21),
+        termEnd: Dates.addDays(monday, 21),
       );
       expect(engine.remainingSessionsFor(1, from: monday), 2);
     });

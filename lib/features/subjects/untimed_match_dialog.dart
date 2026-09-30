@@ -74,7 +74,7 @@ String matchedMessage(int count) =>
 /// holding untimed marks has had classes all term, and a rule starting today
 /// would leave those marks with nothing to be matched to.
 DateTime firstClassFor(WidgetRef ref, int? subjectId, DateTime otherwise) {
-  final DateTime? termStart = ref.read(settingsProvider).value?.semesterStart;
+  final DateTime? termStart = ref.read(settingsProvider).value?.termStart;
   if (subjectId == null ||
       termStart == null ||
       Dates.keyOf(termStart) >= Dates.keyOf(otherwise)) {

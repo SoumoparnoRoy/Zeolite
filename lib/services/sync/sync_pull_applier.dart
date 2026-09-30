@@ -89,8 +89,8 @@ class SyncPullApplier {
     final AppSettings current = await _settings.load();
 
     final AppSettings merged = current.copyWith(
-      semesterStart: readDay(f['semesterStart']),
-      semesterEnd: readDay(f['semesterEnd']),
+      termStart: readDay(f['semesterStart']),
+      termEnd: readDay(f['semesterEnd']),
       targetPercent: readDouble(f['targetPercent']),
       defaultClassDurationMinutes: readInt(f['defaultClassMinutes']),
       dayStartMinutes: readInt(f['dayStartMinutes']),
@@ -445,7 +445,7 @@ class SyncPullApplier {
     SyncLocalRows local,
   ) async {
     switch (kind) {
-      // The row always exists, and clearing the semester dates because another
+      // The row always exists, and clearing the term dates because another
       // device stopped holding them is not a deletion anyone asked for.
       case SyncKind.settings:
         return;

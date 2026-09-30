@@ -1,11 +1,12 @@
 import 'dart:async';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../data/db/zeolite_repository.dart';
 import '../../data/models/class_category.dart';
 import '../../data/models/room.dart';
 import '../../data/models/subject.dart';
 import '../../data/models/tag.dart';
-import '../providers.dart';
 
 import 'action_core.dart';
 
@@ -100,3 +101,7 @@ class SubjectActions {
 
   Future<int> countMarksWithTag(int id) => _core.repo.countMarksWithTag(id);
 }
+
+final subjectActionsProvider = Provider<SubjectActions>(
+  (ref) => SubjectActions(ref.read(actionCoreProvider)),
+);

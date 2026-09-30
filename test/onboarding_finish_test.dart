@@ -62,7 +62,7 @@ void main() {
 
     final AppSettings saved = await SettingsService().load();
     expect(saved.onboarded, isTrue);
-    expect(saved.semesterStart, isNotNull);
+    expect(saved.termStart, isNotNull);
     expect(saved.welcomeShown, isTrue);
     expect(saved.accentColour, AccentColour.teal);
     expect(saved.launchAnimation, LaunchAnimation.short);

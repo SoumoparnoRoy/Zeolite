@@ -10,8 +10,10 @@ import '../domain/sync/sync_target.dart';
 import '../services/firebase/firestore_sync_target.dart';
 import '../services/sync/sync_coordinator.dart';
 import '../services/sync/sync_scheduler.dart';
+import 'actions/action_core.dart';
+import 'actions/data_actions.dart';
+import 'app_providers.dart';
 import 'auth_providers.dart';
-import 'providers.dart';
 
 /// The account as somewhere to mirror to, or null while signed out. Rebuilt
 /// when the user changes, so signing into a second account cannot go on
@@ -61,6 +63,9 @@ final syncSchedulerProvider = Provider<SyncScheduler?>((ref) {
     lastSyncAt: () => ref.read(settingsProvider).value?.lastSyncAt,
   );
   ref.onDispose(scheduler.dispose);
+  // Every scheduler listens, or a change would reach one target and quietly
+  // never reach the other.
+  ref.listen<int>(localChangesProvider, (_, __) => scheduler.onLocalChange());
   scheduler.start();
   return scheduler;
 });

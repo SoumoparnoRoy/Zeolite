@@ -30,8 +30,8 @@ ClassSlot slot({int start = 9 * 60, int end = 10 * 60}) => ClassSlot(
 ScheduleEngine engineWith({
   List<Holiday> holidays = const <Holiday>[],
   List<AttendanceRecord> records = const <AttendanceRecord>[],
-  DateTime? semesterStart,
-  DateTime? semesterEnd,
+  DateTime? termStart,
+  DateTime? termEnd,
 }) =>
     ScheduleEngine(
       subjects: <Subject>[subject],
@@ -39,8 +39,8 @@ ScheduleEngine engineWith({
       extras: const <ExtraClass>[],
       holidays: holidays,
       records: records,
-      semesterStart: semesterStart,
-      semesterEnd: semesterEnd,
+      termStart: termStart,
+      termEnd: termEnd,
     );
 
 void main() {
@@ -78,8 +78,8 @@ void main() {
       expect(
         HomeWidgetPayload.today(
           engine: engineWith(
-            semesterStart: monday,
-            semesterEnd: Dates.addDays(monday, 3),
+            termStart: monday,
+            termEnd: Dates.addDays(monday, 3),
           ),
           settings: const AppSettings(),
           on: Dates.addDays(monday, 10),

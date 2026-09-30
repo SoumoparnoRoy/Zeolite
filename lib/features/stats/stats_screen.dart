@@ -176,9 +176,9 @@ class _OverallHeader extends StatelessWidget {
                         _LegendLine(
                           label: 'Cancelled',
                           value: stats.cancelled,
-                          // Cancelled counts towards neither side of the
-                          // percentage, so its line reads quieter than the two
-                          // that do.
+                          // Cancelled usually leaves the percentage alone, so
+                          // its line reads quieter than the two that always
+                          // move it.
                           dimmed: true,
                         ),
                       ],

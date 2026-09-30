@@ -233,11 +233,20 @@ class _LogTile extends ConsumerWidget {
   final AttendanceLogEntry entry;
   final bool use24Hour;
 
+  /// A zero-weight mark never counts, whatever the settings say.
+  bool _counts(AppSettings? settings) {
+    final AttendanceStatus? status = entry.status;
+    return status != null &&
+        entry.weight != 0 &&
+        (settings ?? const AppSettings()).markCounts(status, entry.date);
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final AppPalette p = context.palette;
     final String? tagName =
         ref.watch(timetableProvider).value?.tagById(entry.tagId)?.name;
+    final bool counts = _counts(ref.watch(settingsProvider).value);
 
     final String time = entry.endMinutes == null
         ? AttendanceRecord.startLabel(entry.startMinutes, use24Hour: use24Hour)
@@ -340,7 +349,8 @@ class _LogTile extends ConsumerWidget {
                   child: Text(
                     'No class on your timetable sits here — the class moved '
                     'to another day, or this mark was brought in from '
-                    'elsewhere. It still counts towards your percentage.',
+                    'elsewhere. ${counts ? 'It still counts' : 'It does not '
+                        'count'} towards your percentage.',
                     style: TextStyle(
                       fontSize: 10.5,
                       height: 1.4,
@@ -375,19 +385,21 @@ class _LogTile extends ConsumerWidget {
 
 /// Confirms before discarding a stray mark.
 ///
-/// There is no undo anywhere in the app, and this row is the only place the
-/// mark is visible at all, so removing it silently would destroy the one thing
-/// that explains a percentage the user cannot otherwise account for.
+/// Clearing a mark offers no undo, and this row is the only place the mark is
+/// visible at all, so removing it silently would destroy the one thing that
+/// explains a percentage the user cannot otherwise account for.
 extension on _LogTile {
   Future<void> _confirmRemove(BuildContext context, WidgetRef ref) async {
+    final bool counts = _counts(ref.read(settingsProvider).value);
     final bool confirmed = await showDialog<bool>(
           context: context,
           builder: (BuildContext context) => AlertDialog(
             title: const Text('Remove this mark?'),
             content: Text(
               'The ${entry.status?.label.toLowerCase() ?? 'recorded'} mark for '
-              '${Dates.formatFull(entry.date)} will be deleted and will stop '
-              'counting towards your percentage. This cannot be undone.',
+              '${Dates.formatFull(entry.date)} will be deleted'
+              '${counts ? ' and will stop counting towards your percentage' : ''}'
+              '. This cannot be undone.',
               style: const TextStyle(fontSize: 13, height: 1.4),
             ),
             actions: <Widget>[

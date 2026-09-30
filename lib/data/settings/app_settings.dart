@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../domain/day_grid.dart';
+import '../models/attendance_status.dart';
 
 /// Which theme the app renders in.
 ///
@@ -276,6 +277,13 @@ class AppSettings {
   /// The window, unless the user has asked for the strays counted too.
   bool countsTowardsPercentage(DateTime date) =>
       countOutsideTerm || countsInTerm(date);
+
+  /// Whether a mark with [status] on [date] moves the percentage at all. The
+  /// one place both switches are read, so copy that promises a mark counts
+  /// cannot disagree with the figures.
+  bool markCounts(AttendanceStatus status, DateTime date) =>
+      countsTowardsPercentage(date) &&
+      (status != AttendanceStatus.cancelled || cancelledCountsAsAttended);
 
   /// How far through the term you are, 0..1.
   double get termProgress {

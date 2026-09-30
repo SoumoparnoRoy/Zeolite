@@ -4,9 +4,8 @@ import '../../core/app_theme.dart';
 
 /// How a single class occurrence turned out.
 ///
-/// Only [present] and [absent] count towards the attendance percentage.
-/// [cancelled] means the class did not take place, so it is excluded from both
-/// the numerator and the denominator.
+/// [cancelled] means the class did not take place, so it is left out of both
+/// sides of the percentage unless the user counts it as attended.
 enum AttendanceStatus {
   present,
   absent,

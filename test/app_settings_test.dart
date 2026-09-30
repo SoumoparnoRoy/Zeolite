@@ -1,3 +1,4 @@
+import 'package:zeolite/data/models/attendance_status.dart';
 import 'package:zeolite/data/settings/app_settings.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -12,6 +13,34 @@ void main() {
       const AppSettings settings = AppSettings(cancelledCountsAsAttended: true);
       final AppSettings restored = AppSettings.fromJson(settings.toJson());
       expect(restored.cancelledCountsAsAttended, isTrue);
+    });
+
+    test('a cancelled mark counts only once the rule is on', () {
+      final DateTime day = DateTime(2026, 3, 2);
+      const AppSettings off = AppSettings();
+      const AppSettings on = AppSettings(cancelledCountsAsAttended: true);
+
+      expect(off.markCounts(AttendanceStatus.cancelled, day), isFalse);
+      expect(on.markCounts(AttendanceStatus.cancelled, day), isTrue);
+      expect(off.markCounts(AttendanceStatus.absent, day), isTrue);
+    });
+
+    test('a mark outside the term counts only when strays are counted', () {
+      final AppSettings term = AppSettings(
+        termStart: DateTime(2026, 1, 5),
+        termEnd: DateTime(2026, 5, 1),
+        cancelledCountsAsAttended: true,
+      );
+      final DateTime before = DateTime(2025, 12, 15);
+
+      expect(term.markCounts(AttendanceStatus.present, before), isFalse);
+      expect(term.markCounts(AttendanceStatus.cancelled, before), isFalse);
+      expect(
+        term
+            .copyWith(countOutsideTerm: true)
+            .markCounts(AttendanceStatus.present, before),
+        isTrue,
+      );
     });
   });
 

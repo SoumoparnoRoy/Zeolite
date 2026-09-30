@@ -430,8 +430,8 @@ class _ImportTimetableScreenState extends ConsumerState<ImportTimetableScreen> {
       setState(() => _controller.text = read.join('\n'));
       messenger.showSnackBar(SnackBar(
         content: Text(choices.isEmpty
-            ? 'Read ${Words.plural(kept, 'line')} — check them against the '
-                'sheet before importing'
+            ? 'Read ${Words.plural(kept, 'line')}. Check them against the '
+                'sheet before importing.'
             : 'Read ${Words.plural(kept, 'line')} of ${entries.length}. The '
                 'rest are commented out.'),
       ));

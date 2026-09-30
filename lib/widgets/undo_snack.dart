@@ -36,7 +36,7 @@ void showUndoSnack(
                   SnackBar(
                     content: Text(
                       restored
-                          ? 'Put back.'
+                          ? 'Put back'
                           : 'Too much has changed since — that can no longer '
                               'be undone.',
                     ),

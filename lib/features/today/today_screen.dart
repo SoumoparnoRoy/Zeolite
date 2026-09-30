@@ -353,8 +353,9 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                                 child: _NoticeCard(
                                   icon: Icons.celebration_rounded,
                                   title: holiday.name,
-                                  message:
-                                      'Marked as a holiday — no recurring classes today.',
+                                  message: 'Marked as a holiday — no '
+                                      'recurring classes '
+                                      '${isToday ? 'today' : 'that day'}.',
                                   color: p.cyan,
                                 ),
                               ),

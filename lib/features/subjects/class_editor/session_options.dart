@@ -148,6 +148,8 @@ Future<void> showSessionOptions(
   final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
   final ActionCore core = ref.read(actionCoreProvider);
   final ScheduleActions schedule = ref.read(scheduleActionsProvider);
+  final bool cancelledCounts =
+      ref.read(settingsProvider).value?.cancelledCountsAsAttended ?? false;
 
   await showAppSheet<void>(
     context: context,
@@ -221,8 +223,10 @@ Future<void> showSessionOptions(
           _OptionTile(
             icon: Icons.block_rounded,
             title: 'Cancel just this class',
-            subtitle:
-                'Marks ${Dates.formatDayMonth(session.date)} as cancelled. It stops counting towards your percentage.',
+            subtitle: 'Marks ${Dates.formatDayMonth(session.date)} as '
+                'cancelled. ${cancelledCounts ? 'It counts as held and '
+                    'attended, as set in Settings.' : 'It stops counting '
+                    'towards your percentage.'}',
             onTap: () async {
               Navigator.of(context).pop();
               await ref

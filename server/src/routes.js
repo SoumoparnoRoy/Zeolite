@@ -76,7 +76,8 @@ export function createNotionRouter({ config, sessions, limit, fetchImpl }) {
       session.tokenPayload = tokenPayload;
       session.status = "ready";
       response.status(200).type("html").send(callbackSuccess(session, config.appScheme));
-    } catch {
+    } catch (error) {
+      process.stderr.write(`Notion code exchange failed: ${error.message}\n`);
       response
         .status(502)
         .type("html")
@@ -124,7 +125,8 @@ export function createNotionRouter({ config, sessions, limit, fetchImpl }) {
         fetchImpl,
       );
       response.status(200).json(tokenPayload);
-    } catch {
+    } catch (error) {
+      process.stderr.write(`Notion token refresh failed: ${error.message}\n`);
       response.status(502).json({ error: "Unable to refresh the connection." });
     }
   });

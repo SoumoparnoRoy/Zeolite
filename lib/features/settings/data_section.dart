@@ -154,7 +154,7 @@ class DataSection extends ConsumerWidget {
     } catch (error) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not use that folder')),
+        const SnackBar(content: Text('Could not use that folder.')),
       );
     }
   }
@@ -175,7 +175,7 @@ class DataSection extends ConsumerWidget {
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text("Automatic backups go to the app's own folder again."),
+        content: Text("Automatic backups go to the app's own folder again"),
       ),
     );
   }
@@ -193,11 +193,21 @@ class DataSection extends ConsumerWidget {
 
   /// Saves through the system dialog so the file lands outside the app's own
   /// folder, which is deleted with the app. Falls back to the clipboard if the
-  /// dialog fails — an awkward paste beats losing the export.
+  /// dialog fails — an awkward paste beats losing the export. Built first, so
+  /// the fallback never repeats a step that just failed.
   Future<void> _export(BuildContext context, WidgetRef ref) async {
-    final BackupService backup = ref.read(backupServiceProvider);
+    final String json;
     try {
-      final String json = await backup.exportToJsonString();
+      json = await ref.read(backupServiceProvider).exportToJsonString();
+    } catch (error) {
+      debugPrint('Zeolite: backup export failed: $error');
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not create the backup.')),
+      );
+      return;
+    }
+    try {
       final Uri? saved = await FilePicker.saveFile(
         dialogTitle: 'Save Zeolite backup',
         fileName: BackupService.fileNameFor(DateTime.now()),
@@ -220,7 +230,6 @@ class DataSection extends ConsumerWidget {
       );
     } catch (error) {
       debugPrint('Zeolite: save dialog failed: $error');
-      final String json = await backup.exportToJsonString();
       await Clipboard.setData(ClipboardData(text: json));
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

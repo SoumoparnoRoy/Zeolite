@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show SliverConstraints;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -129,11 +131,11 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
       pages.jumpToPage(target);
       return;
     }
-    pages.animateToPage(
+    unawaited(pages.animateToPage(
       target,
       duration: const Duration(milliseconds: 260),
       curve: Curves.easeOutQuart,
-    );
+    ));
   }
 
   @override
@@ -170,7 +172,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
       if (context.mounted) _showPendingAlerts(context, ref);
       // Due at most once a day, and a no-op the rest of the time — the check is
       // a date comparison, not an export.
-      ref.read(dataActionsProvider).maybeRunAutoBackup();
+      unawaited(ref.read(dataActionsProvider).maybeRunAutoBackup());
     });
 
     // A date set anywhere else has to reach the pager: the day pills, the
@@ -547,10 +549,10 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
     // Recorded before awaiting the dialog so a rebuild mid-flight cannot open
     // a second copy of it.
     announced.markAnnounced(pending);
-    showDialog<void>(
+    unawaited(showDialog<void>(
       context: context,
       builder: (BuildContext context) => _InAppAlertDialog(alerts: pending),
-    );
+    ));
   }
 }
 

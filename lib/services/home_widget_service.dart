@@ -8,6 +8,7 @@ import 'package:home_widget/home_widget.dart';
 
 import '../core/app_theme.dart';
 import '../core/date_utils.dart';
+import '../core/report_error.dart';
 import '../data/settings/app_settings.dart';
 import '../domain/day_grid.dart';
 import '../domain/home_widget_payload.dart';
@@ -77,8 +78,8 @@ class HomeWidgetService {
       );
       await HomeWidget.saveWidgetData<String>(themeKey, jsonEncode(theme));
       await _redraw();
-    } catch (error) {
-      debugPrint('Home widget update skipped: $error');
+    } catch (error, stack) {
+      reportError(error, stack, where: 'home widget update');
     }
   }
 
@@ -129,8 +130,8 @@ class HomeWidgetService {
         logicalSize: size,
       );
       await _redraw();
-    } catch (error) {
-      debugPrint('Week widget image skipped: $error');
+    } catch (error, stack) {
+      reportError(error, stack, where: 'week widget image');
     }
   }
 

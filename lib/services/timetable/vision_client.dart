@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:http/http.dart' as http;
 
+import '../../core/report_error.dart';
 import '../../domain/vision_read.dart';
 
 /// The device's half of `POST /timetable/read`.
@@ -60,9 +61,10 @@ class VisionClient {
       return _readFrom(response);
     } on TimeoutException {
       return const VisionRead.failed(VisionFailure.offline);
-    } catch (_) {
+    } catch (error, stack) {
       // Socket and handshake failures both land here and mean the same thing
       // to the student: the service could not be reached.
+      reportError(error, stack, where: 'timetable image check');
       return const VisionRead.failed(VisionFailure.offline);
     }
   }

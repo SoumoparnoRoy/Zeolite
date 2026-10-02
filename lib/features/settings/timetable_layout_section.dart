@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -99,11 +101,11 @@ class DayGridSection extends ConsumerWidget {
                     : Clock.formatDuration(settings.blockMinutes),
                 onChanged: (double value) {
                   final int minutes = (value / 5).round() * 5;
-                  controller.save(
+                  unawaited(controller.save(
                     settings.copyWith(
                       blockMinutes: minutes < 15 ? 0 : minutes,
                     ),
-                  );
+                  ));
                 },
               ),
               if (grid.isConfigured) ...<Widget>[
@@ -168,7 +170,7 @@ class _BreakField extends ConsumerWidget {
               : Clock.formatDuration(settings.breakMinutes),
           onChanged: (double value) {
             final int minutes = (value / 5).round() * 5;
-            controller.save(
+            unawaited(controller.save(
               settings.copyWith(
                 breakMinutes: minutes,
                 // A length on its own would do nothing, so give it a position.
@@ -176,7 +178,7 @@ class _BreakField extends ConsumerWidget {
                     ? (maxAfter + 1) ~/ 2
                     : settings.breakAfterBlock,
               ),
-            );
+            ));
           },
         ),
         if (settings.breakMinutes > 0) ...<Widget>[

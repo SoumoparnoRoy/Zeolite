@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../core/date_utils.dart';
+import '../core/report_error.dart';
 import '../data/db/zeolite_repository.dart';
 import '../data/models/attendance_record.dart';
 import '../data/models/class_category.dart';
@@ -604,7 +605,8 @@ class BackupService {
         message: 'Backup restored',
         settings: settings,
       );
-    } catch (_) {
+    } catch (error, stack) {
+      reportError(error, stack, where: 'backup restore');
       if (settingsWriteAttempted && originalSettings != null) {
         try {
           await _settingsService.save(originalSettings);

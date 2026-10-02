@@ -1,8 +1,8 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/report_error.dart';
 import '../../data/db/zeolite_repository.dart';
 import '../../data/models/class_category.dart';
 import '../../data/settings/app_settings.dart';
@@ -47,11 +47,11 @@ class DataActions {
       await _core.ref
           .read(settingsProvider.notifier)
           .save(settings.copyWith(lastAutoBackupAt: DateTime.now()));
-    } catch (error) {
+    } catch (error, stack) {
       // A failed backup must not take the home screen down with it. The next
       // launch tries again, and the stamp is only written on success so a
       // failure does not count as today's backup.
-      debugPrint('Zeolite: auto backup failed: $error');
+      reportError(error, stack, where: 'auto backup');
     } finally {
       _autoBackupRunning = false;
     }

@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:home_widget/home_widget.dart';
 
 import 'core/app_theme.dart';
+import 'core/report_error.dart';
 import 'data/settings/app_settings.dart';
 import 'features/launch/launch_screen.dart';
 import 'features/onboarding/onboarding_screen.dart';
@@ -98,7 +99,7 @@ class _BootstrapState extends ConsumerState<_Bootstrap> {
       // choice rather than starting violet and changing colour part way.
       loading: () => ColoredBox(color: context.palette.canvas),
       error: (Object error, StackTrace stack) {
-        debugPrint('Zeolite: settings failed to load: $error');
+        reportError(error, stack, where: 'settings load');
         return Scaffold(
           body: Center(
             child: Padding(
@@ -268,7 +269,8 @@ class _RootShellState extends ConsumerState<RootShell> with RouteAware {
       _pages.jumpToPage(index);
       return;
     }
-    _pages.animateToPage(index, duration: _slide, curve: Curves.easeOutQuart);
+    unawaited(_pages.animateToPage(index,
+        duration: _slide, curve: Curves.easeOutQuart));
   }
 
   void _openTappedNotification() {

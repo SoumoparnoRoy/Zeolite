@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
+import '../../core/report_error.dart';
 import '../../core/words.dart';
 import '../../data/models/class_slot.dart';
 import '../../data/models/subject.dart';
@@ -435,8 +436,8 @@ class _ImportTimetableScreenState extends ConsumerState<ImportTimetableScreen> {
             : 'Read ${Words.plural(kept, 'line')} of ${entries.length}. The '
                 'rest are commented out.'),
       ));
-    } catch (error) {
-      debugPrint('Zeolite: timetable image read failed: $error');
+    } catch (error, stack) {
+      reportError(error, stack, where: 'timetable image read');
       messenger.showSnackBar(
         const SnackBar(content: Text('Could not read that image.')),
       );

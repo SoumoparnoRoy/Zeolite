@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
+import '../../core/report_error.dart';
 import '../../core/words.dart';
 import '../../data/models/attendance_record.dart';
 import '../../data/settings/app_settings.dart';
@@ -151,7 +152,8 @@ class DataSection extends ConsumerWidget {
           content: Text('Automatic backups go to ${picked.name} from now on'),
         ),
       );
-    } catch (error) {
+    } catch (error, stack) {
+      reportError(error, stack, where: 'choosing a backup folder');
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not use that folder.')),
@@ -168,7 +170,9 @@ class DataSection extends ConsumerWidget {
     if (uri != null) {
       try {
         await BackupFolder().release(uri);
-      } catch (_) {}
+      } catch (error, stack) {
+        reportError(error, stack, where: 'releasing the backup folder');
+      }
     }
     await ref.read(settingsProvider.notifier).clearBackupFolder();
     ref.invalidate(backupFolderUsableProvider);
@@ -199,8 +203,8 @@ class DataSection extends ConsumerWidget {
     final String json;
     try {
       json = await ref.read(backupServiceProvider).exportToJsonString();
-    } catch (error) {
-      debugPrint('Zeolite: backup export failed: $error');
+    } catch (error, stack) {
+      reportError(error, stack, where: 'backup export');
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not create the backup.')),
@@ -228,8 +232,8 @@ class DataSection extends ConsumerWidget {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Backup saved')),
       );
-    } catch (error) {
-      debugPrint('Zeolite: save dialog failed: $error');
+    } catch (error, stack) {
+      reportError(error, stack, where: 'save dialog');
       await Clipboard.setData(ClipboardData(text: json));
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -281,8 +285,8 @@ class DataSection extends ConsumerWidget {
     try {
       final String json = utf8.decode(await folder.readBytes(picked.uri));
       result = await ref.read(backupServiceProvider).importFromJsonString(json);
-    } catch (error) {
-      debugPrint('Zeolite: backup file unreadable: $error');
+    } catch (error, stack) {
+      reportError(error, stack, where: 'reading a backup file');
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not read that file.')),

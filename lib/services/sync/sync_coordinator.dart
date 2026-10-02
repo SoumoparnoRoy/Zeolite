@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
+import '../../core/report_error.dart';
 import '../../data/db/zeolite_repository.dart';
 import '../../data/settings/app_settings.dart';
 import '../../domain/sync/sync_merge.dart';
@@ -244,7 +247,8 @@ class SyncCoordinator {
       if (!_rerunWanted) return;
       _rerunWanted = false;
       // Nobody awaits this one, so a failure would go unhandled.
-      _start(force: false, merge: null).then<void>((_) {}, onError: (_, __) {});
+      unawaited(_start(force: false, merge: null)
+          .then<void>((_) {}, onError: (_, __) {}));
     });
   }
 
@@ -268,7 +272,7 @@ class SyncCoordinator {
     } catch (error, stack) {
       // Anything unforeseen still has to end the run, or the status stays on
       // running and every later run is turned away as already in progress.
-      debugPrint('Sync run failed: $error\n$stack');
+      reportError(error, stack, where: 'sync run');
       _status = _status.failed(SyncFailure.unknown);
       return const SyncRunResult(
         outcome: SyncRunOutcome.failed,

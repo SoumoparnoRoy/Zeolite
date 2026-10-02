@@ -55,7 +55,7 @@ class _JoiningScreenState extends ConsumerState<JoiningScreen> {
     // filed twice.
     if (ref.read(settingsProvider).value?.accountAutoSync != true) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) ref.read(syncStatusProvider.notifier).run();
+        if (mounted) unawaited(ref.read(syncStatusProvider.notifier).run());
       });
     }
   }

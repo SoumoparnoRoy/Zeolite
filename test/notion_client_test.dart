@@ -157,7 +157,7 @@ void main() {
 
     expect(refreshes, 0);
     expect(result.failure, SyncFailure.auth);
-    expect(result.message, 'restricted_resource');
+    expect(result.code, 'restricted_resource');
   });
 
   test('a page that is already gone is told apart from a bad request',
@@ -174,7 +174,7 @@ void main() {
     // The target reads this to call an archive done rather than retrying a
     // page nobody can reach any more.
     expect(result.failure, SyncFailure.rejected);
-    expect(result.message, 'object_not_found');
+    expect(result.isNotFound, isTrue);
   });
 
   test('the rate limit is reported rather than absorbed', () async {

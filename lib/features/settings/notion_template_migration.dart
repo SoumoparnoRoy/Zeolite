@@ -228,7 +228,7 @@ class NotionTemplateMigration {
         pageId: old.value,
       );
       // Already gone is the outcome that was asked for, so the row goes too.
-      if (result.ok || result.message == 'object_not_found') {
+      if (result.ok || result.isNotFound) {
         moved++;
         await ref.read(notionConnectionStoreProvider).removeRetired(old.key.id);
       }

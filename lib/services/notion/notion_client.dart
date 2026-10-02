@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import '../../core/report_error.dart';
 import '../../domain/sync/sync_target.dart';
 
 /// One Notion call that either decoded or gave a reason it did not. Shaped
@@ -13,9 +14,9 @@ import '../../domain/sync/sync_target.dart';
 class NotionResult {
   const NotionResult.done(Map<String, Object?> this.body)
       : failure = null,
-        message = null;
+        code = null;
 
-  const NotionResult.failed(this.failure, {this.message}) : body = null;
+  const NotionResult.failed(this.failure, {this.code}) : body = null;
 
   final Map<String, Object?>? body;
   final SyncFailure? failure;
@@ -23,9 +24,12 @@ class NotionResult {
   /// Notion's own error code — `object_not_found`, `validation_error`. Carried
   /// because the caller acts on it: a page that is already gone is a finished
   /// archive, not a failure to retry.
-  final String? message;
+  final String? code;
 
   bool get ok => failure == null;
+
+  /// The page or table is gone, or was never shared with the connection.
+  bool get isNotFound => code == 'object_not_found';
 }
 
 /// Every row of a data source, or the reason the walk stopped.
@@ -37,14 +41,14 @@ class NotionResult {
 class NotionRows {
   const NotionRows.done(this.pages)
       : failure = null,
-        message = null;
+        code = null;
 
-  const NotionRows.failed(this.failure, {this.message})
+  const NotionRows.failed(this.failure, {this.code})
       : pages = const <Map<String, Object?>>[];
 
   final List<Map<String, Object?>> pages;
   final SyncFailure? failure;
-  final String? message;
+  final String? code;
 
   bool get ok => failure == null;
 }
@@ -173,7 +177,7 @@ class NotionClient {
         pageSize: queryPageSize,
       );
       if (!result.ok) {
-        return NotionRows.failed(result.failure, message: result.message);
+        return NotionRows.failed(result.failure, code: result.code);
       }
 
       final Object? rows = result.body?['results'];
@@ -295,7 +299,7 @@ class NotionClient {
     Map<String, Object?>? body,
   }) async {
     final NotionResult first = await _attempt(method, path, body);
-    if (first.failure != SyncFailure.auth || first.message != _expired) {
+    if (first.failure != SyncFailure.auth || first.code != _expired) {
       return first;
     }
     if (!await _refresh()) {
@@ -333,8 +337,9 @@ class NotionClient {
       return const NotionResult.failed(SyncFailure.offline);
     } on http.ClientException {
       return const NotionResult.failed(SyncFailure.offline);
-    } catch (error) {
-      return NotionResult.failed(SyncFailure.unknown, message: '$error');
+    } catch (error, stack) {
+      reportError(error, stack, where: 'Notion $method $path');
+      return const NotionResult.failed(SyncFailure.unknown);
     }
   }
 
@@ -366,21 +371,21 @@ class NotionClient {
     final String? code = decoded?['code'] as String?;
     switch (response.statusCode) {
       case 401:
-        return NotionResult.failed(SyncFailure.auth, message: code ?? _expired);
+        return NotionResult.failed(SyncFailure.auth, code: code ?? _expired);
       // Not something a new token fixes — either the connection was never
       // given the capability, or the page is not shared with it.
       case 403:
-        return NotionResult.failed(SyncFailure.auth, message: code);
+        return NotionResult.failed(SyncFailure.auth, code: code);
       case 400:
       case 404:
-        return NotionResult.failed(SyncFailure.rejected, message: code);
+        return NotionResult.failed(SyncFailure.rejected, code: code);
       case 429:
-        return NotionResult.failed(SyncFailure.rateLimited, message: code);
+        return NotionResult.failed(SyncFailure.rateLimited, code: code);
       // Notion's word for two writers colliding, which is worth another run.
       case 409:
-        return NotionResult.failed(SyncFailure.unknown, message: code);
+        return NotionResult.failed(SyncFailure.unknown, code: code);
       default:
-        return NotionResult.failed(SyncFailure.unknown, message: code);
+        return NotionResult.failed(SyncFailure.unknown, code: code);
     }
   }
 

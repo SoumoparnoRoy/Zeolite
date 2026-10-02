@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
@@ -81,11 +83,11 @@ class _WeekStripState extends State<WeekStrip> {
       _controller.jumpTo(target);
       return;
     }
-    _controller.animateTo(
+    unawaited(_controller.animateTo(
       target,
       duration: const Duration(milliseconds: 320),
       curve: Curves.easeOutCubic,
-    );
+    ));
   }
 
   @override

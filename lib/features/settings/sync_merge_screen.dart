@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
+import '../../core/report_error.dart';
 import '../../core/words.dart';
 import '../../data/models/attendance_record.dart';
 import '../../data/models/attendance_status.dart';
@@ -66,9 +67,10 @@ class _SyncMergeScreenState extends ConsumerState<SyncMergeScreen> {
     SyncRunResult? result;
     try {
       result = await ref.read(syncStatusProvider.notifier).merge(_choices);
-    } catch (_) {
+    } catch (error, stack) {
       // The button is gone the moment the merge starts, so a run that ends
       // any way but cleanly still has to close the screen behind it.
+      reportError(error, stack, where: 'sync merge');
       result = null;
     }
     if (!mounted) return;

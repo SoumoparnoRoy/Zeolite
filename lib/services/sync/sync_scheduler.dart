@@ -54,14 +54,14 @@ class SyncScheduler {
     _pending?.cancel();
     _pending = Timer(debounce, () {
       _pending = null;
-      _run();
+      unawaited(_run());
     });
   }
 
   void onResumed() {
     final DateTime? last = _lastSyncAt();
     if (last != null && _now().difference(last) < staleAfter) return;
-    _run();
+    unawaited(_run());
   }
 
   /// The timer dies with the process and the next resume would be inside the
@@ -70,7 +70,7 @@ class SyncScheduler {
     if (_pending == null) return;
     _pending!.cancel();
     _pending = null;
-    _run();
+    unawaited(_run());
   }
 
   @visibleForTesting

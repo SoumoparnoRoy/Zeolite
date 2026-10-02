@@ -60,7 +60,7 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
 
   @override
   void dispose() {
-    _sub?.cancel();
+    unawaited(_sub?.cancel());
     _code.dispose();
     super.dispose();
   }
@@ -80,7 +80,9 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
   void _onLink(Uri uri) {
     if (uri.scheme != 'zeolite' || uri.host != 'notion') return;
     final String? session = uri.queryParameters['session'];
-    if (session != null && session.isNotEmpty) _claim(session: session);
+    if (session != null && session.isNotEmpty) {
+      unawaited(_claim(session: session));
+    }
   }
 
   Future<void> _start() async {

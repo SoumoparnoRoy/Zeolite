@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import '../../core/report_error.dart';
 import '../../domain/sync/sync_target.dart';
 
 /// What Notion hands back once a connection is authorised. There is no
@@ -173,7 +174,8 @@ class NotionAuthClient {
       return const NotionAuthResult.failed(SyncFailure.offline);
     } on http.ClientException {
       return const NotionAuthResult.failed(SyncFailure.offline);
-    } catch (_) {
+    } catch (error, stack) {
+      reportError(error, stack, where: 'Notion connection request');
       return const NotionAuthResult.failed(SyncFailure.unknown);
     }
   }

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:home_widget/home_widget.dart';
 
 import '../core/date_utils.dart';
+import '../core/report_error.dart';
 import '../data/models/attendance_status.dart';
 import '../data/models/class_session.dart';
 import '../data/settings/app_settings.dart';
@@ -218,8 +219,8 @@ Future<void> _handleExternalMark(
       HomeWidgetService.markEpochKey,
       DateTime.now().microsecondsSinceEpoch.toString(),
     );
-  } catch (error) {
-    debugPrint('$source mark failed: $error');
+  } catch (error, stack) {
+    reportError(error, stack, where: '$source mark');
   } finally {
     container.dispose();
   }
@@ -250,7 +251,7 @@ Future<void> _pushFromContainer(ProviderContainer container) async {
 Future<void> registerHomeWidgetCallbacks() async {
   try {
     await HomeWidget.registerInteractivityCallback(handleWidgetTap);
-  } catch (error) {
-    debugPrint('Home widget callback not registered: $error');
+  } catch (error, stack) {
+    reportError(error, stack, where: 'home widget callback registration');
   }
 }

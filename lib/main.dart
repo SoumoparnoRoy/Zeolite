@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
 import 'core/app_theme.dart';
+import 'core/report_error.dart';
 import 'services/notification_service.dart';
 import 'state/home_widget_providers.dart';
 
@@ -31,8 +32,8 @@ Future<void> main() async {
           ? const AndroidPlayIntegrityProvider()
           : const AndroidDebugProvider(),
     );
-  } catch (error) {
-    debugPrint('Firebase unavailable, continuing offline: $error');
+  } catch (error, stack) {
+    reportError(error, stack, where: 'Firebase start-up');
   }
 
   // The stored choice is not readable this early, so the chrome follows the

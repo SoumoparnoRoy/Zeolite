@@ -7,6 +7,7 @@ import 'package:timezone/timezone.dart' as tz;
 
 import '../core/app_theme.dart';
 import '../core/date_utils.dart';
+import '../core/report_error.dart';
 import '../data/models/class_session.dart';
 import '../data/settings/app_settings.dart';
 import '../domain/attendance_stats.dart';
@@ -156,7 +157,7 @@ class NotificationService {
     } catch (error, stack) {
       // A missing or unrecognised zone must never stop the app from starting;
       // scheduling simply falls back to whatever tz.local resolved to.
-      debugPrint('Zeolite: timezone init failed: $error\n$stack');
+      reportError(error, stack, where: 'timezone init');
     }
 
     const AndroidInitializationSettings android =
@@ -191,7 +192,7 @@ class NotificationService {
       }
       _ready = true;
     } catch (error, stack) {
-      debugPrint('Zeolite: notification init failed: $error\n$stack');
+      reportError(error, stack, where: 'notification init');
     }
   }
 
@@ -282,8 +283,8 @@ class NotificationService {
         appAllowed: await androidPlugin.areNotificationsEnabled(),
         channels: await androidPlugin.getNotificationChannels(),
       );
-    } catch (error) {
-      debugPrint('Zeolite: could not read notification access: $error');
+    } catch (error, stack) {
+      reportError(error, stack, where: 'reading notification access');
       return TrayAccess.open;
     }
   }
@@ -322,8 +323,8 @@ class NotificationService {
         'open',
         <String, Object?>{'channel': id},
       );
-    } on PlatformException catch (error) {
-      debugPrint('Zeolite: could not open notification settings: $error');
+    } on PlatformException catch (error, stack) {
+      reportError(error, stack, where: 'opening notification settings');
     } on MissingPluginException {
       return;
     }
@@ -541,8 +542,8 @@ class NotificationService {
           payload: 'class:${session.key}',
         );
         scheduled++;
-      } catch (error) {
-        debugPrint('Zeolite: could not schedule class reminder: $error');
+      } catch (error, stack) {
+        reportError(error, stack, where: 'class reminder');
       }
     }
   }
@@ -618,8 +619,8 @@ class NotificationService {
           payload: 'class:${session.key}',
         );
         scheduled++;
-      } catch (error) {
-        debugPrint('Zeolite: could not schedule class-end reminder: $error');
+      } catch (error, stack) {
+        reportError(error, stack, where: 'class-end reminder');
       }
     }
   }
@@ -735,8 +736,8 @@ class NotificationService {
               payload: 'evening',
             );
         }
-      } catch (error) {
-        debugPrint('Zeolite: could not schedule evening reminder: $error');
+      } catch (error, stack) {
+        reportError(error, stack, where: 'evening reminder');
       }
     }
   }
@@ -744,8 +745,8 @@ class NotificationService {
   Future<List<ActiveNotification>> _activeNotifications() async {
     try {
       return await _plugin.getActiveNotifications();
-    } catch (error) {
-      debugPrint('Zeolite: could not read the tray: $error');
+    } catch (error, stack) {
+      reportError(error, stack, where: 'reading the tray');
       return const <ActiveNotification>[];
     }
   }
@@ -824,8 +825,8 @@ class NotificationService {
         payload: 'danger',
       );
       await _rememberWarned(decision.warned);
-    } catch (error) {
-      debugPrint('Zeolite: could not show attendance alert: $error');
+    } catch (error, stack) {
+      reportError(error, stack, where: 'attendance alert');
     }
   }
 

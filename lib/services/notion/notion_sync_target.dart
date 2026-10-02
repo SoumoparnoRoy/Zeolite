@@ -344,7 +344,7 @@ class NotionSyncTarget implements SyncTarget {
   @override
   Future<SyncOutcome> archive(SyncKind kind, String remoteId) async {
     final NotionResult result = await _client.trashPage(remoteId);
-    if (result.ok || result.message == 'object_not_found') {
+    if (result.ok || result.isNotFound) {
       return SyncOutcome.done(remoteId: remoteId, remoteHash: _gone);
     }
     return _failure(result);
@@ -373,7 +373,7 @@ class NotionSyncTarget implements SyncTarget {
 
   static SyncOutcome _failure(NotionResult result) =>
       SyncOutcome.failed(result.failure ?? SyncFailure.unknown,
-          message: result.message);
+          message: result.code);
 
   /// One value for every removal, so a page that has gone reads as changed
   /// exactly once.

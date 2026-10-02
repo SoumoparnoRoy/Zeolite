@@ -83,7 +83,7 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
   @override
   void initState() {
     super.initState();
-    _open();
+    unawaited(_open());
   }
 
   NotionClient get _client => ref.read(notionClientProvider);
@@ -159,7 +159,7 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
       _retries++;
       _retry?.cancel();
       _retry = Timer(_searchBackoff * _retries, () {
-        if (mounted) _loadSources();
+        if (mounted) unawaited(_loadSources());
       });
     }
   }
@@ -619,7 +619,7 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
   /// or simply waiting. One message for all three sends the user to the wrong
   /// one of the three.
   static String _messageFor(NotionResult result) {
-    if (result.message == 'object_not_found') {
+    if (result.isNotFound) {
       return 'Zeolite cannot see that table. Share it with the connection in '
           'Notion, then try again.';
     }
@@ -781,7 +781,7 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
                 if (field == NotionField.kind) _kindValues = <String, String>{};
                 if (field == NotionField.course) _suggestedCourses = null;
               });
-              if (field == NotionField.course) _findCourses();
+              if (field == NotionField.course) unawaited(_findCourses());
             },
           ),
           const SizedBox(height: AppSpacing.sm),

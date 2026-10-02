@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -51,7 +53,9 @@ class LauncherIconScreen extends ConsumerWidget {
                         selected: icon == inForce,
                         onTap: () {
                           if (icon == inForce) return;
-                          ref.read(launcherIconProvider.notifier).select(icon);
+                          unawaited(ref
+                              .read(launcherIconProvider.notifier)
+                              .select(icon));
                         },
                       ),
                     ],

@@ -28,10 +28,14 @@ const Subject _physics = Subject(
 );
 
 /// Records writes instead of touching sqflite, which is unavailable under
-/// flutter_test. Only the two methods the log can reach are overridden.
+/// flutter_test. Only the methods the log can reach are overridden.
 class _FakeRepository extends ZeoliteRepository {
   final List<AttendanceRecord> written = <AttendanceRecord>[];
   final List<String> cleared = <String>[];
+
+  @override
+  Future<DatabaseSnapshot> snapshot() async =>
+      <String, List<Map<String, Object?>>>{};
 
   @override
   Future<void> setAttendance(AttendanceRecord record) async {
@@ -326,5 +330,7 @@ void main() {
       repo.cleared.single,
       AttendanceRecord.keyFor(1, target, 15 * 60),
     );
+    expect(find.text('Mark cleared'), findsOneWidget);
+    expect(find.text('Undo'), findsOneWidget);
   });
 }

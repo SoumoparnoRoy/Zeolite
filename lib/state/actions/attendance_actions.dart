@@ -19,11 +19,12 @@ class AttendanceActions {
   // attendance -------------------------------------------------------------
 
   /// Marks one occurrence. Tapping the status it already has clears the mark,
-  /// which makes the Today screen fully reversible with a single gesture.
-  Future<void> mark(ClassSession session, AttendanceStatus status) async {
+  /// and true comes back so the screen can offer it back: re-marking restores
+  /// the status but not the tag or the weight the mark carried.
+  Future<bool> mark(ClassSession session, AttendanceStatus status) async {
     final int? subjectId = session.subject.id;
-    if (subjectId == null) return;
-    await setStatusAt(
+    if (subjectId == null) return false;
+    return setStatusAt(
       subjectId: subjectId,
       date: session.date,
       startMinutes: session.startMinutes,
@@ -46,7 +47,7 @@ class AttendanceActions {
   /// [ClassSession] to pass, but must still be correctable. Keeping one
   /// implementation means the "tap the current status to clear it" behaviour
   /// cannot drift between the two screens.
-  Future<void> setStatusAt({
+  Future<bool> setStatusAt({
     required int subjectId,
     required DateTime date,
     required int startMinutes,
@@ -62,7 +63,7 @@ class AttendanceActions {
         date: date,
         startMinutes: startMinutes,
       );
-      return;
+      return true;
     }
     // The log corrects a mark with no session behind it, so the type it was
     // made with is read back rather than lost to the row being replaced.
@@ -87,6 +88,7 @@ class AttendanceActions {
     // Both screens that mark come through here, so this is the one place it
     // has to be counted.
     unawaited(_core.analytics.attendanceMarked());
+    return false;
   }
 
   /// Attaches or removes the tag on a marked occurrence, leaving the status
@@ -126,8 +128,10 @@ class AttendanceActions {
     required DateTime date,
     required int startMinutes,
   }) async {
+    final DatabaseSnapshot before = await _core.snapshot();
     await _core.repo.clearAttendance(subjectId, date, startMinutes);
     await _core.refresh();
+    _core.arm(before);
   }
 
   /// [clearStatusAt] addressed by session rather than by natural key.

@@ -218,7 +218,10 @@ Future<void> showSessionOptions(
             },
           ),
         ],
-        if (slot == null) ...<Widget>[
+        // Not on a class already cancelled: the mark toggles, so this would
+        // quietly clear it instead.
+        if (slot == null &&
+            session.status != AttendanceStatus.cancelled) ...<Widget>[
           const SizedBox(height: AppSpacing.md),
           _OptionTile(
             icon: Icons.block_rounded,
@@ -342,6 +345,7 @@ Future<void> showSessionOptions(
             onTap: () async {
               Navigator.of(context).pop();
               await ref.read(attendanceActionsProvider).clearMark(session);
+              showUndoSnack(messenger, core, 'Mark cleared');
             },
           ),
         ],

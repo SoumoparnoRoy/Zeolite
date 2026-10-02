@@ -12,6 +12,7 @@ import '../../domain/attendance_stats.dart';
 import '../../state/providers.dart';
 import '../../widgets/common.dart';
 import '../../widgets/gradient_header.dart';
+import '../../widgets/undo_snack.dart';
 
 /// Every past class for one subject, with its mark, correctable in place.
 ///
@@ -324,16 +325,7 @@ class _LogTile extends ConsumerWidget {
                     // Same reason as the Today card: the row is replaced on
                     // write, so the tag has to be handed back or correcting
                     // Present to Absent would quietly strip it.
-                    onTap: () =>
-                        ref.read(attendanceActionsProvider).setStatusAt(
-                              subjectId: subjectId,
-                              date: entry.date,
-                              startMinutes: entry.startMinutes,
-                              current: entry.status,
-                              status: status,
-                              weight: entry.weight,
-                              tagId: entry.tagId,
-                            ),
+                    onTap: () => _setStatus(context, ref, status),
                   ),
                 ),
             ],
@@ -383,13 +375,33 @@ class _LogTile extends ConsumerWidget {
   }
 }
 
-/// Confirms before discarding a stray mark.
-///
-/// Clearing a mark offers no undo, and this row is the only place the mark is
-/// visible at all, so removing it silently would destroy the one thing that
-/// explains a percentage the user cannot otherwise account for.
+/// Confirms before discarding a stray mark: this row is the only place the
+/// mark is visible at all, and the one thing that explains a percentage the
+/// user cannot otherwise account for.
 extension on _LogTile {
+  /// Captured before the write: clearing a stray mark takes this row with it.
+  Future<void> _setStatus(
+    BuildContext context,
+    WidgetRef ref,
+    AttendanceStatus status,
+  ) async {
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    final ActionCore core = ref.read(actionCoreProvider);
+    final bool cleared = await ref.read(attendanceActionsProvider).setStatusAt(
+          subjectId: subjectId,
+          date: entry.date,
+          startMinutes: entry.startMinutes,
+          current: entry.status,
+          status: status,
+          weight: entry.weight,
+          tagId: entry.tagId,
+        );
+    if (cleared) showUndoSnack(messenger, core, 'Mark cleared');
+  }
+
   Future<void> _confirmRemove(BuildContext context, WidgetRef ref) async {
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    final ActionCore core = ref.read(actionCoreProvider);
     final bool counts = _counts(ref.read(settingsProvider).value);
     final bool confirmed = await showDialog<bool>(
           context: context,
@@ -399,7 +411,7 @@ extension on _LogTile {
               'The ${entry.status?.label.toLowerCase() ?? 'recorded'} mark for '
               '${Dates.formatFull(entry.date)} will be deleted'
               '${counts ? ' and will stop counting towards your percentage' : ''}'
-              '. This cannot be undone.',
+              '.',
               style: const TextStyle(fontSize: 13, height: 1.4),
             ),
             actions: <Widget>[
@@ -425,6 +437,7 @@ extension on _LogTile {
           date: entry.date,
           startMinutes: entry.startMinutes,
         );
+    showUndoSnack(messenger, core, 'Mark removed');
   }
 }
 

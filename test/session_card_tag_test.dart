@@ -55,7 +55,7 @@ class _RecordingActions extends AttendanceActions {
   bool called = false;
 
   @override
-  Future<void> setStatusAt({
+  Future<bool> setStatusAt({
     required int subjectId,
     required DateTime date,
     required int startMinutes,
@@ -68,6 +68,7 @@ class _RecordingActions extends AttendanceActions {
     called = true;
     seenStatus = status;
     seenTagId = tagId;
+    return false;
   }
 }
 

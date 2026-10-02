@@ -452,9 +452,8 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                                       next.startMinutes ==
                                           session.startMinutes &&
                                       next.subject.id == session.subject.id,
-                                  onMark: (AttendanceStatus status) => ref
-                                      .read(attendanceActionsProvider)
-                                      .mark(session, status),
+                                  onMark: (AttendanceStatus status) =>
+                                      _mark(context, session, status),
                                   onTag: tags.isEmpty
                                       ? null
                                       : () =>
@@ -501,6 +500,18 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
           startMinutes: session.startMinutes,
           tagId: chosen,
         );
+  }
+
+  Future<void> _mark(
+    BuildContext context,
+    ClassSession session,
+    AttendanceStatus status,
+  ) async {
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    final ActionCore core = ref.read(actionCoreProvider);
+    final bool cleared =
+        await ref.read(attendanceActionsProvider).mark(session, status);
+    if (cleared) showUndoSnack(messenger, core, 'Mark cleared');
   }
 
   Future<void> _markAllPresent(

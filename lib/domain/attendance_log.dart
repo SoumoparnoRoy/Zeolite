@@ -21,6 +21,7 @@ class AttendanceLogEntry {
     this.weight = 1,
     this.tagId,
     this.isOrphaned = false,
+    this.session,
   });
 
   final DateTime date;
@@ -48,6 +49,10 @@ class AttendanceLogEntry {
   /// cascades. Those marks still count towards the subject's percentage, so
   /// hiding them here would leave a number the user cannot explain or correct.
   final bool isOrphaned;
+
+  /// The occurrence behind the row, which the class options act on. Null for
+  /// an orphaned mark: there is no class left to edit or delete.
+  final ClassSession? session;
 
   bool get isMarked => status != null;
 
@@ -95,6 +100,7 @@ List<AttendanceLogEntry> buildAttendanceLog({
         status: bySubjectKey[key]?.status,
         weight: bySubjectKey[key]?.weight ?? session.weight,
         tagId: bySubjectKey[key]?.tagId,
+        session: session,
       ),
     );
   }

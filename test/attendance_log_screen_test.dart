@@ -303,6 +303,44 @@ void main() {
     expect(find.text('Remove this mark'), findsNothing);
   });
 
+  testWidgets('holding a scheduled class opens its options',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(_app(_fixture()));
+    await tester.pumpAndSettle();
+
+    await tester.longPress(
+      find
+          .ancestor(
+            of: find.text(Dates.formatFull(Dates.addDays(Dates.today(), -7))),
+            matching: find.byType(SurfaceCard),
+          )
+          .first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Delete just this class'), findsOneWidget);
+    expect(find.text('Stop repeating from this date'), findsOneWidget);
+    expect(find.text('Clear the mark'), findsNothing);
+  });
+
+  testWidgets('holding a stray mark opens nothing',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(_app(_fixture()));
+    await tester.pumpAndSettle();
+
+    await tester.longPress(
+      find
+          .ancestor(
+            of: find.text(Dates.formatFull(Dates.addDays(Dates.today(), -3))),
+            matching: find.byType(SurfaceCard),
+          )
+          .first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Delete just this class'), findsNothing);
+  });
+
   testWidgets('tapping the status a class already has clears it',
       (WidgetTester tester) async {
     final _FakeRepository repo = _FakeRepository();

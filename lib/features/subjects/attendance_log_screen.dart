@@ -5,6 +5,7 @@ import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../data/models/attendance_record.dart';
 import '../../data/models/attendance_status.dart';
+import '../../data/models/class_session.dart';
 import '../../data/models/subject.dart';
 import '../../data/settings/app_settings.dart';
 import '../../domain/attendance_log.dart';
@@ -13,6 +14,7 @@ import '../../state/providers.dart';
 import '../../widgets/common.dart';
 import '../../widgets/gradient_header.dart';
 import '../../widgets/undo_snack.dart';
+import 'class_editor_sheets.dart';
 
 /// Every past class for one subject, with its mark, correctable in place.
 ///
@@ -257,7 +259,18 @@ class _LogTile extends ConsumerWidget {
             use24Hour: use24Hour,
           );
 
+    final ClassSession? session = entry.session;
     return SurfaceCard(
+      // The same options as a long-press on Today or the timetable. The status
+      // buttons are already on the row, so the sheet leaves them out.
+      onLongPress: session == null
+          ? null
+          : () => showSessionOptions(
+                context,
+                ref,
+                session,
+                marksInline: true,
+              ),
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       // Unmarked rows are the ones worth chasing, so they carry a hint of the
       // warning colour instead of sitting silently in the list. With outlines

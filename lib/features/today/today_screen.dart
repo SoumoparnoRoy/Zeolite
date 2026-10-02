@@ -107,6 +107,18 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
     _weekPages = PageController(
       initialPage: TodayScreen.pageFor(HomeView.grid, _origin, selected),
     );
+    // Warnings the notification tray is no longer carrying have to surface
+    // somewhere. Immediately as well as on change, because whether the tray
+    // is blocked is only known after the first frame. Post-frame keeps the
+    // dialog out of the build phase; the announced set stops a repeat.
+    ref.listenManual<List<SubjectStats>>(
+      inAppAlertsProvider,
+      (List<SubjectStats>? _, List<SubjectStats> __) =>
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _showPendingAlerts(context, ref);
+      }),
+      fireImmediately: true,
+    );
   }
 
   PageController _pagesFor(HomeView view) =>
@@ -145,9 +157,6 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
     final AppSettings settings =
         ref.watch(settingsProvider).value ?? const AppSettings();
     final OverallStats stats = ref.watch(statsProvider);
-    // Watched only so the popup below runs again once Android has said
-    // whether the tray is blocked, which lands after the first frame.
-    ref.watch(inAppAlertsProvider);
     final ScheduleEngine? engine = ref.watch(scheduleEngineProvider);
     final List<ClassSession> unmarked = ref.watch(unmarkedSessionsProvider);
     final ClassSession? next = ref.watch(nextSessionProvider);
@@ -163,17 +172,6 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
     // The grid follows whichever day you were looking at, so switching views
     // does not lose your place and needs no state of its own.
     final DateTime gridWeek = Dates.startOfWeek(selected);
-
-    // Warnings the notification tray is no longer carrying have to surface
-    // somewhere, so raise them here once the frame is on screen. Showing it
-    // post-frame keeps the dialog out of the build phase, and the announced
-    // set makes a rebuild a no-op rather than a second popup.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (context.mounted) _showPendingAlerts(context, ref);
-      // Due at most once a day, and a no-op the rest of the time — the check is
-      // a date comparison, not an export.
-      unawaited(ref.read(dataActionsProvider).maybeRunAutoBackup());
-    });
 
     // A date set anywhere else has to reach the pager: the day pills, the
     // header arrows, "jump to today", the unmarked banner.

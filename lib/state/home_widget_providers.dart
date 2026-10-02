@@ -27,8 +27,8 @@ final homeWidgetServiceProvider = Provider<HomeWidgetService>(
 ///
 /// Watched rather than called, so every path that moves the timetable — a
 /// mark, an import, a sync pull — pushes without having to remember to. The
-/// week image is only redrawn when the app is in the foreground, which is the
-/// one thing this cannot do from anywhere else.
+/// week widget's picture is drawn by `weekWidgetImageProvider`, next to the
+/// grid it draws.
 final homeWidgetSyncProvider = Provider<void>((Ref ref) {
   final ScheduleEngine? engine = ref.watch(scheduleEngineProvider);
   final AppSettings? settings = ref.watch(settingsProvider).value;
@@ -36,8 +36,8 @@ final homeWidgetSyncProvider = Provider<void>((Ref ref) {
   final OverallStats stats = ref.watch(statsProvider);
   final HomeWidgetService service = ref.watch(homeWidgetServiceProvider);
 
-  unawaited(() async {
-    await service.push(
+  unawaited(
+    service.push(
       today: HomeWidgetPayload.today(engine: engine, settings: settings),
       week: HomeWidgetPayload.week(engine: engine),
       standing: HomeWidgetPayload.standing(
@@ -47,14 +47,8 @@ final homeWidgetSyncProvider = Provider<void>((Ref ref) {
       ),
       subjects: HomeWidgetPayload.subjects(stats),
       theme: HomeWidgetPayload.theme(settings),
-    );
-    await service.renderWeek(
-      container: ref.container,
-      settings: settings,
-      // Only until the widget has drawn once and reported its own cell.
-      fallbackSize: const Size(420, 215),
-    );
-  }());
+    ),
+  );
 });
 
 /// Reloads the app when a widget mark landed while it was in the background.

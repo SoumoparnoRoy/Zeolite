@@ -134,7 +134,7 @@ class DataSection extends ConsumerWidget {
 
   Future<void> _pickBackupFolder(BuildContext context, WidgetRef ref) async {
     try {
-      final BackupFolder folder = BackupFolder();
+      final BackupFolder folder = ref.read(backupFolderProvider);
       final BackupFile? picked = await folder.choose(
         initialUri: ref.read(settingsProvider).value?.backupFolderUri,
       );
@@ -169,7 +169,7 @@ class DataSection extends ConsumerWidget {
     final String? uri = settings.backupFolderUri;
     if (uri != null) {
       try {
-        await BackupFolder().release(uri);
+        await ref.read(backupFolderProvider).release(uri);
       } catch (error, stack) {
         reportError(error, stack, where: 'releasing the backup folder');
       }
@@ -189,7 +189,7 @@ class DataSection extends ConsumerWidget {
     final String? tree = ref.read(settingsProvider).value?.backupFolderUri;
     if (tree == null) return null;
     try {
-      return await BackupFolder().resolveFolder(tree);
+      return await ref.read(backupFolderProvider).resolveFolder(tree);
     } catch (_) {
       return null;
     }
@@ -250,7 +250,7 @@ class DataSection extends ConsumerWidget {
   /// the Settings list and it replaces everything. Reads bytes rather than a
   /// path: a document-picker file is a `content://` URI with no path at all.
   Future<void> _import(BuildContext context, WidgetRef ref) async {
-    final BackupFolder folder = BackupFolder();
+    final BackupFolder folder = ref.read(backupFolderProvider);
     // Not `FilePicker`: its Android side never sets the initial-folder extra
     // on an open dialog, so the starting folder below would be ignored.
     final BackupFile? picked =

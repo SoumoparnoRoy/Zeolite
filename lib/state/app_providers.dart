@@ -32,6 +32,7 @@ import '../services/backup_folder.dart';
 import '../services/backup_service.dart';
 import '../services/launcher_icon_service.dart';
 import '../services/notification_service.dart';
+import '../services/timetable/vision_client.dart';
 
 // ---------------------------------------------------------------- singletons
 
@@ -73,7 +74,17 @@ final analyticsProvider = Provider<Analytics>(
 final backupFolderUsableProvider = FutureProvider<bool>((ref) async {
   final String? uri = ref.watch(settingsProvider).value?.backupFolderUri;
   if (uri == null) return false;
-  return BackupFolder().isUsable(uri);
+  return ref.watch(backupFolderProvider).isUsable(uri);
+});
+
+/// The storage access framework only exists on a device, so tests swap this.
+final backupFolderProvider = Provider<BackupFolder>((ref) => BackupFolder());
+
+/// One client for the app's life rather than one per read, closed with it.
+final visionClientProvider = Provider<VisionClient>((ref) {
+  final VisionClient client = VisionClient();
+  ref.onDispose(client.close);
+  return client;
 });
 
 /// The notification plugin only exists on a device, so tests swap this for one
@@ -97,6 +108,7 @@ final backupServiceProvider = Provider<BackupService>(
   (ref) => BackupService(
     ref.watch(repositoryProvider),
     ref.watch(settingsServiceProvider),
+    folder: ref.watch(backupFolderProvider),
   ),
 );
 

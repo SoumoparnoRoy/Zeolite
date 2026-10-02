@@ -119,7 +119,7 @@ class _ImportTimetableScreenState extends ConsumerState<ImportTimetableScreen> {
       builder: (_) => const _CheckingDialog(),
     ));
 
-    final VisionClient client = VisionClient();
+    final VisionClient client = ref.read(visionClientProvider);
     final VisionRead read;
     try {
       read = await client.read(
@@ -127,7 +127,6 @@ class _ImportTimetableScreenState extends ConsumerState<ImportTimetableScreen> {
         text: <String>[for (final OcrLine l in lines) l.text].join('\n'),
       );
     } finally {
-      client.close();
       if (mounted) Navigator.of(context, rootNavigator: true).pop();
     }
 

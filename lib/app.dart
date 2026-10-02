@@ -14,6 +14,7 @@ import 'features/onboarding/onboarding_screen.dart';
 import 'features/settings/settings_screen.dart';
 import 'features/stats/stats_screen.dart';
 import 'features/timetable/timetable_screen.dart';
+import 'features/timetable/week_widget_image.dart';
 import 'features/today/today_screen.dart';
 import 'state/home_widget_providers.dart';
 import 'state/providers.dart';
@@ -40,6 +41,7 @@ class ZeoliteApp extends ConsumerWidget {
     ref.watch(syncSchedulerProvider);
     ref.watch(notionSchedulerProvider);
     ref.watch(homeWidgetSyncProvider);
+    ref.watch(weekWidgetImageProvider);
     ref.watch(homeWidgetMarkWatcherProvider);
 
     final FirebaseAnalyticsObserver? observer =
@@ -217,7 +219,10 @@ class _RootShellState extends ConsumerState<RootShell> with RouteAware {
   void initState() {
     super.initState();
     _lifecycle = AppLifecycleListener(
-      onResume: () => ref.invalidate(trayAccessProvider),
+      onResume: () {
+        ref.invalidate(trayAccessProvider);
+        _maybeBackUp();
+      },
     );
     _tapped.addListener(_openTappedNotification);
     // The stream carries a tap that arrived while the app was running; only
@@ -227,10 +232,16 @@ class _RootShellState extends ConsumerState<RootShell> with RouteAware {
     unawaited(HomeWidget.initiallyLaunchedFromHomeWidget().then(_openLink));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _report();
+      _maybeBackUp();
       // A tap that launched the app was recorded before this shell existed.
       _openTappedNotification();
     });
   }
+
+  /// Due at most once a day and a date comparison the rest of the time, so a
+  /// launch and every return to the app can both ask.
+  void _maybeBackUp() =>
+      unawaited(ref.read(dataActionsProvider).maybeRunAutoBackup());
 
   @override
   void didChangeDependencies() {

@@ -78,23 +78,23 @@ class _TotalsImportScreenState extends ConsumerState<TotalsImportScreen> {
   @override
   Widget build(BuildContext context) {
     final AppPalette p = context.palette;
-    final TimetableData? data = ref.watch(timetableProvider).value;
+    final TimetableData? timetable = ref.watch(timetableProvider).value;
     final AppSettings settings =
         ref.watch(settingsProvider).value ?? const AppSettings();
 
     final Map<int, int> marks = <int, int>{};
     for (final AttendanceRecord record
-        in data?.records ?? const <AttendanceRecord>[]) {
+        in timetable?.records ?? const <AttendanceRecord>[]) {
       if (!settings.countsInTerm(record.date)) continue;
       marks[record.subjectId] = (marks[record.subjectId] ?? 0) + 1;
     }
 
     final TotalsPlan plan = TotalsPlan.from(
       rows: widget.totals.rows,
-      subjects: data?.subjects ?? const <Subject>[],
+      subjects: timetable?.subjects ?? const <Subject>[],
       marksBySubject: marks,
     );
-    _seed(plan, ready: data != null);
+    _seed(plan, ready: timetable != null);
 
     final int chosen = plan.rows.length - _excluded.length;
 
@@ -155,12 +155,12 @@ class _ChecksumWarning extends StatelessWidget {
     final AppPalette p = context.palette;
     final List<String> parts = <String>[
       if (totals.printedTotal != null && totals.printedTotal != totals.totalSum)
-        'sessions add to ${totals.totalSum}, the page says '
-            '${totals.printedTotal}',
+        ('sessions add to ${totals.totalSum}, the page says '
+            '${totals.printedTotal}'),
       if (totals.printedAttended != null &&
           totals.printedAttended != totals.attendedSum)
-        'attended adds to ${totals.attendedSum}, the page says '
-            '${totals.printedAttended}',
+        ('attended adds to ${totals.attendedSum}, the page says '
+            '${totals.printedAttended}'),
     ];
 
     return Padding(

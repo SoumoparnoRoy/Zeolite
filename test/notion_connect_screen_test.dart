@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:zeolite/core/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_secure_storage/test/test_flutter_secure_storage_platform.dart';
@@ -7,6 +6,7 @@ import 'package:flutter_secure_storage_platform_interface/flutter_secure_storage
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:zeolite/core/app_theme.dart';
 import 'package:zeolite/features/settings/notion_connect_screen.dart';
 import 'package:zeolite/services/notion/notion_auth_client.dart';
 import 'package:zeolite/services/notion/notion_connection_store.dart';
@@ -88,24 +88,6 @@ void main() {
     // Without this the screen offers a connected workspace nothing but
     // Disconnect, and a new template could only be taken by tearing the
     // working connection down first.
-    expect(find.text('Take the latest template'), findsOneWidget);
-    expect(find.text('Disconnect'), findsNothing);
-  });
-
-  testWidgets('taking a newer template offers consent, not Disconnect',
-      (WidgetTester tester) async {
-    stored['notion_connection'] = _tokenPayload;
-
-    await tester.pumpWidget(
-      _app(
-        MockClient((_) async => http.Response('ok', 200)),
-        retakeTemplate: true,
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    // A connected workspace was offered nothing but Disconnect, so the only
-    // way to a newer template was tearing down a working connection first.
     expect(find.text('Take the latest template'), findsOneWidget);
     expect(find.text('Disconnect'), findsNothing);
   });

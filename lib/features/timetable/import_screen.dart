@@ -304,8 +304,8 @@ class _ImportTimetableScreenState extends ConsumerState<ImportTimetableScreen> {
     final DayGrid grid = ref.watch(dayGridProvider);
     final bool use24Hour =
         ref.watch(settingsProvider).value?.use24HourTime ?? false;
-    final TimetableData? data = ref.watch(timetableProvider).value;
-    final List<Subject> subjects = data?.subjects ?? const <Subject>[];
+    final TimetableData? timetable = ref.watch(timetableProvider).value;
+    final List<Subject> subjects = timetable?.subjects ?? const <Subject>[];
     final List<ExistingSubject> existing = <ExistingSubject>[
       for (final Subject s in subjects)
         if (s.id != null) (id: s.id!, name: s.name, code: s.code),
@@ -332,7 +332,7 @@ class _ImportTimetableScreenState extends ConsumerState<ImportTimetableScreen> {
       result,
       into,
       held: <({int subjectId, int weekday, int startMinutes})>[
-        for (final ClassSlot slot in data?.slots ?? const <ClassSlot>[])
+        for (final ClassSlot slot in timetable?.slots ?? const <ClassSlot>[])
           (
             subjectId: slot.subjectId,
             weekday: slot.weekday,
@@ -347,10 +347,8 @@ class _ImportTimetableScreenState extends ConsumerState<ImportTimetableScreen> {
       title: 'Import timetable',
       subtitle: result.isEmpty
           ? null
-          : '${result.classes.length} '
-              '${result.classes.length == 1 ? 'class' : 'classes'} · '
-              '${result.subjectNames.length} '
-              '${result.subjectNames.length == 1 ? 'subject' : 'subjects'}',
+          : '${Words.plural(result.classes.length, 'class', 'classes')} · '
+              '${Words.plural(result.subjectNames.length, 'subject')}',
       floatingActionButton: ready
           ? GradientFab(
               label: 'Add ${result.classes.length} to my timetable',

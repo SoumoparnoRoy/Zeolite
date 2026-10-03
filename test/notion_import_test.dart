@@ -6,6 +6,7 @@ import 'package:zeolite/data/models/attendance_record.dart';
 import 'package:zeolite/data/models/attendance_status.dart';
 import 'package:zeolite/data/models/class_slot.dart';
 import 'package:zeolite/data/models/subject.dart';
+import 'package:zeolite/domain/class_log.dart';
 import 'package:zeolite/domain/notion_export.dart';
 import 'package:zeolite/domain/notion_import.dart';
 
@@ -18,7 +19,7 @@ final DateTime _today = DateTime(2026, 8, 26);
 /// Mon 3 Aug 2026.
 final DateTime _monday = DateTime(2026, 8, 3);
 
-NotionExport _read(List<String> rows) => NotionExport.read(
+NotionExport _read(List<String> rows) => readNotionExport(
       Uint8List.fromList(utf8.encode(<String>[_header, ...rows].join('\n'))),
       today: _today,
     );

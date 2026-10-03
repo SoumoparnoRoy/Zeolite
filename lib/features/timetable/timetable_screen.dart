@@ -46,16 +46,14 @@ class TimetableScreen extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 HeaderEyebrow(
-                  'Timetable · ${weekStart.day} '
-                  '${kMonthNamesShort[weekStart.month - 1]} – '
-                  '${weekEnd.day} ${kMonthNamesShort[weekEnd.month - 1]}',
+                  'Timetable · ${Dates.formatWeekRange(weekStart, weekEnd)}',
                 ),
                 const SizedBox(height: 7),
                 HeaderTitle(
                   weekTotal == 0
                       ? 'No classes this week'
                       : '${Words.count(weekTotal)} '
-                          '${weekTotal == 1 ? 'class' : 'classes'} this week',
+                          '${Words.noun(weekTotal, 'class', 'classes')} this week',
                 ),
               ],
             ),
@@ -80,7 +78,7 @@ class TimetableScreen extends ConsumerWidget {
           ? null
           : GradientFab(
               label: 'Add class',
-              onPressed: () => showAddClassSheet(context, ref),
+              onPressed: () => showAddClassSheet(context),
             ),
       slivers: <Widget>[
         if (slots.isEmpty && weekTotal == 0)
@@ -94,7 +92,7 @@ class TimetableScreen extends ConsumerWidget {
                 message: 'Add your weekly classes once and Zeolite will lay '
                     'out every week for you.',
                 action: FilledButton.icon(
-                  onPressed: () => showAddClassSheet(context, ref),
+                  onPressed: () => showAddClassSheet(context),
                   icon: const Icon(Icons.add_rounded),
                   label: const Text('Add your first class'),
                 ),
@@ -113,8 +111,7 @@ class TimetableScreen extends ConsumerWidget {
                   sessions: byDay[Dates.keyOf(day)] ?? const <ClassSession>[],
                   settings: settings,
                   holidayName: engine?.holidayOn(day)?.name,
-                  onAdd: () =>
-                      showAddClassSheet(context, ref, initialDate: day),
+                  onAdd: () => showAddClassSheet(context, initialDate: day),
                   onTapSession: (ClassSession session) =>
                       showSessionEditor(context, ref, session),
                   onLongPressSession: (ClassSession session) =>

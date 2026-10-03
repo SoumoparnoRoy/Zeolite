@@ -50,19 +50,19 @@ class ImportActions {
     bool weighByBlocks = false,
     Map<String, int>? into,
   }) async {
-    final TimetableData? data = _core.ref.read(timetableProvider).value;
-    if (data == null || result.classes.isEmpty) return;
+    final TimetableData? timetable = _core.ref.read(timetableProvider).value;
+    if (timetable == null || result.classes.isEmpty) return;
 
     final DatabaseSnapshot before = await _core.repo.snapshot();
 
     final Map<String, int> idByName = into != null
         ? <String, int>{...into}
         : <String, int>{
-            for (final Subject subject in data.subjects)
+            for (final Subject subject in timetable.subjects)
               if (subject.id != null)
                 subject.name.trim().toLowerCase(): subject.id!,
           };
-    final Map<String, int?> typeOf = _typesByLetter(data.categories);
+    final Map<String, int?> typeOf = _typesByLetter(timetable.categories);
     int? typeOfClass(ImportedClass c) => typeOf[c.letter];
 
     final List<String> fresh = result.subjectNames
@@ -72,7 +72,7 @@ class ImportActions {
     final DateTime start =
         _core.ref.read(settingsProvider).value?.termStart ?? Dates.today();
     final Set<String> known =
-        data.rooms.map((Room room) => room.name.toLowerCase()).toSet();
+        timetable.rooms.map((Room room) => room.name.toLowerCase()).toSet();
 
     await _core.repo.transaction((ZeoliteRepository repository) async {
       final List<int> palette = AppColors.subjectPalette;
@@ -88,12 +88,13 @@ class ImportActions {
           Subject(
             name: fresh[i],
             teacher: _teacherFor(result, fresh[i]),
-            colorValue: palette[(data.subjects.length + i) % palette.length],
+            colorValue:
+                palette[(timetable.subjects.length + i) % palette.length],
             categoryId: freshTypes[i],
           ),
       ]);
       final Map<int, int?> subjectType = <int, int?>{
-        for (final Subject subject in data.subjects)
+        for (final Subject subject in timetable.subjects)
           if (subject.id != null) subject.id!: subject.categoryId,
         for (int i = 0; i < fresh.length; i++) ids[i]: freshTypes[i],
       };
@@ -141,8 +142,8 @@ class ImportActions {
   /// A weight set by hand on one class is replaced: the category is now the
   /// authority. Returns how many marks actually moved.
   Future<int> applyClassWeights() async {
-    final TimetableData? data = _core.ref.read(timetableProvider).value;
-    if (data == null) return 0;
+    final TimetableData? timetable = _core.ref.read(timetableProvider).value;
+    if (timetable == null) return 0;
 
     final DatabaseSnapshot before = await _core.repo.snapshot();
 
@@ -151,21 +152,22 @@ class ImportActions {
     int weightOf(int subjectId, [int? categoryId]) {
       final ClassCategory? own = categoryId == null
           ? null
-          : data.categories
+          : timetable.categories
               .where((ClassCategory c) => c.id == categoryId)
               .firstOrNull;
-      return weightFor(own ?? data.categoryFor(data.subjectById(subjectId)));
+      return weightFor(
+          own ?? timetable.categoryFor(timetable.subjectById(subjectId)));
     }
 
     final int changedCount = await _core.repo.transaction(
       (ZeoliteRepository repository) async {
-        for (final ClassSlot slot in data.slots) {
+        for (final ClassSlot slot in timetable.slots) {
           final int weight = weightOf(slot.subjectId, slot.categoryId);
           if (slot.weight != weight) {
             await repository.updateSlot(slot.copyWith(weight: weight));
           }
         }
-        for (final ExtraClass extra in data.extras) {
+        for (final ExtraClass extra in timetable.extras) {
           final int weight = weightOf(extra.subjectId, extra.categoryId);
           if (extra.weight != weight) {
             await repository.updateExtraClass(extra.copyWith(weight: weight));
@@ -200,8 +202,8 @@ class ImportActions {
   /// snapshot. [TotalsDecision.clearMarks] drops that subject's term marks
   /// first, for the reason given on [TotalsMatch.overlap].
   Future<int> importAttendanceTotals(List<TotalsDecision> decisions) async {
-    final TimetableData? data = _core.ref.read(timetableProvider).value;
-    if (data == null || decisions.isEmpty) return 0;
+    final TimetableData? timetable = _core.ref.read(timetableProvider).value;
+    if (timetable == null || decisions.isEmpty) return 0;
 
     final DatabaseSnapshot before = await _core.repo.snapshot();
     final AppSettings settings =
@@ -217,8 +219,8 @@ class ImportActions {
           await repository.insertSubject(
             Subject(
               name: row.subject,
-              colorValue:
-                  palette[(data.subjects.length + created) % palette.length],
+              colorValue: palette[
+                  (timetable.subjects.length + created) % palette.length],
               priorHeld: row.held,
               priorAttended: row.attended,
               expectedTotal: row.expectedTotal,
@@ -239,7 +241,7 @@ class ImportActions {
           );
         }
         final Subject? existing =
-            data.subjects.where((Subject s) => s.id == id).firstOrNull;
+            timetable.subjects.where((Subject s) => s.id == id).firstOrNull;
         // Gone since the preview was built, so there is nothing to write onto.
         if (existing == null) continue;
         await repository.updateSubject(
@@ -274,8 +276,8 @@ class ImportActions {
     bool? cancelledCounts,
     Map<String, int> typeWeights = const <String, int>{},
   }) async {
-    final TimetableData? data = _core.ref.read(timetableProvider).value;
-    if (data == null || chosen.isEmpty) return 0;
+    final TimetableData? timetable = _core.ref.read(timetableProvider).value;
+    if (timetable == null || chosen.isEmpty) return 0;
 
     final DatabaseSnapshot before = await _core.repo.snapshot();
     final AppSettings? settings = _core.ref.read(settingsProvider).value;
@@ -298,7 +300,7 @@ class ImportActions {
         for (final NotionPlacement placed in planned.placements) {
           final String? name = placed.row.tagName;
           if (name == null || tagIds.containsKey(name)) continue;
-          final Tag? existing = data.tags
+          final Tag? existing = timetable.tags
               .where(
                 (Tag tag) =>
                     tag.name.trim().toLowerCase() == name.toLowerCase(),
@@ -312,7 +314,7 @@ class ImportActions {
       // Matched by name first, the same way tags are, so a table's
       // "Practical" lands on the app's "Practical" rather than beside it.
       final Map<String, int> categoryIds = <String, int>{
-        for (final ClassCategory category in data.categories)
+        for (final ClassCategory category in timetable.categories)
           if (category.id != null)
             category.name.trim().toLowerCase(): category.id!,
       };
@@ -324,7 +326,7 @@ class ImportActions {
         final int? known = categoryIds[key];
         if (known != null) {
           if (worth != null && weighed.add(key)) {
-            final ClassCategory? type = data.categoryById(known);
+            final ClassCategory? type = timetable.categoryById(known);
             if (type != null && type.weight != worth) {
               await repository.updateCategory(type.copyWith(weight: worth));
             }
@@ -356,8 +358,8 @@ class ImportActions {
             Subject(
               name: planned.name,
               code: planned.code,
-              colorValue:
-                  palette[(data.subjects.length + created) % palette.length],
+              colorValue: palette[
+                  (timetable.subjects.length + created) % palette.length],
               categoryId: subjectType,
             ),
           );

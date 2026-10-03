@@ -17,8 +17,8 @@ import 'features/timetable/timetable_screen.dart';
 import 'features/timetable/week_widget_image.dart';
 import 'features/today/today_screen.dart';
 import 'state/home_widget_providers.dart';
-import 'state/providers.dart';
 import 'state/notion_sync_providers.dart';
+import 'state/providers.dart';
 import 'state/sync_providers.dart';
 import 'widgets/nav_bar_scroll.dart';
 

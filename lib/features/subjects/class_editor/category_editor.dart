@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/app_theme.dart';
 import '../../../core/date_utils.dart';
+import '../../../core/words.dart';
 import '../../../data/models/class_category.dart';
 import '../../../data/models/subject.dart';
 import '../../../domain/day_grid.dart';
@@ -13,8 +14,7 @@ import 'editor_fields.dart';
 
 /// Create or edit a class category. Returns its id on save.
 Future<int?> showCategoryEditor(
-  BuildContext context,
-  WidgetRef ref, {
+  BuildContext context, {
   ClassCategory? category,
 }) {
   return showAppSheet<int>(
@@ -174,7 +174,7 @@ class _CategoryFormState extends ConsumerState<_CategoryForm> {
               for (int blocks = 1; blocks <= maxBlocks; blocks++)
                 DurationChip(
                   minutes: blocks * grid.blockMinutes,
-                  label: '$blocks ${blocks == 1 ? 'block' : 'blocks'}',
+                  label: Words.plural(blocks, 'block'),
                   selected: _minutes == blocks * grid.blockMinutes,
                   onTap: () =>
                       setState(() => _minutes = blocks * grid.blockMinutes),
@@ -284,8 +284,8 @@ class _CategorySubjects extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final TimetableData? data = ref.watch(timetableProvider).value;
-    final List<Subject> subjects = data?.subjects ?? const <Subject>[];
+    final TimetableData? timetable = ref.watch(timetableProvider).value;
+    final List<Subject> subjects = timetable?.subjects ?? const <Subject>[];
     if (subjects.isEmpty) {
       return Text(
         'No subjects yet. Add one and it can be filed here.',
@@ -298,7 +298,8 @@ class _CategorySubjects extends ConsumerWidget {
     }
 
     final Map<int, String> categoryNames = <int, String>{
-      for (final ClassCategory c in data?.categories ?? const <ClassCategory>[])
+      for (final ClassCategory c
+          in timetable?.categories ?? const <ClassCategory>[])
         if (c.id != null) c.id!: c.name,
     };
 

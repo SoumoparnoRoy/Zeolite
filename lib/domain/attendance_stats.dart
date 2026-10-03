@@ -335,7 +335,7 @@ class OverallStats {
     if (atRisk.isNotEmpty) return '${_subjects(atRisk.length)} below target';
 
     final int spare = canSkip;
-    return '${Words.count(spare)} ${spare == 1 ? 'class' : 'classes'} to spare';
+    return '${Words.count(spare)} ${Words.noun(spare, 'class', 'classes')} to spare';
   }
 
   /// The line under [verdict], where it needs one to be understood.
@@ -349,7 +349,7 @@ class OverallStats {
   }
 
   static String _subjects(int n) =>
-      '${Words.count(n)} ${n == 1 ? 'subject' : 'subjects'}';
+      '${Words.count(n)} ${Words.noun(n, 'subject')}';
 
   SubjectStats? get weakest {
     final List<SubjectStats> withData =

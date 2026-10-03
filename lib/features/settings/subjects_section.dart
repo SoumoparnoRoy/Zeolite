@@ -28,7 +28,9 @@ import 'settings_rows.dart';
 ///
 /// A file that explains itself — a template export, or a layout read once
 /// before — goes straight to the preview; anything else is matched first.
-Future<void> importClassLogFile(BuildContext context, WidgetRef ref) async {
+Future<void> importClassLogFile(
+  BuildContext context,
+) async {
   final PlatformFile? picked = await FilePicker.pickFile(
     dialogTitle: 'Choose a class log (CSV or Notion export)',
   );
@@ -118,7 +120,7 @@ class CategoriesSection extends ConsumerWidget {
         SectionHeader(
           'Categories',
           trailing: TextButton.icon(
-            onPressed: () => showCategoryEditor(context, ref),
+            onPressed: () => showCategoryEditor(context),
             icon: const Icon(Icons.add_rounded, size: 18),
             label: const Text('Add'),
           ),
@@ -153,7 +155,6 @@ class CategoriesSection extends ConsumerWidget {
                           ),
                           onTap: () => showCategoryEditor(
                             context,
-                            ref,
                             category: categories[i],
                           ),
                           trailing: IconButton(
@@ -251,7 +252,7 @@ class CategoriesSection extends ConsumerWidget {
         content: Text(
           inUse == 0
               ? 'No subjects use this category.'
-              : '$inUse ${inUse == 1 ? 'subject uses' : 'subjects use'} this '
+              : '$inUse ${Words.noun(inUse, 'subject uses', 'subjects use')} this '
                   'category. They keep all their classes and attendance — they '
                   'just fall back to the default class length.',
           style: const TextStyle(height: 1.4),

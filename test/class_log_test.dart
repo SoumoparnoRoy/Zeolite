@@ -80,8 +80,7 @@ void main() {
 
   test('a template export needs no questions', () {
     final ClassLogTable table = _table(<String>[
-      'Name,Attendance Credit (1/2/0),Course,Date,Held (1/2/0),Held?,L/T/P,'
-          'Status',
+      'Name,Attendance Credit (1/2/0),Course,Date,Held (1/2/0),Held?,L/T/P,Status',
       'ABC101L,1,Thermodynamics,Aug 5,1,Yes,Lecture,Proxy',
     ]);
     final ClassLogMapping guessed = ClassLogMapping.guess(table);

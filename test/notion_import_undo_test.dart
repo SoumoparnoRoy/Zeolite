@@ -7,8 +7,8 @@ import 'package:shared_preferences_platform_interface/shared_preferences_async_p
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:zeolite/data/db/app_database.dart';
 import 'package:zeolite/data/db/zeolite_repository.dart';
-import 'package:zeolite/data/models/attendance_status.dart';
 import 'package:zeolite/data/models/attendance_record.dart';
+import 'package:zeolite/data/models/attendance_status.dart';
 import 'package:zeolite/data/models/class_category.dart';
 import 'package:zeolite/data/models/class_slot.dart';
 import 'package:zeolite/data/models/subject.dart';

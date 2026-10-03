@@ -14,7 +14,7 @@ import '../undo.dart';
 
 /// Split by what they touch rather than gathered on one object: every action
 /// shares [ActionCore], so one refresh and one Undo offer still cover them all.
-final actionCoreProvider = Provider<ActionCore>((ref) => ActionCore(ref));
+final actionCoreProvider = Provider<ActionCore>(ActionCore.new);
 
 /// The plumbing every action shares: the database, the one refresh that
 /// rebuilds the engine, the day lists and the stats, and the Undo store an

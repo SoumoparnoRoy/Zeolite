@@ -206,14 +206,14 @@ void main() {
     // Ids are reissued on the way in, so only they may differ. Anything else
     // that changes is a column the restore did not carry.
     Object? withoutIds(Object? node) => switch (node) {
-          Map<String, Object?> map => <String, Object?>{
+          final Map<String, Object?> map => <String, Object?>{
               for (final MapEntry<String, Object?> e in map.entries)
                 if (e.key != 'id' &&
                     !e.key.endsWith('_id') &&
                     e.key != 'exportedAt')
                   e.key: withoutIds(e.value),
             },
-          List<Object?> list => list.map(withoutIds).toList(),
+          final List<Object?> list => list.map(withoutIds).toList(),
           _ => node,
         };
     expect(withoutIds(jsonDecode(second)), withoutIds(jsonDecode(first)));

@@ -27,14 +27,14 @@ Future<void> showSessionEditor(
   WidgetRef ref,
   ClassSession session,
 ) async {
-  final TimetableData? data = ref.read(timetableProvider).value;
+  final TimetableData? timetable = ref.read(timetableProvider).value;
   if (session.slotId != null) {
-    final ClassSlot? slot = data?.slotById(session.slotId);
-    if (slot != null) await showSlotEditor(context, ref, slot: slot);
+    final ClassSlot? slot = timetable?.slotById(session.slotId);
+    if (slot != null) await showSlotEditor(context, slot: slot);
     return;
   }
-  final ExtraClass? extra = data?.extraById(session.extraClassId);
-  if (extra != null) await showExtraClassEditor(context, ref, extra: extra);
+  final ExtraClass? extra = timetable?.extraById(session.extraClassId);
+  if (extra != null) await showExtraClassEditor(context, extra: extra);
 }
 
 /// The count is the part worth reading, so the dialog names it rather than
@@ -137,17 +137,17 @@ Future<void> showSessionOptions(
 /// so the undo offer is raised through a messenger that outlives the route.
 class _SessionOptions {
   _SessionOptions(this.context, this.ref, this.session)
-      : data = ref.read(timetableProvider).value,
+      : timetable = ref.read(timetableProvider).value,
         messenger = ScaffoldMessenger.of(context),
         core = ref.read(actionCoreProvider),
         schedule = ref.read(scheduleActionsProvider) {
-    slot = data?.slotById(session.slotId);
+    slot = timetable?.slotById(session.slotId);
   }
 
   final BuildContext context;
   final WidgetRef ref;
   final ClassSession session;
-  final TimetableData? data;
+  final TimetableData? timetable;
   final ScaffoldMessengerState messenger;
   final ActionCore core;
   final ScheduleActions schedule;
@@ -159,10 +159,11 @@ class _SessionOptions {
   /// Only the marks from the long-pressed date on: the weeks before the cut
   /// keep theirs, so they are not what the warning is about.
   late final int _endingMarks =
-      slot == null ? 0 : data!.marksCoveredBy(slot!, from: session.date);
+      slot == null ? 0 : timetable!.marksCoveredBy(slot!, from: session.date);
 
   /// With nothing marked the two deletes would do the same thing.
-  late final int _allMarks = slot == null ? 0 : data!.marksCoveredBy(slot!);
+  late final int _allMarks =
+      slot == null ? 0 : timetable!.marksCoveredBy(slot!);
 
   List<Widget> tiles({
     required bool tapOpensEditor,
@@ -193,7 +194,6 @@ class _SessionOptions {
           Navigator.of(context).pop();
           await showOccurrenceEditor(
             context,
-            ref,
             slot: slot!,
             date: session.date,
           );
@@ -204,7 +204,8 @@ class _SessionOptions {
     final bool weekly = session.slotId != null;
     // Only mentioned where it is true, so the promise of "every week" is not
     // quietly contradicted by a week set by hand.
-    final bool editedWeeks = data?.hasOverridesFor(session.slotId) ?? false;
+    final bool editedWeeks =
+        timetable?.hasOverridesFor(session.slotId) ?? false;
     return _OptionTile(
       icon: Icons.edit_outlined,
       title: weekly ? 'Edit the weekly class' : 'Edit this class',

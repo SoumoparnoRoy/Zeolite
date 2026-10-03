@@ -10,8 +10,8 @@ import '../../state/notion_pairing.dart';
 import '../../state/notion_providers.dart';
 import '../../widgets/common.dart';
 import '../../widgets/gradient_header.dart';
-import 'notion_mapping_screen.dart';
 import 'notion_mapping_gaps.dart';
+import 'notion_mapping_screen.dart';
 
 /// Authorising Notion, both ways it can come back.
 ///

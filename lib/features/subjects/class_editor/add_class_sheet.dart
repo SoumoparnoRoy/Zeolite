@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/app_theme.dart';
 import '../../../widgets/common.dart';
@@ -10,8 +9,7 @@ import 'slot_editor.dart';
 /// Asks whether the new class repeats weekly or happens once, then opens the
 /// matching editor.
 Future<void> showAddClassSheet(
-  BuildContext context,
-  WidgetRef ref, {
+  BuildContext context, {
   DateTime? initialDate,
 }) async {
   final _AddKind? kind = await showAppSheet<_AddKind>(
@@ -39,9 +37,9 @@ Future<void> showAddClassSheet(
 
   if (kind == null || !context.mounted) return;
   if (kind == _AddKind.recurring) {
-    await showSlotEditor(context, ref, initialDate: initialDate);
+    await showSlotEditor(context, initialDate: initialDate);
   } else {
-    await showExtraClassEditor(context, ref, initialDate: initialDate);
+    await showExtraClassEditor(context, initialDate: initialDate);
   }
 }
 

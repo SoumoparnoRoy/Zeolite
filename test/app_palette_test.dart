@@ -1,8 +1,8 @@
 import 'dart:math' as math;
 
-import 'package:zeolite/core/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zeolite/core/app_theme.dart';
 
 /// WCAG relative-luminance contrast ratio. Used to keep the light palette
 /// honest: a colour that reads on black is frequently unreadable on white.

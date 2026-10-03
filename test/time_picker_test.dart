@@ -1,7 +1,7 @@
-import 'package:zeolite/core/app_theme.dart';
-import 'package:zeolite/core/time_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zeolite/core/app_theme.dart';
+import 'package:zeolite/core/time_picker.dart';
 
 /// Opens the picker under a device that claims the opposite clock convention,
 /// so the only thing that can decide the format is the setting we pass in.

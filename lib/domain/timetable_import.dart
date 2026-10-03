@@ -404,7 +404,7 @@ class TimetableImportResult {
   List<String> get subjectNames {
     final Map<String, String> seen = <String, String>{};
     for (final ImportedClass c in classes) {
-      seen.putIfAbsent(c.subjectKey, () => c.subjectName.trim());
+      seen.putIfAbsent(c.subjectKey, c.subjectName.trim);
     }
     return seen.values.toList();
   }

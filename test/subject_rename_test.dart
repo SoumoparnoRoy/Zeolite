@@ -8,11 +8,11 @@ import 'package:zeolite/data/db/app_database.dart';
 import 'package:zeolite/data/db/zeolite_repository.dart';
 import 'package:zeolite/data/models/subject.dart';
 import 'package:zeolite/data/settings/app_settings.dart';
+import 'package:zeolite/domain/sync/sync_merge.dart';
+import 'package:zeolite/domain/sync/sync_target.dart';
 import 'package:zeolite/services/sync/sync_coordinator.dart';
 
 import 'fake_sync_target.dart';
-import 'package:zeolite/domain/sync/sync_merge.dart';
-import 'package:zeolite/domain/sync/sync_target.dart';
 
 /// Two devices that have both renamed the same subject — the case schema v10
 /// gave a subject its own edit date in order to settle.

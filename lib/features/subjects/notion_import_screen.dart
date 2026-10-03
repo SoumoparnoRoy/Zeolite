@@ -121,22 +121,22 @@ class _NotionImportScreenState extends ConsumerState<NotionImportScreen> {
   @override
   Widget build(BuildContext context) {
     final AppPalette p = context.palette;
-    final TimetableData? data = ref.watch(timetableProvider).value;
+    final TimetableData? timetable = ref.watch(timetableProvider).value;
     final AppSettings settings =
         ref.watch(settingsProvider).value ?? const AppSettings();
 
     final NotionGrouping grouping =
-        _groupingFrom(data?.categories ?? const <ClassCategory>[]);
+        _groupingFrom(timetable?.categories ?? const <ClassCategory>[]);
     final NotionPlan plan = NotionPlan.from(
       export: _export,
       grouping: grouping,
-      subjects: data?.subjects ?? const <Subject>[],
-      slots: data?.slots ?? const <ClassSlot>[],
-      records: data?.records ?? const <AttendanceRecord>[],
+      subjects: timetable?.subjects ?? const <Subject>[],
+      slots: timetable?.slots ?? const <ClassSlot>[],
+      records: timetable?.records ?? const <AttendanceRecord>[],
       countsCancelledNow: settings.cancelledCountsAsAttended,
       countUntyped: _countUntyped,
     );
-    _seed(plan, ready: data != null);
+    _seed(plan, ready: timetable != null);
 
     final List<NotionPlanSubject> chosen = <NotionPlanSubject>[
       for (final NotionPlanSubject s in plan.subjects)
@@ -188,7 +188,7 @@ class _NotionImportScreenState extends ConsumerState<NotionImportScreen> {
               _CancelledRule(plan: plan, settings: settings),
               _TypeWorth(
                 plan: plan,
-                types: data?.categories ?? const <ClassCategory>[],
+                types: timetable?.categories ?? const <ClassCategory>[],
               ),
               if (plan.untyped > 0)
                 _UntypedChoice(
@@ -516,17 +516,17 @@ class _SubjectCard extends StatelessWidget {
 
     final List<String> notes = <String>[
       if (planned.match == NotionMatch.overlap)
-        'You have marked ${Words.plural(planned.marksInRange, 'class', 'classes')} '
+        ('You have marked ${Words.plural(planned.marksInRange, 'class', 'classes')} '
             'here between these dates. The file covers those days too, so '
-            'bringing this in replaces them rather than adding to them.',
+            'bringing this in replaces them rather than adding to them.'),
       if (planned.unscheduled > 0)
-        '${Words.plural(planned.unscheduled, 'class', 'classes')} had no '
+        ('${Words.plural(planned.unscheduled, 'class', 'classes')} had no '
             'matching class on your timetable that day. They still count, and '
-            'show in the log with no time unless the file gave one.',
+            'show in the log with no time unless the file gave one.'),
       if (planned.suspect > 0)
-        '${Words.plural(planned.suspect, 'row')} disagree with their own '
+        ('${Words.plural(planned.suspect, 'row')} disagree with their own '
             'credit column — attended but credited nothing, or the other way '
-            'round.',
+            'round.'),
     ];
 
     return SurfaceCard(
@@ -572,8 +572,7 @@ class _SubjectCard extends StatelessWidget {
           Text(
             <String>[
               if (planned.code != null) planned.code!,
-              '${planned.attended} of ${planned.held}'
-                  '${planned.hasWeighted ? ' periods' : ''}',
+              '${planned.attended} of ${planned.held}${planned.hasWeighted ? ' periods' : ''}',
               '${planned.classes} marked',
               for (final MapEntry<String, int> label in planned.labels.entries)
                 '${label.value} ${label.key.toLowerCase()}',

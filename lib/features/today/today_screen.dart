@@ -145,7 +145,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
   Widget build(BuildContext context) {
     final AppPalette p = context.palette;
     final DateTime selected = ref.watch(selectedDateProvider);
-    final TimetableData? data = ref.watch(timetableProvider).value;
+    final TimetableData? timetable = ref.watch(timetableProvider).value;
     final HomeView view = ref.watch(homeViewProvider);
     final NavBarScroll? navBar = NavBarScroll.of(context);
     final Size screen = MediaQuery.sizeOf(context);
@@ -173,14 +173,14 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
       header:
           view == HomeView.grid ? _gridHeader(selected) : _dayHeader(selected),
       // On a first run the empty state carries the same button, larger.
-      floatingActionButton:
-          (data?.slots.isEmpty ?? true) && (data?.extras.isEmpty ?? true)
-              ? null
-              : GradientFab(
-                  label: 'Add class',
-                  onPressed: () =>
-                      showAddClassSheet(context, ref, initialDate: selected),
-                ),
+      floatingActionButton: (timetable?.slots.isEmpty ?? true) &&
+              (timetable?.extras.isEmpty ?? true)
+          ? null
+          : GradientFab(
+              label: 'Add class',
+              onPressed: () =>
+                  showAddClassSheet(context, initialDate: selected),
+            ),
       body: PageView.builder(
         controller: _pagesFor(view),
         onPageChanged: (int page) {
@@ -377,7 +377,7 @@ class _DayHeader extends StatelessWidget {
                 Expanded(
                   child: HeaderCaption(
                     '${stats.attended} attended of ${stats.held} held\n'
-                    'target ${settings.targetPercent.toStringAsFixed(0)}%'
+                    'target ${Words.percent(settings.targetPercent)}'
                     '${_termTail(settings)}',
                   ),
                 ),
@@ -438,16 +438,14 @@ class _GridHeader extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     HeaderEyebrow(
-                      '${weekStart.day} ${kMonthNamesShort[weekStart.month - 1]}'
-                      ' – ${weekEnd.day} '
-                      '${kMonthNamesShort[weekEnd.month - 1]}',
+                      Dates.formatWeekRange(weekStart, weekEnd),
                     ),
                     const SizedBox(height: 6),
                     HeaderTitle(
                       count == 0
                           ? 'No classes'
                           : '${Words.count(count)} '
-                              '${count == 1 ? 'class' : 'classes'}',
+                              '${Words.noun(count, 'class', 'classes')}',
                     ),
                   ],
                 ),

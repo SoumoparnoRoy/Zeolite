@@ -14,10 +14,10 @@ import '../../../widgets/common.dart';
 
 import '../untimed_match_dialog.dart';
 import 'editor_fields.dart';
+import 'subject_picker.dart';
 
 Future<void> showExtraClassEditor(
-  BuildContext context,
-  WidgetRef ref, {
+  BuildContext context, {
   DateTime? initialDate,
   ExtraClass? extra,
 }) {
@@ -178,11 +178,11 @@ class _ExtraClassFormState extends ConsumerState<_ExtraClassForm> {
       note: widget.extra?.note,
     );
 
-    final TimetableData? data = ref.read(timetableProvider).value;
-    if (data != null &&
+    final TimetableData? timetable = ref.read(timetableProvider).value;
+    if (timetable != null &&
         ClassClash.forOneOff(
-          slots: data.slots,
-          extras: data.extras,
+          slots: timetable.slots,
+          extras: timetable.extras,
           proposed: value,
         )) {
       setState(() {

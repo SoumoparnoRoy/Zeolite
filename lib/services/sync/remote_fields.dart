@@ -5,16 +5,16 @@ import '../../core/date_utils.dart';
 /// as absent here rather than throwing and ending the run for every row.
 
 int? readInt(Object? value) => switch (value) {
-      int v => v,
+      final int v => v,
       // NaN and infinity are storable in Firestore and `round` throws on them.
-      double v when v.isFinite => v.round(),
-      String v => int.tryParse(v),
+      final double v when v.isFinite => v.round(),
+      final String v => int.tryParse(v),
       _ => null,
     };
 
 double? readDouble(Object? value) => switch (value) {
-      num v when v.isFinite => v.toDouble(),
-      String v => double.tryParse(v),
+      final num v when v.isFinite => v.toDouble(),
+      final String v => double.tryParse(v),
       _ => null,
     };
 

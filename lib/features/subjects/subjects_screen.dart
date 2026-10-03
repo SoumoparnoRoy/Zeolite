@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
+import '../../core/words.dart';
 import '../../data/models/attendance_record.dart';
 import '../../data/models/class_category.dart';
 import '../../data/models/class_slot.dart';
@@ -24,22 +25,22 @@ class SubjectsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final TimetableData? data = ref.watch(timetableProvider).value;
+    final TimetableData? timetable = ref.watch(timetableProvider).value;
     // Already ordered by name from the repository.
-    final List<Subject> subjects = data?.subjects ?? <Subject>[];
-    final int weekly = data?.slots.length ?? 0;
+    final List<Subject> subjects = timetable?.subjects ?? <Subject>[];
+    final int weekly = timetable?.slots.length ?? 0;
 
     return PushScaffold(
       title: 'Subjects',
       subtitle: subjects.isEmpty
           ? null
-          : '${subjects.length} ${subjects.length == 1 ? 'subject' : 'subjects'}'
-              ' · $weekly weekly ${weekly == 1 ? 'class' : 'classes'}',
+          : '${Words.plural(subjects.length, 'subject')}'
+              ' · $weekly weekly ${Words.noun(weekly, 'class', 'classes')}',
       floatingActionButton: subjects.isEmpty
           ? null
           : GradientFab(
               label: 'Add subject',
-              onPressed: () => showSubjectEditor(context, ref),
+              onPressed: () => showSubjectEditor(context),
             ),
       slivers: <Widget>[
         if (subjects.isEmpty)
@@ -53,7 +54,7 @@ class SubjectsScreen extends ConsumerWidget {
                 message: 'Add the subjects you are taking. Classes hang off a '
                     'subject, and your attendance is tracked per subject.',
                 action: FilledButton.icon(
-                  onPressed: () => showSubjectEditor(context, ref),
+                  onPressed: () => showSubjectEditor(context),
                   icon: const Icon(Icons.add_rounded),
                   label: const Text('Add your first subject'),
                 ),
@@ -202,13 +203,13 @@ class _SubjectRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final AppPalette p = context.palette;
-    final TimetableData? data = ref.watch(timetableProvider).value;
+    final TimetableData? timetable = ref.watch(timetableProvider).value;
     final int? id = subject.id;
     final SubjectStats? stats =
         id == null ? null : ref.watch(subjectStatsProvider(id));
 
-    final ClassCategory? category = data?.categoryFor(subject);
-    final int classCount = _classCount(data, id);
+    final ClassCategory? category = timetable?.categoryFor(subject);
+    final int classCount = _classCount(timetable, id);
 
     // Code first: a theory course and its lab share a name up to one word, so
     // the line has to lead with what differs. Totals live in the header, so
@@ -234,7 +235,7 @@ class _SubjectRow extends ConsumerWidget {
 
     return SurfaceCard(
       padding: const EdgeInsets.fromLTRB(13, 12, 4, 12),
-      onTap: () => showSubjectEditor(context, ref, subject: subject),
+      onTap: () => showSubjectEditor(context, subject: subject),
       onLongPress: () => showSubjectColorPicker(context, ref, subject),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -278,7 +279,7 @@ class _SubjectRow extends ConsumerWidget {
               const SizedBox(width: 8),
               Text(
                 stats != null && stats.hasData
-                    ? '${stats.percent.toStringAsFixed(0)}%'
+                    ? Words.percent(stats.percent)
                     : '—',
                 style: TextStyle(
                   fontSize: AppType.titleMedium,
@@ -302,11 +303,11 @@ class _SubjectRow extends ConsumerWidget {
                 onSelected: (_SubjectAction action) async {
                   switch (action) {
                     case _SubjectAction.edit:
-                      await showSubjectEditor(context, ref, subject: subject);
+                      await showSubjectEditor(context, subject: subject);
                     case _SubjectAction.colour:
                       await showSubjectColorPicker(context, ref, subject);
                     case _SubjectAction.delete:
-                      await _confirmDelete(context, ref, data);
+                      await _confirmDelete(context, ref, timetable);
                   }
                 },
                 itemBuilder: (BuildContext context) =>

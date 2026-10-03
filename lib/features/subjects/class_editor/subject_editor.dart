@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/app_theme.dart';
 import '../../../core/date_utils.dart';
+import '../../../core/words.dart';
 import '../../../data/models/class_category.dart';
 import '../../../data/models/subject.dart';
 import '../../../state/providers.dart';
@@ -14,8 +15,7 @@ import 'editor_fields.dart';
 
 /// Create or edit a subject. Returns the subject id on save.
 Future<int?> showSubjectEditor(
-  BuildContext context,
-  WidgetRef ref, {
+  BuildContext context, {
   Subject? subject,
 }) {
   return showAppSheet<int>(
@@ -203,7 +203,7 @@ class _SubjectFormState extends ConsumerState<_SubjectForm> {
           title: const Text('Custom attendance target'),
           subtitle: Text(
             _overrideTarget
-                ? 'This subject needs ${_target.round()}%'
+                ? 'This subject needs ${Words.percent(_target)}'
                 : 'Uses your global target',
             style: const TextStyle(fontSize: AppType.bodyMedium),
           ),
@@ -214,7 +214,7 @@ class _SubjectFormState extends ConsumerState<_SubjectForm> {
             min: 40,
             max: 100,
             divisions: 60,
-            label: '${_target.round()}%',
+            label: Words.percent(_target),
             onChanged: (double v) => setState(() => _target = v),
           ),
         const SizedBox(height: AppSpacing.xl),
@@ -424,7 +424,7 @@ class _CategoryPicker extends ConsumerWidget {
               ),
             NewSubjectChip(
               onTap: () async {
-                final int? id = await showCategoryEditor(context, ref);
+                final int? id = await showCategoryEditor(context);
                 if (id != null) onChanged(id);
               },
             ),

@@ -11,12 +11,12 @@ import '../../services/sync/sync_coordinator.dart';
 import '../../state/auth_providers.dart';
 import '../../state/providers.dart';
 import '../../state/sync_providers.dart';
-import 'auth_form.dart';
-import 'settings_rows.dart';
-import 'sync_status_line.dart';
-import 'sync_merge_screen.dart';
 import '../../widgets/common.dart';
 import '../../widgets/gradient_header.dart';
+import 'auth_form.dart';
+import 'settings_rows.dart';
+import 'sync_merge_screen.dart';
+import 'sync_status_line.dart';
 
 /// Signing in is optional and buys backup and sync across devices. Notion is
 /// deliberately not on that list — it holds its own token on the device and

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
+import '../../core/words.dart';
 import '../../data/settings/app_settings.dart';
 import '../../state/providers.dart';
 import '../../widgets/common.dart';
@@ -204,7 +205,7 @@ class _TargetHeader extends StatelessWidget {
               min: 40,
               max: 100,
               divisions: 60,
-              label: '${target.round()}%',
+              label: Words.percent(target),
               onChanged: onChanged,
             ),
           ),

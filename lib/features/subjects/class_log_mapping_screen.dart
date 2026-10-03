@@ -116,7 +116,7 @@ class _ClassLogMappingScreenState extends State<ClassLogMappingScreen> {
               if (ClassLogMapping.datesAreAmbiguous(_table, dateColumn))
                 _DateOrder(
                   sample: _table.valuesOf(dateColumn).firstWhere(
-                        (String v) => ClassLogMapping.numericDate(v) != null,
+                        (String v) => NotionExport.numericDate(v) != null,
                       ),
                   dayFirst: _mapping.dayFirst,
                   onChanged: (bool dayFirst) => setState(

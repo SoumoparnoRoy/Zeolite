@@ -217,7 +217,7 @@ void main() {
   group('a start time takes its length from the category', () {
     testWidgets('weekly form, subject chosen first',
         (WidgetTester tester) async {
-      await tester.pumpWidget(_host((c, ref) => showSlotEditor(c, ref)));
+      await tester.pumpWidget(_host((c, _) => showSlotEditor(c)));
       await _openSheet(tester);
 
       await tester.tap(find.text('Physics'));
@@ -232,7 +232,7 @@ void main() {
 
     testWidgets('weekly form, start time chosen first',
         (WidgetTester tester) async {
-      await tester.pumpWidget(_host((c, ref) => showSlotEditor(c, ref)));
+      await tester.pumpWidget(_host((c, _) => showSlotEditor(c)));
       await _openSheet(tester);
 
       // No subject yet, so the global hour applies.
@@ -245,7 +245,7 @@ void main() {
     });
 
     testWidgets('one-off form, either order', (WidgetTester tester) async {
-      await tester.pumpWidget(_host((c, ref) => showExtraClassEditor(c, ref)));
+      await tester.pumpWidget(_host((c, _) => showExtraClassEditor(c)));
       await _openSheet(tester);
 
       await tester.tap(find.text('Physics'));
@@ -259,7 +259,7 @@ void main() {
 
     testWidgets('a subject with no category falls back to the global length',
         (WidgetTester tester) async {
-      await tester.pumpWidget(_host((c, ref) => showSlotEditor(c, ref)));
+      await tester.pumpWidget(_host((c, _) => showSlotEditor(c)));
       await _openSheet(tester);
 
       await tester.tap(find.text('Maths'));
@@ -272,7 +272,7 @@ void main() {
 
     testWidgets('an end time set by hand pins the length',
         (WidgetTester tester) async {
-      await tester.pumpWidget(_host((c, ref) => showSlotEditor(c, ref)));
+      await tester.pumpWidget(_host((c, _) => showSlotEditor(c)));
       await _openSheet(tester);
 
       await _pickTime(tester, find.text('10:00 AM'), 9, 30);
@@ -286,9 +286,8 @@ void main() {
         (WidgetTester tester) async {
       await tester.pumpWidget(
         _host(
-          (c, ref) => showSlotEditor(
+          (c, _) => showSlotEditor(
             c,
-            ref,
             slot: ClassSlot(
               id: 9,
               subjectId: 1,
@@ -332,7 +331,7 @@ void main() {
       late _EditRecorder recorder;
       await tester.pumpWidget(
         _host(
-          (c, ref) => showSlotEditor(c, ref, slot: existing),
+          (c, _) => showSlotEditor(c, slot: existing),
           records: records,
           slots: <ClassSlot>[existing],
           schedule: (Ref ref) => recorder = _EditRecorder(ActionCore(ref)),
@@ -387,7 +386,7 @@ void main() {
   group('the length rule is named on screen', () {
     testWidgets('the category and its length are both shown',
         (WidgetTester tester) async {
-      await tester.pumpWidget(_host((c, ref) => showSlotEditor(c, ref)));
+      await tester.pumpWidget(_host((c, _) => showSlotEditor(c)));
       await _openSheet(tester);
       await tester.tap(find.text('Physics'));
       await tester.pumpAndSettle();
@@ -398,7 +397,7 @@ void main() {
     testWidgets('with a block length set, the count is shown too',
         (WidgetTester tester) async {
       await tester.pumpWidget(
-        _host((c, ref) => showSlotEditor(c, ref), settings: _blockSettings),
+        _host((c, _) => showSlotEditor(c), settings: _blockSettings),
       );
       await _openSheet(tester);
       await tester.tap(find.text('Maths'));
@@ -412,7 +411,7 @@ void main() {
   group('rooms saved in Settings', () {
     testWidgets('are offered as chips and fill the field in',
         (WidgetTester tester) async {
-      await tester.pumpWidget(_host((c, ref) => showExtraClassEditor(c, ref)));
+      await tester.pumpWidget(_host((c, _) => showExtraClassEditor(c)));
       await _openSheet(tester);
 
       // The chip sits below the field, so once the field holds the same text
@@ -440,9 +439,8 @@ void main() {
         (WidgetTester tester) async {
       await tester.pumpWidget(
         _host(
-          (c, ref) => showBlockClassEditor(
+          (c, _) => showBlockClassEditor(
             c,
-            ref,
             date: Dates.startOfWeek(Dates.today()),
             blockIndex: 0,
           ),
@@ -471,9 +469,8 @@ void main() {
       final List<ExtraClass> extras = <ExtraClass>[];
       await tester.pumpWidget(
         _host(
-          (c, ref) => showBlockClassEditor(
+          (c, _) => showBlockClassEditor(
             c,
-            ref,
             date: Dates.startOfWeek(Dates.today()),
             blockIndex: 0,
           ),
@@ -502,7 +499,7 @@ void main() {
       final List<ExtraClass> extras = <ExtraClass>[];
       await tester.pumpWidget(
         _host(
-          (c, ref) => showBlockClassEditor(c, ref, date: monday, blockIndex: 0),
+          (c, _) => showBlockClassEditor(c, date: monday, blockIndex: 0),
           settings: _blockSettings,
           schedule: (Ref ref) => _RecordingActions(ActionCore(ref),
               slots: written, extras: extras),
@@ -538,7 +535,7 @@ void main() {
       final List<ExtraClass> extras = <ExtraClass>[];
       await tester.pumpWidget(
         _host(
-          (c, ref) => showBlockClassEditor(c, ref, date: monday, blockIndex: 0),
+          (c, _) => showBlockClassEditor(c, date: monday, blockIndex: 0),
           settings: _blockSettings,
           slots: <ClassSlot>[
             ClassSlot(
@@ -806,8 +803,7 @@ void main() {
       final List<Subject> saved = <Subject>[];
       await tester.pumpWidget(
         _host(
-          (c, ref) =>
-              showSubjectEditor(c, ref, subject: _fixture().subjects[1]),
+          (c, _) => showSubjectEditor(c, subject: _fixture().subjects[1]),
           subjects: (Ref ref) =>
               _SubjectRecorder(ActionCore(ref), saved: saved),
         ),
@@ -871,9 +867,8 @@ void main() {
       (WidgetTester tester) async {
     final List<Subject> saved = <Subject>[];
     await tester.pumpWidget(_host(
-      (BuildContext c, WidgetRef ref) => showCategoryEditor(
+      (BuildContext c, WidgetRef _) => showCategoryEditor(
         c,
-        ref,
         category: const ClassCategory(
           id: 1,
           name: 'Lab',

@@ -1,6 +1,6 @@
+import 'package:flutter_test/flutter_test.dart';
 import 'package:zeolite/data/models/attendance_status.dart';
 import 'package:zeolite/data/settings/app_settings.dart';
-import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('the cancelled rule', () {

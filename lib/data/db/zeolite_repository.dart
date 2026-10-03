@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../../core/date_utils.dart';
+import '../../core/ids.dart';
 import '../../domain/sync/sync_target.dart';
 import '../models/attendance_record.dart';
 import '../models/attendance_status.dart';
@@ -9,12 +10,11 @@ import '../models/class_category.dart';
 import '../models/class_slot.dart';
 import '../models/extra_class.dart';
 import '../models/holiday.dart';
-import '../models/slot_override.dart';
 import '../models/room.dart';
+import '../models/slot_override.dart';
 import '../models/subject.dart';
 import '../models/tag.dart';
 import 'app_database.dart';
-import '../../core/ids.dart';
 
 /// One row per table, exactly as SQLite handed it over.
 typedef DatabaseSnapshot = Map<String, List<Map<String, Object?>>>;

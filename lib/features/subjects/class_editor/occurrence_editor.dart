@@ -14,6 +14,7 @@ import '../../../widgets/common.dart';
 
 import '../untimed_match_dialog.dart';
 import 'editor_fields.dart';
+import 'subject_picker.dart';
 
 /// Edits a single week of a weekly rule.
 ///
@@ -21,8 +22,7 @@ import 'editor_fields.dart';
 /// picker would let the sheet contradict the day behind it. Weight is not
 /// offered either — what one class is worth belongs to the rule.
 Future<void> showOccurrenceEditor(
-  BuildContext context,
-  WidgetRef ref, {
+  BuildContext context, {
   required ClassSlot slot,
   required DateTime date,
 }) {

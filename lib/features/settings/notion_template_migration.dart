@@ -6,11 +6,11 @@ import '../../core/date_utils.dart';
 import '../../domain/notion/notion_mapping.dart';
 import '../../services/notion/notion_connection_store.dart';
 import '../../services/notion/notion_template_retirement.dart';
-import '../../state/notion_retirement_actions.dart';
 import '../../services/sync/sync_coordinator.dart';
 import '../../state/notion_providers.dart';
-import '../../state/providers.dart';
+import '../../state/notion_retirement_actions.dart';
 import '../../state/notion_sync_providers.dart';
+import '../../state/providers.dart';
 import '../../widgets/common.dart';
 import 'notion_connect_screen.dart';
 import 'notion_mapping_gaps.dart';
@@ -266,11 +266,11 @@ class NotionTemplateMigration {
         title: const Text('And the old table?'),
         content: Text(
           <String>[
-            'Your marks are now in the new table. "$title" is still in '
-                'your workspace with a copy of all of them.',
+            ('Your marks are now in the new table. "$title" is still in '
+                'your workspace with a copy of all of them.'),
             if (whole)
-              'It came in a page of its own, so renaming or trashing it takes '
-                  'that page and its Courses table with it.',
+              ('It came in a page of its own, so renaming or trashing it '
+                  'takes that page and its Courses table with it.'),
           ].join('\n\n'),
           style: const TextStyle(height: 1.4),
         ),

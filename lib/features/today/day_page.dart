@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
+import '../../core/words.dart';
 import '../../data/models/attendance_status.dart';
 import '../../data/models/class_session.dart';
 import '../../data/models/holiday.dart';
@@ -146,9 +147,9 @@ class TodayDayPage extends ConsumerWidget {
   }
 
   Widget _empty(BuildContext context, WidgetRef ref) {
-    final TimetableData? data = ref.watch(timetableProvider).value;
-    final bool nothingScheduled =
-        (data?.slots.isEmpty ?? true) && (data?.extras.isEmpty ?? true);
+    final TimetableData? timetable = ref.watch(timetableProvider).value;
+    final bool nothingScheduled = (timetable?.slots.isEmpty ?? true) &&
+        (timetable?.extras.isEmpty ?? true);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 36),
       // A timetable with nothing in it at all is a first run, not a free day —
@@ -161,8 +162,7 @@ class TodayDayPage extends ConsumerWidget {
               message: 'Add your first class and Zeolite starts tracking '
                   'attendance for it.',
               action: FilledButton.icon(
-                onPressed: () =>
-                    showAddClassSheet(context, ref, initialDate: date),
+                onPressed: () => showAddClassSheet(context, initialDate: date),
                 icon: const Icon(Icons.add_rounded),
                 label: const Text('Add your first class'),
               ),
@@ -182,11 +182,11 @@ class TodayDayPage extends ConsumerWidget {
     WidgetRef ref,
     List<ClassSession> sessions,
   ) {
-    final TimetableData? data = ref.watch(timetableProvider).value;
+    final TimetableData? timetable = ref.watch(timetableProvider).value;
     final AppSettings settings =
         ref.watch(settingsProvider).value ?? const AppSettings();
     final ClassSession? next = ref.watch(nextSessionProvider);
-    final List<Tag> tags = data?.tags ?? const <Tag>[];
+    final List<Tag> tags = timetable?.tags ?? const <Tag>[];
     return SliverPadding(
       padding: const EdgeInsets.fromLTRB(_pad, 0, _pad, 96),
       sliver: SliverList.separated(
@@ -203,8 +203,9 @@ class TodayDayPage extends ConsumerWidget {
                     context.palette,
                   )
                 : null,
-            categoryName: data?.categoryById(session.effectiveCategoryId)?.name,
-            tagName: data?.tagById(session.record?.tagId)?.name,
+            categoryName:
+                timetable?.categoryById(session.effectiveCategoryId)?.name,
+            tagName: timetable?.tagById(session.record?.tagId)?.name,
             isNext: next != null &&
                 next.date == session.date &&
                 next.startMinutes == session.startMinutes &&
@@ -275,7 +276,7 @@ class TodayDayPage extends ConsumerWidget {
     showUndoSnack(
       messenger,
       core,
-      'Marked $count ${count == 1 ? 'class' : 'classes'} present',
+      'Marked ${Words.plural(count, 'class', 'classes')} present',
     );
   }
 }
@@ -299,7 +300,7 @@ class _UnmarkedBanner extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              '$count past ${count == 1 ? 'class needs' : 'classes need'} '
+              '$count past ${Words.noun(count, 'class needs', 'classes need')} '
               'marking',
               style: TextStyle(
                 fontSize: AppType.bodySmall,

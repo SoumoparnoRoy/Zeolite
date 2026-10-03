@@ -119,6 +119,11 @@ class Dates {
   static String formatFull(DateTime date) =>
       '${date.day} ${kMonthNamesShort[date.month - 1]} ${date.year}';
 
+  /// e.g. "28 Sep – 4 Oct"
+  static String formatWeekRange(DateTime start, DateTime end) =>
+      '${start.day} ${kMonthNamesShort[start.month - 1]} – '
+      '${end.day} ${kMonthNamesShort[end.month - 1]}';
+
   /// e.g. "August 2026"
   static String formatMonthYear(DateTime date) =>
       '${kMonthNamesLong[date.month - 1]} ${date.year}';

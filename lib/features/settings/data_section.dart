@@ -88,6 +88,7 @@ class DataSection extends ConsumerWidget {
                           'matched',
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
+                      settings: const RouteSettings(name: 'untimed_match'),
                       builder: (_) => const UntimedMatchScreen(),
                     ),
                   ),

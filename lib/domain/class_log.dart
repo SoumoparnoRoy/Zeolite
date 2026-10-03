@@ -117,7 +117,7 @@ class ClassLogMapping {
     bool sawDayFirst = false;
     bool sawMonthFirst = false;
     for (final String value in dates) {
-      final List<int>? parts = numericDate(value);
+      final List<int>? parts = NotionExport.numericDate(value);
       if (parts == null) continue;
       if (parts[0] > 12) sawDayFirst = true;
       if (parts[1] > 12) sawMonthFirst = true;
@@ -130,21 +130,8 @@ class ClassLogMapping {
   /// the one case the user is asked.
   static bool datesAreAmbiguous(ClassLogTable table, int? column) {
     final List<String> values = table.valuesOf(column);
-    return values.any((String v) => numericDate(v) != null) &&
+    return values.any((String v) => NotionExport.numericDate(v) != null) &&
         _dateOrder(values) == null;
-  }
-
-  /// `05/08/2026`, `5-8-26`, `5.8.2026` as its three numbers, or null.
-  static List<int>? numericDate(String value) {
-    final RegExpMatch? m =
-        RegExp(r'^(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{2}|\d{4})$')
-            .firstMatch(value.trim());
-    if (m == null) return null;
-    return <int>[
-      int.parse(m.group(1)!),
-      int.parse(m.group(2)!),
-      int.parse(m.group(3)!),
-    ];
   }
 
   /// Whether this can be read without asking: the three columns every row
@@ -310,4 +297,40 @@ NotionExport readClassLog(
     );
   }
   return NotionExport(rows: rows, problems: problems, upcoming: upcoming);
+}
+
+/// Reads a Notion database export.
+///
+/// Accepts the zip Notion hands you, the zip inside it, or a bare CSV — the
+/// export nests one zip inside another and Android has no comfortable way to
+/// unpack that by hand.
+///
+/// [today] anchors the year, which the export leaves off. Injected so the
+/// inference is testable rather than tied to the clock.
+NotionExport readNotionExport(Uint8List bytes, {DateTime? today}) {
+  if (NotionExport.csvCells(bytes) == null) {
+    return const NotionExport(
+      rows: <NotionRow>[],
+      problems: <String>['No CSV was found in that file.'],
+    );
+  }
+  final ClassLogTable? table = ClassLogTable.of(bytes);
+  if (table == null) {
+    return const NotionExport(
+      rows: <NotionRow>[],
+      problems: <String>['That CSV has no rows in it.'],
+    );
+  }
+  final ClassLogMapping mapping = ClassLogMapping.guess(table);
+  if (!<NotionField>[NotionField.course, NotionField.date, NotionField.status]
+      .every(mapping.columns.containsKey)) {
+    return const NotionExport(
+      rows: <NotionRow>[],
+      problems: <String>[
+        ('That CSV is not a Notion class log — it needs a course, a date '
+            'and a status column.'),
+      ],
+    );
+  }
+  return readClassLog(table, mapping, today: today);
 }

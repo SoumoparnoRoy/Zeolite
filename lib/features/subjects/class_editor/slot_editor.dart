@@ -14,11 +14,11 @@ import '../../../widgets/common.dart';
 
 import '../untimed_match_dialog.dart';
 import 'editor_fields.dart';
+import 'subject_picker.dart';
 
 /// Create or edit a weekly recurring class.
 Future<void> showSlotEditor(
-  BuildContext context,
-  WidgetRef ref, {
+  BuildContext context, {
   ClassSlot? slot,
   DateTime? initialDate,
 }) {
@@ -322,8 +322,8 @@ class _SlotFormState extends ConsumerState<_SlotForm> {
       }
     }
 
-    final TimetableData? data = ref.read(timetableProvider).value;
-    final List<ClassSlot> existing = data?.slots ?? <ClassSlot>[];
+    final TimetableData? timetable = ref.read(timetableProvider).value;
+    final List<ClassSlot> existing = timetable?.slots ?? <ClassSlot>[];
     for (final _ClassTime time in _times) {
       for (final ClassSlot slot in existing) {
         if (slot.subjectId != _subjectId) continue;
@@ -339,10 +339,10 @@ class _SlotFormState extends ConsumerState<_SlotForm> {
 
     // The other half: a one-off class already sitting on a date this rule would
     // cover shares the same attendance key.
-    if (data != null) {
+    if (timetable != null) {
       for (final _ClassTime time in _times) {
         final DateTime? on = ClassClash.forWeekly(
-          extras: data.extras,
+          extras: timetable.extras,
           proposed: ClassSlot(
             id: widget.slot?.id,
             subjectId: _subjectId!,

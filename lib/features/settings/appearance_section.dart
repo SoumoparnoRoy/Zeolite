@@ -13,27 +13,26 @@ import 'settings_rows.dart';
 class AppearanceSection extends ConsumerWidget {
   const AppearanceSection({super.key});
 
-  static const Map<AppThemeMode, (IconData, String)> _themes =
-      <AppThemeMode, (IconData, String)>{
-    AppThemeMode.system: (
-      Icons.brightness_auto_rounded,
-      'Follows your device, switching when it does',
-    ),
-    AppThemeMode.light: (Icons.light_mode_rounded, 'Always light'),
-    AppThemeMode.dark: (Icons.dark_mode_rounded, 'Always dark'),
-  };
+  static (IconData, String) _theme(AppThemeMode mode) => switch (mode) {
+        AppThemeMode.system => (
+            Icons.brightness_auto_rounded,
+            'Follows your device, switching when it does',
+          ),
+        AppThemeMode.light => (Icons.light_mode_rounded, 'Always light'),
+        AppThemeMode.dark => (Icons.dark_mode_rounded, 'Always dark'),
+      };
 
-  static const Map<LaunchAnimation, (IconData, String)> _launches =
-      <LaunchAnimation, (IconData, String)>{
-    LaunchAnimation.full: (
-      Icons.auto_awesome_rounded,
-      'The whole crystal animation',
-    ),
-    LaunchAnimation.short: (
-      Icons.bolt_rounded,
-      'The wordmark only, about a second',
-    ),
-  };
+  static (IconData, String) _launch(LaunchAnimation animation) =>
+      switch (animation) {
+        LaunchAnimation.full => (
+            Icons.auto_awesome_rounded,
+            'The whole crystal animation',
+          ),
+        LaunchAnimation.short => (
+            Icons.bolt_rounded,
+            'The wordmark only, about a second',
+          ),
+      };
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -49,9 +48,9 @@ class AppearanceSection extends ConsumerWidget {
           children: <Widget>[
             for (final AppThemeMode mode in AppThemeMode.values)
               SettingsRadioRow(
-                leading: SettingsIconTile(_themes[mode]!.$1),
+                leading: SettingsIconTile(_theme(mode).$1),
                 title: mode.label,
-                subtitle: _themes[mode]!.$2,
+                subtitle: _theme(mode).$2,
                 selected: settings.themeMode == mode,
                 onTap: () =>
                     controller.save(settings.copyWith(themeMode: mode)),
@@ -85,9 +84,9 @@ class AppearanceSection extends ConsumerWidget {
           children: <Widget>[
             for (final LaunchAnimation animation in LaunchAnimation.values)
               SettingsRadioRow(
-                leading: SettingsIconTile(_launches[animation]!.$1),
+                leading: SettingsIconTile(_launch(animation).$1),
                 title: animation.label,
-                subtitle: _launches[animation]!.$2,
+                subtitle: _launch(animation).$2,
                 selected: settings.launchAnimation == animation,
                 onTap: () => controller.save(
                   settings.copyWith(launchAnimation: animation),

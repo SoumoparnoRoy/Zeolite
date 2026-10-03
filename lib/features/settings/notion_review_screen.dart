@@ -71,10 +71,10 @@ class _NotionReviewScreenState extends ConsumerState<NotionReviewScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final TimetableData? data = ref.watch(timetableProvider).value;
-    final List<Subject> subjects = data?.subjects ?? const <Subject>[];
+    final TimetableData? timetable = ref.watch(timetableProvider).value;
+    final List<Subject> subjects = timetable?.subjects ?? const <Subject>[];
     final List<AttendanceRecord> records =
-        data?.records ?? const <AttendanceRecord>[];
+        timetable?.records ?? const <AttendanceRecord>[];
     final int taking =
         _choices.values.where((SyncSide side) => side == SyncSide.there).length;
     final int keeping = _choices.length - taking;
@@ -82,7 +82,7 @@ class _NotionReviewScreenState extends ConsumerState<NotionReviewScreen> {
 
     return PushScaffold(
       title: 'Changed in Notion',
-      subtitle: '${_pulls.length} row${_pulls.length == 1 ? '' : 's'}',
+      subtitle: Words.plural(_pulls.length, 'row'),
       slivers: <Widget>[
         SliverToBoxAdapter(
           child: Padding(
@@ -129,7 +129,7 @@ class _NotionReviewScreenState extends ConsumerState<NotionReviewScreen> {
                       pull: pull,
                       subjects: subjects,
                       records: records,
-                      tags: data?.tags ?? const <Tag>[],
+                      tags: timetable?.tags ?? const <Tag>[],
                       side: _choices[pull.remote.localKey],
                       onChanged: (SyncSide side) =>
                           _choose(pull.remote.localKey, side),

@@ -15,6 +15,7 @@ import 'package:zeolite/data/models/extra_class.dart';
 import 'package:zeolite/data/models/holiday.dart';
 import 'package:zeolite/data/models/subject.dart';
 import 'package:zeolite/data/settings/app_settings.dart';
+import 'package:zeolite/domain/class_log.dart';
 import 'package:zeolite/domain/notion_export.dart';
 import 'package:zeolite/features/subjects/notion_import_screen.dart';
 import 'package:zeolite/state/providers.dart';
@@ -82,10 +83,9 @@ NotionExport _export() {
   final String csv = <String>[
     'Name,Attendance Credit (1/2/0),Course,Date,Held (1/2/0),Held?,L/T/P,Status',
     'ABC101L,1,Thermodynamics,${_dayCell(_day)},1,Yes,Lecture,Present',
-    'ABC101P,2,Thermodynamics,${_dayCell(Dates.addDays(_day, 1))},2,Yes,'
-        'Practical,Present',
+    'ABC101P,2,Thermodynamics,${_dayCell(Dates.addDays(_day, 1))},2,Yes,Practical,Present',
   ].join('\n');
-  return NotionExport.read(Uint8List.fromList(utf8.encode(csv)));
+  return readNotionExport(Uint8List.fromList(utf8.encode(csv)));
 }
 
 Widget _app({bool weighted = true}) => ProviderScope(

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/date_utils.dart';
+import '../core/words.dart';
 import '../data/db/zeolite_repository.dart';
 import '../data/models/attendance_record.dart';
 import '../data/models/attendance_status.dart';
@@ -348,16 +349,16 @@ final timetableProvider = FutureProvider<TimetableData>((ref) async {
 
 /// The expansion engine, rebuilt whenever data or term bounds change.
 final scheduleEngineProvider = Provider<ScheduleEngine?>((ref) {
-  final TimetableData? data = ref.watch(timetableProvider).value;
+  final TimetableData? timetable = ref.watch(timetableProvider).value;
   final AppSettings? settings = ref.watch(settingsProvider).value;
-  if (data == null) return null;
+  if (timetable == null) return null;
   return ScheduleEngine(
-    subjects: data.subjects,
-    slots: data.slots,
-    extras: data.extras,
-    holidays: data.holidays,
-    records: data.records,
-    overrides: data.overrides,
+    subjects: timetable.subjects,
+    slots: timetable.slots,
+    extras: timetable.extras,
+    holidays: timetable.holidays,
+    records: timetable.records,
+    overrides: timetable.overrides,
     termStart: settings?.termStart,
     termEnd: settings?.termEnd,
   );
@@ -432,12 +433,12 @@ class HomeViewController extends Notifier<HomeView> {
 
 /// Attendance figures for every subject, plus the aggregate.
 final statsProvider = Provider<OverallStats>((ref) {
-  final TimetableData? data = ref.watch(timetableProvider).value;
+  final TimetableData? timetable = ref.watch(timetableProvider).value;
   final AppSettings? settings = ref.watch(settingsProvider).value;
   final ScheduleEngine? engine = ref.watch(scheduleEngineProvider);
 
   final double globalTarget = (settings?.targetRatio ?? 0.75);
-  if (data == null) {
+  if (timetable == null) {
     return OverallStats(subjects: const <SubjectStats>[], target: globalTarget);
   }
 
@@ -452,7 +453,7 @@ final statsProvider = Provider<OverallStats>((ref) {
   // Subjects where something counts as more than one class, which is all the
   // headlines need in order to say "periods" instead.
   final Set<int> weighted = <int>{};
-  for (final AttendanceRecord record in data.records) {
+  for (final AttendanceRecord record in timetable.records) {
     if (!term.countsTowardsPercentage(record.date)) continue;
     if (record.weight != 1) weighted.add(record.subjectId);
     counts.putIfAbsent(record.subjectId, () => <AttendanceStatus, int>{});
@@ -461,10 +462,10 @@ final statsProvider = Provider<OverallStats>((ref) {
   }
   // A subject can be weighted before anything is marked against it, and the
   // projection it is about to be judged on is already in periods.
-  for (final ClassSlot slot in data.slots) {
+  for (final ClassSlot slot in timetable.slots) {
     if (slot.weight != 1) weighted.add(slot.subjectId);
   }
-  for (final ExtraClass extra in data.extras) {
+  for (final ExtraClass extra in timetable.extras) {
     if (extra.weight != 1) weighted.add(extra.subjectId);
   }
 
@@ -472,7 +473,7 @@ final statsProvider = Provider<OverallStats>((ref) {
       engine?.remainingSessionsBySubject() ?? <int, int>{};
 
   final List<SubjectStats> subjectStats = <SubjectStats>[];
-  for (final Subject subject in data.subjects) {
+  for (final Subject subject in timetable.subjects) {
     final int? id = subject.id;
     if (id == null) continue;
     final Map<AttendanceStatus, int> byStatus =
@@ -520,29 +521,29 @@ final subjectStatsProvider =
 /// refreshes with the same `timetableProvider` invalidation as everything else
 /// and cannot fall out of step with the stats beside it.
 final tagBreakdownsProvider = Provider<List<TagBreakdown>>((ref) {
-  final TimetableData? data = ref.watch(timetableProvider).value;
-  if (data == null) return const <TagBreakdown>[];
+  final TimetableData? timetable = ref.watch(timetableProvider).value;
+  if (timetable == null) return const <TagBreakdown>[];
   // The same window as the figures above it, or the two halves of Stats
   // would report different terms.
   final AppSettings term =
       ref.watch(settingsProvider).value ?? const AppSettings();
   return buildTagBreakdowns(
-    tags: data.tags,
-    records: data.records
+    tags: timetable.tags,
+    records: timetable.records
         .where((AttendanceRecord r) => term.countsTowardsPercentage(r.date))
         .toList(),
-    subjects: data.subjects,
+    subjects: timetable.subjects,
   );
 });
 
 /// Marks dated outside the term, so the stats screen can say so instead of
 /// quietly leaving them out of every figure on it.
 final outOfTermMarksProvider = Provider<OutOfTermMarks>((ref) {
-  final TimetableData? data = ref.watch(timetableProvider).value;
-  if (data == null) return const OutOfTermMarks(count: 0);
+  final TimetableData? timetable = ref.watch(timetableProvider).value;
+  if (timetable == null) return const OutOfTermMarks(count: 0);
   final AppSettings term =
       ref.watch(settingsProvider).value ?? const AppSettings();
-  return OutOfTermMarks.from(data.records, term);
+  return OutOfTermMarks.from(timetable.records, term);
 });
 
 /// Whether anything is tagged at all. The stats screen hides its tag section
@@ -569,8 +570,8 @@ const int _maxLogDays = 400;
 final attendanceLogProvider =
     Provider.family<List<AttendanceLogEntry>, int>((ref, int subjectId) {
   final ScheduleEngine? engine = ref.watch(scheduleEngineProvider);
-  final TimetableData? data = ref.watch(timetableProvider).value;
-  if (engine == null || data == null) return const <AttendanceLogEntry>[];
+  final TimetableData? timetable = ref.watch(timetableProvider).value;
+  if (engine == null || timetable == null) return const <AttendanceLogEntry>[];
 
   final DateTime today = Dates.today();
   final DateTime earliest = Dates.addDays(today, -_maxLogDays);
@@ -580,7 +581,7 @@ final attendanceLogProvider =
   // exactly why they have to stay reachable: this is where you see one and
   // remove it.
   DateTime from = engine.termStart ?? today;
-  for (final AttendanceRecord record in data.records) {
+  for (final AttendanceRecord record in timetable.records) {
     if (record.subjectId != subjectId) continue;
     if (record.date.isBefore(from)) from = Dates.dayOf(record.date);
   }
@@ -595,16 +596,16 @@ final attendanceLogProvider =
   return buildAttendanceLog(
     subjectId: subjectId,
     pastSessions: past,
-    records: data.records,
+    records: timetable.records,
   );
 });
 
 /// Marks kept with no time that a class on the timetable could now take.
 final untimedMatchesProvider = Provider<List<UntimedMatch>>((ref) {
   final ScheduleEngine? engine = ref.watch(scheduleEngineProvider);
-  final TimetableData? data = ref.watch(timetableProvider).value;
-  if (engine == null || data == null) return const <UntimedMatch>[];
-  return matchUntimed(engine: engine, records: data.records);
+  final TimetableData? timetable = ref.watch(timetableProvider).value;
+  if (engine == null || timetable == null) return const <UntimedMatch>[];
+  return matchUntimed(engine: engine, records: timetable.records);
 });
 
 // Navigation
@@ -695,9 +696,10 @@ final defaultDurationProvider =
     Provider.family<int, int?>((ref, int? subjectId) {
   final int fallback =
       ref.watch(settingsProvider).value?.defaultClassDurationMinutes ?? 60;
-  final TimetableData? data = ref.watch(timetableProvider).value;
-  if (data == null || subjectId == null) return fallback;
-  final ClassCategory? category = data.categoryFor(data.subjectById(subjectId));
+  final TimetableData? timetable = ref.watch(timetableProvider).value;
+  if (timetable == null || subjectId == null) return fallback;
+  final ClassCategory? category =
+      timetable.categoryFor(timetable.subjectById(subjectId));
   return category?.defaultDurationMinutes ?? fallback;
 });
 
@@ -705,9 +707,9 @@ final defaultDurationProvider =
 /// [defaultDurationProvider] because it answers the same kind of question off
 /// the same category.
 final defaultWeightProvider = Provider.family<int, int?>((ref, int? subjectId) {
-  final TimetableData? data = ref.watch(timetableProvider).value;
-  if (data == null || subjectId == null) return 1;
-  return weightFor(data.categoryFor(data.subjectById(subjectId)));
+  final TimetableData? timetable = ref.watch(timetableProvider).value;
+  if (timetable == null || subjectId == null) return 1;
+  return weightFor(timetable.categoryFor(timetable.subjectById(subjectId)));
 });
 
 /// Says *why* a class came out the length it did — "Lab · 2 blocks · 1h 40m",
@@ -727,17 +729,17 @@ final defaultDurationLabelProvider = Provider.family<String, int?>(
 final classLengthLabelProvider =
     Provider.family<String, ({int? subjectId, int? categoryId})>((ref, key) {
   final DayGrid grid = ref.watch(dayGridProvider);
-  final TimetableData? data = ref.watch(timetableProvider).value;
-  final ClassCategory? own = data?.categoryById(key.categoryId);
+  final TimetableData? timetable = ref.watch(timetableProvider).value;
+  final ClassCategory? own = timetable?.categoryById(key.categoryId);
   final int minutes = own?.defaultDurationMinutes ??
       ref.watch(defaultDurationProvider(key.subjectId));
   final ClassCategory? category =
-      own ?? data?.categoryFor(data.subjectById(key.subjectId));
+      own ?? timetable?.categoryFor(timetable.subjectById(key.subjectId));
 
   final List<String> parts = <String>[category?.name ?? 'no category'];
   if (grid.isWholeBlocks(minutes)) {
     final int blocks = grid.blocksFor(minutes);
-    parts.add('$blocks ${blocks == 1 ? 'block' : 'blocks'}');
+    parts.add(Words.plural(blocks, 'block'));
   }
   parts.add(Clock.formatDuration(minutes));
   return parts.join(' · ');

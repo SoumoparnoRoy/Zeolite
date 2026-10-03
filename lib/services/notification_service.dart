@@ -8,6 +8,7 @@ import 'package:timezone/timezone.dart' as tz;
 import '../core/app_theme.dart';
 import '../core/date_utils.dart';
 import '../core/report_error.dart';
+import '../core/words.dart';
 import '../data/models/class_session.dart';
 import '../data/settings/app_settings.dart';
 import '../domain/attendance_stats.dart';
@@ -481,7 +482,7 @@ class NotificationService {
   ) {
     final String name = session.subject.name;
     if (subjectStats == null || !subjectStats.hasData) return name;
-    return '${subjectStats.percent.toStringAsFixed(0)}% $name';
+    return '${Words.percent(subjectStats.percent)} $name';
   }
 
   Future<void> _scheduleClassReminders(
@@ -757,7 +758,7 @@ class NotificationService {
   /// One shape either side of the target — the on-target case used to get a
   /// sentence of its own — and rounded like every percentage elsewhere.
   static String dangerMessage(SubjectStats subjectStats) =>
-      '${subjectStats.percent.toStringAsFixed(0)}% · ${subjectStats.headline}';
+      '${Words.percent(subjectStats.percent)} · ${subjectStats.headline}';
 
   /// Shared with the in-app dialog, so the two cannot word it differently.
   static String dangerTitle(int count) =>

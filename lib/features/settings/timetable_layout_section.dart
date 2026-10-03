@@ -275,16 +275,16 @@ class _GridPreview extends StatelessWidget {
         Text(
           <String>[
             if (grid.tailMinutes > 0)
-              '${grid.blockCount - 1} blocks of '
-                  '${Clock.formatDuration(grid.blockMinutes)}'
+              ('${grid.blockCount - 1} blocks of '
+                  '${Clock.formatDuration(grid.blockMinutes)}')
             else
-              '${grid.blockCount} blocks of '
-                  '${Clock.formatDuration(grid.blockMinutes)}',
+              ('${grid.blockCount} blocks of '
+                  '${Clock.formatDuration(grid.blockMinutes)}'),
             if (grid.tailMinutes > 0)
               'a last one of ${Clock.formatDuration(grid.tailMinutes)}',
             if (grid.hasBreak)
-              '${Clock.formatDuration(grid.breakMinutes)} break after '
-                  '${grid.breakAfterBlock}',
+              ('${Clock.formatDuration(grid.breakMinutes)} break after '
+                  '${grid.breakAfterBlock}'),
           ].join(' · '),
           style: TextStyle(
             fontSize: AppType.bodySmall,

@@ -7,8 +7,6 @@ import 'package:flutter/foundation.dart';
 import '../core/date_utils.dart';
 import '../core/words.dart';
 import '../data/models/attendance_status.dart';
-import 'class_log.dart';
-import 'notion/notion_mapping.dart';
 
 /// Which part of a course a row belongs to.
 enum NotionKind {
@@ -168,12 +166,12 @@ class NotionExport {
   /// fine, and counting them as unreadable would overstate what went wrong.
   List<String> get leftOut => <String>[
         if (alreadySynced > 0)
-          '${Words.plural(alreadySynced, 'class', 'classes')} already synced '
-              'from this device ${alreadySynced == 1 ? 'was' : 'were'} left out.',
+          ('${Words.plural(alreadySynced, 'class', 'classes')} already synced '
+              'from this device ${alreadySynced == 1 ? 'was' : 'were'} left out.'),
         if (upcoming > 0)
-          '${Words.plural(upcoming, 'class', 'classes')} dated after today '
+          ('${Words.plural(upcoming, 'class', 'classes')} dated after today '
               '${upcoming == 1 ? 'was' : 'were'} left out. Import again once '
-              '${upcoming == 1 ? 'it has' : 'they have'} happened.',
+              '${upcoming == 1 ? 'it has' : 'they have'} happened.'),
       ];
 
   bool get isEmpty => rows.isEmpty;
@@ -206,42 +204,6 @@ class NotionExport {
       : rows.map((NotionRow r) => r.date).reduce(
             (DateTime a, DateTime b) => a.isAfter(b) ? a : b,
           );
-
-  /// Reads a Notion database export.
-  ///
-  /// Accepts the zip Notion hands you, the zip inside it, or a bare CSV — the
-  /// export nests one zip inside another and Android has no comfortable way to
-  /// unpack that by hand.
-  ///
-  /// [today] anchors the year, which the export leaves off. Injected so the
-  /// inference is testable rather than tied to the clock.
-  static NotionExport read(Uint8List bytes, {DateTime? today}) {
-    if (_findCsv(bytes) == null) {
-      return const NotionExport(
-        rows: <NotionRow>[],
-        problems: <String>['No CSV was found in that file.'],
-      );
-    }
-    final ClassLogTable? table = ClassLogTable.of(bytes);
-    if (table == null) {
-      return const NotionExport(
-        rows: <NotionRow>[],
-        problems: <String>['That CSV has no rows in it.'],
-      );
-    }
-    final ClassLogMapping mapping = ClassLogMapping.guess(table);
-    if (!<NotionField>[NotionField.course, NotionField.date, NotionField.status]
-        .every(mapping.columns.containsKey)) {
-      return const NotionExport(
-        rows: <NotionRow>[],
-        problems: <String>[
-          'That CSV is not a Notion class log — it needs a course, a date and '
-              'a status column.',
-        ],
-      );
-    }
-    return readClassLog(table, mapping, today: today);
-  }
 
   /// The file's CSV as cells, wherever in the export it sits.
   static List<List<String>>? csvCells(Uint8List bytes) {
@@ -357,6 +319,19 @@ class NotionExport {
     'dec',
   ];
 
+  /// `05/08/2026`, `5-8-26`, `5.8.2026` as its three numbers, or null.
+  static List<int>? numericDate(String value) {
+    final RegExpMatch? m =
+        RegExp(r'^(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{2}|\d{4})$')
+            .firstMatch(value.trim());
+    if (m == null) return null;
+    return <int>[
+      int.parse(m.group(1)!),
+      int.parse(m.group(2)!),
+      int.parse(m.group(3)!),
+    ];
+  }
+
   /// Reads `Jul 27`, `July 27, 2025`, an ISO date, or a numeric one such as
   /// `27/07/2025` in the order [dayFirst] gives — null leaves a numeric date
   /// unread, since `05/08` is a different day either way.
@@ -372,7 +347,7 @@ class NotionExport {
     final DateTime? iso = DateTime.tryParse(value);
     if (iso != null) return DateTime(iso.year, iso.month, iso.day);
 
-    final List<int>? numbers = ClassLogMapping.numericDate(value);
+    final List<int>? numbers = numericDate(value);
     if (numbers != null) {
       if (dayFirst == null) return null;
       final int day = dayFirst ? numbers[0] : numbers[1];

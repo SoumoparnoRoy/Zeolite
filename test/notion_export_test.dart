@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zeolite/data/models/attendance_status.dart';
+import 'package:zeolite/domain/class_log.dart';
 import 'package:zeolite/domain/notion_export.dart';
 
 const String _header =
@@ -29,7 +30,7 @@ final DateTime _today = DateTime(2026, 8, 26);
 void main() {
   group('reading the rows', () {
     test('a lecture, a proxy and a two-period practical', () {
-      final NotionExport export = NotionExport.read(
+      final NotionExport export = readNotionExport(
         _bytes(_csv(<String>[
           'ABC101L,1,Thermodynamics ($_link),Jul 27,1,Yes,Lecture,Present',
           'ABC101L,1,Thermodynamics ($_link),Jul 28,1,Yes,Lecture,Proxy',
@@ -58,7 +59,7 @@ void main() {
     });
 
     test('a cancelled class stays cancelled, credited or not', () {
-      final NotionExport export = NotionExport.read(
+      final NotionExport export = readNotionExport(
         _bytes(_csv(<String>[
           'ABC101L,1,Thermodynamics,Aug 5,1,Yes,Lecture,Cancelled',
           'ABC101L,0,Thermodynamics,Aug 6,1,Yes,Lecture,Cancelled',
@@ -79,7 +80,7 @@ void main() {
         () {
       // Filed as cancelled it would count as attended the moment the setting
       // for cancellations went on.
-      final NotionExport export = NotionExport.read(
+      final NotionExport export = readNotionExport(
         _bytes(_csv(<String>[
           'ABC101L,0,Thermodynamics,Aug 5,0,No,Lecture,Present',
         ])),
@@ -92,7 +93,7 @@ void main() {
     });
 
     test('the credit column wins when the word beside it disagrees', () {
-      final NotionExport export = NotionExport.read(
+      final NotionExport export = readNotionExport(
         _bytes(_csv(<String>[
           'ABC101L,0,Thermodynamics,Aug 5,1,Yes,Lecture,Present',
           'ABC101L,1,Thermodynamics,Aug 6,1,Yes,Lecture,Absent',
@@ -107,7 +108,7 @@ void main() {
     });
 
     test('an unreadable row is reported rather than dropped in silence', () {
-      final NotionExport export = NotionExport.read(
+      final NotionExport export = readNotionExport(
         _bytes(_csv(<String>[
           'ABC101L,1,Thermodynamics,Aug 5,1,Yes,Lecture,Attended',
           'ABC101L,1,Thermodynamics,Smorgasbord 5,1,Yes,Lecture,Present',
@@ -124,7 +125,7 @@ void main() {
 
   group('the year the export leaves off', () {
     test('a date already past this year stays in it', () {
-      final NotionExport export = NotionExport.read(
+      final NotionExport export = readNotionExport(
         _bytes(_csv(<String>['A,1,Course,Jul 27,1,Yes,Lecture,Present'])),
         today: _today,
       );
@@ -133,7 +134,7 @@ void main() {
 
     test('a date still to come this year belongs to the last one', () {
       // Read in January, a December row is last term rather than next.
-      final NotionExport export = NotionExport.read(
+      final NotionExport export = readNotionExport(
         _bytes(_csv(<String>['A,1,Course,Dec 3,1,Yes,Lecture,Present'])),
         today: DateTime(2026, 1, 12),
       );
@@ -141,7 +142,7 @@ void main() {
     });
 
     test('a year printed in the cell wins', () {
-      final NotionExport export = NotionExport.read(
+      final NotionExport export = readNotionExport(
         _bytes(
             _csv(<String>['A,1,Course,"Jul 27, 2024",1,Yes,Lecture,Present'])),
         today: _today,
@@ -156,19 +157,19 @@ void main() {
     ]));
 
     test('a bare csv', () {
-      expect(NotionExport.read(csv, today: _today).rows, hasLength(1));
+      expect(readNotionExport(csv, today: _today).rows, hasLength(1));
     });
 
     test('a byte-order mark does not stick to the first header', () {
       final Uint8List marked = _bytes('﻿${utf8.decode(csv)}');
-      expect(NotionExport.read(marked, today: _today).rows, hasLength(1));
+      expect(readNotionExport(marked, today: _today).rows, hasLength(1));
     });
 
     test('the zip inside the zip Notion actually hands you', () {
       final Uint8List inner = _zip(<String, Uint8List>{'Classes abc.csv': csv});
       final Uint8List outer =
           _zip(<String, Uint8List>{'ExportBlock-1-Part-1.zip': inner});
-      expect(NotionExport.read(outer, today: _today).rows, hasLength(1));
+      expect(readNotionExport(outer, today: _today).rows, hasLength(1));
     });
 
     test('the _all csv wins, since the other one obeys the view filters', () {
@@ -183,12 +184,12 @@ void main() {
         'Classes abc.csv': filtered,
         'Classes abc_all.csv': all,
       });
-      expect(NotionExport.read(zip, today: _today).rows, hasLength(2));
+      expect(readNotionExport(zip, today: _today).rows, hasLength(2));
     });
 
     test('something that is not an export says so', () {
       final NotionExport export =
-          NotionExport.read(_bytes('nothing,useful\n1,2'), today: _today);
+          readNotionExport(_bytes('nothing,useful\n1,2'), today: _today);
       expect(export.isEmpty, isTrue);
       expect(export.problems.single, contains('not a Notion class log'));
     });

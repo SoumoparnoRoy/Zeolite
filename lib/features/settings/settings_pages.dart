@@ -95,7 +95,7 @@ enum SettingsItem {
   Future<void> open(BuildContext context, WidgetRef ref) async {
     switch (this) {
       case importClassLog:
-        return importClassLogFile(context, ref);
+        return importClassLogFile(context);
       case privacy:
         unawaited(launchUrl(WelcomeCopy.privacyUrl,
             mode: LaunchMode.inAppBrowserView));

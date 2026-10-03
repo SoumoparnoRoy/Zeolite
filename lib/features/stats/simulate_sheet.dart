@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
+import '../../core/words.dart';
 import '../../domain/attendance_stats.dart';
 import '../../widgets/common.dart';
 
@@ -66,7 +67,7 @@ class _SimulateSheetState extends State<SimulateSheet> {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: <Widget>[
             Text(
-              then.hasData ? '${then.percent.toStringAsFixed(0)}%' : '—',
+              then.hasData ? Words.percent(then.percent) : '—',
               style: TextStyle(
                 fontSize: AppType.figureSmall,
                 height: 1,
@@ -84,7 +85,7 @@ class _SimulateSheetState extends State<SimulateSheet> {
                     // Until a class is added the big number already is "now".
                     : _attended == 0 && _missed == 0
                         ? 'Where you are now'
-                        : 'Now ${now.percent.toStringAsFixed(0)}%',
+                        : 'Now ${Words.percent(now.percent)}',
                 style:
                     monoStyle(color: p.textTertiary, size: AppType.labelSmall),
               ),

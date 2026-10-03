@@ -78,7 +78,7 @@ class StatsScreen extends ConsumerWidget {
                 final SubjectStats subjectStats = stats.subjects[index];
                 return _SubjectStatsCard(
                   stats: subjectStats,
-                  onTap: () => _showSubjectDetail(context, ref, subjectStats),
+                  onTap: () => _showSubjectDetail(context, subjectStats),
                 );
               },
             ),
@@ -113,7 +113,6 @@ class StatsScreen extends ConsumerWidget {
 
   Future<void> _showSubjectDetail(
     BuildContext context,
-    WidgetRef ref,
     SubjectStats stats,
   ) async {
     await showAppSheet<void>(
@@ -196,7 +195,7 @@ class _OverallHeader extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
             child: Text(
-              'Your portal will say ${stats.termPercent!.round()}% — it counts '
+              'Your portal will say ${Words.percent(stats.termPercent!)} — it counts '
               'the $toCome still to come as missed.',
               style: TextStyle(
                 fontSize: AppType.captionLarge,
@@ -214,7 +213,7 @@ class _OverallHeader extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
             child: Text(
-              'Term ${(settings.termProgress * 100).round()}% done · '
+              'Term ${Words.percent(settings.termProgress * 100)} done · '
               '${Words.plural(settings.daysLeftInTerm, 'day')} left',
               style: TextStyle(
                 fontSize: AppType.captionLarge,
@@ -331,7 +330,7 @@ class _SubjectStatsCard extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                stats.hasData ? '${stats.percent.toStringAsFixed(0)}%' : '—',
+                stats.hasData ? Words.percent(stats.percent) : '—',
                 style: TextStyle(
                   fontSize: AppType.headingLarge,
                   height: 1,
@@ -419,7 +418,7 @@ class _SubjectDetail extends ConsumerWidget {
                 const SizedBox(height: 5),
               ],
               Text(
-                'Target ${(stats.target * 100).round()}%',
+                'Target ${Words.percent(stats.target * 100)}',
                 style: TextStyle(
                   fontSize: AppType.bodySmall,
                   fontWeight: FontWeight.w600,
@@ -519,7 +518,7 @@ class _SubjectDetail extends ConsumerWidget {
         const SizedBox(height: AppSpacing.md),
         Text(
           'Attending every remaining class would put you at '
-          '${(stats.maxAchievableRatio * 100).toStringAsFixed(0)}%.',
+          '${Words.percent(stats.maxAchievableRatio * 100)}.',
           style: TextStyle(
               fontSize: AppType.labelLarge, height: 1.4, color: p.textTertiary),
         ),
@@ -569,7 +568,7 @@ class _SubjectDetail extends ConsumerWidget {
               onPressed: () async {
                 // Open the editor on top first — popping this sheet before
                 // awaiting would unmount the context we need.
-                await showSubjectEditor(context, ref, subject: subject);
+                await showSubjectEditor(context, subject: subject);
                 if (context.mounted) Navigator.of(context).pop();
               },
               icon: const Icon(Icons.edit_outlined, size: 18),

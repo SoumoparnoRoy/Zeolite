@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/app_theme.dart';
 import '../../../core/date_utils.dart';
+import '../../../core/words.dart';
 import '../../../data/models/class_category.dart';
 import '../../../data/models/class_slot.dart';
 import '../../../data/models/extra_class.dart';
@@ -14,6 +15,7 @@ import '../../../widgets/common.dart';
 
 import '../untimed_match_dialog.dart';
 import 'editor_fields.dart';
+import 'subject_picker.dart';
 
 /// Fills one cell of the block grid: choose a subject, how many blocks it runs
 /// for, a room, and whether it repeats every week or happens once.
@@ -23,8 +25,7 @@ import 'editor_fields.dart';
 /// one-off keeps its date for the same reason: the cell you tapped *is* the
 /// date, so offering a picker would let the sheet contradict the grid behind it.
 Future<void> showBlockClassEditor(
-  BuildContext context,
-  WidgetRef ref, {
+  BuildContext context, {
   required DateTime date,
   required int blockIndex,
 }) {
@@ -101,7 +102,7 @@ class _BlockClassFormState extends ConsumerState<_BlockClassForm> {
     final int end = Clock.endFromStart(start, blocks * grid.blockMinutes);
     final String? room = _room.text.trim().isEmpty ? null : _room.text.trim();
 
-    final TimetableData? data = ref.read(timetableProvider).value;
+    final TimetableData? timetable = ref.read(timetableProvider).value;
 
     if (!_repeatsWeekly) {
       final ExtraClass proposed = ExtraClass(
@@ -115,10 +116,10 @@ class _BlockClassFormState extends ConsumerState<_BlockClassForm> {
       );
       // One call covers both halves here: another one-off on this date, and a
       // weekly rule whose window reaches it.
-      if (data != null &&
+      if (timetable != null &&
           ClassClash.forOneOff(
-            slots: data.slots,
-            extras: data.extras,
+            slots: timetable.slots,
+            extras: timetable.extras,
             proposed: proposed,
           )) {
         setState(() {
@@ -141,7 +142,7 @@ class _BlockClassFormState extends ConsumerState<_BlockClassForm> {
       return;
     }
 
-    for (final ClassSlot slot in data?.slots ?? <ClassSlot>[]) {
+    for (final ClassSlot slot in timetable?.slots ?? <ClassSlot>[]) {
       if (slot.subjectId == _subjectId &&
           slot.weekday == widget.date.weekday &&
           slot.startMinutes == start) {
@@ -164,9 +165,9 @@ class _BlockClassFormState extends ConsumerState<_BlockClassForm> {
       startDate: _startDate,
     );
 
-    if (data != null) {
+    if (timetable != null) {
       final DateTime? on =
-          ClassClash.forWeekly(extras: data.extras, proposed: proposed);
+          ClassClash.forWeekly(extras: timetable.extras, proposed: proposed);
       if (on != null) {
         setState(() {
           _error = 'A one-off class for this subject is already in this block '
@@ -247,7 +248,7 @@ class _BlockClassFormState extends ConsumerState<_BlockClassForm> {
             for (int n = 1; n <= maxBlocks && n <= 6; n++)
               DurationChip(
                 minutes: n * grid.blockMinutes,
-                label: '$n ${n == 1 ? 'block' : 'blocks'}',
+                label: Words.plural(n, 'block'),
                 selected: n == effective,
                 onTap: () => setState(() => _blocks = n),
               ),

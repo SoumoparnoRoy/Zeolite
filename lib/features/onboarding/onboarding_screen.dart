@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
+import '../../core/words.dart';
 import '../../data/settings/app_settings.dart';
 import '../../state/providers.dart';
 import '../../widgets/common.dart';
@@ -163,7 +164,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: <Widget>[
                         Text(
-                          '${_target.round()}%',
+                          Words.percent(_target),
                           style: TextStyle(
                             fontSize: AppType.figureSmall,
                             height: 1,
@@ -194,7 +195,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       min: 40,
                       max: 100,
                       divisions: 60,
-                      label: '${_target.round()}%',
+                      label: Words.percent(_target),
                       onChanged: (double v) => setState(() => _target = v),
                     ),
                   ],

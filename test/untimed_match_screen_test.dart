@@ -123,7 +123,7 @@ void main() {
     await tester.pumpWidget(_host(
       (WidgetRef ref) => Builder(
         builder: (BuildContext c) => TextButton(
-          onPressed: () => showSlotEditor(c, ref, slot: _slot(2, 2)),
+          onPressed: () => showSlotEditor(c, slot: _slot(2, 2)),
           child: const Text('open'),
         ),
       ),
@@ -150,7 +150,7 @@ void main() {
     await tester.pumpWidget(_host(
       (WidgetRef ref) => Builder(
         builder: (BuildContext c) => TextButton(
-          onPressed: () => showSlotEditor(c, ref),
+          onPressed: () => showSlotEditor(c),
           child: const Text('open'),
         ),
       ),

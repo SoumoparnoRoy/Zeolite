@@ -406,7 +406,6 @@ class _DayColumn extends ConsumerWidget {
               dimmed: weekend,
               onTap: () => showBlockClassEditor(
                 context,
-                ref,
                 date: date,
                 blockIndex: index,
               ),

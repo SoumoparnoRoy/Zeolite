@@ -41,12 +41,12 @@ class _UntimedMatchScreenState extends ConsumerState<UntimedMatchScreen> {
   @override
   Widget build(BuildContext context) {
     final AppPalette p = context.palette;
-    final TimetableData? data = ref.watch(timetableProvider).value;
+    final TimetableData? timetable = ref.watch(timetableProvider).value;
     final List<UntimedMatch> all = ref.watch(untimedMatchesProvider);
 
     final Map<int, int> untimed = <int, int>{};
     for (final AttendanceRecord record
-        in data?.records ?? const <AttendanceRecord>[]) {
+        in timetable?.records ?? const <AttendanceRecord>[]) {
       if (AttendanceRecord.isTimed(record.startMinutes)) continue;
       untimed[record.subjectId] = (untimed[record.subjectId] ?? 0) + 1;
     }
@@ -57,7 +57,7 @@ class _UntimedMatchScreenState extends ConsumerState<UntimedMatchScreen> {
     }
 
     final List<Subject> subjects = <Subject>[
-      for (final Subject subject in data?.subjects ?? const <Subject>[])
+      for (final Subject subject in timetable?.subjects ?? const <Subject>[])
         if (matchable.containsKey(subject.id)) subject,
     ];
     final String other = subjects.isEmpty ? '' : 'other ';

@@ -5,6 +5,10 @@ linter:
     prefer_single_quotes: true
     unawaited_futures: true
     avoid_redundant_argument_values: false
+    directives_ordering: true
+    no_adjacent_strings_in_list: true
+    prefer_final_locals: true
+    unnecessary_lambdas: true
 
 analyzer:
   errors:

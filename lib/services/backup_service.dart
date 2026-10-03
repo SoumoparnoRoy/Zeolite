@@ -261,7 +261,7 @@ class BackupService {
   Future<void> pruneAutoBackups() async {
     final Directory dir = await getApplicationDocumentsDirectory();
     final Map<String, File> backups = <String, File>{
-      for (final FileSystemEntity e in dir.listSync())
+      await for (final FileSystemEntity e in dir.list())
         if (e is File && p.basename(e.path).startsWith(_filePrefix))
           p.basename(e.path): e,
     };
@@ -269,7 +269,7 @@ class BackupService {
     for (final String name
         in namesToPrune(backups.keys.toList(), keepAutoBackups)) {
       try {
-        backups[name]!.deleteSync();
+        await backups[name]!.delete();
       } catch (_) {
         // A file the OS has locked or the user deleted underneath us is not
         // worth failing a backup over; the next run tries again.

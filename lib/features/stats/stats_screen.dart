@@ -375,6 +375,21 @@ class _SubjectDetail extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        _header(context),
+        const SizedBox(height: AppSpacing.xl),
+        ..._figures(context),
+        const SizedBox(height: AppSpacing.xl),
+        ..._verdict(context),
+        const SizedBox(height: AppSpacing.xl),
+        ..._actions(context, ref),
+      ],
+    );
+  }
+
+  Widget _header(BuildContext context) {
     final AppPalette p = context.palette;
     final Subject subject = stats.subject;
     final String meta = <String>[
@@ -382,203 +397,195 @@ class _SubjectDetail extends ConsumerWidget {
       if (subject.teacher != null && subject.teacher!.isNotEmpty)
         subject.teacher!,
     ].join(' · ');
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Row(
       children: <Widget>[
-        Row(
-          children: <Widget>[
-            SubjectAvatar(
-              initials: subject.initials,
-              color: subject.color,
-              size: 48,
-            ),
-            const SizedBox(width: AppSpacing.lg),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  if (meta.isNotEmpty) ...<Widget>[
-                    Text(
-                      meta,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: monoStyle(color: p.textTertiary, size: 11),
-                    ),
-                    const SizedBox(height: 5),
-                  ],
-                  Text(
-                    'Target ${(stats.target * 100).round()}%',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: p.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.xl),
-        Row(
-          children: <Widget>[
-            Expanded(
-              child: _MetricTile(
-                label: 'Attended',
-                value: '${stats.attended}',
-                color: p.present,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: _MetricTile(
-                label: 'Missed',
-                value: '${stats.held - stats.attended}',
-                color: p.absent,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: _MetricTile(
-                label: 'Cancelled',
-                value: '${stats.cancelled}',
-                color: p.cancelled,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.md),
-        Row(
-          children: <Widget>[
-            Expanded(
-              child: _MetricTile(
-                label: 'Can skip',
-                value: stats.meetsTarget ? '${stats.canSkip}' : '0',
-                color: p.accent,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: _MetricTile(
-                label: 'Must attend',
-                // More than is left in the term, once the target is gone.
-                value: stats.isUnrecoverable ? '—' : '${stats.needToAttend}',
-                color: p.warning,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: _MetricTile(
-                label: 'Left in term',
-                value: '${stats.remainingPlanned}',
-                color: p.cyan,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.xl),
-        SurfaceCard(
-          elevated: false,
-          padding: const EdgeInsets.all(14),
-          child: Row(
+        SubjectAvatar(
+            initials: subject.initials, color: subject.color, size: 48),
+        const SizedBox(width: AppSpacing.lg),
+        Expanded(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Icon(
-                stats.meetsTarget
-                    ? Icons.check_circle_outline_rounded
-                    : Icons.error_outline_rounded,
-                size: 17,
-                color: healthColor(stats.health, p),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Text(
-                  stats.headline,
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    height: 1.4,
-                    fontWeight: FontWeight.w600,
-                    color: p.textPrimary,
-                  ),
+              if (meta.isNotEmpty) ...<Widget>[
+                Text(
+                  meta,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: monoStyle(color: p.textTertiary, size: 11),
+                ),
+                const SizedBox(height: 5),
+              ],
+              Text(
+                'Target ${(stats.target * 100).round()}%',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: p.textSecondary,
                 ),
               ),
             ],
           ),
         ),
-        if (stats.remainingPlanned > 0) ...<Widget>[
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            'Attending every remaining class would put you at '
-            '${(stats.maxAchievableRatio * 100).toStringAsFixed(0)}%.',
-            style: TextStyle(
-              fontSize: 11.5,
-              height: 1.4,
-              color: p.textTertiary,
-            ),
-          ),
+      ],
+    );
+  }
+
+  static Widget _row(List<_MetricTile> tiles) => Row(
+        children: <Widget>[
+          for (final (int i, _MetricTile tile) in tiles.indexed) ...<Widget>[
+            if (i > 0) const SizedBox(width: AppSpacing.sm),
+            Expanded(child: tile),
+          ],
         ],
-        const SizedBox(height: AppSpacing.xl),
-        OutlinedButton.icon(
-          onPressed: () => showSimulateSheet(context, stats),
-          icon: const Icon(Icons.tune_rounded, size: 18),
-          label: const Text('Simulate'),
+      );
+
+  List<Widget> _figures(BuildContext context) {
+    final AppPalette p = context.palette;
+    return <Widget>[
+      _row(<_MetricTile>[
+        _MetricTile(
+          label: 'Attended',
+          value: '${stats.attended}',
+          color: p.present,
         ),
-        const SizedBox(height: AppSpacing.sm),
-        Text(
-          'See where your percentage would land if you attend or miss the '
-          'classes ahead.',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 11.5, height: 1.4, color: p.textTertiary),
+        _MetricTile(
+          label: 'Missed',
+          value: '${stats.held - stats.attended}',
+          color: p.absent,
         ),
-        const SizedBox(height: AppSpacing.lg),
-        OutlinedButton.icon(
-          onPressed: () async {
-            // Same ordering as Edit below: push on top first, because popping
-            // this sheet would unmount the context being navigated from.
-            await Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                settings: const RouteSettings(name: 'attendance_log'),
-                builder: (BuildContext context) =>
-                    AttendanceLogScreen(subject: subject),
-              ),
-            );
-            if (context.mounted) Navigator.of(context).pop();
-          },
-          icon: const Icon(Icons.history_rounded, size: 18),
-          label: const Text('Attendance log'),
+        _MetricTile(
+          label: 'Cancelled',
+          value: '${stats.cancelled}',
+          color: p.cancelled,
         ),
-        const SizedBox(height: AppSpacing.md),
-        Row(
+      ]),
+      const SizedBox(height: AppSpacing.md),
+      _row(<_MetricTile>[
+        _MetricTile(
+          label: 'Can skip',
+          value: stats.meetsTarget ? '${stats.canSkip}' : '0',
+          color: p.accent,
+        ),
+        _MetricTile(
+          label: 'Must attend',
+          // More than is left in the term, once the target is gone.
+          value: stats.isUnrecoverable ? '—' : '${stats.needToAttend}',
+          color: p.warning,
+        ),
+        _MetricTile(
+          label: 'Left in term',
+          value: '${stats.remainingPlanned}',
+          color: p.cyan,
+        ),
+      ]),
+    ];
+  }
+
+  List<Widget> _verdict(BuildContext context) {
+    final AppPalette p = context.palette;
+    return <Widget>[
+      SurfaceCard(
+        elevated: false,
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () async {
-                  // Open the editor on top first — popping this sheet before
-                  // awaiting would unmount the context we need.
-                  await showSubjectEditor(context, ref, subject: subject);
-                  if (context.mounted) Navigator.of(context).pop();
-                },
-                icon: const Icon(Icons.edit_outlined, size: 18),
-                label: const Text('Edit'),
-              ),
+            Icon(
+              stats.meetsTarget
+                  ? Icons.check_circle_outline_rounded
+                  : Icons.error_outline_rounded,
+              size: 17,
+              color: healthColor(stats.health, p),
             ),
             const SizedBox(width: AppSpacing.md),
             Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () => _confirmDelete(context, ref, subject),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: p.absent,
-                  backgroundColor: p.absent.withValues(alpha: 0.1),
+              child: Text(
+                stats.headline,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  height: 1.4,
+                  fontWeight: FontWeight.w600,
+                  color: p.textPrimary,
                 ),
-                icon: const Icon(Icons.delete_outline_rounded, size: 18),
-                label: const Text('Delete'),
               ),
             ),
           ],
         ),
+      ),
+      if (stats.remainingPlanned > 0) ...<Widget>[
+        const SizedBox(height: AppSpacing.md),
+        Text(
+          'Attending every remaining class would put you at '
+          '${(stats.maxAchievableRatio * 100).toStringAsFixed(0)}%.',
+          style: TextStyle(fontSize: 11.5, height: 1.4, color: p.textTertiary),
+        ),
       ],
-    );
+    ];
+  }
+
+  List<Widget> _actions(BuildContext context, WidgetRef ref) {
+    final AppPalette p = context.palette;
+    final Subject subject = stats.subject;
+    return <Widget>[
+      OutlinedButton.icon(
+        onPressed: () => showSimulateSheet(context, stats),
+        icon: const Icon(Icons.tune_rounded, size: 18),
+        label: const Text('Simulate'),
+      ),
+      const SizedBox(height: AppSpacing.sm),
+      Text(
+        'See where your percentage would land if you attend or miss the '
+        'classes ahead.',
+        textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 11.5, height: 1.4, color: p.textTertiary),
+      ),
+      const SizedBox(height: AppSpacing.lg),
+      OutlinedButton.icon(
+        onPressed: () async {
+          // Same ordering as Edit below: push on top first, because popping
+          // this sheet would unmount the context being navigated from.
+          await Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              settings: const RouteSettings(name: 'attendance_log'),
+              builder: (BuildContext context) =>
+                  AttendanceLogScreen(subject: subject),
+            ),
+          );
+          if (context.mounted) Navigator.of(context).pop();
+        },
+        icon: const Icon(Icons.history_rounded, size: 18),
+        label: const Text('Attendance log'),
+      ),
+      const SizedBox(height: AppSpacing.md),
+      Row(
+        children: <Widget>[
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: () async {
+                // Open the editor on top first — popping this sheet before
+                // awaiting would unmount the context we need.
+                await showSubjectEditor(context, ref, subject: subject);
+                if (context.mounted) Navigator.of(context).pop();
+              },
+              icon: const Icon(Icons.edit_outlined, size: 18),
+              label: const Text('Edit'),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: () => _confirmDelete(context, ref, subject),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: p.absent,
+                backgroundColor: p.absent.withValues(alpha: 0.1),
+              ),
+              icon: const Icon(Icons.delete_outline_rounded, size: 18),
+              label: const Text('Delete'),
+            ),
+          ),
+        ],
+      ),
+    ];
   }
 
   Future<void> _confirmDelete(

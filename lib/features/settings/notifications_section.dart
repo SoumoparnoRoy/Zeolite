@@ -22,76 +22,12 @@ class NotificationsSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final AppSettings settings =
         ref.watch(settingsProvider).value ?? const AppSettings();
-    final SettingsController controller = ref.read(settingsProvider.notifier);
-    final bool exactAlarms = ref.watch(exactAlarmsProvider).value ?? true;
     final TrayAccess tray =
         ref.watch(trayAccessProvider).value ?? TrayAccess.open;
-    // Only a type the user has switched on is worth warning about.
-    bool blocked(TrayChannel channel, bool on) =>
-        on && tray.blocksOnly(channel);
-    final bool classesBlocked = blocked(
-      TrayChannel.classes,
-      settings.notifyBeforeClass || settings.notifyAtClassEnd,
-    );
-    final bool eveningBlocked =
-        blocked(TrayChannel.reminders, settings.notifyEveningReminder);
-    final bool alertsBlocked =
-        blocked(TrayChannel.alerts, settings.notifyAttendanceDanger);
-    final bool showInApp = settings.showDangerInApp(
-      alertsReachTray: tray.allows(TrayChannel.alerts),
-    );
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        SurfaceCard(
-          padding: EdgeInsets.zero,
-          child: Column(
-            children: <Widget>[
-              if (settings.notificationsEnabled &&
-                  !tray.appAllowed) ...<Widget>[
-                SettingsRow(
-                  icon: Icons.notifications_off_outlined,
-                  title: 'Blocked in Android settings',
-                  value: 'Nothing reaches your tray — tap to allow',
-                  danger: true,
-                  onTap: () => _allow(ref),
-                ),
-                const Divider(indent: 58),
-              ],
-              SettingsSwitchRow(
-                icon: settings.notificationsEnabled
-                    ? Icons.notifications_outlined
-                    : Icons.notifications_off_outlined,
-                title: 'All notifications',
-                subtitle: settings.notificationsEnabled
-                    ? 'Individual types can be turned off below'
-                    : 'Nothing is sent to your notification tray',
-                value: settings.notificationsEnabled,
-                onChanged: (bool v) async {
-                  if (v) {
-                    await ref.read(notificationsProvider).requestPermissions();
-                  }
-                  await controller
-                      .save(settings.copyWith(notificationsEnabled: v));
-                  await ref.read(actionCoreProvider).reloadAfterImport();
-                },
-              ),
-              const Divider(indent: 58),
-              SettingsSwitchRow(
-                icon: Icons.chat_bubble_outline,
-                title: 'Show alerts in the app',
-                subtitle: showInApp
-                    ? 'Attendance warnings appear here instead'
-                    : 'Used when attendance alerts are switched off',
-                value: settings.inAppAlerts,
-                onChanged: (bool v) async {
-                  await controller.save(settings.copyWith(inAppAlerts: v));
-                },
-              ),
-            ],
-          ),
-        ),
+        _masterCard(ref, settings, tray),
         const SizedBox(height: AppSpacing.md),
         Opacity(
           // The per-type rows stay readable but inert while the master
@@ -99,143 +35,182 @@ class NotificationsSection extends ConsumerWidget {
           opacity: settings.notificationsEnabled ? 1 : 0.4,
           child: IgnorePointer(
             ignoring: !settings.notificationsEnabled,
-            child: SurfaceCard(
-              padding: EdgeInsets.zero,
-              child: Column(
-                children: <Widget>[
-                  SettingsSwitchRow(
-                    icon: Icons.notifications_active_outlined,
-                    title: 'Before each class',
-                    subtitle: classesBlocked && settings.notifyBeforeClass
-                        ? _blockedHere
-                        : '${settings.notifyLeadMinutes} minutes before it starts',
-                    warning: classesBlocked && settings.notifyBeforeClass,
-                    value: settings.notifyBeforeClass,
-                    onChanged: (bool v) async {
-                      if (v) {
-                        await ref
-                            .read(notificationsProvider)
-                            .requestPermissions();
-                      }
-                      await controller
-                          .save(settings.copyWith(notifyBeforeClass: v));
-                      await ref.read(actionCoreProvider).reloadAfterImport();
-                    },
-                    onTapSubtitle: classesBlocked && settings.notifyBeforeClass
-                        ? () => _openChannel(ref, TrayChannel.classes)
-                        : settings.notifyBeforeClass
-                            ? () => _pickLeadTime(
-                                  context,
-                                  controller,
-                                  settings,
-                                  ref,
-                                )
-                            : null,
-                  ),
-                  const Divider(indent: 58),
-                  SettingsSwitchRow(
-                    icon: Icons.task_alt_rounded,
-                    title: 'When each class ends',
-                    subtitle: classesBlocked && settings.notifyAtClassEnd
-                        ? _blockedHere
-                        : 'Mark it from the notification',
-                    warning: classesBlocked && settings.notifyAtClassEnd,
-                    onTapSubtitle: classesBlocked && settings.notifyAtClassEnd
-                        ? () => _openChannel(ref, TrayChannel.classes)
-                        : null,
-                    value: settings.notifyAtClassEnd,
-                    onChanged: (bool v) async {
-                      if (v) {
-                        await ref
-                            .read(notificationsProvider)
-                            .requestPermissions();
-                      }
-                      await controller
-                          .save(settings.copyWith(notifyAtClassEnd: v));
-                      await ref.read(actionCoreProvider).reloadAfterImport();
-                    },
-                  ),
-                  if (settings.classRemindersActive ||
-                      settings.classEndRemindersActive) ...<Widget>[
-                    const Divider(indent: 58),
-                    SettingsRow(
-                      icon: Icons.timer_outlined,
-                      title: 'Exact timing',
-                      value: exactAlarms
-                          ? 'Reminders arrive on the minute'
-                          : 'Off — a reminder can be a few minutes late',
-                      onTap: () => _requestExactAlarms(context, ref),
-                    ),
-                  ],
-                  const Divider(indent: 58),
-                  SettingsSwitchRow(
-                    icon: Icons.edit_calendar_outlined,
-                    title: 'Evening reminder',
-                    subtitle: eveningBlocked
-                        ? _blockedHere
-                        : 'Mark unmarked classes at ${Clock.format(settings.eveningReminderMinutes, use24Hour: settings.use24HourTime)}',
-                    warning: eveningBlocked,
-                    value: settings.notifyEveningReminder,
-                    onChanged: (bool v) async {
-                      if (v) {
-                        await ref
-                            .read(notificationsProvider)
-                            .requestPermissions();
-                      }
-                      await controller
-                          .save(settings.copyWith(notifyEveningReminder: v));
-                      await ref.read(actionCoreProvider).reloadAfterImport();
-                    },
-                    onTapSubtitle: eveningBlocked
-                        ? () => _openChannel(ref, TrayChannel.reminders)
-                        : settings.notifyEveningReminder
-                            ? () => _pickEveningTime(
-                                  context,
-                                  controller,
-                                  settings,
-                                  ref,
-                                )
-                            : null,
-                  ),
-                  const Divider(indent: 58),
-                  SettingsSwitchRow(
-                    icon: Icons.warning_amber_rounded,
-                    title: 'Attendance alerts',
-                    subtitle: alertsBlocked
-                        ? _blockedHere
-                        : settings.showDangerInApp(alertsReachTray: true)
-                            ? 'Off — shown in the app instead'
-                            : 'Warn me when a subject nears the limit',
-                    warning: alertsBlocked,
-                    onTapSubtitle: alertsBlocked
-                        ? () => _openChannel(ref, TrayChannel.alerts)
-                        : null,
-                    value: settings.notifyAttendanceDanger,
-                    onChanged: (bool v) async {
-                      if (v) {
-                        await ref
-                            .read(notificationsProvider)
-                            .requestPermissions();
-                      }
-                      await controller
-                          .save(settings.copyWith(notifyAttendanceDanger: v));
-                      await ref.read(actionCoreProvider).reloadAfterImport();
-                    },
-                  ),
-                ],
-              ),
-            ),
+            child: _typesCard(context, ref, settings, tray),
           ),
         ),
       ],
     );
   }
 
+  /// Every change reschedules, since what is queued in the tray was built from
+  /// the old settings. Turning a type on is when Android is asked.
+  static Future<void> _save(
+    WidgetRef ref,
+    AppSettings next, {
+    bool ask = false,
+  }) async {
+    if (ask) await ref.read(notificationsProvider).requestPermissions();
+    await ref.read(settingsProvider.notifier).save(next);
+    await ref.read(actionCoreProvider).reloadAfterImport();
+  }
+
+  Widget _masterCard(WidgetRef ref, AppSettings settings, TrayAccess tray) {
+    final bool showInApp = settings.showDangerInApp(
+      alertsReachTray: tray.allows(TrayChannel.alerts),
+    );
+    return SurfaceCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: <Widget>[
+          if (settings.notificationsEnabled && !tray.appAllowed) ...<Widget>[
+            SettingsRow(
+              icon: Icons.notifications_off_outlined,
+              title: 'Blocked in Android settings',
+              value: 'Nothing reaches your tray — tap to allow',
+              danger: true,
+              onTap: () => _allow(ref),
+            ),
+            const Divider(indent: 58),
+          ],
+          SettingsSwitchRow(
+            icon: settings.notificationsEnabled
+                ? Icons.notifications_outlined
+                : Icons.notifications_off_outlined,
+            title: 'All notifications',
+            subtitle: settings.notificationsEnabled
+                ? 'Individual types can be turned off below'
+                : 'Nothing is sent to your notification tray',
+            value: settings.notificationsEnabled,
+            onChanged: (bool v) =>
+                _save(ref, settings.copyWith(notificationsEnabled: v), ask: v),
+          ),
+          const Divider(indent: 58),
+          SettingsSwitchRow(
+            icon: Icons.chat_bubble_outline,
+            title: 'Show alerts in the app',
+            subtitle: showInApp
+                ? 'Attendance warnings appear here instead'
+                : 'Used when attendance alerts are switched off',
+            value: settings.inAppAlerts,
+            onChanged: (bool v) => ref
+                .read(settingsProvider.notifier)
+                .save(settings.copyWith(inAppAlerts: v)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _typesCard(
+    BuildContext context,
+    WidgetRef ref,
+    AppSettings settings,
+    TrayAccess tray,
+  ) {
+    final bool exactAlarms = ref.watch(exactAlarmsProvider).value ?? true;
+    // Only a type the user has switched on is worth warning about.
+    bool blocked(TrayChannel channel, bool on) =>
+        on && tray.blocksOnly(channel);
+    final bool beforeBlocked =
+        blocked(TrayChannel.classes, settings.notifyBeforeClass);
+    final bool endBlocked =
+        blocked(TrayChannel.classes, settings.notifyAtClassEnd);
+    final bool eveningBlocked =
+        blocked(TrayChannel.reminders, settings.notifyEveningReminder);
+    final bool alertsBlocked =
+        blocked(TrayChannel.alerts, settings.notifyAttendanceDanger);
+
+    return SurfaceCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: <Widget>[
+          SettingsSwitchRow(
+            icon: Icons.notifications_active_outlined,
+            title: 'Before each class',
+            subtitle: beforeBlocked
+                ? _blockedHere
+                : '${settings.notifyLeadMinutes} minutes before it starts',
+            warning: beforeBlocked,
+            value: settings.notifyBeforeClass,
+            onChanged: (bool v) =>
+                _save(ref, settings.copyWith(notifyBeforeClass: v), ask: v),
+            onTapSubtitle: beforeBlocked
+                ? () => _openChannel(ref, TrayChannel.classes)
+                : settings.notifyBeforeClass
+                    ? () => _pickLeadTime(context, ref, settings)
+                    : null,
+          ),
+          const Divider(indent: 58),
+          SettingsSwitchRow(
+            icon: Icons.task_alt_rounded,
+            title: 'When each class ends',
+            subtitle:
+                endBlocked ? _blockedHere : 'Mark it from the notification',
+            warning: endBlocked,
+            onTapSubtitle: endBlocked
+                ? () => _openChannel(ref, TrayChannel.classes)
+                : null,
+            value: settings.notifyAtClassEnd,
+            onChanged: (bool v) =>
+                _save(ref, settings.copyWith(notifyAtClassEnd: v), ask: v),
+          ),
+          if (settings.classRemindersActive ||
+              settings.classEndRemindersActive) ...<Widget>[
+            const Divider(indent: 58),
+            SettingsRow(
+              icon: Icons.timer_outlined,
+              title: 'Exact timing',
+              value: exactAlarms
+                  ? 'Reminders arrive on the minute'
+                  : 'Off — a reminder can be a few minutes late',
+              onTap: () => _requestExactAlarms(ref),
+            ),
+          ],
+          const Divider(indent: 58),
+          SettingsSwitchRow(
+            icon: Icons.edit_calendar_outlined,
+            title: 'Evening reminder',
+            subtitle: eveningBlocked
+                ? _blockedHere
+                : 'Mark unmarked classes at '
+                    '${Clock.format(settings.eveningReminderMinutes, use24Hour: settings.use24HourTime)}',
+            warning: eveningBlocked,
+            value: settings.notifyEveningReminder,
+            onChanged: (bool v) =>
+                _save(ref, settings.copyWith(notifyEveningReminder: v), ask: v),
+            onTapSubtitle: eveningBlocked
+                ? () => _openChannel(ref, TrayChannel.reminders)
+                : settings.notifyEveningReminder
+                    ? () => _pickEveningTime(context, ref, settings)
+                    : null,
+          ),
+          const Divider(indent: 58),
+          SettingsSwitchRow(
+            icon: Icons.warning_amber_rounded,
+            title: 'Attendance alerts',
+            subtitle: alertsBlocked
+                ? _blockedHere
+                : settings.showDangerInApp(alertsReachTray: true)
+                    ? 'Off — shown in the app instead'
+                    : 'Warn me when a subject nears the limit',
+            warning: alertsBlocked,
+            onTapSubtitle: alertsBlocked
+                ? () => _openChannel(ref, TrayChannel.alerts)
+                : null,
+            value: settings.notifyAttendanceDanger,
+            onChanged: (bool v) => _save(
+                ref, settings.copyWith(notifyAttendanceDanger: v),
+                ask: v),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _pickLeadTime(
     BuildContext context,
-    SettingsController controller,
-    AppSettings settings,
     WidgetRef ref,
+    AppSettings settings,
   ) async {
     const List<int> options = <int>[5, 10, 15, 20, 30, 45, 60];
     final int? picked = await showAppSheet<int>(
@@ -256,15 +231,13 @@ class NotificationsSection extends ConsumerWidget {
       ),
     );
     if (picked == null) return;
-    await controller.save(settings.copyWith(notifyLeadMinutes: picked));
-    await ref.read(actionCoreProvider).reloadAfterImport();
+    await _save(ref, settings.copyWith(notifyLeadMinutes: picked));
   }
 
   Future<void> _pickEveningTime(
     BuildContext context,
-    SettingsController controller,
-    AppSettings settings,
     WidgetRef ref,
+    AppSettings settings,
   ) async {
     final TimeOfDay? picked = await showAppTimePicker(
       context,
@@ -275,12 +248,12 @@ class NotificationsSection extends ConsumerWidget {
       use24Hour: settings.use24HourTime,
     );
     if (picked == null) return;
-    await controller.save(
+    await _save(
+      ref,
       settings.copyWith(
         eveningReminderMinutes: Clock.toMinutes(picked.hour, picked.minute),
       ),
     );
-    await ref.read(actionCoreProvider).reloadAfterImport();
   }
 
   Future<void> _allow(WidgetRef ref) async {
@@ -293,7 +266,7 @@ class NotificationsSection extends ConsumerWidget {
 
   /// Android owns the decision, so the app opens the screen and re-reads the
   /// answer once it closes.
-  Future<void> _requestExactAlarms(BuildContext context, WidgetRef ref) async {
+  Future<void> _requestExactAlarms(WidgetRef ref) async {
     await ref.read(notificationsProvider).requestExactAlarms();
     ref.invalidate(exactAlarmsProvider);
     await ref.read(actionCoreProvider).refreshNotifications();

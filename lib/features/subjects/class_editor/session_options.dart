@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/app_theme.dart';
 import '../../../core/date_utils.dart';
 import '../../../core/words.dart';
-import '../../../data/models/attendance_record.dart';
 import '../../../data/models/attendance_status.dart';
 import '../../../data/models/class_session.dart';
 import '../../../data/models/class_slot.dart';
@@ -29,22 +28,13 @@ Future<void> showSessionEditor(
   ClassSession session,
 ) async {
   final TimetableData? data = ref.read(timetableProvider).value;
-  if (data == null) return;
-
   if (session.slotId != null) {
-    for (final ClassSlot slot in data.slots) {
-      if (slot.id != session.slotId) continue;
-      await showSlotEditor(context, ref, slot: slot);
-      return;
-    }
+    final ClassSlot? slot = data?.slotById(session.slotId);
+    if (slot != null) await showSlotEditor(context, ref, slot: slot);
     return;
   }
-
-  for (final ExtraClass extra in data.extras) {
-    if (extra.id != session.extraClassId) continue;
-    await showExtraClassEditor(context, ref, extra: extra);
-    return;
-  }
+  final ExtraClass? extra = data?.extraById(session.extraClassId);
+  if (extra != null) await showExtraClassEditor(context, ref, extra: extra);
 }
 
 /// The count is the part worth reading, so the dialog names it rather than
@@ -123,235 +113,233 @@ Future<void> showSessionOptions(
   /// The screen behind already carries the status buttons.
   bool marksInline = false,
 }) async {
-  final TimetableData? data = ref.read(timetableProvider).value;
-  ClassSlot? slot;
-  for (final ClassSlot candidate in data?.slots ?? <ClassSlot>[]) {
-    if (candidate.id == session.slotId) slot = candidate;
-  }
-  // Only the marks from the long-pressed date on: the weeks before the cut
-  // keep theirs, so they are not what the warning is about.
-  final int endingMarkCount = slot == null
-      ? 0
-      : (data?.records ?? <AttendanceRecord>[])
-          .where((AttendanceRecord r) =>
-              slot!.covers(r) &&
-              Dates.keyOf(r.date) >= Dates.keyOf(session.date))
-          .length;
-
-  // With nothing marked the two deletes would do the same thing.
-  final int markCount = slot == null
-      ? 0
-      : (data?.records ?? <AttendanceRecord>[]).where(slot.covers).length;
-
-  // Grabbed before the sheet opens: every option below pops it first, so the
-  // undo offer has to be raised through something that outlives the route.
-  final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
-  final ActionCore core = ref.read(actionCoreProvider);
-  final ScheduleActions schedule = ref.read(scheduleActionsProvider);
-  final bool cancelledCounts =
-      ref.read(settingsProvider).value?.cancelledCountsAsAttended ?? false;
-
+  final _SessionOptions options = _SessionOptions(context, ref, session);
   await showAppSheet<void>(
     context: context,
     title: session.subject.name,
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        if (slot != null) ...<Widget>[
-          _OptionTile(
-            icon: Icons.edit_calendar_outlined,
-            title: 'Edit just this class',
-            subtitle: 'Changes the time, room or subject for '
-                '${Dates.formatDayMonth(session.date)} alone. Every other week '
-                'keeps the weekly class as it is.',
-            onTap: () async {
-              Navigator.of(context).pop();
-              await showOccurrenceEditor(
-                context,
-                ref,
-                slot: slot!,
-                date: session.date,
-              );
-            },
-          ),
-          const SizedBox(height: AppSpacing.md),
-        ],
-        if (!tapOpensEditor)
-          _OptionTile(
-            icon: Icons.edit_outlined,
-            title: session.slotId != null
-                ? 'Edit the weekly class'
-                : 'Edit this class',
-            subtitle: session.slotId != null
-                // Only mentioned where it is true, so the promise of "every
-                // week" is not quietly contradicted by a week set by hand.
-                ? 'Changes the day, time, room or subject for every week, '
-                    'including the ones already past.'
-                    '${data?.hasOverridesFor(session.slotId) ?? false ? ' Weeks you edited on their own keep what you set.' : ''}'
-                : 'Changes the date, time, room or subject.',
-            onTap: () async {
-              Navigator.of(context).pop();
-              await showSessionEditor(context, ref, session);
-            },
-          ),
-        if (slot != null) ...<Widget>[
-          const SizedBox(height: AppSpacing.md),
-          _OptionTile(
-            icon: Icons.event_busy_outlined,
-            title: 'Delete just this class',
-            subtitle: session.isMarked
-                ? 'Removes '
-                    '${Dates.formatDayMonth(session.date)} from your timetable, '
-                    'and the mark recorded against it. Every other week stays.'
-                : 'Removes ${Dates.formatDayMonth(session.date)} from your '
-                    'timetable. Every other week stays.',
-            danger: true,
-            onTap: () async {
-              Navigator.of(context).pop();
-              await schedule.skipSlotOn(slot!, session.date);
-              showUndoSnack(
-                messenger,
-                core,
-                '${session.subject.name} on '
-                '${Dates.formatDayMonth(session.date)} removed',
-              );
-            },
-          ),
-        ],
-        // Not on a class already cancelled: the mark toggles, so this would
-        // quietly clear it instead.
-        if (slot == null &&
-            session.status != AttendanceStatus.cancelled) ...<Widget>[
-          const SizedBox(height: AppSpacing.md),
-          _OptionTile(
-            icon: Icons.block_rounded,
-            title: 'Cancel just this class',
-            subtitle: 'Marks ${Dates.formatDayMonth(session.date)} as '
-                'cancelled. ${cancelledCounts ? 'It counts as held and '
-                    'attended, as set in Settings.' : 'It stops counting '
-                    'towards your percentage.'}',
-            onTap: () async {
-              Navigator.of(context).pop();
-              await ref
-                  .read(attendanceActionsProvider)
-                  .mark(session, AttendanceStatus.cancelled);
-            },
-          ),
-        ],
-        if (session.slotId != null) ...<Widget>[
-          const SizedBox(height: AppSpacing.md),
-          _OptionTile(
-            icon: Icons.event_busy_rounded,
-            title: 'Stop repeating from this date',
-            subtitle: endingMarkCount > 0
-                ? 'Stops the class from '
-                    '${Dates.formatDayMonth(session.date)}, this one included, '
-                    'along with the '
-                    '${Words.plural(endingMarkCount, 'mark')} recorded from '
-                    'then on. Earlier weeks keep theirs.'
-                : 'Stops the class from '
-                    '${Dates.formatDayMonth(session.date)}, this one included. '
-                    'Earlier weeks are kept, and so is everything already '
-                    'recorded.',
-            onTap: () async {
-              if (endingMarkCount > 0) {
-                final bool confirmed = await _confirmEndWithMarks(
-                  context,
-                  session.subject.name,
-                  Dates.formatDayMonth(session.date),
-                  endingMarkCount,
-                );
-                if (!confirmed || !context.mounted) return;
-              }
-              Navigator.of(context).pop();
-              if (slot != null && endingMarkCount > 0) {
-                await schedule.endSlotFromAndClearMarks(slot, session.date);
-              } else {
-                await schedule.endSlotFrom(session.slotId!, session.date);
-              }
-              showUndoSnack(
-                messenger,
-                core,
-                endingMarkCount > 0
-                    ? '${session.subject.name} stops repeating from '
-                        '${Dates.formatDayMonth(session.date)}, and its '
-                        '${Words.plural(endingMarkCount, 'mark')} from then '
-                        'on are gone'
-                    : '${session.subject.name} stops repeating from '
-                        '${Dates.formatDayMonth(session.date)}',
-              );
-            },
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _OptionTile(
-            icon: Icons.delete_outline_rounded,
-            title: 'Delete this weekly class',
-            subtitle: markCount > 0
-                ? 'Removes the class from every week, past ones included, '
-                    'along with the ${Words.plural(markCount, 'mark')} '
-                    'recorded against it. Your percentage will change.'
-                : 'Removes the class from every week, past ones included.',
-            danger: true,
-            onTap: () async {
-              if (markCount > 0) {
-                final bool confirmed = await _confirmDeleteWithMarks(
-                  context,
-                  session.subject.name,
-                  markCount,
-                );
-                if (!confirmed || !context.mounted) return;
-              }
-              Navigator.of(context).pop();
-              if (slot != null) {
-                await schedule.deleteSlotAndMarks(slot);
-              } else {
-                await schedule.deleteSlot(session.slotId!);
-              }
-              showUndoSnack(
-                messenger,
-                core,
-                markCount > 0
-                    ? 'Weekly ${session.subject.name} and its '
-                        '${Words.plural(markCount, 'mark')} deleted'
-                    : 'Weekly ${session.subject.name} deleted',
-              );
-            },
-          ),
-        ],
-        if (session.extraClassId != null) ...<Widget>[
-          const SizedBox(height: AppSpacing.md),
-          _OptionTile(
-            icon: Icons.delete_outline_rounded,
-            title: 'Delete this one-off class',
-            subtitle: 'Removes it from your timetable.',
-            danger: true,
-            onTap: () async {
-              Navigator.of(context).pop();
-              await schedule.deleteExtraClass(session.extraClassId!);
-              showUndoSnack(
-                messenger,
-                core,
-                'One-off ${session.subject.name} deleted',
-              );
-            },
-          ),
-        ],
-        if (session.isMarked && !marksInline) ...<Widget>[
-          const SizedBox(height: AppSpacing.md),
-          _OptionTile(
-            icon: Icons.undo_rounded,
-            title: 'Clear the mark',
-            subtitle: 'Sets this class back to unmarked.',
-            onTap: () async {
-              Navigator.of(context).pop();
-              await ref.read(attendanceActionsProvider).clearMark(session);
-              showUndoSnack(messenger, core, 'Mark cleared');
-            },
-          ),
+        for (final (int i, Widget tile) in options
+            .tiles(tapOpensEditor: tapOpensEditor, marksInline: marksInline)
+            .indexed) ...<Widget>[
+          if (i > 0) const SizedBox(height: AppSpacing.md),
+          tile,
         ],
       ],
     ),
   );
+}
+
+/// What the sheet offers for one class, and what each choice does.
+///
+/// Everything is read when the sheet opens. Every choice pops the sheet first,
+/// so the undo offer is raised through a messenger that outlives the route.
+class _SessionOptions {
+  _SessionOptions(this.context, this.ref, this.session)
+      : data = ref.read(timetableProvider).value,
+        messenger = ScaffoldMessenger.of(context),
+        core = ref.read(actionCoreProvider),
+        schedule = ref.read(scheduleActionsProvider) {
+    slot = data?.slotById(session.slotId);
+  }
+
+  final BuildContext context;
+  final WidgetRef ref;
+  final ClassSession session;
+  final TimetableData? data;
+  final ScaffoldMessengerState messenger;
+  final ActionCore core;
+  final ScheduleActions schedule;
+  late final ClassSlot? slot;
+
+  String get _day => Dates.formatDayMonth(session.date);
+  String get _name => session.subject.name;
+
+  /// Only the marks from the long-pressed date on: the weeks before the cut
+  /// keep theirs, so they are not what the warning is about.
+  late final int _endingMarks =
+      slot == null ? 0 : data!.marksCoveredBy(slot!, from: session.date);
+
+  /// With nothing marked the two deletes would do the same thing.
+  late final int _allMarks = slot == null ? 0 : data!.marksCoveredBy(slot!);
+
+  List<Widget> tiles({
+    required bool tapOpensEditor,
+    required bool marksInline,
+  }) =>
+      <Widget>[
+        if (slot != null) _editThisOne(),
+        if (!tapOpensEditor) _editTheClass(),
+        if (slot != null) _deleteThisOne(),
+        // Not on a class already cancelled: the mark toggles, so this would
+        // quietly clear it instead.
+        if (slot == null && session.status != AttendanceStatus.cancelled)
+          _cancelThisOne(),
+        if (session.slotId != null) ...<Widget>[
+          _stopRepeating(),
+          _deleteWeekly(),
+        ],
+        if (session.extraClassId != null) _deleteOneOff(),
+        if (session.isMarked && !marksInline) _clearMark(),
+      ];
+
+  Widget _editThisOne() => _OptionTile(
+        icon: Icons.edit_calendar_outlined,
+        title: 'Edit just this class',
+        subtitle: 'Changes the time, room or subject for $_day alone. Every '
+            'other week keeps the weekly class as it is.',
+        onTap: () async {
+          Navigator.of(context).pop();
+          await showOccurrenceEditor(
+            context,
+            ref,
+            slot: slot!,
+            date: session.date,
+          );
+        },
+      );
+
+  Widget _editTheClass() {
+    final bool weekly = session.slotId != null;
+    // Only mentioned where it is true, so the promise of "every week" is not
+    // quietly contradicted by a week set by hand.
+    final bool editedWeeks = data?.hasOverridesFor(session.slotId) ?? false;
+    return _OptionTile(
+      icon: Icons.edit_outlined,
+      title: weekly ? 'Edit the weekly class' : 'Edit this class',
+      subtitle: weekly
+          ? 'Changes the day, time, room or subject for every week, including '
+              'the ones already past.'
+              '${editedWeeks ? ' Weeks you edited on their own keep what you set.' : ''}'
+          : 'Changes the date, time, room or subject.',
+      onTap: () async {
+        Navigator.of(context).pop();
+        await showSessionEditor(context, ref, session);
+      },
+    );
+  }
+
+  Widget _deleteThisOne() => _OptionTile(
+        icon: Icons.event_busy_outlined,
+        title: 'Delete just this class',
+        subtitle: session.isMarked
+            ? 'Removes $_day from your timetable, and the mark recorded '
+                'against it. Every other week stays.'
+            : 'Removes $_day from your timetable. Every other week stays.',
+        danger: true,
+        onTap: () async {
+          Navigator.of(context).pop();
+          await schedule.skipSlotOn(slot!, session.date);
+          showUndoSnack(messenger, core, '$_name on $_day removed');
+        },
+      );
+
+  Widget _cancelThisOne() {
+    final bool cancelledCounts =
+        ref.read(settingsProvider).value?.cancelledCountsAsAttended ?? false;
+    return _OptionTile(
+      icon: Icons.block_rounded,
+      title: 'Cancel just this class',
+      subtitle: 'Marks $_day as cancelled. ${cancelledCounts ? 'It counts as '
+          'held and attended, as set in Settings.' : 'It stops counting '
+          'towards your percentage.'}',
+      onTap: () async {
+        Navigator.of(context).pop();
+        await ref
+            .read(attendanceActionsProvider)
+            .mark(session, AttendanceStatus.cancelled);
+      },
+    );
+  }
+
+  Widget _stopRepeating() => _OptionTile(
+        icon: Icons.event_busy_rounded,
+        title: 'Stop repeating from this date',
+        subtitle: _endingMarks > 0
+            ? 'Stops the class from $_day, this one included, along with the '
+                '${Words.plural(_endingMarks, 'mark')} recorded from then on. '
+                'Earlier weeks keep theirs.'
+            : 'Stops the class from $_day, this one included. Earlier weeks '
+                'are kept, and so is everything already recorded.',
+        onTap: () async {
+          if (_endingMarks > 0) {
+            final bool confirmed =
+                await _confirmEndWithMarks(context, _name, _day, _endingMarks);
+            if (!confirmed || !context.mounted) return;
+          }
+          Navigator.of(context).pop();
+          if (slot != null && _endingMarks > 0) {
+            await schedule.endSlotFromAndClearMarks(slot!, session.date);
+          } else {
+            await schedule.endSlotFrom(session.slotId!, session.date);
+          }
+          showUndoSnack(
+            messenger,
+            core,
+            _endingMarks > 0
+                ? '$_name stops repeating from $_day, and its '
+                    '${Words.plural(_endingMarks, 'mark')} from then on are '
+                    'gone'
+                : '$_name stops repeating from $_day',
+          );
+        },
+      );
+
+  Widget _deleteWeekly() => _OptionTile(
+        icon: Icons.delete_outline_rounded,
+        title: 'Delete this weekly class',
+        subtitle: _allMarks > 0
+            ? 'Removes the class from every week, past ones included, along '
+                'with the ${Words.plural(_allMarks, 'mark')} recorded against '
+                'it. Your percentage will change.'
+            : 'Removes the class from every week, past ones included.',
+        danger: true,
+        onTap: () async {
+          if (_allMarks > 0) {
+            final bool confirmed =
+                await _confirmDeleteWithMarks(context, _name, _allMarks);
+            if (!confirmed || !context.mounted) return;
+          }
+          Navigator.of(context).pop();
+          if (slot != null) {
+            await schedule.deleteSlotAndMarks(slot!);
+          } else {
+            await schedule.deleteSlot(session.slotId!);
+          }
+          showUndoSnack(
+            messenger,
+            core,
+            _allMarks > 0
+                ? 'Weekly $_name and its '
+                    '${Words.plural(_allMarks, 'mark')} deleted'
+                : 'Weekly $_name deleted',
+          );
+        },
+      );
+
+  Widget _deleteOneOff() => _OptionTile(
+        icon: Icons.delete_outline_rounded,
+        title: 'Delete this one-off class',
+        subtitle: 'Removes it from your timetable.',
+        danger: true,
+        onTap: () async {
+          Navigator.of(context).pop();
+          await schedule.deleteExtraClass(session.extraClassId!);
+          showUndoSnack(messenger, core, 'One-off $_name deleted');
+        },
+      );
+
+  Widget _clearMark() => _OptionTile(
+        icon: Icons.undo_rounded,
+        title: 'Clear the mark',
+        subtitle: 'Sets this class back to unmarked.',
+        onTap: () async {
+          Navigator.of(context).pop();
+          await ref.read(attendanceActionsProvider).clearMark(session);
+          showUndoSnack(messenger, core, 'Mark cleared');
+        },
+      );
 }
 
 class _OptionTile extends StatelessWidget {

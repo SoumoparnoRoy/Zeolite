@@ -293,6 +293,30 @@ class TimetableData {
     }
     return null;
   }
+
+  ClassSlot? slotById(int? id) {
+    if (id == null) return null;
+    for (final ClassSlot slot in slots) {
+      if (slot.id == id) return slot;
+    }
+    return null;
+  }
+
+  ExtraClass? extraById(int? id) {
+    if (id == null) return null;
+    for (final ExtraClass extra in extras) {
+      if (extra.id == id) return extra;
+    }
+    return null;
+  }
+
+  /// The marks a weekly class owns, from [from] on when given — what deleting
+  /// it or cutting it short would take with it.
+  int marksCoveredBy(ClassSlot slot, {DateTime? from}) => records
+      .where((AttendanceRecord r) =>
+          slot.covers(r) &&
+          (from == null || Dates.keyOf(r.date) >= Dates.keyOf(from)))
+      .length;
 }
 
 /// Reads the whole timetable. Datasets here are small — a term is a few

@@ -118,7 +118,7 @@ class ActionCore {
   int? _mergeUndoToken;
   String? _mergeUndoTarget;
 
-  // undo ---------------------------------------------------------------------
+  // Undo
 
   int? get pendingUndoToken => _undo.pendingToken;
 

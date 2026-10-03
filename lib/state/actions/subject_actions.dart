@@ -16,7 +16,7 @@ class SubjectActions {
 
   final ActionCore _core;
 
-  // categories -------------------------------------------------------------
+  // Categories
 
   Future<int> addCategory(ClassCategory category) async {
     final int id = await _core.repo.insertCategory(category);
@@ -39,7 +39,7 @@ class SubjectActions {
   Future<int> countSubjectsInCategory(int id) =>
       _core.repo.countSubjectsInCategory(id);
 
-  // rooms ------------------------------------------------------------------
+  // Rooms
 
   Future<int> addRoom(Room room) async {
     final int id = await _core.repo.insertRoom(room);
@@ -59,7 +59,7 @@ class SubjectActions {
     await _core.refresh();
   }
 
-  // subjects ---------------------------------------------------------------
+  // Subjects
 
   Future<int> addSubject(Subject subject) async {
     final int id = await _core.repo.insertSubject(subject);
@@ -79,7 +79,7 @@ class SubjectActions {
     _core.arm(before);
   }
 
-  // tags --------------------------------------------------------------------
+  // Tags
 
   Future<int> addTag(Tag tag) async {
     final int id = await _core.repo.insertTag(tag);

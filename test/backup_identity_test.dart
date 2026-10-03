@@ -7,7 +7,16 @@ import 'package:shared_preferences_platform_interface/shared_preferences_async_p
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:zeolite/data/db/app_database.dart';
 import 'package:zeolite/data/db/zeolite_repository.dart';
+import 'package:zeolite/data/models/attendance_record.dart';
+import 'package:zeolite/data/models/attendance_status.dart';
+import 'package:zeolite/data/models/class_category.dart';
+import 'package:zeolite/data/models/class_slot.dart';
+import 'package:zeolite/data/models/extra_class.dart';
+import 'package:zeolite/data/models/holiday.dart';
+import 'package:zeolite/data/models/room.dart';
+import 'package:zeolite/data/models/slot_override.dart';
 import 'package:zeolite/data/models/subject.dart';
+import 'package:zeolite/data/models/tag.dart';
 import 'package:zeolite/data/settings/app_settings.dart';
 import 'package:zeolite/services/backup_service.dart';
 
@@ -125,5 +134,88 @@ void main() {
       (await repository.getSubjects()).map((Subject subject) => subject.name),
       <String>['Keep me'],
     );
+  });
+
+  test('a restore brings back every column, not just the ones it names',
+      () async {
+    final ZeoliteRepository source = await repoAt('full');
+    final int lab = await source.insertCategory(
+      const ClassCategory(name: 'Lab', defaultDurationMinutes: 120, weight: 2),
+    );
+    await source.insertRoom(const Room(name: 'Room 1'));
+    final int proxy = await source.insertTag(const Tag(name: 'Proxy'));
+    final int subject = await source.insertSubject(
+      Subject(
+        name: 'Subject 1',
+        code: 'AAA1001',
+        colorValue: 0xFF336699,
+        categoryId: lab,
+        priorHeld: 4,
+        priorAttended: 3,
+        expectedTotal: 40,
+      ),
+    );
+    final int slot = await source.insertSlot(
+      ClassSlot(
+        subjectId: subject,
+        weekday: 1,
+        startMinutes: 540,
+        endMinutes: 660,
+        room: 'Room 1',
+        weight: 2,
+        categoryId: lab,
+        startDate: DateTime(2026, 7, 13),
+      ),
+    );
+    await source.insertSlotOverrides(<SlotOverride>[
+      SlotOverride(slotId: slot, date: DateTime(2026, 7, 20), room: 'Room 2'),
+    ]);
+    await source.insertExtraClass(
+      ExtraClass(
+        subjectId: subject,
+        date: DateTime(2026, 7, 22),
+        startMinutes: 600,
+        endMinutes: 660,
+        note: 'Make-up',
+      ),
+    );
+    await source.setManyAttendance(<AttendanceRecord>[
+      AttendanceRecord(
+        subjectId: subject,
+        date: DateTime(2026, 7, 13),
+        startMinutes: 540,
+        status: AttendanceStatus.present,
+        weight: 2,
+        categoryId: lab,
+        tagId: proxy,
+        note: 'Signed late',
+        markedAt: DateTime(2026, 7, 13, 11),
+      ),
+    ]);
+    await source.insertHoliday(
+      Holiday(date: DateTime(2026, 8, 15), name: 'Holiday 1'),
+    );
+
+    final String first =
+        await BackupService(source, SettingsService()).exportToJsonString();
+    final ZeoliteRepository target = await repoAt('copy');
+    await BackupService(target, SettingsService()).importFromJsonString(first);
+    final String second =
+        await BackupService(target, SettingsService()).exportToJsonString();
+
+    // Ids are reissued on the way in, so only they may differ. Anything else
+    // that changes is a column the restore did not carry.
+    Object? withoutIds(Object? node) => switch (node) {
+          Map<String, Object?> map => <String, Object?>{
+              for (final MapEntry<String, Object?> e in map.entries)
+                if (e.key != 'id' &&
+                    !e.key.endsWith('_id') &&
+                    e.key != 'exportedAt')
+                  e.key: withoutIds(e.value),
+            },
+          List<Object?> list => list.map(withoutIds).toList(),
+          _ => node,
+        };
+    expect(withoutIds(jsonDecode(second)), withoutIds(jsonDecode(first)));
   });
 }

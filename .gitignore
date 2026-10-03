@@ -1,4 +1,4 @@
-# ---------------------------------------------------------------- Flutter/Dart
+# Flutter/Dart
 .dart_tool/
 .packages
 .pub-cache/
@@ -13,7 +13,7 @@ doc/api/
 # pubspec.lock IS committed. This is an application, not a package — pinning
 # resolved versions is what makes a clone build the same way this one does.
 
-# ------------------------------------------------------------------------- IDE
+# IDE
 .idea/
 .vscode/
 *.iml
@@ -22,7 +22,7 @@ doc/api/
 *.swp
 *~
 
-# --------------------------------------------------------------------- Android
+# Android
 android/.gradle/
 android/captures/
 android/local.properties
@@ -33,7 +33,7 @@ android/app/release/
 android/.cxx/
 android/.kotlin/
 
-# ------------------------------------------------ Signing / secrets / env
+# Signing / secrets / env
 # Never commit these. Anything matching is a private key or a credential.
 *.jks
 *.keystore
@@ -51,13 +51,13 @@ secrets.dart
 **/GoogleService-Info.plist
 **/firebase_options.dart
 
-# --------------------------------------------- Desktop/web generated output
+# Desktop/web generated output
 windows/flutter/ephemeral/
 linux/flutter/ephemeral/
 macos/Flutter/ephemeral/
 ios/Flutter/ephemeral/
 
-# ------------------------------------------------------------- Local scratch
+# Editor and tool leftovers
 # Leftover hooks from a VS Code Java-modernization extension, unrelated to this
 # Flutter project.
 .github/modernize/
@@ -65,7 +65,7 @@ ios/Flutter/ephemeral/
 # Firebase CLI deploy cache — regenerated on every `firebase deploy`.
 .firebase/
 
-# --------------------------------------------------------------- OS noise
+# OS noise
 .DS_Store
 Thumbs.db
 desktop.ini

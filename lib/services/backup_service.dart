@@ -154,7 +154,7 @@ class BackupService {
   /// old ones are deleted rather than left to grow for the life of the install.
   static const int keepAutoBackups = 5;
 
-  // ------------------------------------------------------------ auto backup
+  // Automatic backups
 
   /// Whether an automatic backup is due. Separate from the writing so it can be
   /// tested without a filesystem, and so the caller skips the export entirely —
@@ -309,283 +309,33 @@ class BackupService {
       // subject uuid and one before v9 no slot uuid, and the identities
       // already on this device are the only place left to recover one from
       // once the tables are empty.
-      final List<Subject> existing = await _repo.getSubjects();
-      final List<ClassSlot> existingSlots = await _repo.getSlots();
-      final List<ExtraClass> existingExtras = await _repo.getExtraClasses();
-      final Map<int, String> existingSubjectUuid = <int, String>{
-        for (final Subject s in existing)
-          if (s.id != null && s.uuid != null) s.id!: s.uuid!,
-      };
+      final _Existing existing = _Existing(
+        subjects: await _repo.getSubjects(),
+        slots: await _repo.getSlots(),
+        extras: await _repo.getExtraClasses(),
+      );
 
       originalSettings = await _settingsService.load();
       final AppSettings? settings = await _repo.transaction(
         (ZeoliteRepository repository) async {
           await repository.clearAll();
-
-          // Old id -> newly assigned id, for categories, subjects and tags.
-          final Map<int, int> categoryIdMap = <int, int>{};
-          final Map<int, int> subjectIdMap = <int, int>{};
-          final Map<int, int> tagIdMap = <int, int>{};
-
-          for (final Object? raw
-              in (data['categories'] as List<Object?>?) ?? const <Object?>[]) {
-            if (raw is! Map) continue;
-            final Map<String, Object?> map = Map<String, Object?>.from(raw);
-            final int? oldId = (map['id'] as num?)?.toInt();
-            final ClassCategory category = ClassCategory.fromMap(map);
-            final int newId = await repository.insertCategory(
-              ClassCategory(
-                name: category.name,
-                defaultDurationMinutes: category.defaultDurationMinutes,
-                createdAt: category.createdAt,
-              ),
-            );
-            if (oldId != null) categoryIdMap[oldId] = newId;
-          }
-
-          // Nothing references a room by id, so these need no id remapping.
-          for (final Object? raw
-              in (data['rooms'] as List<Object?>?) ?? const <Object?>[]) {
-            if (raw is! Map) continue;
-            final Room room = Room.fromMap(Map<String, Object?>.from(raw));
-            await repository.insertRoom(Room(name: room.name));
-          }
-
-          // Tags do need remapping — `attendance.tag_id` points at one. Restored
-          // before the marks that reference them, so the ids exist by then.
-          for (final Object? raw
-              in (data['tags'] as List<Object?>?) ?? const <Object?>[]) {
-            if (raw is! Map) continue;
-            final Map<String, Object?> map = Map<String, Object?>.from(raw);
-            final int? oldId = (map['id'] as num?)?.toInt();
-            final Tag tag = Tag.fromMap(map);
-            final int newId = await repository.insertTag(Tag(name: tag.name));
-            if (oldId != null) tagIdMap[oldId] = newId;
-          }
-
-          final List<int?> subjectOldIds = <int?>[];
-          final List<Subject> restored = <Subject>[];
-          for (final Object? raw
-              in (data['subjects'] as List<Object?>?) ?? const <Object?>[]) {
-            if (raw is! Map) continue;
-            final Map<String, Object?> map = Map<String, Object?>.from(raw);
-            subjectOldIds.add((map['id'] as num?)?.toInt());
-            restored.add(Subject.fromMap(map));
-          }
-
-          final Map<int, String> adopted = matchByKey(
-            unknown: <RowIdentity>[
-              for (final Subject s in restored)
-                // A file that already carries uuids needs no matching, and must
-                // not be re-pointed at whatever this device filed the code under.
-                RowIdentity(key: s.uuid == null ? subjectKey(s.code) : null),
-            ],
-            known: <RowIdentity>[
-              for (final Subject s in existing)
-                RowIdentity(key: subjectKey(s.code), uuid: s.uuid),
-            ],
-          );
-
-          for (int i = 0; i < restored.length; i++) {
-            final Subject subject = restored[i];
-            final int? oldId = subjectOldIds[i];
-            final int newId = await repository.insertSubject(
-              Subject(
-                // Carried through, not reissued: a restore onto a second device
-                // has to land on the same uuid or the subject syncs as two. An
-                // older file has none, so it takes the one held for its code.
-                uuid: subject.uuid ?? adopted[i],
-                name: subject.name,
-                code: subject.code,
-                teacher: subject.teacher,
-                colorValue: subject.colorValue,
-                targetPercent: subject.targetPercent,
-                categoryId: subject.categoryId == null
-                    ? null
-                    : categoryIdMap[subject.categoryId],
-                createdAt: subject.createdAt,
-                updatedAt: subject.updatedAt,
-                priorHeld: subject.priorHeld,
-                priorAttended: subject.priorAttended,
-                expectedTotal: subject.expectedTotal,
-              ),
-            );
-            if (oldId != null) subjectIdMap[oldId] = newId;
-          }
-
-          // Read back so a slot is keyed on the uuid its subject ended up with,
-          // whether that was adopted just now or issued on insert.
-          final Map<int, String> subjectUuidById = <int, String>{
+          final _IdMaps ids = _IdMaps();
+          // In this order: each table points at rows of the ones before it.
+          await _restoreCategories(repository, data, ids);
+          await _restoreRooms(repository, data);
+          await _restoreTags(repository, data, ids);
+          await _restoreSubjects(repository, data, ids, existing);
+          // Read back so a slot is keyed on the uuid its subject ended up
+          // with, whether that was adopted just now or issued on insert.
+          final Map<int, String> subjectUuids = <int, String>{
             for (final Subject s in await repository.getSubjects())
               if (s.id != null && s.uuid != null) s.id!: s.uuid!,
           };
-
-          final List<ClassSlot> restoredSlots = <ClassSlot>[];
-          for (final Object? raw
-              in (data['slots'] as List<Object?>?) ?? const <Object?>[]) {
-            if (raw is! Map) continue;
-            final ClassSlot slot =
-                ClassSlot.fromMap(Map<String, Object?>.from(raw));
-            if (subjectIdMap[slot.subjectId] == null) continue;
-            restoredSlots.add(slot);
-          }
-
-          final Map<int, String> adoptedSlots = matchByKey(
-            unknown: <RowIdentity>[
-              for (final ClassSlot s in restoredSlots)
-                RowIdentity(
-                  key: s.uuid != null
-                      ? null
-                      : slotKey(subjectUuidById[subjectIdMap[s.subjectId]],
-                          s.weekday, s.startMinutes),
-                ),
-            ],
-            known: <RowIdentity>[
-              for (final ClassSlot s in existingSlots)
-                RowIdentity(
-                  key: slotKey(existingSubjectUuid[s.subjectId], s.weekday,
-                      s.startMinutes),
-                  uuid: s.uuid,
-                ),
-            ],
-          );
-
-          // The backup's slot ids mean nothing here — SQLite assigns new ones — so
-          // the overrides that point at them are remapped through this.
-          final Map<int, int> slotIdMap = <int, int>{};
-          for (int i = 0; i < restoredSlots.length; i++) {
-            final ClassSlot slot = restoredSlots[i];
-            // Rebuilt without an id so SQLite assigns a fresh primary key. The
-            // uuid is not an id in that sense and has to survive, or the rule
-            // comes back as a second class beside the one the account holds.
-            final int newSlotId = await repository.insertSlot(
-              ClassSlot(
-                uuid: slot.uuid ?? adoptedSlots[i],
-                subjectId: subjectIdMap[slot.subjectId]!,
-                weekday: slot.weekday,
-                startMinutes: slot.startMinutes,
-                endMinutes: slot.endMinutes,
-                room: slot.room,
-                weight: slot.weight,
-                categoryId: slot.categoryId == null
-                    ? null
-                    : categoryIdMap[slot.categoryId],
-                startDate: slot.startDate,
-                endDate: slot.endDate,
-              ),
-            );
-            if (slot.id != null) slotIdMap[slot.id!] = newSlotId;
-          }
-
-          final List<SlotOverride> restoredOverrides = <SlotOverride>[];
-          for (final Object? raw in (data['slotOverrides'] as List<Object?>?) ??
-              const <Object?>[]) {
-            if (raw is! Map) continue;
-            final SlotOverride override =
-                SlotOverride.fromMap(Map<String, Object?>.from(raw));
-            final int? slotId = slotIdMap[override.slotId];
-            // A rule the restore dropped takes its exceptions with it: an override
-            // with no slot is a foreign key pointing nowhere.
-            if (slotId == null) continue;
-            restoredOverrides.add(
-              override.copyWith(
-                id: null,
-                slotId: slotId,
-                subjectId: override.subjectId == null
-                    ? null
-                    : subjectIdMap[override.subjectId!],
-              ),
-            );
-          }
-          await repository.insertSlotOverrides(restoredOverrides);
-
-          final List<ExtraClass> restoredExtras = <ExtraClass>[];
-          for (final Object? raw in (data['extraClasses'] as List<Object?>?) ??
-              const <Object?>[]) {
-            if (raw is! Map) continue;
-            final ExtraClass extra =
-                ExtraClass.fromMap(Map<String, Object?>.from(raw));
-            if (subjectIdMap[extra.subjectId] == null) continue;
-            restoredExtras.add(extra);
-          }
-
-          final Map<int, String> adoptedExtras = matchByKey(
-            unknown: <RowIdentity>[
-              for (final ExtraClass e in restoredExtras)
-                RowIdentity(
-                  key: e.uuid != null
-                      ? null
-                      : extraKey(subjectUuidById[subjectIdMap[e.subjectId]],
-                          Dates.keyOf(e.date), e.startMinutes),
-                ),
-            ],
-            known: <RowIdentity>[
-              for (final ExtraClass e in existingExtras)
-                RowIdentity(
-                  key: extraKey(existingSubjectUuid[e.subjectId],
-                      Dates.keyOf(e.date), e.startMinutes),
-                  uuid: e.uuid,
-                ),
-            ],
-          );
-
-          for (int i = 0; i < restoredExtras.length; i++) {
-            final ExtraClass extra = restoredExtras[i];
-            await repository.insertExtraClass(
-              ExtraClass(
-                uuid: extra.uuid ?? adoptedExtras[i],
-                subjectId: subjectIdMap[extra.subjectId]!,
-                date: extra.date,
-                startMinutes: extra.startMinutes,
-                endMinutes: extra.endMinutes,
-                room: extra.room,
-                categoryId: extra.categoryId == null
-                    ? null
-                    : categoryIdMap[extra.categoryId],
-                weight: extra.weight,
-                note: extra.note,
-              ),
-            );
-          }
-
-          final List<AttendanceRecord> records = <AttendanceRecord>[];
-          for (final Object? raw
-              in (data['attendance'] as List<Object?>?) ?? const <Object?>[]) {
-            if (raw is! Map) continue;
-            final Map<String, Object?> map = Map<String, Object?>.from(raw);
-            final AttendanceRecord record = AttendanceRecord.fromMap(map);
-            final int? subjectId = subjectIdMap[record.subjectId];
-            if (subjectId == null) continue;
-            records.add(
-              AttendanceRecord(
-                subjectId: subjectId,
-                date: record.date,
-                startMinutes: record.startMinutes,
-                status: record.status,
-                weight: record.weight,
-                categoryId: record.categoryId == null
-                    ? null
-                    : categoryIdMap[record.categoryId],
-                // An unknown tag id drops to null rather than failing the import.
-                // The mark is the data worth keeping; the label is not worth
-                // rejecting a whole backup over.
-                tagId: record.tagId == null ? null : tagIdMap[record.tagId],
-                note: record.note,
-                markedAt: record.markedAt,
-              ),
-            );
-          }
-          await repository.setManyAttendance(records);
-
-          for (final Object? raw
-              in (data['holidays'] as List<Object?>?) ?? const <Object?>[]) {
-            if (raw is! Map) continue;
-            final Map<String, Object?> map = Map<String, Object?>.from(raw);
-            final Holiday holiday = Holiday.fromMap(map);
-            await repository.insertHoliday(
-              Holiday(date: holiday.date, name: holiday.name),
-            );
-          }
+          await _restoreSlots(repository, data, ids, existing, subjectUuids);
+          await _restoreOverrides(repository, data, ids);
+          await _restoreExtras(repository, data, ids, existing, subjectUuids);
+          await _restoreAttendance(repository, data, ids);
+          await _restoreHolidays(repository, data);
 
           final Object? rawSettings = data['settings'];
           if (rawSettings is Map) {
@@ -613,4 +363,287 @@ class BackupService {
       return const ImportResult(ImportOutcome.failed);
     }
   }
+
+  // Each row is read whole and only its ids are rewritten, so a column added
+  // later comes back without the restore having to name it. Rebuilding rows
+  // field by field silently dropped every column it was not told about.
+
+  /// The rows of one table, each with its own id taken out — SQLite assigns
+  /// a new one — and the old id beside it for the tables that point here.
+  static Iterable<({int? oldId, Map<String, Object?> row})> _rows(
+    Map<String, Object?> data,
+    String table,
+  ) sync* {
+    for (final Object? raw
+        in (data[table] as List<Object?>?) ?? const <Object?>[]) {
+      if (raw is! Map) continue;
+      final Map<String, Object?> row = Map<String, Object?>.from(raw);
+      yield (oldId: (row.remove('id') as num?)?.toInt(), row: row);
+    }
+  }
+
+  static Future<void> _restoreCategories(
+    ZeoliteRepository repository,
+    Map<String, Object?> data,
+    _IdMaps ids,
+  ) async {
+    for (final (:int? oldId, :Map<String, Object?> row)
+        in _rows(data, 'categories')) {
+      final int newId =
+          await repository.insertCategory(ClassCategory.fromMap(row));
+      if (oldId != null) ids.categories[oldId] = newId;
+    }
+  }
+
+  /// Nothing references a room by id, so these need no remapping.
+  static Future<void> _restoreRooms(
+    ZeoliteRepository repository,
+    Map<String, Object?> data,
+  ) async {
+    for (final (oldId: _, :Map<String, Object?> row) in _rows(data, 'rooms')) {
+      await repository.insertRoom(Room.fromMap(row));
+    }
+  }
+
+  /// Before the marks, because `attendance.tag_id` points at one.
+  static Future<void> _restoreTags(
+    ZeoliteRepository repository,
+    Map<String, Object?> data,
+    _IdMaps ids,
+  ) async {
+    for (final (:int? oldId, :Map<String, Object?> row)
+        in _rows(data, 'tags')) {
+      final int newId = await repository.insertTag(Tag.fromMap(row));
+      if (oldId != null) ids.tags[oldId] = newId;
+    }
+  }
+
+  static Future<void> _restoreSubjects(
+    ZeoliteRepository repository,
+    Map<String, Object?> data,
+    _IdMaps ids,
+    _Existing existing,
+  ) async {
+    final List<({int? oldId, Subject subject})> restored =
+        <({int? oldId, Subject subject})>[
+      for (final (:int? oldId, :Map<String, Object?> row)
+          in _rows(data, 'subjects'))
+        (oldId: oldId, subject: Subject.fromMap(row)),
+    ];
+    final Map<int, String> adopted = matchByKey(
+      unknown: <RowIdentity>[
+        for (final (oldId: _, :Subject subject) in restored)
+          // A file that already carries uuids needs no matching, and must not
+          // be re-pointed at whatever this device filed the code under.
+          RowIdentity(
+            key: subject.uuid == null ? subjectKey(subject.code) : null,
+          ),
+      ],
+      known: <RowIdentity>[
+        for (final Subject s in existing.subjects)
+          RowIdentity(key: subjectKey(s.code), uuid: s.uuid),
+      ],
+    );
+
+    for (int i = 0; i < restored.length; i++) {
+      final (:int? oldId, :Subject subject) = restored[i];
+      final int? categoryId = ids.category(subject.categoryId);
+      final int newId = await repository.insertSubject(
+        subject.copyWith(
+          // Carried through, not reissued: a restore onto a second device has
+          // to land on the same uuid or the subject syncs as two. An older
+          // file has none, so it takes the one held for its code.
+          uuid: subject.uuid ?? adopted[i],
+          categoryId: categoryId,
+          clearCategory: categoryId == null,
+        ),
+      );
+      if (oldId != null) ids.subjects[oldId] = newId;
+    }
+  }
+
+  static Future<void> _restoreSlots(
+    ZeoliteRepository repository,
+    Map<String, Object?> data,
+    _IdMaps ids,
+    _Existing existing,
+    Map<int, String> subjectUuids,
+  ) async {
+    final List<({int? oldId, ClassSlot slot})> restored =
+        <({int? oldId, ClassSlot slot})>[
+      for (final (:int? oldId, :Map<String, Object?> row)
+          in _rows(data, 'slots'))
+        if (ClassSlot.fromMap(row) case final ClassSlot slot
+            when ids.subjects[slot.subjectId] != null)
+          (oldId: oldId, slot: slot),
+    ];
+    final Map<int, String> adopted = matchByKey(
+      unknown: <RowIdentity>[
+        for (final (oldId: _, :ClassSlot slot) in restored)
+          RowIdentity(
+            key: slot.uuid != null
+                ? null
+                : slotKey(subjectUuids[ids.subjects[slot.subjectId]],
+                    slot.weekday, slot.startMinutes),
+          ),
+      ],
+      known: <RowIdentity>[
+        for (final ClassSlot s in existing.slots)
+          RowIdentity(
+            key: slotKey(
+                existing.subjectUuid[s.subjectId], s.weekday, s.startMinutes),
+            uuid: s.uuid,
+          ),
+      ],
+    );
+
+    for (int i = 0; i < restored.length; i++) {
+      final (:int? oldId, :ClassSlot slot) = restored[i];
+      final int? categoryId = ids.category(slot.categoryId);
+      // The uuid is not an id in the SQLite sense and has to survive, or the
+      // rule comes back as a second class beside the one the account holds.
+      final int newId = await repository.insertSlot(
+        slot.copyWith(
+          uuid: slot.uuid ?? adopted[i],
+          subjectId: ids.subjects[slot.subjectId],
+          categoryId: categoryId,
+          clearCategory: categoryId == null,
+        ),
+      );
+      if (oldId != null) ids.slots[oldId] = newId;
+    }
+  }
+
+  static Future<void> _restoreOverrides(
+    ZeoliteRepository repository,
+    Map<String, Object?> data,
+    _IdMaps ids,
+  ) async {
+    await repository.insertSlotOverrides(<SlotOverride>[
+      for (final (oldId: _, :Map<String, Object?> row)
+          in _rows(data, 'slotOverrides'))
+        if (SlotOverride.fromMap(row) case final SlotOverride override
+            // A rule the restore dropped takes its exceptions with it: an
+            // override with no slot is a foreign key pointing nowhere.
+            when ids.slots[override.slotId] != null)
+          override.copyWith(
+            slotId: ids.slots[override.slotId],
+            subjectId: override.subjectId == null
+                ? null
+                : ids.subjects[override.subjectId!],
+          ),
+    ]);
+  }
+
+  static Future<void> _restoreExtras(
+    ZeoliteRepository repository,
+    Map<String, Object?> data,
+    _IdMaps ids,
+    _Existing existing,
+    Map<int, String> subjectUuids,
+  ) async {
+    final List<ExtraClass> restored = <ExtraClass>[
+      for (final (oldId: _, :Map<String, Object?> row)
+          in _rows(data, 'extraClasses'))
+        if (ExtraClass.fromMap(row) case final ExtraClass extra
+            when ids.subjects[extra.subjectId] != null)
+          extra,
+    ];
+    final Map<int, String> adopted = matchByKey(
+      unknown: <RowIdentity>[
+        for (final ExtraClass e in restored)
+          RowIdentity(
+            key: e.uuid != null
+                ? null
+                : extraKey(subjectUuids[ids.subjects[e.subjectId]],
+                    Dates.keyOf(e.date), e.startMinutes),
+          ),
+      ],
+      known: <RowIdentity>[
+        for (final ExtraClass e in existing.extras)
+          RowIdentity(
+            key: extraKey(existing.subjectUuid[e.subjectId],
+                Dates.keyOf(e.date), e.startMinutes),
+            uuid: e.uuid,
+          ),
+      ],
+    );
+
+    for (int i = 0; i < restored.length; i++) {
+      final ExtraClass extra = restored[i];
+      final int? categoryId = ids.category(extra.categoryId);
+      await repository.insertExtraClass(
+        extra.copyWith(
+          uuid: extra.uuid ?? adopted[i],
+          subjectId: ids.subjects[extra.subjectId],
+          categoryId: categoryId,
+          clearCategory: categoryId == null,
+        ),
+      );
+    }
+  }
+
+  static Future<void> _restoreAttendance(
+    ZeoliteRepository repository,
+    Map<String, Object?> data,
+    _IdMaps ids,
+  ) async {
+    await repository.setManyAttendance(<AttendanceRecord>[
+      for (final (oldId: _, :Map<String, Object?> row)
+          in _rows(data, 'attendance'))
+        if (AttendanceRecord.fromMap(row) case final AttendanceRecord record
+            when ids.subjects[record.subjectId] != null)
+          record.copyWith(
+            subjectId: ids.subjects[record.subjectId],
+            categoryId: ids.category(record.categoryId),
+            clearCategory: ids.category(record.categoryId) == null,
+            // An unknown tag drops to null rather than failing the import.
+            // The mark is the data worth keeping; the label is not worth
+            // rejecting a whole backup over.
+            tagId: ids.tag(record.tagId),
+            clearTag: ids.tag(record.tagId) == null,
+          ),
+    ]);
+  }
+
+  static Future<void> _restoreHolidays(
+    ZeoliteRepository repository,
+    Map<String, Object?> data,
+  ) async {
+    for (final (oldId: _, :Map<String, Object?> row)
+        in _rows(data, 'holidays')) {
+      await repository.insertHoliday(Holiday.fromMap(row));
+    }
+  }
+}
+
+/// Old id → new id, per table, filled as each one goes back in.
+class _IdMaps {
+  final Map<int, int> categories = <int, int>{};
+  final Map<int, int> subjects = <int, int>{};
+  final Map<int, int> tags = <int, int>{};
+  final Map<int, int> slots = <int, int>{};
+
+  /// A type the file does not hold falls back to inheriting, as if unset.
+  int? category(int? oldId) => oldId == null ? null : categories[oldId];
+
+  int? tag(int? oldId) => oldId == null ? null : tags[oldId];
+}
+
+/// What the device held before the wipe, kept for the identities a file
+/// written before uuids existed has to borrow.
+class _Existing {
+  _Existing({
+    required this.subjects,
+    required this.slots,
+    required this.extras,
+  }) : subjectUuid = <int, String>{
+          for (final Subject s in subjects)
+            if (s.id != null && s.uuid != null) s.id!: s.uuid!,
+        };
+
+  final List<Subject> subjects;
+  final List<ClassSlot> slots;
+  final List<ExtraClass> extras;
+  final Map<int, String> subjectUuid;
 }

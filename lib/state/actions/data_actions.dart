@@ -32,8 +32,6 @@ class DataActions {
     return result;
   }
 
-  // admin ------------------------------------------------------------------
-
   Future<void> resetEverything() async {
     final DatabaseSnapshot before = await _core.repo.snapshot();
     await _core.repo.clearAll();

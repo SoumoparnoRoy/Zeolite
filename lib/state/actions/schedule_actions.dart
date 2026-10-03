@@ -19,7 +19,7 @@ class ScheduleActions {
 
   final ActionCore _core;
 
-  // recurring slots --------------------------------------------------------
+  // Weekly classes
 
   Future<void> addSlot(ClassSlot slot) async {
     await _core.repo.insertSlot(slot);
@@ -226,7 +226,7 @@ class ScheduleActions {
     _core.arm(before);
   }
 
-  // one-off classes --------------------------------------------------------
+  // One-off classes
 
   Future<void> addExtraClass(ExtraClass extra) async {
     await _core.repo.insertExtraClass(extra);
@@ -284,7 +284,7 @@ class ScheduleActions {
     _core.arm(before);
   }
 
-  // holidays ---------------------------------------------------------------
+  // Holidays
 
   Future<void> addHoliday(Holiday holiday) async {
     await _core.repo.insertHoliday(holiday);

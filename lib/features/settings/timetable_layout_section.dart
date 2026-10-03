@@ -364,8 +364,6 @@ class _TimeField extends StatelessWidget {
   }
 }
 
-// ------------------------------------------------------------------- rooms
-
 /// The saved list of room numbers, offered wherever a room is entered.
 class RoomsSection extends ConsumerWidget {
   const RoomsSection({super.key});

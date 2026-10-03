@@ -16,8 +16,6 @@ class AttendanceActions {
 
   final ActionCore _core;
 
-  // attendance -------------------------------------------------------------
-
   /// Marks one occurrence. Tapping the status it already has clears the mark,
   /// and true comes back so the screen can offer it back: re-marking restores
   /// the status but not the tag or the weight the mark carried.

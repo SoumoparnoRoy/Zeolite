@@ -48,7 +48,7 @@ class ZeoliteRepository {
     );
   }
 
-  // -------------------------------------------------------------- categories
+  // Categories
 
   Future<List<ClassCategory>> getCategories() async {
     final DatabaseExecutor db = await _db;
@@ -108,7 +108,7 @@ class ZeoliteRepository {
     return (rows.first['c'] as int?) ?? 0;
   }
 
-  // ------------------------------------------------------------------- rooms
+  // Rooms
 
   Future<List<Room>> getRooms() async {
     final DatabaseExecutor db = await _db;
@@ -154,7 +154,7 @@ class ZeoliteRepository {
     await db.delete('rooms', where: 'id = ?', whereArgs: <Object?>[id]);
   }
 
-  // -------------------------------------------------------------------- tags
+  // Tags
 
   Future<List<Tag>> getTags() async {
     final DatabaseExecutor db = await _db;
@@ -212,7 +212,7 @@ class ZeoliteRepository {
     return (rows.first['c'] as int?) ?? 0;
   }
 
-  // ---------------------------------------------------------------- subjects
+  // Subjects
 
   Future<List<Subject>> getSubjects() async {
     final DatabaseExecutor db = await _db;
@@ -269,7 +269,7 @@ class ZeoliteRepository {
     await db.delete('subjects', where: 'id = ?', whereArgs: <Object?>[id]);
   }
 
-  // ------------------------------------------------------------------- slots
+  // Slots
 
   Future<List<ClassSlot>> getSlots() async {
     final DatabaseExecutor db = await _db;
@@ -334,7 +334,7 @@ class ZeoliteRepository {
     await db.delete('class_slots', where: 'id = ?', whereArgs: <Object?>[id]);
   }
 
-  // --------------------------------------------------------- slot overrides
+  // Slot overrides
 
   Future<List<SlotOverride>> getSlotOverrides() async {
     final DatabaseExecutor db = await _db;
@@ -397,7 +397,7 @@ class ZeoliteRepository {
     );
   }
 
-  // ----------------------------------------------------------- extra classes
+  // One-off classes
 
   Future<List<ExtraClass>> getExtraClasses() async {
     final DatabaseExecutor db = await _db;
@@ -427,7 +427,7 @@ class ZeoliteRepository {
     await db.delete('extra_classes', where: 'id = ?', whereArgs: <Object?>[id]);
   }
 
-  // -------------------------------------------------------------- attendance
+  // Attendance
 
   Future<List<AttendanceRecord>> getAttendance() async {
     final DatabaseExecutor db = await _db;
@@ -545,7 +545,7 @@ class ZeoliteRepository {
     return result;
   }
 
-  // ---------------------------------------------------------------- holidays
+  // Holidays
 
   Future<List<Holiday>> getHolidays() async {
     final DatabaseExecutor db = await _db;
@@ -594,7 +594,7 @@ class ZeoliteRepository {
     );
   }
 
-  // ------------------------------------------------------------ sync ledger
+  // Sync ledger
 
   Future<List<RemoteLink>> getRemoteLinks(String target, SyncKind kind) async {
     final DatabaseExecutor db = await _db;
@@ -649,7 +649,7 @@ class ZeoliteRepository {
     );
   }
 
-  // ------------------------------------------------------------------- admin
+  // Admin
 
   Future<void> clearAll() async {
     final DatabaseExecutor db = await _db;

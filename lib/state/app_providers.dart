@@ -34,7 +34,7 @@ import '../services/launcher_icon_service.dart';
 import '../services/notification_service.dart';
 import '../services/timetable/vision_client.dart';
 
-// ---------------------------------------------------------------- singletons
+// Singletons
 
 final repositoryProvider = Provider<ZeoliteRepository>(
   (ref) => ZeoliteRepository(),
@@ -135,7 +135,7 @@ class LauncherIconController extends AsyncNotifier<LauncherIcon> {
   }
 }
 
-// ----------------------------------------------------------------- settings
+// Settings
 
 /// Loads and mutates [AppSettings]. Every write persists immediately so the
 /// app can be killed at any moment without losing a preference.
@@ -206,7 +206,7 @@ final settingsProvider = AsyncNotifierProvider<SettingsController, AppSettings>(
   SettingsController.new,
 );
 
-// --------------------------------------------------------------- timetable
+// Timetable
 
 /// Everything the schedule engine needs, loaded in one round trip.
 class TimetableData {
@@ -404,7 +404,7 @@ class HomeViewController extends Notifier<HomeView> {
   void toggle() => state = state == HomeView.day ? HomeView.grid : HomeView.day;
 }
 
-// ------------------------------------------------------------------- stats
+// Stats
 
 /// Attendance figures for every subject, plus the aggregate.
 final statsProvider = Provider<OverallStats>((ref) {
@@ -488,7 +488,7 @@ final subjectStatsProvider =
   return null;
 });
 
-// ------------------------------------------------------------------- tags
+// Tags
 
 /// Every tag with the marks carrying it.
 ///
@@ -528,7 +528,7 @@ final hasTaggedMarksProvider = Provider<bool>((ref) {
   return breakdowns.any((TagBreakdown b) => !b.isEmpty);
 });
 
-// ---------------------------------------------------------- attendance log
+// Attendance log
 
 /// Furthest back the log will look.
 ///
@@ -583,7 +583,7 @@ final untimedMatchesProvider = Provider<List<UntimedMatch>>((ref) {
   return matchUntimed(engine: engine, records: data.records);
 });
 
-// ------------------------------------------------------------ navigation
+// Navigation
 
 /// The selected bottom-navigation tab.
 ///
@@ -599,7 +599,7 @@ class SelectedTabController extends Notifier<int> {
 final selectedTabProvider =
     NotifierProvider<SelectedTabController, int>(SelectedTabController.new);
 
-// ------------------------------------------------------------ in-app alerts
+// In-app alerts
 
 /// Subjects the app has to warn about itself, because their system
 /// notification is switched off and in-app alerts are on. Empty whenever the
@@ -719,7 +719,7 @@ final classLengthLabelProvider =
   return parts.join(' · ');
 });
 
-// ------------------------------------------------------------ local changes
+// Local changes
 
 /// Ticks on every local write the sync targets have to hear about.
 ///

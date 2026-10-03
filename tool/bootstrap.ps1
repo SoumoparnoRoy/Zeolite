@@ -21,7 +21,7 @@ $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 Write-Host "Zeolite bootstrap in $root" -ForegroundColor Cyan
 
-# --- 0. Sanity check -------------------------------------------------------
+# 0. Sanity check
 
 $flutter = Get-Command flutter -ErrorAction SilentlyContinue
 if (-not $flutter) {
@@ -32,7 +32,7 @@ if (-not $flutter) {
 Write-Host "`n[1/5] Flutter version" -ForegroundColor Cyan
 flutter --version
 
-# --- 1. Stash the authored source -----------------------------------------
+# 1. Stash the authored source
 
 $authored = @('lib', 'test', 'tool', 'pubspec.yaml', 'analysis_options.yaml', 'README.md')
 $backup = Join-Path $env:TEMP ("zeolite_backup_" + [System.Guid]::NewGuid().ToString('N').Substring(0, 8))
@@ -46,12 +46,12 @@ foreach ($item in $authored) {
     }
 }
 
-# --- 2. Generate the platform scaffolding ---------------------------------
+# 2. Generate the platform scaffolding
 
 Write-Host "`n[3/5] Generating the Android project" -ForegroundColor Cyan
 flutter create . --project-name zeolite --org com.soumoparno --platforms android
 
-# --- 3. Put the app source back -------------------------------------------
+# 3. Put the app source back
 
 Write-Host "`n[4/5] Restoring app source" -ForegroundColor Cyan
 foreach ($item in $authored) {
@@ -68,7 +68,7 @@ if ((Test-Path $defaultTest) -and -not (Test-Path (Join-Path $backup 'test\widge
     Remove-Item $defaultTest -Force
 }
 
-# --- 4. Android patches ----------------------------------------------------
+# 4. Android patches
 
 Write-Host "`n[5/5] Applying Android notification setup" -ForegroundColor Cyan
 
@@ -171,7 +171,7 @@ dependencies {
     Write-Host "  ! No app build.gradle found - skipping desugaring patch" -ForegroundColor Yellow
 }
 
-# --- 5. Dependencies -------------------------------------------------------
+# 5. Dependencies
 
 Write-Host "`nFetching packages..." -ForegroundColor Cyan
 flutter pub get

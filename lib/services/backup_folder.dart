@@ -120,6 +120,19 @@ class BackupFolder {
 
   Future<void> delete(String uri) => _util.delete(uri, false);
 
-  Future<void> release(String treeUri) =>
-      _util.releasePersistedPermission(treeUri, read: true, write: true);
+  /// The grant was taken on the tree the user picked, but the picker hands
+  /// back that folder's own document uri, and only the tree can be released.
+  Future<void> release(String folderUri) => _util.releasePersistedPermission(
+        treeUriOf(folderUri),
+        read: true,
+        write: true,
+      );
+
+  /// `…/tree/<id>/document/<id>` → `…/tree/<id>`. Anything else unchanged.
+  static String treeUriOf(String uri) {
+    final int tree = uri.indexOf('/tree/');
+    if (tree < 0) return uri;
+    final int document = uri.indexOf('/document/', tree);
+    return document < 0 ? uri : uri.substring(0, document);
+  }
 }

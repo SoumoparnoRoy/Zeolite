@@ -36,8 +36,10 @@ final weekWidgetImageProvider = Provider<void>((Ref ref) {
   );
 });
 
-/// Only until the widget has drawn once and reported its own cell.
-const Size _fallbackSize = Size(420, 215);
+/// Only until the widget has drawn once and reported its own cell. The
+/// minimum `widget_week_info.xml` declares, so a first render has the widget's
+/// shape and room for the grid's empty state.
+const Size _fallbackSize = Size(250, 290);
 
 /// [WeekGridView]'s own floors and spacing, which are what a widget cell
 /// cannot meet: a block will not go under [_minBlockHeight], so a full day

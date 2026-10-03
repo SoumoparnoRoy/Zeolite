@@ -62,6 +62,15 @@ void main() {
     expect(saf.made, <String>[BackupFolder.folderName]);
   });
 
+  test('a folder is released by the tree it was granted on', () {
+    const String tree = 'content://docs/tree/primary%3ADownload%2FBackups';
+    expect(
+      BackupFolder.treeUriOf('$tree/document/primary%3ADownload%2FBackups'),
+      tree,
+    );
+    expect(BackupFolder.treeUriOf(tree), tree);
+  });
+
   test('a tree that cannot be read is treated as somewhere else', () async {
     final _Saf saf = _Saf(null);
 

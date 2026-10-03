@@ -135,9 +135,9 @@ class DataSection extends ConsumerWidget {
   Future<void> _pickBackupFolder(BuildContext context, WidgetRef ref) async {
     try {
       final BackupFolder folder = ref.read(backupFolderProvider);
-      final BackupFile? picked = await folder.choose(
-        initialUri: ref.read(settingsProvider).value?.backupFolderUri,
-      );
+      final String? previous =
+          ref.read(settingsProvider).value?.backupFolderUri;
+      final BackupFile? picked = await folder.choose(initialUri: previous);
       if (picked == null) return;
       // Created now, not at the first backup, so a grant that cannot write
       // fails in front of the user rather than days later.
@@ -146,6 +146,17 @@ class DataSection extends ConsumerWidget {
           .read(settingsProvider.notifier)
           .setBackupFolder(picked.uri, picked.name);
       ref.invalidate(backupFolderUsableProvider);
+      // The old grant is no use once replaced, and Android caps how many an
+      // app may hold.
+      if (previous != null &&
+          BackupFolder.treeUriOf(previous) !=
+              BackupFolder.treeUriOf(picked.uri)) {
+        try {
+          await folder.release(previous);
+        } catch (error, stack) {
+          reportError(error, stack, where: 'releasing the old backup folder');
+        }
+      }
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

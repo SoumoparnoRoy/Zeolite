@@ -20,17 +20,29 @@ import '../data/settings/app_settings.dart';
 import '../domain/restore_identity.dart';
 import 'backup_folder.dart';
 
+/// How a restore ended. The words are the screen's to choose.
+enum ImportOutcome {
+  restored,
+  notABackup,
+  notJson,
+  notZeolite,
+  tooNew,
+
+  /// The file could not be read off the device at all.
+  unreadable,
+
+  /// Recognised, but writing it failed and nothing was changed.
+  failed,
+}
+
 /// Result of an import attempt.
 class ImportResult {
-  const ImportResult({
-    required this.success,
-    required this.message,
-    this.settings,
-  });
+  const ImportResult(this.outcome, {this.settings});
 
-  final bool success;
-  final String message;
+  final ImportOutcome outcome;
   final AppSettings? settings;
+
+  bool get success => outcome == ImportOutcome.restored;
 }
 
 /// Where an automatic backup is written.
@@ -274,32 +286,20 @@ class BackupService {
     try {
       final Object? decoded = jsonDecode(jsonString);
       if (decoded is! Map<String, Object?>) {
-        return const ImportResult(
-          success: false,
-          message: 'That does not look like a Zeolite backup.',
-        );
+        return const ImportResult(ImportOutcome.notABackup);
       }
       data = decoded;
     } catch (_) {
-      return const ImportResult(
-        success: false,
-        message: 'Could not read that as JSON.',
-      );
+      return const ImportResult(ImportOutcome.notJson);
     }
 
     if (!isRecognisedTag(data['app'])) {
-      return const ImportResult(
-        success: false,
-        message: 'This file was not created by Zeolite.',
-      );
+      return const ImportResult(ImportOutcome.notZeolite);
     }
 
     final int version = (data['formatVersion'] as num?)?.toInt() ?? 0;
     if (version > formatVersion) {
-      return const ImportResult(
-        success: false,
-        message: 'This backup came from a newer version of Zeolite.',
-      );
+      return const ImportResult(ImportOutcome.tooNew);
     }
 
     AppSettings? originalSettings;
@@ -600,11 +600,7 @@ class BackupService {
         },
       );
 
-      return ImportResult(
-        success: true,
-        message: 'Backup restored',
-        settings: settings,
-      );
+      return ImportResult(ImportOutcome.restored, settings: settings);
     } catch (error, stack) {
       reportError(error, stack, where: 'backup restore');
       if (settingsWriteAttempted && originalSettings != null) {
@@ -614,10 +610,7 @@ class BackupService {
           // The database transaction has already rolled back.
         }
       }
-      return const ImportResult(
-        success: false,
-        message: 'Could not restore this backup.',
-      );
+      return const ImportResult(ImportOutcome.failed);
     }
   }
 }

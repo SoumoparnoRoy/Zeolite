@@ -1,61 +1,18 @@
-import 'dart:async';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/report_error.dart';
 import '../../data/db/zeolite_repository.dart';
 import '../../data/models/class_category.dart';
-import '../../data/settings/app_settings.dart';
 import '../../domain/sync/sync_merge.dart';
 import '../../services/sync/sync_coordinator.dart';
 import '../app_providers.dart';
 import 'action_core.dart';
 
-/// Whole-database actions: the automatic backup, a first sync that had to be
-/// merged, and wiping everything.
+/// Whole-database actions: a first sync that had to be merged, and wiping
+/// everything.
 class DataActions {
   DataActions(this._core);
 
   final ActionCore _core;
-
-  // backup -------------------------------------------------------------------
-
-  /// Guards against the home screen's post-frame callback firing again while
-  /// the first write is still in flight — it runs on every build, not only on
-  /// launch, and two concurrent exports would race on the same filename.
-  bool _autoBackupRunning = false;
-
-  /// Writes today's automatic backup if one is due, then records when.
-  ///
-  /// Called from the home screen rather than from [ActionCore.refresh],
-  /// because a backup per mutation would serialise the whole database on every
-  /// attendance tap for a freshness gain measured in hours.
-  Future<void> maybeRunAutoBackup() async {
-    if (_autoBackupRunning) return;
-    final AppSettings? settings = _core.ref.read(settingsProvider).value;
-    if (settings == null || !settings.autoBackupEnabled) return;
-
-    _autoBackupRunning = true;
-    try {
-      final bool written =
-          await _core.ref.read(backupServiceProvider).runAutoBackup(
-                enabled: settings.autoBackupEnabled,
-                lastAt: settings.lastAutoBackupAt,
-                folderUri: settings.backupFolderUri,
-              );
-      if (!written) return;
-      await _core.ref
-          .read(settingsProvider.notifier)
-          .save(settings.copyWith(lastAutoBackupAt: DateTime.now()));
-    } catch (error, stack) {
-      // A failed backup must not take the home screen down with it. The next
-      // launch tries again, and the stamp is only written on success so a
-      // failure does not count as today's backup.
-      reportError(error, stack, where: 'auto backup');
-    } finally {
-      _autoBackupRunning = false;
-    }
-  }
 
   /// Runs the first sync against an account that already had data, with the
   /// merge screen's decisions.

@@ -9,6 +9,7 @@ import '../domain/sync/sync_target.dart';
 import '../services/notion/notion_auth_client.dart';
 import '../services/notion/notion_client.dart';
 import '../services/notion/notion_connection_store.dart';
+import '../services/notion/notion_database_reader.dart';
 import 'app_providers.dart';
 
 final notionAuthClientProvider =
@@ -182,6 +183,14 @@ class NotionMappingController extends AsyncNotifier<NotionMapping?> {
     if (title == null || title == mapping.title) return;
     await save(mapping.copyWith(title: title));
   }
+
+  /// The mapped table's rows, for the same preview a CSV class log goes
+  /// through.
+  Future<NotionReadResult> readRows(NotionMapping mapping) =>
+      NotionDatabaseReader(
+        client: ref.read(notionClientProvider),
+        mapping: mapping,
+      ).read();
 
   /// Maps the database Notion copied in during consent, without asking.
   ///

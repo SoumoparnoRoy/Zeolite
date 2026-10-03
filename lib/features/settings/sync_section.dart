@@ -169,10 +169,8 @@ class NotionSection extends ConsumerWidget {
       ),
     ));
 
-    final NotionReadResult result = await NotionDatabaseReader(
-      client: ref.read(notionClientProvider),
-      mapping: mapping,
-    ).read();
+    final NotionReadResult result =
+        await ref.read(notionMappingProvider.notifier).readRows(mapping);
     navigator.pop();
 
     final NotionSource? source = result.source;

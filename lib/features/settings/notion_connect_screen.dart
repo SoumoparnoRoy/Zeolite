@@ -3,12 +3,10 @@ import 'dart:async';
 import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/app_theme.dart';
-import '../../domain/sync/sync_target.dart';
 import '../../services/notion/notion_auth_client.dart';
-import '../../services/notion/pkce.dart';
+import '../../state/notion_pairing.dart';
 import '../../state/notion_providers.dart';
 import '../../widgets/common.dart';
 import '../../widgets/gradient_header.dart';
@@ -35,27 +33,18 @@ class NotionConnectScreen extends ConsumerStatefulWidget {
       _NotionConnectScreenState();
 }
 
-enum _Stage { idle, waiting, claiming }
-
 class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
   final TextEditingController _code = TextEditingController();
   final AppLinks _links = AppLinks();
   StreamSubscription<Uri>? _sub;
 
-  /// Read back from the store on open, so an attempt survives leaving this
-  /// screen while the browser is in front.
-  String? _verifier;
-  _Stage _stage = _Stage.idle;
-  String? _error;
+  NotionPairingController get _pairing =>
+      ref.read(notionPairingProvider.notifier);
 
   @override
   void initState() {
     super.initState();
-    // Wakes a spun-down host while the user is still reading this screen.
-    // Nothing waits on it and a failure changes nothing.
-    unawaited(ref.read(notionAuthClientProvider).health());
     _sub = _links.uriLinkStream.listen(_onLink);
-    unawaited(_resume());
   }
 
   @override
@@ -63,18 +52,6 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
     unawaited(_sub?.cancel());
     _code.dispose();
     super.dispose();
-  }
-
-  /// Picks up an attempt already in the browser. Anything older than the
-  /// service keeps its session for reads back as nothing.
-  Future<void> _resume() async {
-    final String? pending =
-        await ref.read(notionConnectionStoreProvider).readPending();
-    if (!mounted || pending == null) return;
-    setState(() {
-      _verifier = pending;
-      _stage = _Stage.waiting;
-    });
   }
 
   void _onLink(Uri uri) {
@@ -85,67 +62,15 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
     }
   }
 
-  Future<void> _start() async {
-    final PkcePair pair = PkcePair.generate();
-    final Uri uri = ref.read(notionAuthClientProvider).startUri(pair.challenge);
-    // A browser tab, never `externalApplication`: the Notion app claims
-    // api.notion.com and, handed the authorize URL, swallows the client id and
-    // state and shows its own login screen. RFC 8252 says the same thing.
-    final bool opened = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
-    // Written before the browser can come back, not after.
-    if (opened) {
-      await ref.read(notionConnectionStoreProvider).writePending(pair.verifier);
-    }
-    if (!mounted) return;
-    setState(() {
-      _verifier = opened ? pair.verifier : null;
-      _stage = opened ? _Stage.waiting : _Stage.idle;
-      _error = opened ? null : 'No browser could be opened to sign in with.';
-    });
-  }
-
   Future<void> _claim({String? session, String? pairingCode}) async {
-    final String? verifier = _verifier;
-    if (verifier == null || _stage == _Stage.claiming) return;
-
-    setState(() {
-      _stage = _Stage.claiming;
-      _error = null;
-    });
-
-    final NotionAuthResult result =
-        await ref.read(notionAuthClientProvider).claim(
-              session: session,
-              pairingCode: pairingCode,
-              verifier: verifier,
-            );
-
-    if (!mounted) return;
-    if (result.ok) {
-      await ref.read(notionConnectionStoreProvider).clearPending();
-      await ref.read(notionConnectionProvider.notifier).connect(result.tokens!);
-      if (!mounted) return;
-      await _settleMapping(result.tokens!);
-      return;
-    }
-    setState(() {
-      _stage = _Stage.waiting;
-      _error = _messageFor(result.failure);
-    });
-  }
-
-  /// The template is the schema this app authored, so mapping it is a fact
-  /// rather than a guess. Anyone else's database is never mapped unseen.
-  Future<void> _settleMapping(NotionTokens tokens) async {
     final NavigatorState navigator = Navigator.of(context);
-    final String? template = tokens.duplicatedTemplateId;
-
-    if (template != null && template.isNotEmpty) {
-      final bool mapped = await ref
-          .read(notionMappingProvider.notifier)
-          .adoptTemplate(template);
-      if (!mounted) return;
-      if (mapped) {
+    final NotionClaimOutcome? outcome =
+        await _pairing.claim(session: session, pairingCode: pairingCode);
+    if (!mounted) return;
+    switch (outcome) {
+      case null || NotionClaimOutcome.refused:
+        return;
+      case NotionClaimOutcome.adopted:
         // Replaced rather than pushed, so Back from either destination lands
         // in Settings and not on a connection already made. A retake is
         // sequenced by the migration instead, which has more to ask after.
@@ -154,39 +79,23 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
         } else {
           navigator.pop();
         }
-        return;
-      }
-    }
-
-    // Replaced, so coming back lands in Settings and not on a connect screen
-    // for a connection already made.
-    unawaited(
-      navigator.pushReplacement(
-        MaterialPageRoute<void>(
-          settings: const RouteSettings(name: 'notion_mapping'),
-          builder: (BuildContext context) => const NotionMappingScreen(),
-        ),
-      ),
-    );
-  }
-
-  String _messageFor(SyncFailure? failure) {
-    switch (failure) {
-      case SyncFailure.offline:
-        return 'Could not reach the connection service. Check your network '
-            'and try again.';
-      case SyncFailure.rejected:
-        return 'That code did not work, or the connection expired. Start '
-            'again from Connect Notion.';
-      case SyncFailure.rateLimited:
-        return 'Too many attempts. Wait a minute, then try again.';
-      default:
-        return 'Something went wrong finishing the connection. Try again.';
+      case NotionClaimOutcome.needsMapping:
+        // Replaced, so coming back lands in Settings and not on a connect
+        // screen for a connection already made.
+        unawaited(
+          navigator.pushReplacement(
+            MaterialPageRoute<void>(
+              settings: const RouteSettings(name: 'notion_mapping'),
+              builder: (BuildContext context) => const NotionMappingScreen(),
+            ),
+          ),
+        );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final NotionPairing pairing = ref.watch(notionPairingProvider);
     return PushScaffold(
       title: 'Connect Notion',
       subtitle: 'Sync your attendance into your own workspace',
@@ -194,7 +103,7 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
         // The tokens are stored before the template is adopted, so the
         // connected card would otherwise stand here offering Disconnect over a
         // claim still running — and then vanish when the mapping replaces it.
-        if (_stage == _Stage.claiming)
+        if (pairing.stage == NotionPairingStage.claiming)
           SliverFillRemaining(
             hasScrollBody: false,
             child: Center(child: _finishing(context)),
@@ -208,7 +117,7 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: _body(context),
+                children: _body(context, pairing),
               ),
             ),
           ),
@@ -216,7 +125,7 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
     );
   }
 
-  List<Widget> _body(BuildContext context) {
+  List<Widget> _body(BuildContext context, NotionPairing pairing) {
     final NotionTokens? connected = ref.watch(notionConnectionProvider).value;
     if (connected != null && !widget.retakeTemplate) {
       return _connected(context, connected);
@@ -256,11 +165,11 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
       ),
       const SizedBox(height: AppSpacing.lg),
       FilledButton(
-        onPressed: _start,
+        onPressed: _pairing.start,
         child: Text(
-          switch ((_stage, widget.retakeTemplate)) {
-            (_Stage.idle, true) => 'Take the latest template',
-            (_Stage.idle, false) => 'Connect Notion',
+          switch ((pairing.stage, widget.retakeTemplate)) {
+            (NotionPairingStage.idle, true) => 'Take the latest template',
+            (NotionPairingStage.idle, false) => 'Connect Notion',
             _ => 'Open Notion again',
           },
         ),
@@ -273,18 +182,19 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
       const SizedBox(height: AppSpacing.sm),
       TextField(
         controller: _code,
-        enabled: _verifier != null,
+        enabled: pairing.verifier != null,
         textCapitalization: TextCapitalization.characters,
         decoration: const InputDecoration(hintText: 'Eight characters'),
         onSubmitted: (String value) => _claim(pairingCode: value),
       ),
       const SizedBox(height: AppSpacing.sm),
       OutlinedButton(
-        onPressed:
-            _verifier == null ? null : () => _claim(pairingCode: _code.text),
+        onPressed: pairing.verifier == null
+            ? null
+            : () => _claim(pairingCode: _code.text),
         child: const Text('Finish connecting'),
       ),
-      if (_verifier == null) ...<Widget>[
+      if (pairing.verifier == null) ...<Widget>[
         const SizedBox(height: AppSpacing.sm),
         Text(
           'The code only works with an attempt you have started, so tap '
@@ -299,7 +209,7 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
       // An attempt still outstanding while this screen is visible *is* the
       // failure signature — a redirect that worked would have popped it. The
       // cause is Notion's app swallowing the Google sign-in redirect.
-      if (_verifier != null) ...<Widget>[
+      if (pairing.verifier != null) ...<Widget>[
         const SizedBox(height: AppSpacing.lg),
         SurfaceCard(
           child: Column(
@@ -320,10 +230,10 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
           ),
         ),
       ],
-      if (_error != null) ...<Widget>[
+      if (pairing.error != null) ...<Widget>[
         const SizedBox(height: AppSpacing.lg),
         Text(
-          _error!,
+          pairing.error!,
           style: TextStyle(color: context.palette.absent),
         ),
       ],

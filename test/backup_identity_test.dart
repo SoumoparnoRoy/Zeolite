@@ -120,7 +120,7 @@ void main() {
     ).importFromJsonString(jsonEncode(data));
 
     expect(result.success, isFalse);
-    expect(result.message, 'Could not restore this backup.');
+    expect(result.outcome, ImportOutcome.failed);
     expect(
       (await repository.getSubjects()).map((Subject subject) => subject.name),
       <String>['Keep me'],

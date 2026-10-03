@@ -1,9 +1,4 @@
-import 'dart:async';
-import 'dart:convert';
-
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
@@ -76,8 +71,7 @@ class DataSection extends ConsumerWidget {
                 onTap: () => _pickBackupFolder(context, ref),
                 trailing: settings.hasBackupFolder
                     ? IconButton(
-                        onPressed: () =>
-                            _clearBackupFolder(context, ref, settings),
+                        onPressed: () => _clearBackupFolder(context, ref),
                         icon: const Icon(Icons.close_rounded, size: 18),
                         color: context.palette.textTertiary,
                       )
@@ -133,139 +127,66 @@ class DataSection extends ConsumerWidget {
   }
 
   Future<void> _pickBackupFolder(BuildContext context, WidgetRef ref) async {
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
     try {
-      final BackupFolder folder = ref.read(backupFolderProvider);
-      final String? previous =
-          ref.read(settingsProvider).value?.backupFolderUri;
-      final BackupFile? picked = await folder.choose(initialUri: previous);
-      if (picked == null) return;
-      // Created now, not at the first backup, so a grant that cannot write
-      // fails in front of the user rather than days later.
-      await folder.resolveFolder(picked.uri);
-      await ref
-          .read(settingsProvider.notifier)
-          .setBackupFolder(picked.uri, picked.name);
-      ref.invalidate(backupFolderUsableProvider);
-      // The old grant is no use once replaced, and Android caps how many an
-      // app may hold.
-      if (previous != null &&
-          BackupFolder.treeUriOf(previous) !=
-              BackupFolder.treeUriOf(picked.uri)) {
-        try {
-          await folder.release(previous);
-        } catch (error, stack) {
-          reportError(error, stack, where: 'releasing the old backup folder');
-        }
-      }
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Automatic backups go to ${picked.name} from now on'),
-        ),
+      final String? name = await ref.read(backupActionsProvider).chooseFolder();
+      if (name == null) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text('Automatic backups go to $name from now on')),
       );
     } catch (error, stack) {
       reportError(error, stack, where: 'choosing a backup folder');
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(content: Text('Could not use that folder.')),
       );
     }
   }
 
-  Future<void> _clearBackupFolder(
-    BuildContext context,
-    WidgetRef ref,
-    AppSettings settings,
-  ) async {
-    final String? uri = settings.backupFolderUri;
-    if (uri != null) {
-      try {
-        await ref.read(backupFolderProvider).release(uri);
-      } catch (error, stack) {
-        reportError(error, stack, where: 'releasing the backup folder');
-      }
-    }
-    await ref.read(settingsProvider.notifier).clearBackupFolder();
-    ref.invalidate(backupFolderUsableProvider);
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
+  Future<void> _clearBackupFolder(BuildContext context, WidgetRef ref) async {
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    await ref.read(backupActionsProvider).clearFolder();
+    messenger.showSnackBar(
       const SnackBar(
         content: Text("Automatic backups go to the app's own folder again"),
       ),
     );
   }
 
-  /// Where both dialogs start. Null leaves the picker wherever it was.
-  static Future<String?> _backupFolderUri(WidgetRef ref) async {
-    final String? tree = ref.read(settingsProvider).value?.backupFolderUri;
-    if (tree == null) return null;
-    try {
-      return await ref.read(backupFolderProvider).resolveFolder(tree);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  /// Saves through the system dialog so the file lands outside the app's own
-  /// folder, which is deleted with the app. Falls back to the clipboard if the
-  /// dialog fails — an awkward paste beats losing the export. Built first, so
-  /// the fallback never repeats a step that just failed.
+  /// Built before the dialog, so the clipboard fallback never repeats a step
+  /// that just failed.
   Future<void> _export(BuildContext context, WidgetRef ref) async {
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    final BackupActions backups = ref.read(backupActionsProvider);
     final String json;
     try {
-      json = await ref.read(backupServiceProvider).exportToJsonString();
+      json = await backups.buildBackup();
     } catch (error, stack) {
       reportError(error, stack, where: 'backup export');
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(content: Text('Could not create the backup.')),
       );
       return;
     }
-    try {
-      final Uri? saved = await FilePicker.saveFile(
-        dialogTitle: 'Save Zeolite backup',
-        fileName: BackupService.fileNameFor(DateTime.now()),
-        bytes: utf8.encode(json),
-        mimeType: 'application/json',
-        initialDirectory: await _backupFolderUri(ref),
-      );
-      if (!context.mounted) return;
-
-      if (saved == null) {
-        // Cancelled. Saying nothing would look like a failure.
-        ScaffoldMessenger.of(context).showSnackBar(
+    messenger.showSnackBar(
+      switch (await backups.saveBackup(json)) {
+        BackupSave.saved => const SnackBar(content: Text('Backup saved')),
+        // Saying nothing would look like a failure.
+        BackupSave.cancelled =>
           const SnackBar(content: Text('Export cancelled')),
-        );
-        return;
-      }
-      unawaited(ref.read(analyticsProvider).backupExported());
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Backup saved')),
-      );
-    } catch (error, stack) {
-      reportError(error, stack, where: 'save dialog');
-      await Clipboard.setData(ClipboardData(text: json));
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not open the save dialog. '
-              'The backup is on your clipboard instead.'),
-          duration: Duration(seconds: 6),
-        ),
-      );
-    }
+        BackupSave.onClipboard => const SnackBar(
+            content: Text('Could not open the save dialog. '
+                'The backup is on your clipboard instead.'),
+            duration: Duration(seconds: 6),
+          ),
+      },
+    );
   }
 
   /// Confirms before restoring, because the file dialog made this two taps from
-  /// the Settings list and it replaces everything. Reads bytes rather than a
-  /// path: a document-picker file is a `content://` URI with no path at all.
+  /// the Settings list and it replaces everything.
   Future<void> _import(BuildContext context, WidgetRef ref) async {
-    final BackupFolder folder = ref.read(backupFolderProvider);
-    // Not `FilePicker`: its Android side never sets the initial-folder extra
-    // on an open dialog, so the starting folder below would be ignored.
-    final BackupFile? picked =
-        await folder.pickFile(initialUri: await _backupFolderUri(ref));
+    final BackupActions backups = ref.read(backupActionsProvider);
+    final BackupFile? picked = await backups.pickBackup();
     if (picked == null || !context.mounted) return;
 
     final bool? confirmed = await showDialog<bool>(
@@ -290,28 +211,25 @@ class DataSection extends ConsumerWidget {
         ],
       ),
     );
-    if (confirmed != true) return;
+    if (confirmed != true || !context.mounted) return;
 
-    late final ImportResult result;
-    try {
-      final String json = utf8.decode(await folder.readBytes(picked.uri));
-      result = await ref.read(backupServiceProvider).importFromJsonString(json);
-    } catch (error, stack) {
-      reportError(error, stack, where: 'reading a backup file');
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not read that file.')),
-      );
-      return;
-    }
-
-    if (result.success) {
-      await ref.read(actionCoreProvider).reloadAfterImport();
-    }
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(result.message)));
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    final ImportResult result = await backups.restore(picked);
+    messenger.showSnackBar(
+      SnackBar(content: Text(_restoreMessage(result.outcome))),
+    );
   }
+
+  static String _restoreMessage(ImportOutcome outcome) => switch (outcome) {
+        ImportOutcome.restored => 'Backup restored',
+        ImportOutcome.notABackup => 'That does not look like a Zeolite backup.',
+        ImportOutcome.notJson => 'Could not read that as JSON.',
+        ImportOutcome.notZeolite => 'This file was not created by Zeolite.',
+        ImportOutcome.tooNew =>
+          'This backup came from a newer version of Zeolite.',
+        ImportOutcome.unreadable => 'Could not read that file.',
+        ImportOutcome.failed => 'Could not restore this backup.',
+      };
 
   Future<void> _reset(BuildContext context, WidgetRef ref) async {
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);

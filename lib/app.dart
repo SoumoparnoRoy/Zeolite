@@ -241,7 +241,7 @@ class _RootShellState extends ConsumerState<RootShell> with RouteAware {
   /// Due at most once a day and a date comparison the rest of the time, so a
   /// launch and every return to the app can both ask.
   void _maybeBackUp() =>
-      unawaited(ref.read(dataActionsProvider).maybeRunAutoBackup());
+      unawaited(ref.read(backupActionsProvider).maybeRunAutoBackup());
 
   @override
   void didChangeDependencies() {

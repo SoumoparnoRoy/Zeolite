@@ -4,9 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../domain/notion/notion_mapping.dart';
-import '../../services/notion/notion_client.dart';
 import '../../services/notion/notion_connection_store.dart';
 import '../../services/notion/notion_template_retirement.dart';
+import '../../state/notion_retirement_actions.dart';
 import '../../services/sync/sync_coordinator.dart';
 import '../../state/notion_providers.dart';
 import '../../state/providers.dart';
@@ -30,8 +30,8 @@ class NotionTemplateMigration {
 
   final WidgetRef ref;
 
-  NotionTemplateRetirement get _retirement =>
-      NotionTemplateRetirement(ref.read(notionClientProvider));
+  NotionRetirementActions get _actions =>
+      ref.read(notionRetirementActionsProvider);
 
   Future<void> start(BuildContext context) async {
     final NotionMapping? before = ref.read(notionMappingProvider).value;
@@ -79,11 +79,10 @@ class NotionTemplateMigration {
     BuildContext context,
     NotionMapping before,
   ) async {
-    final NotionConnectionStore store = ref.read(notionConnectionStoreProvider);
     // Resolved before the prompt, because it decides what the prompt can
-    // honestly say is going: the page, or only the one table inside it.
-    final String? page = await _retirement.pageOf(
-      databaseId: before.databaseId,
+    // honestly say is going.
+    final String? page = await _actions.pageOf(
+      before.databaseId,
       knownPageId: before.templatePageId,
     );
     if (!context.mounted) return;
@@ -91,27 +90,12 @@ class NotionTemplateMigration {
     final _OldDatabase? choice =
         await _askAboutOld(context, before.title, whole: page != null);
     if (choice == null) {
-      // Remembered so the offer outlives the moment it was made: Settings
-      // keeps a way back until it is dealt with.
-      await store.writeRetired(before.databaseId, before.title, pageId: page);
-      ref.invalidate(retiredNotionDatabasesProvider);
+      await _actions.defer(before, page);
       return;
     }
 
     if (choice == _OldDatabase.rename) {
-      final NotionRename renamed = await _retirement.rename(
-        databaseId: before.databaseId,
-        databaseTitle: before.title,
-        pageId: page,
-      );
-      // Stored from what the rename settled on rather than rebuilt here: the
-      // page's name is not the table's, so the two would not agree.
-      await store.writeRetired(
-        before.databaseId,
-        renamed.result.ok ? renamed.title : before.title,
-        pageId: page,
-      );
-      ref.invalidate(retiredNotionDatabasesProvider);
+      final NotionRename renamed = await _actions.rename(before, page);
       if (!context.mounted) return;
       _say(
         context,
@@ -120,22 +104,9 @@ class NotionTemplateMigration {
       return;
     }
 
-    final NotionResult result = await _retirement.trash(
-      databaseId: before.databaseId,
-      pageId: page,
-      coursesDatabaseId: before.courses?.databaseId,
-    );
-    if (result.ok) {
-      // Only this one: an offer still open for a different page is not ours
-      // to answer here.
-      await store.removeRetired(before.databaseId);
-      ref.invalidate(retiredNotionDatabasesProvider);
-    }
+    final bool trashed = await _actions.trash(before, page);
     if (!context.mounted) return;
-    _say(
-      context,
-      result.ok ? 'Moved to the trash in Notion' : _changeFailed,
-    );
+    _say(context, trashed ? 'Moved to the trash in Notion' : _changeFailed);
   }
 
   static const String _changeFailed =
@@ -202,10 +173,7 @@ class NotionTemplateMigration {
     final Map<RetiredNotionDatabase, String?> pages =
         <RetiredNotionDatabase, String?>{
       for (final RetiredNotionDatabase old in chosen)
-        old: await _retirement.pageOf(
-          databaseId: old.id,
-          knownPageId: old.pageId,
-        ),
+        old: await _actions.pageOf(old.id, knownPageId: old.pageId),
     };
     if (!context.mounted) return;
 
@@ -219,21 +187,7 @@ class NotionTemplateMigration {
     );
     if (!go || !context.mounted) return;
 
-    // Sequentially, and through a failure rather than stopping at it: the
-    // alternative leaves an arbitrary subset done with no way to tell which.
-    int moved = 0;
-    for (final MapEntry<RetiredNotionDatabase, String?> old in pages.entries) {
-      final NotionResult result = await _retirement.trash(
-        databaseId: old.key.id,
-        pageId: old.value,
-      );
-      // Already gone is the outcome that was asked for, so the row goes too.
-      if (result.ok || result.isNotFound) {
-        moved++;
-        await ref.read(notionConnectionStoreProvider).removeRetired(old.key.id);
-      }
-    }
-    ref.invalidate(retiredNotionDatabasesProvider);
+    final int moved = await _actions.trashRetired(pages);
     if (!context.mounted) return;
     _say(context, notionTrashOutcome(moved: moved, of: chosen.length));
   }

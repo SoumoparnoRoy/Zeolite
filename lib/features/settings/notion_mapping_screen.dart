@@ -1,16 +1,11 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
 import '../../data/models/class_category.dart';
-import '../../state/providers.dart';
 import '../../domain/notion/notion_mapping.dart';
-import '../../domain/sync/sync_target.dart';
-import '../../services/notion/notion_client.dart';
-import '../../services/notion/notion_places.dart';
-import '../../state/notion_providers.dart';
+import '../../state/notion_mapping_form.dart';
+import '../../state/providers.dart';
 import '../../widgets/common.dart';
 import '../../widgets/gradient_header.dart';
 
@@ -19,7 +14,7 @@ import '../../widgets/gradient_header.dart';
 /// Three stages in one route rather than three pushes: picking a database and
 /// then a column inside it is one decision the user is making, and a back
 /// stack through it would let them leave half a mapping behind.
-class NotionMappingScreen extends ConsumerStatefulWidget {
+class NotionMappingScreen extends ConsumerWidget {
   const NotionMappingScreen({super.key, this.onlyUnmapped = false});
 
   /// Shows only what a template did not match, with a way past it. The whole
@@ -27,624 +22,20 @@ class NotionMappingScreen extends ConsumerStatefulWidget {
   final bool onlyUnmapped;
 
   @override
-  ConsumerState<NotionMappingScreen> createState() =>
-      _NotionMappingScreenState();
-}
-
-enum _Stage { loading, sources, fields }
-
-class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
-  _Stage _stage = _Stage.loading;
-  String? _error;
-  bool _busy = false;
-
-  final List<_Choice> _sources = <_Choice>[];
-
-  /// Filled in after the list shows, since it costs a read or two per table.
-  final Map<String, String?> _places = <String, String?>{};
-  late final NotionPlaces _lookup = NotionPlaces(_client);
-  String? _cursor;
-  bool _hasMore = false;
-  int _retries = 0;
-  Timer? _retry;
-
-  String _databaseId = '';
-  String _databaseTitle = '';
-  String _dataSourceId = '';
-
-  List<NotionProperty> _properties = const <NotionProperty>[];
-  Map<NotionField, NotionProperty> _fields = <NotionField, NotionProperty>{};
-  Map<String, LogVerdict> _statusMeanings = <String, LogVerdict>{};
-  Map<String, String> _kindValues = <String, String>{};
-  NotionCourses? _courses;
-
-  /// Shown next to the link. [NotionCourses] holds ids, not a name, and a
-  /// table identified only by an id is not something anyone can check.
-  String? _coursesTitle;
-
-  /// Linking this one would add a column to it, which waits for a tap rather
-  /// than happening by itself.
-  _Choice? _suggestedCourses;
-
-  /// Saved from, not rebuilt, so a field this screen does not edit survives.
-  NotionMapping? _loaded;
-
-  /// What was unmapped when this opened. Captured once, not recomputed: a row
-  /// that vanished the moment you answered it would leave no way to change it.
-  Set<NotionField>? _gapFields;
-  Set<String>? _gapStatus;
-  Set<String>? _gapKinds;
-
-  bool get _narrowed => widget.onlyUnmapped && _gapFields != null;
-
-  List<ClassCategory> get _categories =>
-      ref.read(timetableProvider).value?.categories ?? const <ClassCategory>[];
-
-  @override
-  void initState() {
-    super.initState();
-    unawaited(_open());
-  }
-
-  NotionClient get _client => ref.read(notionClientProvider);
-
-  /// An existing mapping reopens on its own columns, so Change is an edit
-  /// rather than starting again from the database list.
-  Future<void> _open() async {
-    final NotionMapping? existing =
-        await ref.read(notionMappingProvider.future);
-    if (!mounted) return;
-    if (existing == null) {
-      await _loadSources();
-      return;
-    }
-    _databaseId = existing.databaseId;
-    _databaseTitle = existing.title;
-    _fields = Map<NotionField, NotionProperty>.from(existing.fields);
-    _statusMeanings = Map<String, LogVerdict>.from(existing.statusMeanings);
-    _kindValues = Map<String, String>.from(existing.kindValues);
-    // Carried, not rebuilt: saving without it would drop the dashboard.
-    _courses = existing.courses;
-    _loaded = existing;
-    await _loadSchema(existing.dataSourceId, keepChoices: true);
-  }
-
-  /// Search answers with tables, not databases — since 2025-09-03 a database
-  /// is only a container — so the one question worth asking is which table,
-  /// and it is asked once instead of twice.
-  Future<void> _loadSources() async {
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    final NotionResult result =
-        await _client.searchDataSources(cursor: _cursor);
-    if (!mounted) return;
-
-    if (!result.ok) {
-      setState(() {
-        _busy = false;
-        _stage = _Stage.sources;
-        _error = _messageFor(result);
-      });
-      return;
-    }
-
-    final Object? results = result.body?['results'];
-    setState(() {
-      _busy = false;
-      _stage = _Stage.sources;
-      if (results is List<Object?>) {
-        for (final Object? row in results) {
-          if (row is! Map<String, Object?>) continue;
-          final String? id = row['id'] as String?;
-          if (id == null) continue;
-          _sources.add(
-            _Choice(
-              id,
-              notionTitleOf(row) ?? 'Untitled',
-              _parentDatabaseOf(row) ?? '',
-            ),
-          );
-        }
-      }
-      _hasMore = result.body?['has_more'] == true;
-      _cursor = result.body?['next_cursor'] as String?;
-    });
-    unawaited(_findPlaces());
-
-    // Notion's search index lags a write, so "No tables shared" is a wrong
-    // answer, not a slow one. A timer, so `dispose` can cancel it.
-    if (_sources.isEmpty && !_hasMore && _retries < _searchRetries) {
-      _retries++;
-      _retry?.cancel();
-      _retry = Timer(_searchBackoff * _retries, () {
-        if (mounted) unawaited(_loadSources());
-      });
-    }
-  }
-
-  /// One at a time, since the client already spaces its calls to Notion's
-  /// rate limit and the list is readable before any of this lands.
-  Future<void> _findPlaces() async {
-    for (final _Choice choice in List<_Choice>.of(_sources)) {
-      final String id = choice.databaseId;
-      if (id.isEmpty || _places.containsKey(id)) continue;
-      _places[id] = null;
-      final String? page = await _lookup.pageTitleOf(id);
-      if (!mounted) return;
-      if (page != null) setState(() => _places[id] = page);
-    }
-  }
-
-  String? _placeOf(_Choice choice) {
-    final String? page = _places[choice.databaseId];
-    return page == null ? null : 'In $page';
-  }
-
-  static const int _searchRetries = 3;
-  static const Duration _searchBackoff = Duration(seconds: 1);
-
-  @override
-  void dispose() {
-    _retry?.cancel();
-    super.dispose();
-  }
-
-  Future<void> _lookAgain() async {
-    _retry?.cancel();
-    setState(() {
-      _sources.clear();
-      _cursor = null;
-      _retries = 0;
-    });
-    await _loadSources();
-  }
-
-  static String? _parentDatabaseOf(Map<String, Object?> source) {
-    final Object? parent = source['parent'];
-    return parent is Map<String, Object?>
-        ? parent['database_id'] as String?
-        : null;
-  }
-
-  Future<void> _chooseSource(_Choice choice) async {
-    // Another database relates into its own Courses table, if any at all.
-    final bool moved = choice.databaseId != _databaseId;
-    setState(() {
-      _databaseId = choice.databaseId;
-      _databaseTitle = choice.title;
-      if (moved) {
-        _courses = null;
-        _coursesTitle = null;
-        _suggestedCourses = null;
-        _loaded = null;
-      }
-    });
-    // Re-picking the open table is backing out, so its answers stay.
-    await _loadSchema(choice.id, keepChoices: !moved);
-  }
-
-  /// Otherwise a saved mapping could only move by disconnecting Notion.
-  Future<void> _showSources() async {
-    setState(() => _stage = _Stage.sources);
-    if (_sources.isEmpty) await _loadSources();
-  }
-
-  Future<void> _loadSchema(String dataSourceId,
-      {bool keepChoices = false}) async {
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-
-    final NotionResult result = await _client.dataSource(dataSourceId);
-    if (!mounted) return;
-    if (!result.ok || result.body == null) {
-      setState(() {
-        _busy = false;
-        _stage = _Stage.fields;
-        _error = _messageFor(result);
-      });
-      return;
-    }
-
-    final List<NotionProperty> properties = notionPropertiesOf(result.body!);
-    final NotionMapping guess = NotionMapping.match(
-      databaseId: _databaseId,
-      dataSourceId: dataSourceId,
-      title: _databaseTitle,
-      properties: properties,
-      categoryNames: _categories.map((ClassCategory c) => c.name).toList(),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final NotionMappingForm form =
+        ref.watch(notionMappingFormProvider(onlyUnmapped));
+    final _MappingBody body = _MappingBody(
+      form: form,
+      controller: ref.read(notionMappingFormProvider(onlyUnmapped).notifier),
+      categories: ref.watch(timetableProvider).value?.categories ??
+          const <ClassCategory>[],
     );
-
-    setState(() {
-      _busy = false;
-      _stage = _Stage.fields;
-      _dataSourceId = dataSourceId;
-      _properties = properties;
-      // Reopening keeps every answer already given and lets the guess fill
-      // only the gaps, so a column added since — to the database or to the
-      // app — is offered instead of staying invisible behind an old mapping.
-      // A column deleted in Notion since is dropped rather than kept: a choice
-      // pointing at a property that no longer exists leaves the dropdown with
-      // a value that is not among its items, which throws instead of drawing.
-      // A kept choice takes the column as it is now, so an option added to
-      // Status or Type since the last save is there to be answered.
-      final Map<String, NotionProperty> live = <String, NotionProperty>{
-        for (final NotionProperty p in properties) p.id: p,
-      };
-      _fields = <NotionField, NotionProperty>{
-        ...guess.fields,
-        if (keepChoices)
-          for (final MapEntry<NotionField, NotionProperty> e in _fields.entries)
-            if (live[e.value.id] case final NotionProperty now) e.key: now,
-      };
-      _statusMeanings = <String, LogVerdict>{
-        ...guess.statusMeanings,
-        if (keepChoices) ..._statusMeanings,
-      };
-      _kindValues = <String, String>{
-        ...guess.kindValues,
-        if (keepChoices) ..._kindValues,
-      };
-      if (widget.onlyUnmapped) _captureGaps();
-    });
-    await _findCourses();
-  }
-
-  /// The Course relation already names the table it points at, so asking
-  /// the student to pick it again is a question with one right answer.
-  Future<void> _findCourses() async {
-    final NotionRelationTarget? target = _fields[NotionField.course]?.relatesTo;
-    if (_courses != null || target == null) return;
-    if (target.databaseId == _databaseId) return;
-
-    final NotionResult result = await _client.dataSource(target.dataSourceId);
-    if (!mounted || !result.ok || result.body == null) return;
-    // The student may have linked one by hand while this was in flight.
-    if (_courses != null) return;
-
-    final _Choice choice = _Choice(
-      target.dataSourceId,
-      notionTitleOf(result.body) ?? 'Untitled',
-      target.databaseId,
-    );
-    final NotionCourses courses = NotionCourses.match(
-      databaseId: choice.databaseId,
-      dataSourceId: choice.id,
-      properties: notionPropertiesOf(result.body!),
-    );
-    setState(() {
-      if (courses.isComplete) {
-        _courses = courses;
-        _coursesTitle = choice.title;
-        _suggestedCourses = null;
-      } else {
-        _suggestedCourses = choice;
-      }
-    });
-  }
-
-  /// Notion leaves a relation out of the schema altogether when the table it
-  /// points at is not shared with the connection, so the column the person can
-  /// see in their own database is simply not there to map. Without saying so,
-  /// the screen just refuses to finish and never explains why.
-  bool get _hiddenRelation =>
-      _fields[NotionField.course] == null &&
-      !_properties.any((NotionProperty p) => p.type == 'relation');
-
-  Widget _shareCoursesNote(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-        child: Text(
-          'Nothing here can hold a course? If your Course column is a relation, '
-          'Notion hides it until the table it points at is shared too. In '
-          'Notion, open the ••• menu on that table, then Connections, and add '
-          'Zeolite. Come back and reopen this screen.',
-          style: TextStyle(
-            fontSize: 12,
-            height: 1.3,
-            color: context.palette.textTertiary,
-          ),
-        ),
-      );
-
-  /// The column the app cannot work without, and the one a table built by hand
-  /// never has. Offered rather than done quietly: it writes to their schema.
-  Widget _addKeyColumnOffer(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            OutlinedButton.icon(
-              onPressed: _busy ? null : _addKeyColumn,
-              icon: const Icon(Icons.add_rounded, size: 18),
-              label: const Text('Add the Zeolite ID column'),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              'Adds a text column called Zeolite ID to your table. Until it '
-              'exists, syncing is held back rather than writing every class '
-              'again on every run. It shows up as a column; hide it in Notion '
-              'if it is in your way.',
-              style: TextStyle(
-                fontSize: 12,
-                height: 1.3,
-                color: context.palette.textTertiary,
-              ),
-            ),
-          ],
-        ),
-      );
-
-  Future<void> _addKeyColumn() async {
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    final NotionResult result = await _client.addProperty(
-      _dataSourceId,
-      name: NotionField.key.label,
-      type: 'rich_text',
-    );
-    if (!mounted) return;
-    if (!result.ok) {
-      setState(() {
-        _busy = false;
-        _error = _messageFor(result);
-      });
-      return;
-    }
-    // Re-read rather than assume: the reload's own guess is what maps the new
-    // column, and it is also what proves Notion made it.
-    await _loadSchema(_dataSourceId, keepChoices: true);
-  }
-
-  /// Where the Course relation points.
-  ///
-  /// Only template adoption used to set this, so anyone who reinstalled and
-  /// reconnected to their own database — or built the two tables by hand —
-  /// had no way to say where their courses live, and the relation was left
-  /// empty on every row.
-  List<Widget> _coursesSection(BuildContext context) {
-    if (_narrowed) return const <Widget>[];
-    final NotionProperty? course = _fields[NotionField.course];
-    if (course?.type != 'relation') return const <Widget>[];
-
-    return <Widget>[
-      const SizedBox(height: AppSpacing.lg),
-      const SectionHeader('Courses table'),
-      Padding(
-        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-        child: Text(
-          'Your Course column is a relation, so Zeolite needs to know which '
-          'table it points at to keep a page per subject there.',
-          style: TextStyle(
-            fontSize: 12,
-            height: 1.3,
-            color: context.palette.textTertiary,
-          ),
-        ),
-      ),
-      SurfaceCard(
-        padding: EdgeInsets.zero,
-        child: AppRow(
-          icon: Icons.table_chart_outlined,
-          title: _coursesTitle ?? (_courses == null ? 'Not linked' : 'Linked'),
-          onTap: _busy ? null : _pickCourses,
-        ),
-      ),
-      if (_courses == null && _suggestedCourses != null)
-        ..._linkSuggestedOffer(context, _suggestedCourses!),
-    ];
-  }
-
-  List<Widget> _linkSuggestedOffer(BuildContext context, _Choice choice) =>
-      <Widget>[
-        const SizedBox(height: AppSpacing.sm),
-        OutlinedButton.icon(
-          onPressed: _busy ? null : () => _linkCourses(choice),
-          icon: const Icon(Icons.link_rounded, size: 18),
-          label: Text('Link ${choice.title}'),
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        Text(
-          'Your Course column points at ${choice.title}. Linking it adds a '
-          'text column called Zeolite ID there, so each course page can be '
-          'found again.',
-          style: TextStyle(
-            fontSize: 12,
-            height: 1.3,
-            color: context.palette.textTertiary,
-          ),
-        ),
-      ];
-
-  Future<void> _pickCourses() async {
-    // Reopening an existing mapping lands straight on the fields, so the table
-    // list has never been fetched and the sheet would offer nothing at all.
-    if (_sources.isEmpty) {
-      await _loadSources();
-      if (!mounted) return;
-      setState(() => _stage = _Stage.fields);
-    }
-    if (!mounted) return;
-
-    final _Choice? choice = await showModalBottomSheet<_Choice>(
-      context: context,
-      builder: (BuildContext context) => SafeArea(
-        child: ListView(
-          shrinkWrap: true,
-          children: <Widget>[
-            for (final _Choice option in _sources)
-              if (option.databaseId != _databaseId)
-                ListTile(
-                  leading: const Icon(Icons.table_chart_outlined),
-                  title: Text(option.title),
-                  subtitle: switch (_placeOf(option)) {
-                    final String place => Text(place),
-                    null => null,
-                  },
-                  onTap: () => Navigator.of(context).pop(option),
-                ),
-          ],
-        ),
-      ),
-    );
-    if (choice == null || !mounted) return;
-    await _linkCourses(choice);
-  }
-
-  Future<void> _linkCourses(_Choice choice) async {
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    final NotionResult result = await _client.dataSource(choice.id);
-    if (!mounted) return;
-    if (!result.ok || result.body == null) {
-      setState(() {
-        _busy = false;
-        _error = _messageFor(result);
-      });
-      return;
-    }
-
-    final NotionCourses courses = NotionCourses.match(
-      databaseId: choice.databaseId,
-      dataSourceId: choice.id,
-      properties: notionPropertiesOf(result.body!),
-    );
-    if (!courses.isComplete) {
-      // Almost always the same missing column as on the attendance table, and
-      // the same answer: a page nothing can find again is written twice.
-      final NotionResult added = await _client.addProperty(
-        choice.id,
-        name: NotionField.key.label,
-        type: 'rich_text',
-      );
-      if (!mounted) return;
-      if (!added.ok) {
-        setState(() {
-          _busy = false;
-          _error = _messageFor(added);
-        });
-        return;
-      }
-      await _linkCoursesAgain(choice);
-      return;
-    }
-
-    setState(() {
-      _busy = false;
-      _courses = courses;
-      _coursesTitle = choice.title;
-      _suggestedCourses = null;
-    });
-  }
-
-  /// One retry only, after the column was added. A table still incomplete has
-  /// no title column either, which is not something this screen can fix.
-  Future<void> _linkCoursesAgain(_Choice choice) async {
-    final NotionResult result = await _client.dataSource(choice.id);
-    if (!mounted) return;
-    final NotionCourses courses = result.body == null
-        ? NotionCourses.match(
-            databaseId: choice.databaseId,
-            dataSourceId: choice.id,
-            properties: const <NotionProperty>[],
-          )
-        : NotionCourses.match(
-            databaseId: choice.databaseId,
-            dataSourceId: choice.id,
-            properties: notionPropertiesOf(result.body!),
-          );
-    setState(() {
-      _busy = false;
-      if (courses.isComplete) {
-        _courses = courses;
-        _coursesTitle = choice.title;
-        _suggestedCourses = null;
-      } else {
-        _error = 'That table needs a title column and a Zeolite ID column '
-            'before courses can be kept in it.';
-      }
-    });
-  }
-
-  void _captureGaps() {
-    _gapFields = <NotionField>{
-      for (final NotionField field in NotionField.values)
-        if (!_fields.containsKey(field)) field,
-    };
-    _gapStatus = <String>{
-      if (_fields.containsKey(NotionField.status))
-        for (final String option in _fields[NotionField.status]!.options)
-          if (!_statusMeanings.containsKey(option)) option,
-    };
-    _gapKinds = <String>{
-      if (_fields.containsKey(NotionField.kind))
-        for (final ClassCategory category in _categories)
-          if (!_kindValues.containsKey(category.name.toLowerCase()))
-            category.name.toLowerCase(),
-    };
-  }
-
-  Future<void> _save() async {
-    setState(() => _busy = true);
-    final NavigatorState navigator = Navigator.of(context);
-    final NotionMapping base = _loaded?.databaseId == _databaseId
-        ? _loaded!
-        : NotionMapping(
-            databaseId: _databaseId,
-            dataSourceId: _dataSourceId,
-            title: _databaseTitle,
-            fields: const <NotionField, NotionProperty>{},
-          );
-
-    await ref.read(notionMappingProvider.notifier).save(
-          base.copyWith(
-            dataSourceId: _dataSourceId,
-            title: _databaseTitle,
-            fields: _fields,
-            statusMeanings: _statusMeanings,
-            kindValues: _kindValues,
-            courses: _courses,
-          ),
-        );
-    if (mounted) navigator.pop();
-  }
-
-  /// Told apart because the fixes are different: sharing a page, reconnecting,
-  /// or simply waiting. One message for all three sends the user to the wrong
-  /// one of the three.
-  static String _messageFor(NotionResult result) {
-    if (result.isNotFound) {
-      return 'Zeolite cannot see that table. Share it with the connection in '
-          'Notion, then try again.';
-    }
-    return switch (result.failure) {
-      SyncFailure.auth =>
-        'Zeolite is not allowed to read your workspace any more. Disconnect '
-            'Notion and connect it again.',
-      SyncFailure.offline =>
-        'Could not reach Notion. Check your network and try again.',
-      SyncFailure.rateLimited => 'Notion is busy. Wait a moment and try again.',
-      _ => 'Notion refused that request. Reconnect Notion and try again.',
-    };
-  }
-
-  bool get _complete => NotionField.values
-      .where((NotionField f) => f.isRequired)
-      .every(_fields.containsKey);
-
-  @override
-  Widget build(BuildContext context) {
     return PushScaffold(
       title: 'Notion table',
-      subtitle: switch (_stage) {
-        _Stage.sources => 'Where should attendance go?',
-        _ => _databaseTitle.isEmpty ? null : _databaseTitle,
+      subtitle: switch (form.stage) {
+        NotionMappingStage.sources => 'Where should attendance go?',
+        _ => form.databaseTitle.isEmpty ? null : form.databaseTitle,
       },
       slivers: <Widget>[
         SliverToBoxAdapter(
@@ -656,13 +47,17 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-                if (_error != null) ...<Widget>[
-                  Text(_error!,
+                if (form.error != null) ...<Widget>[
+                  Text(form.error!,
                       style: TextStyle(color: context.palette.absent)),
                   const SizedBox(height: AppSpacing.lg),
                 ],
-                ..._stageBody(context),
-                if (_busy) ...<Widget>[
+                ...switch (form.stage) {
+                  NotionMappingStage.loading => const <Widget>[],
+                  NotionMappingStage.sources => body.sourceList(context),
+                  NotionMappingStage.fields => body.fieldForm(context),
+                },
+                if (form.busy) ...<Widget>[
                   const SizedBox(height: AppSpacing.lg),
                   const Center(child: CircularProgressIndicator()),
                 ],
@@ -673,15 +68,158 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
       ],
     );
   }
+}
 
-  List<Widget> _stageBody(BuildContext context) => switch (_stage) {
-        _Stage.loading => const <Widget>[],
-        _Stage.sources => _sourceList(context),
-        _Stage.fields => _fieldForm(context),
-      };
+/// The two stages' contents, kept out of `build` so each reads on its own.
+class _MappingBody {
+  const _MappingBody({
+    required this.form,
+    required this.controller,
+    required this.categories,
+  });
 
-  List<Widget> _sourceList(BuildContext context) {
-    if (_sources.isEmpty && !_busy) {
+  final NotionMappingForm form;
+  final NotionMappingFormController controller;
+  final List<ClassCategory> categories;
+
+  bool get _busy => form.busy;
+
+  static TextStyle _hint(BuildContext context) => TextStyle(
+        fontSize: 12,
+        height: 1.3,
+        color: context.palette.textTertiary,
+      );
+
+  Widget _shareCoursesNote(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+        child: Text(
+          'Nothing here can hold a course? If your Course column is a relation, '
+          'Notion hides it until the table it points at is shared too. In '
+          'Notion, open the ••• menu on that table, then Connections, and add '
+          'Zeolite. Come back and reopen this screen.',
+          style: _hint(context),
+        ),
+      );
+
+  /// The column the app cannot work without, and the one a table built by hand
+  /// never has. Offered rather than done quietly: it writes to their schema.
+  Widget _addKeyColumnOffer(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            OutlinedButton.icon(
+              onPressed: _busy ? null : controller.addKeyColumn,
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: const Text('Add the Zeolite ID column'),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Adds a text column called Zeolite ID to your table. Until it '
+              'exists, syncing is held back rather than writing every class '
+              'again on every run. It shows up as a column; hide it in Notion '
+              'if it is in your way.',
+              style: _hint(context),
+            ),
+          ],
+        ),
+      );
+
+  /// Where the Course relation points.
+  ///
+  /// Only template adoption used to set this, so anyone who reinstalled and
+  /// reconnected to their own database — or built the two tables by hand —
+  /// had no way to say where their courses live, and the relation was left
+  /// empty on every row.
+  List<Widget> _coursesSection(BuildContext context) {
+    if (form.narrowed) return const <Widget>[];
+    final NotionProperty? course = form.fields[NotionField.course];
+    if (course?.type != 'relation') return const <Widget>[];
+
+    return <Widget>[
+      const SizedBox(height: AppSpacing.lg),
+      const SectionHeader('Courses table'),
+      Padding(
+        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+        child: Text(
+          'Your Course column is a relation, so Zeolite needs to know which '
+          'table it points at to keep a page per subject there.',
+          style: _hint(context),
+        ),
+      ),
+      SurfaceCard(
+        padding: EdgeInsets.zero,
+        child: AppRow(
+          icon: Icons.table_chart_outlined,
+          title: form.coursesTitle ??
+              (form.courses == null ? 'Not linked' : 'Linked'),
+          onTap: _busy ? null : () => _pickCourses(context),
+        ),
+      ),
+      if (form.courses == null && form.suggestedCourses != null)
+        ..._linkSuggestedOffer(context, form.suggestedCourses!),
+    ];
+  }
+
+  List<Widget> _linkSuggestedOffer(
+    BuildContext context,
+    NotionTableChoice choice,
+  ) =>
+      <Widget>[
+        const SizedBox(height: AppSpacing.sm),
+        OutlinedButton.icon(
+          onPressed: _busy ? null : () => controller.linkCourses(choice),
+          icon: const Icon(Icons.link_rounded, size: 18),
+          label: Text('Link ${choice.title}'),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          'Your Course column points at ${choice.title}. Linking it adds a '
+          'text column called Zeolite ID there, so each course page can be '
+          'found again.',
+          style: _hint(context),
+        ),
+      ];
+
+  Future<void> _pickCourses(BuildContext context) async {
+    // Not [form], which predates the wait.
+    final NotionMappingForm now = await controller.ensureSources();
+    if (!context.mounted) return;
+
+    final NotionTableChoice? choice =
+        await showModalBottomSheet<NotionTableChoice>(
+      context: context,
+      builder: (BuildContext context) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: <Widget>[
+            for (final NotionTableChoice option in now.sources)
+              if (option.databaseId != now.databaseId)
+                ListTile(
+                  leading: const Icon(Icons.table_chart_outlined),
+                  title: Text(option.title),
+                  subtitle: switch (now.placeOf(option)) {
+                    final String place => Text(place),
+                    null => null,
+                  },
+                  onTap: () => Navigator.of(context).pop(option),
+                ),
+          ],
+        ),
+      ),
+    );
+    if (choice == null || !context.mounted) return;
+    await controller.linkCourses(choice);
+  }
+
+  Future<void> _save(BuildContext context) async {
+    final NavigatorState navigator = Navigator.of(context);
+    await controller.save();
+    if (context.mounted) navigator.pop();
+  }
+
+  List<Widget> sourceList(BuildContext context) {
+    if (form.sources.isEmpty && !_busy) {
       return <Widget>[
         const EmptyState(
           icon: Icons.table_chart_outlined,
@@ -693,7 +231,7 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
         const SizedBox(height: AppSpacing.md),
         Center(
           child: TextButton(
-            onPressed: _lookAgain,
+            onPressed: controller.lookAgain,
             child: const Text('Look again'),
           ),
         ),
@@ -710,115 +248,94 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
           'classes and courses are two tables, share the page holding both — '
           'or add each table to the connection — or the link between them '
           'cannot be read.',
-          style: TextStyle(
-            fontSize: 12,
-            height: 1.3,
-            color: context.palette.textTertiary,
-          ),
+          style: _hint(context),
         ),
       ),
-      for (final _Choice choice in _sources) ...<Widget>[
+      for (final NotionTableChoice choice in form.sources) ...<Widget>[
         SurfaceCard(
           padding: EdgeInsets.zero,
           child: AppRow(
             icon: Icons.table_chart_outlined,
             title: choice.title,
-            value: _placeOf(choice),
-            onTap: _busy ? null : () => _chooseSource(choice),
+            value: form.placeOf(choice),
+            onTap: _busy ? null : () => controller.chooseSource(choice),
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
       ],
-      if (_hasMore) ...<Widget>[
+      if (form.hasMore) ...<Widget>[
         const SizedBox(height: AppSpacing.sm),
         OutlinedButton(
-          onPressed: _busy ? null : _loadSources,
+          onPressed: _busy ? null : controller.loadSources,
           child: const Text('Show more'),
         ),
       ],
     ];
   }
 
-  List<Widget> _fieldForm(BuildContext context) {
-    final NotionProperty? status = _fields[NotionField.status];
-    final NotionProperty? kind = _fields[NotionField.kind];
+  List<Widget> fieldForm(BuildContext context) {
+    final bool narrowed = form.narrowed;
+    final NotionProperty? status = form.fields[NotionField.status];
+    final NotionProperty? kind = form.fields[NotionField.kind];
     return <Widget>[
       Text(
-        _narrowed
+        narrowed
             ? 'Your template matched everything Zeolite needs. These are the '
                 'rest — map them, or carry on without them.'
             : 'Zeolite filled these in from the column names. Change anything '
                 'it guessed wrong.',
         style: TextStyle(color: context.palette.textSecondary),
       ),
-      if (!_narrowed)
+      if (!narrowed)
         Align(
           alignment: Alignment.centerLeft,
           child: TextButton(
-            onPressed: _busy ? null : _showSources,
+            onPressed: _busy ? null : controller.showSources,
             child: const Text('Use a different table'),
           ),
         ),
       const SizedBox(height: AppSpacing.lg),
       for (final NotionField field in NotionField.values)
-        if (!_narrowed || _gapFields!.contains(field)) ...<Widget>[
+        if (!narrowed || form.gapFields!.contains(field)) ...<Widget>[
           _PropertyPicker(
             field: field,
-            properties: _properties,
-            chosen: _fields[field],
-            onChanged: (NotionProperty? property) {
-              setState(() {
-                if (property == null) {
-                  _fields.remove(field);
-                } else {
-                  _fields[field] = property;
-                }
-                // The words belong to the column, so a different Status column
-                // leaves the old workspace's spellings behind.
-                if (field == NotionField.status) {
-                  _statusMeanings = NotionMapping.guessMeanings(property);
-                }
-                if (field == NotionField.kind) _kindValues = <String, String>{};
-                if (field == NotionField.course) _suggestedCourses = null;
-              });
-              if (field == NotionField.course) unawaited(_findCourses());
-            },
+            properties: form.properties,
+            chosen: form.fields[field],
+            onChanged: (NotionProperty? property) =>
+                controller.setField(field, property),
           ),
           const SizedBox(height: AppSpacing.sm),
-          if (field == NotionField.key && _fields[field] == null)
+          if (field == NotionField.key && form.fields[field] == null)
             _addKeyColumnOffer(context),
-          if (field == NotionField.course && _hiddenRelation)
+          if (field == NotionField.course && form.hiddenRelation)
             _shareCoursesNote(context),
         ],
       ..._coursesSection(context),
       if (kind != null &&
           kind.options.isNotEmpty &&
-          _categories.isNotEmpty &&
-          (!_narrowed || _gapKinds!.isNotEmpty)) ...<Widget>[
+          categories.isNotEmpty &&
+          (!narrowed || form.gapKinds!.isNotEmpty)) ...<Widget>[
         const SizedBox(height: AppSpacing.lg),
         const SectionHeader('What each class type is called'),
-        for (final ClassCategory category in _categories)
-          if (!_narrowed ||
-              _gapKinds!.contains(category.name.toLowerCase())) ...<Widget>[
+        for (final ClassCategory category in categories)
+          if (!narrowed ||
+              form.gapKinds!.contains(category.name.toLowerCase())) ...<Widget>[
             _ValuePicker(
               word: category.name.toLowerCase(),
               label: category.name,
               options: kind.options,
-              chosen: _kindValues[category.name.toLowerCase()],
-              onChanged: (String? option) => setState(() {
-                if (option == null) {
-                  _kindValues.remove(category.name.toLowerCase());
-                } else {
-                  _kindValues[category.name.toLowerCase()] = option;
-                }
-              }),
+              chosen: form.kindValues[category.name.toLowerCase()],
+              onChanged: (String? option) => controller.setKindValue(
+                category.name.toLowerCase(),
+                option,
+              ),
             ),
             const SizedBox(height: AppSpacing.sm),
           ],
       ],
       if (status != null &&
           status.options.isNotEmpty &&
-          (!_narrowed || _gapStatus!.isNotEmpty)) ...<Widget>[
+          (!narrowed || form.gapStatus!.isNotEmpty)) ...<Widget>[
         const SizedBox(height: AppSpacing.lg),
         const SectionHeader('What each status means'),
         Text(
@@ -827,30 +344,25 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
         ),
         const SizedBox(height: AppSpacing.sm),
         for (final String option in status.options)
-          if (!_narrowed || _gapStatus!.contains(option)) ...<Widget>[
+          if (!narrowed || form.gapStatus!.contains(option)) ...<Widget>[
             _MeaningPicker(
               option: option,
-              chosen: _statusMeanings[option],
-              onChanged: (LogVerdict? meaning) => setState(() {
-                if (meaning == null) {
-                  _statusMeanings.remove(option);
-                } else {
-                  _statusMeanings[option] = meaning;
-                }
-              }),
+              chosen: form.statusMeanings[option],
+              onChanged: (LogVerdict? meaning) =>
+                  controller.setStatusMeaning(option, meaning),
             ),
             const SizedBox(height: AppSpacing.sm),
           ],
       ],
       const SizedBox(height: AppSpacing.lg),
       FilledButton(
-        onPressed: _busy || !_complete ? null : _save,
+        onPressed: _busy || !form.complete ? null : () => _save(context),
         child: const Text('Save'),
       ),
       // Only where every gap is optional — adoption guarantees that, but a
       // required field left unmapped still has to be answered.
-      if (_narrowed &&
-          !_gapFields!.any((NotionField f) => f.isRequired)) ...<Widget>[
+      if (narrowed &&
+          !form.gapFields!.any((NotionField f) => f.isRequired)) ...<Widget>[
         const SizedBox(height: AppSpacing.sm),
         OutlinedButton(
           onPressed: _busy ? null : () => Navigator.of(context).maybePop(),
@@ -863,7 +375,7 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
           style: TextStyle(fontSize: 12, color: context.palette.textTertiary),
         ),
       ],
-      if (!_complete) ...<Widget>[
+      if (!form.complete) ...<Widget>[
         const SizedBox(height: AppSpacing.sm),
         Text(
           'Course, Date and Status are needed before anything can be synced.',
@@ -872,18 +384,6 @@ class _NotionMappingScreenState extends ConsumerState<NotionMappingScreen> {
       ],
     ];
   }
-}
-
-@immutable
-class _Choice {
-  const _Choice(this.id, this.title, this.databaseId);
-
-  final String id;
-  final String title;
-
-  /// Kept only so the mapping records where the table lives; every call is
-  /// made against the table itself.
-  final String databaseId;
 }
 
 /// One Zeolite field and the columns that could hold it.

@@ -70,7 +70,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   'Zeolite counts how the app is used either way.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: AppType.bodySmall,
                     height: 1.5,
                     color: context.palette.textTertiary,
                   ),
@@ -173,7 +173,7 @@ class _TargetHeader extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: <Widget>[
-              HeaderNumber('${target.round()}', size: 46),
+              HeaderNumber('${target.round()}', size: AppType.figureLarge),
               const SizedBox(width: 12),
               const Expanded(
                 child: Padding(

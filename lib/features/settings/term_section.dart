@@ -222,7 +222,7 @@ class HolidaysSection extends ConsumerWidget {
               : '${Dates.formatFull(range.start)} – '
                   '${Dates.formatFull(range.end)} · $days days',
           style: TextStyle(
-            fontSize: 13,
+            fontSize: AppType.bodyLarge,
             color: context.palette.textSecondary,
           ),
         ),

@@ -113,7 +113,7 @@ class _JoiningScreenState extends ConsumerState<JoiningScreen> {
                 JoiningScreen.heading,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 17,
+                  fontSize: AppType.headlineSmall,
                   fontWeight: FontWeight.w800,
                   color: widget.colors.text,
                 ),
@@ -123,7 +123,7 @@ class _JoiningScreenState extends ConsumerState<JoiningScreen> {
                 JoiningScreen.caption,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 12.5,
+                  fontSize: AppType.bodyMedium,
                   height: 1.4,
                   fontWeight: FontWeight.w500,
                   color: widget.colors.textSecondary,

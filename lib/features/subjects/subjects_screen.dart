@@ -106,7 +106,8 @@ class _BalanceCounter extends ConsumerWidget {
         Expanded(
           child: Text(
             '${subject.priorAttended} of ${subject.priorHeld} attended',
-            style: monoStyle(color: p.textTertiary, size: 10),
+            style:
+                monoStyle(color: p.textTertiary, size: AppType.captionMedium),
           ),
         ),
         _CountButton(
@@ -183,7 +184,7 @@ class _MenuRow extends StatelessWidget {
         Text(
           label,
           style: TextStyle(
-            fontSize: 14,
+            fontSize: AppType.titleMedium,
             fontWeight: FontWeight.w500,
             color: tint,
           ),
@@ -255,7 +256,7 @@ class _SubjectRow extends ConsumerWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 12.5,
+                        fontSize: AppType.bodyMedium,
                         height: 1.2,
                         fontWeight: FontWeight.w700,
                         color: p.textPrimary,
@@ -267,7 +268,8 @@ class _SubjectRow extends ConsumerWidget {
                         detail,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: monoStyle(color: p.textTertiary, size: 9.5),
+                        style: monoStyle(
+                            color: p.textTertiary, size: AppType.captionSmall),
                       ),
                     ],
                   ],
@@ -279,7 +281,7 @@ class _SubjectRow extends ConsumerWidget {
                     ? '${stats.percent.toStringAsFixed(0)}%'
                     : '—',
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: AppType.titleMedium,
                   height: 1,
                   fontWeight: stats?.hasData ?? false
                       ? FontWeight.w800

@@ -164,7 +164,7 @@ class HeaderEyebrow extends StatelessWidget {
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style: const TextStyle(
-        fontSize: 10.5,
+        fontSize: AppType.captionLarge,
         height: 1,
         fontWeight: FontWeight.w600,
         letterSpacing: 1.3,
@@ -176,7 +176,7 @@ class HeaderEyebrow extends StatelessWidget {
 
 /// The headline itself: the one sentence or number the screen exists to say.
 class HeaderTitle extends StatelessWidget {
-  const HeaderTitle(this.text, {super.key, this.size = 23});
+  const HeaderTitle(this.text, {super.key, this.size = AppType.heroSmall});
 
   final String text;
   final double size;
@@ -213,7 +213,7 @@ class HeaderCaption extends StatelessWidget {
     return Text(
       text,
       style: TextStyle(
-        fontSize: 11,
+        fontSize: AppType.labelSmall,
         height: 1.35,
         fontWeight: FontWeight.w600,
         color: Colors.white.withValues(alpha: emphasis),
@@ -229,7 +229,7 @@ class HeaderNumber extends StatelessWidget {
   const HeaderNumber(
     this.value, {
     super.key,
-    this.size = 44,
+    this.size = AppType.figureMedium,
     this.unit = '%',
   });
 
@@ -340,7 +340,7 @@ class HeaderStepper extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 11.5,
+                    fontSize: AppType.labelLarge,
                     height: 1,
                     fontWeight: FontWeight.w700,
                     color: Colors.white,
@@ -477,7 +477,7 @@ class PushHeader extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 19,
+                    fontSize: AppType.headlineLarge,
                     height: 1.1,
                     fontWeight: FontWeight.w800,
                     letterSpacing: -0.5,
@@ -491,7 +491,7 @@ class PushHeader extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 10.5,
+                      fontSize: AppType.captionLarge,
                       height: 1,
                       fontWeight: FontWeight.w500,
                       color: Colors.white.withValues(alpha: 0.7),
@@ -579,7 +579,7 @@ class GradientFab extends StatelessWidget {
                 Text(
                   label,
                   style: const TextStyle(
-                    fontSize: 12.5,
+                    fontSize: AppType.bodyMedium,
                     height: 1,
                     fontWeight: FontWeight.w700,
                     color: Colors.white,

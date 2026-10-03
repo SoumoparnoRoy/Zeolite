@@ -92,7 +92,7 @@ class SettingsSwitchRow extends StatelessWidget {
                     Text(
                       title,
                       style: const TextStyle(
-                        fontSize: 12.5,
+                        fontSize: AppType.bodyMedium,
                         height: 1.15,
                         fontWeight: FontWeight.w700,
                       ),
@@ -105,7 +105,7 @@ class SettingsSwitchRow extends StatelessWidget {
                             subtitle,
                             maxLines: 2,
                             style: TextStyle(
-                              fontSize: 10.5,
+                              fontSize: AppType.captionLarge,
                               color: onTapSubtitle != null
                                   ? link
                                   : context.palette.textTertiary,
@@ -172,7 +172,7 @@ class SettingsRadioRow extends StatelessWidget {
                     Text(
                       title,
                       style: TextStyle(
-                        fontSize: 12.5,
+                        fontSize: AppType.bodyMedium,
                         height: 1.15,
                         fontWeight: FontWeight.w700,
                         color: p.textPrimary,
@@ -183,7 +183,7 @@ class SettingsRadioRow extends StatelessWidget {
                       Text(
                         subtitle!,
                         style: TextStyle(
-                          fontSize: 10.5,
+                          fontSize: AppType.captionLarge,
                           height: 1.35,
                           color: p.textTertiary,
                         ),
@@ -276,7 +276,7 @@ class SettingsHint extends StatelessWidget {
     return Text(
       text,
       style: TextStyle(
-        fontSize: 10.5,
+        fontSize: AppType.captionLarge,
         height: 1.4,
         color: context.palette.textTertiary,
       ),

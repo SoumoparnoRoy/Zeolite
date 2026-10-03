@@ -299,7 +299,8 @@ class _ExtraClassFormState extends ConsumerState<_ExtraClassForm> {
           const SizedBox(height: AppSpacing.md),
           Text(
             _error!,
-            style: TextStyle(color: context.palette.absent, fontSize: 13),
+            style: TextStyle(
+                color: context.palette.absent, fontSize: AppType.bodyLarge),
           ),
         ],
         const SizedBox(height: AppSpacing.xl),

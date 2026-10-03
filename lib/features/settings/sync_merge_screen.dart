@@ -307,7 +307,8 @@ class _RowCard extends StatelessWidget {
             if (row.kind == SyncKind.attendance)
               Text(
                 _when(row.localKey),
-                style: TextStyle(fontSize: 12, color: p.textTertiary),
+                style: TextStyle(
+                    fontSize: AppType.bodySmall, color: p.textTertiary),
               ),
             const SizedBox(height: AppSpacing.sm),
             Row(
@@ -392,7 +393,7 @@ class _Choice extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: AppType.labelSmall,
                 fontWeight: FontWeight.w600,
                 color: selected ? accent : p.textTertiary,
               ),
@@ -403,7 +404,8 @@ class _Choice extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 'Changed more recently',
-                style: TextStyle(fontSize: 11, color: p.textTertiary),
+                style: TextStyle(
+                    fontSize: AppType.labelSmall, color: p.textTertiary),
               ),
             ],
           ],

@@ -649,6 +649,53 @@ class AppSpacing {
   static const double radiusSheet = 28;
 }
 
+/// Every font size the app draws with. Sizes only — weight and line height
+/// still vary by place, and a fixed set of full styles would have meant either
+/// sixty of them or a visible redesign. The half steps are the design's own.
+class AppType {
+  const AppType._();
+
+  /// Inside the week grid's blocks and on pills.
+  static const double microXs = 7;
+  static const double microSmall = 8;
+  static const double microMedium = 8.5;
+  static const double microLarge = 9;
+
+  /// Eyebrows, badges, and the mono times and counts.
+  static const double captionSmall = 9.5;
+  static const double captionMedium = 10;
+  static const double captionLarge = 10.5;
+
+  static const double labelSmall = 11;
+  static const double labelLarge = 11.5;
+
+  static const double bodySmall = 12;
+  static const double bodyMedium = 12.5;
+  static const double bodyLarge = 13;
+
+  static const double titleSmall = 13.5;
+  static const double titleMedium = 14;
+  static const double titleLarge = 14.5;
+
+  static const double headingSmall = 15;
+  static const double headingMedium = 15.5;
+  static const double headingLarge = 16;
+
+  static const double headlineSmall = 17;
+  static const double headlineMedium = 18;
+  static const double headlineLarge = 19;
+
+  /// The gradient header's headline.
+  static const double heroSmall = 23;
+  static const double heroLarge = 30;
+
+  /// Big numbers: the header percentage and the figures that echo it.
+  static const double figureSmall = 40;
+  static const double figureMedium = 44;
+  static const double figureLarge = 46;
+  static const double figureXl = 60;
+}
+
 class AppTheme {
   const AppTheme._();
 
@@ -748,7 +795,7 @@ class AppTheme {
         titleTextStyle: const TextStyle(
           fontFamily: AppFonts.sans,
           color: Colors.white,
-          fontSize: 19,
+          fontSize: AppType.headlineLarge,
           fontWeight: FontWeight.w800,
           letterSpacing: -0.5,
         ),
@@ -776,7 +823,7 @@ class AppTheme {
           final bool selected = states.contains(WidgetState.selected);
           return TextStyle(
             fontFamily: AppFonts.sans,
-            fontSize: 11,
+            fontSize: AppType.labelSmall,
             fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
             color: selected ? p.accent : p.textFaint,
           );
@@ -827,7 +874,7 @@ class AppTheme {
           ),
           textStyle: const TextStyle(
             fontFamily: AppFonts.sans,
-            fontSize: 15,
+            fontSize: AppType.headingSmall,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -837,7 +884,7 @@ class AppTheme {
           foregroundColor: p.accent,
           textStyle: const TextStyle(
             fontFamily: AppFonts.sans,
-            fontSize: 14,
+            fontSize: AppType.titleMedium,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -856,7 +903,7 @@ class AppTheme {
           ),
           textStyle: const TextStyle(
             fontFamily: AppFonts.sans,
-            fontSize: 15,
+            fontSize: AppType.headingSmall,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -929,7 +976,7 @@ class AppTheme {
         // two numbers off centre inside their boxes.
         hourMinuteTextStyle: const TextStyle(
           fontFamily: AppFonts.sans,
-          fontSize: 40,
+          fontSize: AppType.figureSmall,
           fontWeight: FontWeight.w700,
           letterSpacing: 0,
         ),
@@ -952,7 +999,7 @@ class AppTheme {
         dialBackgroundColor: p.surfaceHigher,
         helpTextStyle: TextStyle(
           fontFamily: AppFonts.sans,
-          fontSize: 13,
+          fontSize: AppType.bodyLarge,
           fontWeight: FontWeight.w600,
           color: p.textSecondary,
         ),
@@ -986,7 +1033,7 @@ class AppTheme {
         labelStyle: TextStyle(
           fontFamily: AppFonts.sans,
           color: p.textSecondary,
-          fontSize: 13,
+          fontSize: AppType.bodyLarge,
           fontWeight: FontWeight.w600,
         ),
         shape: RoundedRectangleBorder(

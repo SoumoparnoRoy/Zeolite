@@ -58,7 +58,8 @@ class _SimulateSheetState extends State<SimulateSheet> {
       children: <Widget>[
         Text(
           'Try out the $units ahead. Nothing here is saved.',
-          style: TextStyle(fontSize: 12, height: 1.4, color: p.textTertiary),
+          style: TextStyle(
+              fontSize: AppType.bodySmall, height: 1.4, color: p.textTertiary),
         ),
         const SizedBox(height: AppSpacing.xl),
         Row(
@@ -67,7 +68,7 @@ class _SimulateSheetState extends State<SimulateSheet> {
             Text(
               then.hasData ? '${then.percent.toStringAsFixed(0)}%' : '—',
               style: TextStyle(
-                fontSize: 40,
+                fontSize: AppType.figureSmall,
                 height: 1,
                 fontWeight: FontWeight.w800,
                 letterSpacing: -1,
@@ -84,7 +85,8 @@ class _SimulateSheetState extends State<SimulateSheet> {
                     : _attended == 0 && _missed == 0
                         ? 'Where you are now'
                         : 'Now ${now.percent.toStringAsFixed(0)}%',
-                style: monoStyle(color: p.textTertiary, size: 11),
+                style:
+                    monoStyle(color: p.textTertiary, size: AppType.labelSmall),
               ),
             ),
           ],
@@ -116,8 +118,10 @@ class _SimulateSheetState extends State<SimulateSheet> {
           Text(
             'That is every ${now.weighted ? 'period' : 'class'} left this '
             'term.',
-            style:
-                TextStyle(fontSize: 11.5, height: 1.4, color: p.textTertiary),
+            style: TextStyle(
+                fontSize: AppType.labelLarge,
+                height: 1.4,
+                color: p.textTertiary),
           ),
         ],
         const SizedBox(height: AppSpacing.xl),
@@ -139,7 +143,7 @@ class _SimulateSheetState extends State<SimulateSheet> {
                 child: Text(
                   then.headline,
                   style: TextStyle(
-                    fontSize: 12.5,
+                    fontSize: AppType.bodyMedium,
                     height: 1.4,
                     fontWeight: FontWeight.w600,
                     color: p.textPrimary,
@@ -200,7 +204,7 @@ class _StepperRow extends StatelessWidget {
             child: Text(
               label,
               style: TextStyle(
-                fontSize: 13,
+                fontSize: AppType.bodyLarge,
                 fontWeight: FontWeight.w700,
                 color: p.textPrimary,
               ),
@@ -218,7 +222,7 @@ class _StepperRow extends StatelessWidget {
               textAlign: TextAlign.center,
               style: monoStyle(
                 color: p.textPrimary,
-                size: 15,
+                size: AppType.headingSmall,
                 weight: FontWeight.w700,
               ),
             ),

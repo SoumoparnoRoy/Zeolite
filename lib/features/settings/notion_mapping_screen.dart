@@ -85,7 +85,7 @@ class _MappingBody {
   bool get _busy => form.busy;
 
   static TextStyle _hint(BuildContext context) => TextStyle(
-        fontSize: 12,
+        fontSize: AppType.bodySmall,
         height: 1.3,
         color: context.palette.textTertiary,
       );
@@ -340,7 +340,8 @@ class _MappingBody {
         const SectionHeader('What each status means'),
         Text(
           LogVerdict.explained,
-          style: TextStyle(fontSize: 12, color: context.palette.textTertiary),
+          style: TextStyle(
+              fontSize: AppType.bodySmall, color: context.palette.textTertiary),
         ),
         const SizedBox(height: AppSpacing.sm),
         for (final String option in status.options)
@@ -372,14 +373,16 @@ class _MappingBody {
         Text(
           'Sync works without these. You can map them later from Notion sync '
           'in Settings.',
-          style: TextStyle(fontSize: 12, color: context.palette.textTertiary),
+          style: TextStyle(
+              fontSize: AppType.bodySmall, color: context.palette.textTertiary),
         ),
       ],
       if (!form.complete) ...<Widget>[
         const SizedBox(height: AppSpacing.sm),
         Text(
           'Course, Date and Status are needed before anything can be synced.',
-          style: TextStyle(fontSize: 12, color: context.palette.textTertiary),
+          style: TextStyle(
+              fontSize: AppType.bodySmall, color: context.palette.textTertiary),
         ),
       ],
     ];
@@ -428,7 +431,7 @@ class _PropertyPicker extends StatelessWidget {
                 Text(
                   field.description,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: AppType.bodySmall,
                     height: 1.3,
                     color: context.palette.textTertiary,
                   ),

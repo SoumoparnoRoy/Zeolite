@@ -90,7 +90,8 @@ class _ClassLogMappingScreenState extends State<ClassLogMappingScreen> {
               Text(
                 'Zeolite filled in what it recognised. Match the rest and it '
                 'will remember this layout for next time.',
-                style: TextStyle(fontSize: 12.5, color: p.textTertiary),
+                style: TextStyle(
+                    fontSize: AppType.bodyMedium, color: p.textTertiary),
               ),
               const SizedBox(height: AppSpacing.lg),
               const SectionHeader('Columns'),
@@ -127,7 +128,8 @@ class _ClassLogMappingScreenState extends State<ClassLogMappingScreen> {
                 const SectionHeader('What each status means'),
                 Text(
                   LogVerdict.explained,
-                  style: TextStyle(fontSize: 12, color: p.textTertiary),
+                  style: TextStyle(
+                      fontSize: AppType.bodySmall, color: p.textTertiary),
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 for (final String word
@@ -158,7 +160,8 @@ class _ClassLogMappingScreenState extends State<ClassLogMappingScreen> {
                 Text(
                   'Only decides which rows are labs. Each type keeps the '
                   'file\'s own name in the app.',
-                  style: TextStyle(fontSize: 12, color: p.textTertiary),
+                  style: TextStyle(
+                      fontSize: AppType.bodySmall, color: p.textTertiary),
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 for (final String word
@@ -228,7 +231,7 @@ class _Choice<T> extends StatelessWidget {
                   Text(
                     subtitle!,
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: AppType.bodySmall,
                       height: 1.3,
                       color: context.palette.textTertiary,
                     ),
@@ -296,8 +299,9 @@ class _DateOrder extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               '"$sample" could be either.',
-              style:
-                  TextStyle(fontSize: 12, color: context.palette.textTertiary),
+              style: TextStyle(
+                  fontSize: AppType.bodySmall,
+                  color: context.palette.textTertiary),
             ),
             const SizedBox(height: AppSpacing.sm),
             Wrap(

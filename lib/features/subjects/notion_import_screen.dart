@@ -179,7 +179,7 @@ class _NotionImportScreenState extends ConsumerState<NotionImportScreen> {
                   child: Text(
                     note,
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: AppType.bodySmall,
                       color: context.palette.textTertiary,
                     ),
                   ),
@@ -209,7 +209,7 @@ class _NotionImportScreenState extends ConsumerState<NotionImportScreen> {
                 trailing: Text(
                   _span(_export),
                   style: TextStyle(
-                    fontSize: 11.5,
+                    fontSize: AppType.labelLarge,
                     fontWeight: FontWeight.w600,
                     color: p.textTertiary,
                   ),
@@ -228,8 +228,10 @@ class _NotionImportScreenState extends ConsumerState<NotionImportScreen> {
               Text(
                 'Every class is written as its own mark, so the attendance log '
                 'reads day by day rather than as one carried total.',
-                style:
-                    TextStyle(fontSize: 12, height: 1.45, color: p.textFaint),
+                style: TextStyle(
+                    fontSize: AppType.bodySmall,
+                    height: 1.45,
+                    color: p.textFaint),
               ),
             ],
           ),
@@ -264,7 +266,7 @@ class _Problems extends StatelessWidget {
             Text(
               '${Words.plural(problems.length, 'row')} could not be read',
               style: TextStyle(
-                fontSize: 13.5,
+                fontSize: AppType.titleSmall,
                 fontWeight: FontWeight.w700,
                 color: p.absent,
               ),
@@ -276,13 +278,15 @@ class _Problems extends StatelessWidget {
                 child: Text(
                   problem,
                   // A sentence, not a figure — mono is for the numbers.
-                  style: TextStyle(fontSize: 10.5, color: p.textTertiary),
+                  style: TextStyle(
+                      fontSize: AppType.captionLarge, color: p.textTertiary),
                 ),
               ),
             if (problems.length > 5)
               Text(
                 'and ${problems.length - 5} more',
-                style: monoStyle(color: p.textFaint, size: 10.5),
+                style:
+                    monoStyle(color: p.textFaint, size: AppType.captionLarge),
               ),
           ],
         ),
@@ -318,7 +322,7 @@ class _OutsideTermWarning extends StatelessWidget {
             Text(
               'Some of these fall outside your term',
               style: TextStyle(
-                fontSize: 13.5,
+                fontSize: AppType.titleSmall,
                 fontWeight: FontWeight.w700,
                 color: p.warning,
               ),
@@ -328,7 +332,7 @@ class _OutsideTermWarning extends StatelessWidget {
               'They will be brought in and shown in the attendance log, but '
               'the percentages only count classes inside the term dates. '
               'Widen the term in Settings if these should count.',
-              style: TextStyle(fontSize: 12.5, height: 1.4),
+              style: TextStyle(fontSize: AppType.bodyMedium, height: 1.4),
             ),
           ],
         ),
@@ -372,7 +376,7 @@ class _CancelledRule extends StatelessWidget {
                   ? 'Cancelled classes will count as attended'
                   : 'Cancelled classes will stop counting',
               style: TextStyle(
-                fontSize: 13.5,
+                fontSize: AppType.titleSmall,
                 fontWeight: FontWeight.w700,
                 color: p.warning,
               ),
@@ -380,7 +384,7 @@ class _CancelledRule extends StatelessWidget {
             const SizedBox(height: 5),
             Text(
               '$why Cancelled classes count as attended in Settings.$rest',
-              style: const TextStyle(fontSize: 12.5, height: 1.4),
+              style: const TextStyle(fontSize: AppType.bodyMedium, height: 1.4),
             ),
           ],
         ),
@@ -422,7 +426,7 @@ class _TypeWorth extends StatelessWidget {
             Text(
               'Class types will count as your table counts them',
               style: TextStyle(
-                fontSize: 13.5,
+                fontSize: AppType.titleSmall,
                 fontWeight: FontWeight.w700,
                 color: p.warning,
               ),
@@ -431,7 +435,7 @@ class _TypeWorth extends StatelessWidget {
             Text(
               '${lines.join(' · ')}. Classes you add later count the same. '
               'Marks already in the app keep what they were worth.',
-              style: const TextStyle(fontSize: 12.5, height: 1.4),
+              style: const TextStyle(fontSize: AppType.bodyMedium, height: 1.4),
             ),
           ],
         ),
@@ -468,7 +472,7 @@ class _UntypedChoice extends StatelessWidget {
                   child: Text(
                     '${Words.plural(rows, 'class', 'classes')} with no type',
                     style: TextStyle(
-                      fontSize: 13.5,
+                      fontSize: AppType.titleSmall,
                       fontWeight: FontWeight.w700,
                       color: p.warning,
                     ),
@@ -486,7 +490,7 @@ class _UntypedChoice extends StatelessWidget {
                   : 'Your table counts none of these, because their type is '
                       'empty. They will come in without counting, as they are '
                       'there.',
-              style: const TextStyle(fontSize: 12.5, height: 1.4),
+              style: const TextStyle(fontSize: AppType.bodyMedium, height: 1.4),
             ),
           ],
         ),
@@ -542,7 +546,7 @@ class _SubjectCard extends StatelessWidget {
                 child: Text(
                   planned.name,
                   style: TextStyle(
-                    fontSize: 13.5,
+                    fontSize: AppType.titleSmall,
                     height: 1.25,
                     fontWeight: FontWeight.w700,
                     color: excluded ? p.textFaint : p.textPrimary,
@@ -574,13 +578,14 @@ class _SubjectCard extends StatelessWidget {
               for (final MapEntry<String, int> label in planned.labels.entries)
                 '${label.value} ${label.key.toLowerCase()}',
             ].join(' · '),
-            style: monoStyle(color: p.textTertiary, size: 10.5),
+            style: monoStyle(color: p.textTertiary, size: AppType.captionLarge),
           ),
           for (final String note in notes) ...<Widget>[
             const SizedBox(height: 8),
             Text(
               note,
-              style: TextStyle(fontSize: 12, height: 1.4, color: p.warning),
+              style: TextStyle(
+                  fontSize: AppType.bodySmall, height: 1.4, color: p.warning),
             ),
           ],
         ],

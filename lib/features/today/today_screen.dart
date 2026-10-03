@@ -513,7 +513,7 @@ class _InAppAlertDialog extends StatelessWidget {
                       s.subject.name,
                       style: const TextStyle(
                         fontWeight: FontWeight.w700,
-                        fontSize: 14,
+                        fontSize: AppType.titleMedium,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -521,7 +521,7 @@ class _InAppAlertDialog extends StatelessWidget {
                       NotificationService.dangerMessage(s),
                       style: TextStyle(
                         color: p.textSecondary,
-                        fontSize: 12.5,
+                        fontSize: AppType.bodyMedium,
                         height: 1.35,
                       ),
                     ),
@@ -533,7 +533,7 @@ class _InAppAlertDialog extends StatelessWidget {
               'here instead. Change this in Settings → Notifications.',
               style: TextStyle(
                 color: p.textTertiary,
-                fontSize: 11.5,
+                fontSize: AppType.labelLarge,
                 height: 1.35,
               ),
             ),

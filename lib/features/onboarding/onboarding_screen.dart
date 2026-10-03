@@ -109,7 +109,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               ),
             ),
             const SizedBox(height: 18),
-            const HeaderTitle('Zeolite', size: 30),
+            const HeaderTitle('Zeolite', size: AppType.heroLarge),
             const SizedBox(height: 8),
             const HeaderCaption(
               'Your timetable and attendance, in one place. '
@@ -165,7 +165,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                         Text(
                           '${_target.round()}%',
                           style: TextStyle(
-                            fontSize: 40,
+                            fontSize: AppType.figureSmall,
                             height: 1,
                             fontWeight: FontWeight.w800,
                             letterSpacing: -2,
@@ -179,7 +179,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                             child: Text(
                               'Most universities require 75%.',
                               style: TextStyle(
-                                fontSize: 10.5,
+                                fontSize: AppType.captionLarge,
                                 height: 1.35,
                                 fontWeight: FontWeight.w500,
                                 color: context.palette.textTertiary,
@@ -228,7 +228,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       child: Text(
                         'Remind me about classes and unmarked attendance',
                         style: TextStyle(
-                          fontSize: 12.5,
+                          fontSize: AppType.bodyMedium,
                           height: 1.35,
                           fontWeight: FontWeight.w700,
                         ),

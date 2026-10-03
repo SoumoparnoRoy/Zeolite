@@ -512,7 +512,7 @@ class _SlotFormState extends ConsumerState<_SlotForm> {
               : Text(
                   durationLabel,
                   style: TextStyle(
-                    fontSize: 11.5,
+                    fontSize: AppType.labelLarge,
                     fontWeight: FontWeight.w600,
                     color: context.palette.textTertiary,
                   ),
@@ -537,7 +537,7 @@ class _SlotFormState extends ConsumerState<_SlotForm> {
             'fills the end in from the subject\'s category, and "Add another '
             'time" covers a subject that meets twice in one day.',
             style: TextStyle(
-              fontSize: 12,
+              fontSize: AppType.bodySmall,
               height: 1.4,
               color: context.palette.textTertiary,
             ),
@@ -610,7 +610,8 @@ class _SlotFormState extends ConsumerState<_SlotForm> {
           const SizedBox(height: AppSpacing.md),
           Text(
             _error!,
-            style: TextStyle(color: context.palette.absent, fontSize: 13),
+            style: TextStyle(
+                color: context.palette.absent, fontSize: AppType.bodyLarge),
           ),
         ],
         const SizedBox(height: AppSpacing.xl),
@@ -672,7 +673,7 @@ class _DayGroup extends StatelessWidget {
                     child: Text(
                       kWeekdayNamesLong[weekday - 1].toUpperCase(),
                       style: TextStyle(
-                        fontSize: 11.5,
+                        fontSize: AppType.labelLarge,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 1.1,
                         color: context.palette.textSecondary,
@@ -683,7 +684,7 @@ class _DayGroup extends StatelessWidget {
                     Text(
                       '${times.length} classes',
                       style: TextStyle(
-                        fontSize: 11.5,
+                        fontSize: AppType.labelLarge,
                         fontWeight: FontWeight.w600,
                         color: context.palette.textTertiary,
                       ),
@@ -717,7 +718,7 @@ class _DayGroup extends StatelessWidget {
                     horizontal: AppSpacing.sm,
                   ),
                   textStyle: const TextStyle(
-                    fontSize: 13,
+                    fontSize: AppType.bodyLarge,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -775,7 +776,8 @@ class _ClassTimeCard extends StatelessWidget {
                 child: Text(
                   '–',
                   style: TextStyle(
-                      color: context.palette.textTertiary, fontSize: 13),
+                      color: context.palette.textTertiary,
+                      fontSize: AppType.bodyLarge),
                 ),
               ),
               _TimeChip(
@@ -786,7 +788,7 @@ class _ClassTimeCard extends StatelessWidget {
               Text(
                 Clock.formatDuration(time.endMinutes - time.startMinutes),
                 style: TextStyle(
-                  fontSize: 11.5,
+                  fontSize: AppType.labelLarge,
                   fontWeight: FontWeight.w600,
                   color: context.palette.textTertiary,
                 ),
@@ -830,7 +832,7 @@ class _TimeChip extends StatelessWidget {
           child: Text(
             label,
             style: const TextStyle(
-              fontSize: 13.5,
+              fontSize: AppType.titleSmall,
               fontWeight: FontWeight.w600,
             ),
           ),

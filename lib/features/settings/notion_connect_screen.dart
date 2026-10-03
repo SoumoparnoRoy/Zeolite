@@ -156,7 +156,7 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
               'The first connection can take up to a minute while the service '
               'wakes up.',
               style: TextStyle(
-                fontSize: 12,
+                fontSize: AppType.bodySmall,
                 color: context.palette.textTertiary,
               ),
             ),
@@ -201,7 +201,7 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
           '${widget.retakeTemplate ? 'Take the template' : 'Connect Notion'} '
           'first.',
           style: TextStyle(
-            fontSize: 12,
+            fontSize: AppType.bodySmall,
             color: context.palette.textTertiary,
           ),
         ),
@@ -271,7 +271,9 @@ class _NotionConnectScreenState extends ConsumerState<NotionConnectScreen> {
           children: <Widget>[
             Text(
               tokens.workspaceName ?? 'Connected',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+              style: const TextStyle(
+                  fontSize: AppType.headlineMedium,
+                  fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(

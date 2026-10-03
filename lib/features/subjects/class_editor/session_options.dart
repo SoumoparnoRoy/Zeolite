@@ -377,7 +377,7 @@ class _OptionTile extends StatelessWidget {
                 Text(
                   title,
                   style: TextStyle(
-                    fontSize: 14.5,
+                    fontSize: AppType.titleLarge,
                     fontWeight: FontWeight.w700,
                     color: color,
                   ),
@@ -386,7 +386,7 @@ class _OptionTile extends StatelessWidget {
                 Text(
                   subtitle,
                   style: TextStyle(
-                    fontSize: 12.5,
+                    fontSize: AppType.bodyMedium,
                     height: 1.35,
                     color: context.palette.textSecondary,
                   ),

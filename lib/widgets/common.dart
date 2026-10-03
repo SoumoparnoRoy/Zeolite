@@ -39,7 +39,7 @@ Color healthFill(AttendanceHealth health, AppPalette palette) {
 /// in the mono face, which is the whole reason it is bundled.
 TextStyle monoStyle({
   required Color color,
-  double size = 10.5,
+  double size = AppType.captionLarge,
   FontWeight weight = FontWeight.w500,
   double height = 1,
 }) {
@@ -118,7 +118,7 @@ class SectionHeader extends StatelessWidget {
               title.toUpperCase(),
               style: TextStyle(
                 color: context.palette.textTertiary,
-                fontSize: 10.5,
+                fontSize: AppType.captionLarge,
                 height: 1,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 1.05,
@@ -173,7 +173,7 @@ class DayRule extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: ink,
-                    fontSize: 10.5,
+                    fontSize: AppType.captionLarge,
                     height: 1,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 1,
@@ -246,7 +246,7 @@ class EmptyState extends StatelessWidget {
               title,
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 16,
+                fontSize: AppType.headingLarge,
                 fontWeight: FontWeight.w800,
                 letterSpacing: -0.3,
                 color: p.textPrimary,
@@ -257,7 +257,7 @@ class EmptyState extends StatelessWidget {
               message,
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 12.5,
+                fontSize: AppType.bodyMedium,
                 height: 1.45,
                 fontWeight: FontWeight.w500,
                 color: p.textTertiary,
@@ -437,7 +437,7 @@ class Pill extends StatelessWidget {
             label.toUpperCase(),
             style: TextStyle(
               color: fg,
-              fontSize: 8.5,
+              fontSize: AppType.microMedium,
               height: 1,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.45,
@@ -505,7 +505,7 @@ class AppRow extends StatelessWidget {
                   Text(
                     title,
                     style: TextStyle(
-                      fontSize: 12.5,
+                      fontSize: AppType.bodyMedium,
                       height: 1.15,
                       fontWeight: FontWeight.w700,
                       color: p.textPrimary,
@@ -522,7 +522,7 @@ class AppRow extends StatelessWidget {
                       // Proportional: these are sentences, and mono is this
                       // app's voice for data — times, codes, dates, counts.
                       style: TextStyle(
-                        fontSize: 10.5,
+                        fontSize: AppType.captionLarge,
                         height: 1.35,
                         color: p.textTertiary,
                       ),
@@ -591,7 +591,7 @@ class GroupNote extends StatelessWidget {
       child: Text(
         text,
         style: TextStyle(
-          fontSize: 10.5,
+          fontSize: AppType.captionLarge,
           height: 1.4,
           fontWeight: FontWeight.w400,
           color: context.palette.textTertiary,
@@ -722,7 +722,7 @@ Future<T?> showAppSheet<T>({
                 Text(
                   title,
                   style: const TextStyle(
-                    fontSize: 19,
+                    fontSize: AppType.headlineLarge,
                     fontWeight: FontWeight.w800,
                     letterSpacing: -0.5,
                   ),

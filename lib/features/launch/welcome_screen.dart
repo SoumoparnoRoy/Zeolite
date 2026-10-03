@@ -134,7 +134,7 @@ class _WelcomeCopyState extends State<WelcomeCopy> {
                       style: TextStyle(
                         fontFamily: AppFonts.sans,
                         fontWeight: FontWeight.w500,
-                        fontSize: 11.5 * scale,
+                        fontSize: AppType.labelLarge * scale,
                         color: colors.textTertiary,
                       ),
                     ),
@@ -174,7 +174,7 @@ class _WelcomeCopyState extends State<WelcomeCopy> {
                 style: TextStyle(
                   fontFamily: AppFonts.sans,
                   fontWeight: weight,
-                  fontSize: 15 * metrics.scale,
+                  fontSize: AppType.headingSmall * metrics.scale,
                   color: foreground,
                 ),
               ),
@@ -191,7 +191,7 @@ class _WelcomeCopyState extends State<WelcomeCopy> {
     final TextStyle base = TextStyle(
       fontFamily: AppFonts.sans,
       fontWeight: FontWeight.w500,
-      fontSize: 12 * scale,
+      fontSize: AppType.bodySmall * scale,
       height: WelcomeMetrics.termsLine / 12,
       color: colors.textTertiary,
     );

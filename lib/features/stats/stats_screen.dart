@@ -156,7 +156,8 @@ class _OverallHeader extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: <Widget>[
-                HeaderNumber('${stats.percent.round()}', size: 60),
+                HeaderNumber('${stats.percent.round()}',
+                    size: AppType.figureXl),
                 const SizedBox(width: 16),
                 // Capped, not just Expanded: on a wide column a label/value
                 // pair stretched to the full width leaves the count stranded
@@ -198,7 +199,7 @@ class _OverallHeader extends StatelessWidget {
               'Your portal will say ${stats.termPercent!.round()}% — it counts '
               'the $toCome still to come as missed.',
               style: TextStyle(
-                fontSize: 10.5,
+                fontSize: AppType.captionLarge,
                 height: 1.4,
                 fontWeight: FontWeight.w500,
                 color: Colors.white.withValues(alpha: 0.75),
@@ -216,7 +217,7 @@ class _OverallHeader extends StatelessWidget {
               'Term ${(settings.termProgress * 100).round()}% done · '
               '${Words.plural(settings.daysLeftInTerm, 'day')} left',
               style: TextStyle(
-                fontSize: 10.5,
+                fontSize: AppType.captionLarge,
                 height: 1,
                 fontWeight: FontWeight.w500,
                 color: Colors.white.withValues(alpha: 0.75),
@@ -253,7 +254,7 @@ class _LegendLine extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: 11,
+              fontSize: AppType.labelSmall,
               height: 1,
               fontWeight: FontWeight.w600,
               color: Colors.white.withValues(alpha: dimmed ? 0.6 : 0.85),
@@ -265,7 +266,7 @@ class _LegendLine extends StatelessWidget {
           '$value',
           style: TextStyle(
             fontFamily: AppFonts.mono,
-            fontSize: 11,
+            fontSize: AppType.labelSmall,
             height: 1,
             fontWeight: FontWeight.w700,
             color: Colors.white.withValues(alpha: dimmed ? 0.8 : 1),
@@ -311,7 +312,7 @@ class _SubjectStatsCard extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 12.5,
+                        fontSize: AppType.bodyMedium,
                         height: 1.2,
                         fontWeight: FontWeight.w700,
                         color: p.textPrimary,
@@ -322,7 +323,8 @@ class _SubjectStatsCard extends StatelessWidget {
                       stats.hasData
                           ? '${stats.attended} of ${stats.held} attended'
                           : 'Nothing marked yet',
-                      style: monoStyle(color: p.textTertiary, size: 10),
+                      style: monoStyle(
+                          color: p.textTertiary, size: AppType.captionMedium),
                     ),
                   ],
                 ),
@@ -331,7 +333,7 @@ class _SubjectStatsCard extends StatelessWidget {
               Text(
                 stats.hasData ? '${stats.percent.toStringAsFixed(0)}%' : '—',
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: AppType.headingLarge,
                   height: 1,
                   fontWeight: FontWeight.w800,
                   letterSpacing: -0.4,
@@ -352,7 +354,7 @@ class _SubjectStatsCard extends StatelessWidget {
               stats.headline,
               maxLines: 2,
               style: TextStyle(
-                fontSize: 10.5,
+                fontSize: AppType.captionLarge,
                 height: 1.3,
                 fontWeight: FontWeight.w600,
                 // Calm by default. The colour is spent only on the subjects
@@ -411,14 +413,15 @@ class _SubjectDetail extends ConsumerWidget {
                   meta,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: monoStyle(color: p.textTertiary, size: 11),
+                  style: monoStyle(
+                      color: p.textTertiary, size: AppType.labelSmall),
                 ),
                 const SizedBox(height: 5),
               ],
               Text(
                 'Target ${(stats.target * 100).round()}%',
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: AppType.bodySmall,
                   fontWeight: FontWeight.w600,
                   color: p.textSecondary,
                 ),
@@ -502,7 +505,7 @@ class _SubjectDetail extends ConsumerWidget {
               child: Text(
                 stats.headline,
                 style: TextStyle(
-                  fontSize: 12.5,
+                  fontSize: AppType.bodyMedium,
                   height: 1.4,
                   fontWeight: FontWeight.w600,
                   color: p.textPrimary,
@@ -517,7 +520,8 @@ class _SubjectDetail extends ConsumerWidget {
         Text(
           'Attending every remaining class would put you at '
           '${(stats.maxAchievableRatio * 100).toStringAsFixed(0)}%.',
-          style: TextStyle(fontSize: 11.5, height: 1.4, color: p.textTertiary),
+          style: TextStyle(
+              fontSize: AppType.labelLarge, height: 1.4, color: p.textTertiary),
         ),
       ],
     ];
@@ -537,7 +541,8 @@ class _SubjectDetail extends ConsumerWidget {
         'See where your percentage would land if you attend or miss the '
         'classes ahead.',
         textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 11.5, height: 1.4, color: p.textTertiary),
+        style: TextStyle(
+            fontSize: AppType.labelLarge, height: 1.4, color: p.textTertiary),
       ),
       const SizedBox(height: AppSpacing.lg),
       OutlinedButton.icon(
@@ -657,7 +662,7 @@ class _MetricTile extends StatelessWidget {
           Text(
             value,
             style: TextStyle(
-              fontSize: 19,
+              fontSize: AppType.headlineLarge,
               height: 1,
               fontWeight: FontWeight.w800,
               letterSpacing: -0.5,
@@ -669,7 +674,7 @@ class _MetricTile extends StatelessWidget {
             label,
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 10,
+              fontSize: AppType.captionMedium,
               height: 1,
               fontWeight: FontWeight.w600,
               color: p.textTertiary,
@@ -726,7 +731,7 @@ class _TagCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 12.5,
+                    fontSize: AppType.bodyMedium,
                     height: 1.2,
                     fontWeight: FontWeight.w700,
                     color: p.textPrimary,
@@ -737,7 +742,8 @@ class _TagCard extends StatelessWidget {
                   breakdown.summary,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: monoStyle(color: p.textTertiary, size: 10),
+                  style: monoStyle(
+                      color: p.textTertiary, size: AppType.captionMedium),
                 ),
               ],
             ),
@@ -746,7 +752,7 @@ class _TagCard extends StatelessWidget {
           Text(
             '${breakdown.total}',
             style: TextStyle(
-              fontSize: 16,
+              fontSize: AppType.headingLarge,
               height: 1,
               fontWeight: FontWeight.w800,
               letterSpacing: -0.4,
@@ -774,7 +780,7 @@ class _TagCard extends StatelessWidget {
                 : '${breakdown.countLabel} across ${breakdown.subjectCount} '
                     'subjects · ${breakdown.summary}',
             style: TextStyle(
-              fontSize: 12,
+              fontSize: AppType.bodySmall,
               height: 1.4,
               color: context.palette.textTertiary,
             ),
@@ -821,7 +827,7 @@ class _TaggedMarkRow extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 12.5,
+                    fontSize: AppType.bodyMedium,
                     height: 1.2,
                     fontWeight: FontWeight.w700,
                     color: p.textPrimary,
@@ -831,7 +837,8 @@ class _TaggedMarkRow extends StatelessWidget {
                 Text(
                   '${Dates.formatDayMonth(mark.record.date)} · '
                   '${AttendanceRecord.startLabel(mark.record.startMinutes, use24Hour: use24Hour)}',
-                  style: monoStyle(color: p.textTertiary, size: 10),
+                  style: monoStyle(
+                      color: p.textTertiary, size: AppType.captionMedium),
                 ),
               ],
             ),

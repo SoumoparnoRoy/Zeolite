@@ -85,7 +85,7 @@ class _ChoiceTile extends StatelessWidget {
                 Text(
                   title,
                   style: const TextStyle(
-                    fontSize: 15.5,
+                    fontSize: AppType.headingMedium,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -93,7 +93,7 @@ class _ChoiceTile extends StatelessWidget {
                 Text(
                   subtitle,
                   style: TextStyle(
-                    fontSize: 12.5,
+                    fontSize: AppType.bodyMedium,
                     height: 1.35,
                     color: context.palette.textSecondary,
                   ),

@@ -140,7 +140,7 @@ class _PackageList extends StatelessWidget {
                           Text(
                             packages[i].package,
                             style: TextStyle(
-                              fontSize: 12.5,
+                              fontSize: AppType.bodyMedium,
                               fontWeight: FontWeight.w700,
                               color: p.textPrimary,
                             ),
@@ -149,7 +149,7 @@ class _PackageList extends StatelessWidget {
                           Text(
                             _count(packages[i].entries.length),
                             style: TextStyle(
-                              fontSize: 10.5,
+                              fontSize: AppType.captionLarge,
                               color: p.textTertiary,
                             ),
                           ),
@@ -227,7 +227,7 @@ class _Paragraph extends StatelessWidget {
         paragraph.text,
         textAlign: centred ? TextAlign.center : TextAlign.start,
         style: TextStyle(
-          fontSize: 11.5,
+          fontSize: AppType.labelLarge,
           height: 1.5,
           color: context.palette.textSecondary,
         ),

@@ -129,8 +129,10 @@ class _TotalsImportScreenState extends ConsumerState<TotalsImportScreen> {
               Text(
                 'Held and attended replace what the subject carries; the term '
                 'total is what "still to come" counts down from.',
-                style:
-                    TextStyle(fontSize: 12, height: 1.45, color: p.textFaint),
+                style: TextStyle(
+                    fontSize: AppType.bodySmall,
+                    height: 1.45,
+                    color: p.textFaint),
               ),
             ],
           ),
@@ -170,7 +172,7 @@ class _ChecksumWarning extends StatelessWidget {
             Text(
               'This does not add up',
               style: TextStyle(
-                fontSize: 13.5,
+                fontSize: AppType.titleSmall,
                 fontWeight: FontWeight.w700,
                 color: p.absent,
               ),
@@ -179,7 +181,7 @@ class _ChecksumWarning extends StatelessWidget {
             Text(
               '${parts.join(', and ')}. A row was probably missed — check '
               'against the page before bringing anything in.',
-              style: const TextStyle(fontSize: 12.5, height: 1.4),
+              style: const TextStyle(fontSize: AppType.bodyMedium, height: 1.4),
             ),
           ],
         ),
@@ -243,7 +245,7 @@ class _RowCard extends StatelessWidget {
                 child: Text(
                   figures.subject,
                   style: TextStyle(
-                    fontSize: 13.5,
+                    fontSize: AppType.titleSmall,
                     height: 1.25,
                     fontWeight: FontWeight.w700,
                     color: excluded ? p.textFaint : p.textPrimary,
@@ -273,14 +275,14 @@ class _RowCard extends StatelessWidget {
                 : '${figures.attended} of ${figures.held} attended · '
                     '${figures.expectedTotal == null ? 'term total unread' : '${figures.expectedTotal} all term'}'
                     '${row.current == null ? '' : '  (now ${row.current})'}',
-            style: monoStyle(color: p.textTertiary, size: 10.5),
+            style: monoStyle(color: p.textTertiary, size: AppType.captionLarge),
           ),
           if (warning != null) ...<Widget>[
             const SizedBox(height: 8),
             Text(
               warning,
               style: TextStyle(
-                fontSize: 12,
+                fontSize: AppType.bodySmall,
                 height: 1.4,
                 color: figures.isTrustworthy ? p.warning : p.absent,
               ),

@@ -28,7 +28,7 @@ Future<int?> showTagPicker(
               ? 'Optional. The Present or Absent mark stays exactly as it is.'
               : 'Tap the current tag to remove it.',
           style: TextStyle(
-            fontSize: 12.5,
+            fontSize: AppType.bodyMedium,
             height: 1.4,
             color: context.palette.textTertiary,
           ),
@@ -94,7 +94,7 @@ class _PickerChip extends StatelessWidget {
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 13.5,
+                  fontSize: AppType.titleSmall,
                   fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
                   color: selected ? accent : context.palette.textSecondary,
                 ),

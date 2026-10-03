@@ -74,7 +74,7 @@ class OptionChip extends StatelessWidget {
           child: Text(
             label,
             style: TextStyle(
-              fontSize: 13,
+              fontSize: AppType.bodyLarge,
               fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
               color: selected
                   ? context.palette.textPrimary
@@ -126,7 +126,7 @@ class WeightPicker extends StatelessWidget {
                 'when you made them.',
           },
           style: TextStyle(
-            fontSize: 12,
+            fontSize: AppType.bodySmall,
             height: 1.4,
             color: context.palette.textTertiary,
           ),
@@ -189,7 +189,7 @@ class TypePicker extends ConsumerWidget {
           'a lab in a lecture course. Marks already made keep the type they '
           'were made with.',
           style: TextStyle(
-            fontSize: 12,
+            fontSize: AppType.bodySmall,
             height: 1.4,
             color: context.palette.textTertiary,
           ),
@@ -253,7 +253,7 @@ class _MoreOptionsState extends State<MoreOptions> {
                         Text(
                           'More options',
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: AppType.bodyLarge,
                             fontWeight: FontWeight.w700,
                             color: p.textPrimary,
                           ),
@@ -262,7 +262,7 @@ class _MoreOptionsState extends State<MoreOptions> {
                         Text(
                           widget.summary,
                           style: TextStyle(
-                            fontSize: 11.5,
+                            fontSize: AppType.labelLarge,
                             height: 1.35,
                             color: p.textTertiary,
                           ),
@@ -324,7 +324,7 @@ class RoomField extends ConsumerWidget {
         TextField(
           controller: controller,
           textCapitalization: TextCapitalization.characters,
-          style: const TextStyle(fontSize: 14),
+          style: const TextStyle(fontSize: AppType.titleMedium),
           decoration: InputDecoration(
             isDense: true,
             prefixIcon: const Icon(Icons.place_outlined, size: 17),
@@ -402,7 +402,7 @@ class _RoomPickChip extends StatelessWidget {
           child: Text(
             label,
             style: TextStyle(
-              fontSize: 12.5,
+              fontSize: AppType.bodyMedium,
               fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
               color: selected
                   ? context.palette.textPrimary
@@ -525,7 +525,7 @@ class _SubjectChip extends StatelessWidget {
               Text(
                 subject.name,
                 style: TextStyle(
-                  fontSize: 13.5,
+                  fontSize: AppType.titleSmall,
                   fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                   color: selected
                       ? context.palette.textPrimary
@@ -568,7 +568,7 @@ class NewSubjectChip extends StatelessWidget {
               Text(
                 'New',
                 style: TextStyle(
-                  fontSize: 13.5,
+                  fontSize: AppType.titleSmall,
                   fontWeight: FontWeight.w600,
                   color: context.palette.accent,
                 ),
@@ -638,7 +638,7 @@ class _WeekdayCell extends StatelessWidget {
           child: Text(
             kWeekdayNamesShort[weekday - 1].substring(0, 1),
             style: TextStyle(
-              fontSize: 13.5,
+              fontSize: AppType.titleSmall,
               fontWeight: FontWeight.w700,
               color: selected ? Colors.white : context.palette.textSecondary,
             ),
@@ -693,7 +693,7 @@ class FieldButton extends StatelessWidget {
                     Text(
                       label,
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: AppType.labelSmall,
                         fontWeight: FontWeight.w600,
                         color: context.palette.textTertiary,
                       ),
@@ -704,7 +704,7 @@ class FieldButton extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 14,
+                        fontSize: AppType.titleMedium,
                         fontWeight: FontWeight.w600,
                       ),
                     ),

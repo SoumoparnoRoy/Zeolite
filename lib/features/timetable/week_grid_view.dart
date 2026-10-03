@@ -194,7 +194,7 @@ class _BreakBand extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
         style: monoStyle(
           color: p.textFaint,
-          size: 8,
+          size: AppType.microSmall,
           weight: FontWeight.w700,
         ),
       ),
@@ -241,7 +241,7 @@ class _DayHeader extends StatelessWidget {
         Text(
           kWeekdayNamesShort[date.weekday - 1].substring(0, 1).toUpperCase(),
           style: TextStyle(
-            fontSize: 8.5,
+            fontSize: AppType.microMedium,
             height: 1.2,
             fontWeight: isToday ? FontWeight.w800 : FontWeight.w700,
             color: ink,
@@ -250,7 +250,7 @@ class _DayHeader extends StatelessWidget {
         Text(
           '${date.day}',
           style: TextStyle(
-            fontSize: 8.5,
+            fontSize: AppType.microMedium,
             height: 1.2,
             fontWeight: isToday ? FontWeight.w800 : FontWeight.w700,
             color: ink,
@@ -307,7 +307,7 @@ class _TimeGutter extends StatelessWidget {
                   softWrap: false,
                   style: monoStyle(
                     color: context.palette.textFaint,
-                    size: 8,
+                    size: AppType.microSmall,
                     weight: FontWeight.w700,
                   ),
                 ),
@@ -485,7 +485,7 @@ class _HolidayCell extends StatelessWidget {
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 9,
+                    fontSize: AppType.microLarge,
                     height: 1.2,
                     fontWeight: FontWeight.w700,
                     color: p.warning,
@@ -598,7 +598,7 @@ class _ClassCell extends StatelessWidget {
                                 maxLines: 1,
                                 overflow: TextOverflow.clip,
                                 style: TextStyle(
-                                  fontSize: 8,
+                                  fontSize: AppType.microSmall,
                                   height: 1,
                                   fontWeight: FontWeight.w800,
                                   color: p.textPrimary,
@@ -632,7 +632,7 @@ class _ClassCell extends StatelessWidget {
                           overflow: TextOverflow.clip,
                           style: monoStyle(
                             color: offGrid ? p.warning : p.textTertiary,
-                            size: 7,
+                            size: AppType.microXs,
                             weight: FontWeight.w600,
                           ),
                         ),

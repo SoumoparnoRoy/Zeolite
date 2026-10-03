@@ -35,14 +35,15 @@ class ImportSubjectRow extends StatelessWidget {
                   Text(
                     name,
                     style: const TextStyle(
-                      fontSize: 13.5,
+                      fontSize: AppType.titleSmall,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 3),
                   Text(
                     target == null ? 'New subject' : 'Added to ${target!.name}',
-                    style: TextStyle(fontSize: 12, color: p.textTertiary),
+                    style: TextStyle(
+                        fontSize: AppType.bodySmall, color: p.textTertiary),
                   ),
                 ],
               ),
@@ -120,14 +121,15 @@ class _Option extends StatelessWidget {
                   Text(
                     label,
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: AppType.titleMedium,
                       fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                     ),
                   ),
                   if (detail != null && detail!.isNotEmpty)
                     Text(
                       detail!,
-                      style: TextStyle(fontSize: 12, color: p.textTertiary),
+                      style: TextStyle(
+                          fontSize: AppType.bodySmall, color: p.textTertiary),
                     ),
                 ],
               ),

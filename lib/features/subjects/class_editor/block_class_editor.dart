@@ -234,7 +234,7 @@ class _BlockClassFormState extends ConsumerState<_BlockClassForm> {
           trailing: Text(
             Clock.formatRange(start, end, use24Hour: use24Hour),
             style: TextStyle(
-              fontSize: 11.5,
+              fontSize: AppType.labelLarge,
               fontWeight: FontWeight.w600,
               color: context.palette.textTertiary,
             ),
@@ -261,7 +261,7 @@ class _BlockClassFormState extends ConsumerState<_BlockClassForm> {
                   (subjectId: _subjectId, categoryId: _categoryId),
                 )),
           style: TextStyle(
-            fontSize: 12,
+            fontSize: AppType.bodySmall,
             height: 1.4,
             color: context.palette.textTertiary,
           ),
@@ -319,7 +319,7 @@ class _BlockClassFormState extends ConsumerState<_BlockClassForm> {
             '${Dates.formatFull(widget.date)} only. It will not appear in any '
             'other week.',
             style: TextStyle(
-              fontSize: 12,
+              fontSize: AppType.bodySmall,
               height: 1.4,
               color: context.palette.textTertiary,
             ),
@@ -345,7 +345,8 @@ class _BlockClassFormState extends ConsumerState<_BlockClassForm> {
           const SizedBox(height: AppSpacing.md),
           Text(
             _error!,
-            style: TextStyle(color: context.palette.absent, fontSize: 13),
+            style: TextStyle(
+                color: context.palette.absent, fontSize: AppType.bodyLarge),
           ),
         ],
         const SizedBox(height: AppSpacing.xl),

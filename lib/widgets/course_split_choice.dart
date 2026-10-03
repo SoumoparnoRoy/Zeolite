@@ -47,7 +47,7 @@ class CourseSplitChoice extends StatelessWidget {
                             ? 'One subject per course'
                             : 'Lecture and lab kept apart',
                         style: const TextStyle(
-                          fontSize: 13.5,
+                          fontSize: AppType.titleSmall,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -60,7 +60,7 @@ class CourseSplitChoice extends StatelessWidget {
                             : 'The lab becomes its own subject with its own '
                                 'target, and every class counts once.',
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: AppType.bodySmall,
                           height: 1.4,
                           color: p.textTertiary,
                         ),

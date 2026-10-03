@@ -71,7 +71,7 @@ class DayGridSection extends ConsumerWidget {
                     child: Text(
                       'One block is',
                       style: TextStyle(
-                        fontSize: 14.5,
+                        fontSize: AppType.titleLarge,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -81,7 +81,7 @@ class DayGridSection extends ConsumerWidget {
                         ? 'Not set'
                         : Clock.formatDuration(settings.blockMinutes),
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: AppType.headlineMedium,
                       fontWeight: FontWeight.w800,
                       color: context.palette.accent,
                       letterSpacing: -0.4,
@@ -145,7 +145,8 @@ class _BreakField extends ConsumerWidget {
             const Expanded(
               child: Text(
                 'Break',
-                style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600),
+                style: TextStyle(
+                    fontSize: AppType.titleLarge, fontWeight: FontWeight.w600),
               ),
             ),
             Text(
@@ -153,7 +154,7 @@ class _BreakField extends ConsumerWidget {
                   ? Clock.formatDuration(settings.breakMinutes)
                   : 'None',
               style: TextStyle(
-                fontSize: 18,
+                fontSize: AppType.headlineMedium,
                 fontWeight: FontWeight.w800,
                 color: context.palette.accent,
                 letterSpacing: -0.4,
@@ -218,7 +219,7 @@ class _GridPreview extends StatelessWidget {
         'each. A class then takes up a whole number of blocks, so a lab twice '
         'the length of a lecture is two of them.',
         style: TextStyle(
-          fontSize: 12,
+          fontSize: AppType.bodySmall,
           height: 1.4,
           color: context.palette.textTertiary,
         ),
@@ -243,7 +244,7 @@ class _GridPreview extends StatelessWidget {
                   '${i + 1}  '
                   '${Clock.format(grid.startOf(i), use24Hour: use24Hour)}',
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: AppType.labelSmall,
                     fontWeight: FontWeight.w600,
                     color: context.palette.textSecondary,
                   ),
@@ -261,7 +262,7 @@ class _GridPreview extends StatelessWidget {
                     'Break  '
                     '${Clock.format(grid.breakStartMinutes, use24Hour: use24Hour)}',
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: AppType.labelSmall,
                       fontWeight: FontWeight.w600,
                       color: context.palette.textTertiary,
                     ),
@@ -286,7 +287,7 @@ class _GridPreview extends StatelessWidget {
                   '${grid.breakAfterBlock}',
           ].join(' · '),
           style: TextStyle(
-            fontSize: 12,
+            fontSize: AppType.bodySmall,
             height: 1.4,
             color: context.palette.textTertiary,
           ),
@@ -343,7 +344,7 @@ class _TimeField extends StatelessWidget {
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: AppType.labelSmall,
                   fontWeight: FontWeight.w600,
                   color: context.palette.textTertiary,
                 ),
@@ -352,7 +353,7 @@ class _TimeField extends StatelessWidget {
               Text(
                 Clock.format(minutes, use24Hour: use24Hour),
                 style: const TextStyle(
-                  fontSize: 14,
+                  fontSize: AppType.titleMedium,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -390,7 +391,7 @@ class RoomsSection extends ConsumerWidget {
               'Add the rooms you have classes in and they turn into one-tap '
               'choices on every class. Typing a room by hand still works.',
               style: TextStyle(
-                fontSize: 12,
+                fontSize: AppType.bodySmall,
                 height: 1.4,
                 color: context.palette.textTertiary,
               ),
@@ -493,7 +494,7 @@ class _RoomChip extends StatelessWidget {
               Text(
                 room.name,
                 style: const TextStyle(
-                  fontSize: 13.5,
+                  fontSize: AppType.titleSmall,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -544,7 +545,7 @@ class TagsSection extends ConsumerWidget {
               'A tag notes how a class went, like "Proxy" or "Online". It is '
               'optional, and added after you mark the class.',
               style: TextStyle(
-                fontSize: 12,
+                fontSize: AppType.bodySmall,
                 height: 1.4,
                 color: context.palette.textTertiary,
               ),
@@ -690,7 +691,7 @@ class _TagChip extends StatelessWidget {
               Text(
                 tag.name,
                 style: const TextStyle(
-                  fontSize: 13.5,
+                  fontSize: AppType.titleSmall,
                   fontWeight: FontWeight.w600,
                 ),
               ),

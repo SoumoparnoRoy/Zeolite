@@ -189,7 +189,7 @@ class CategoriesSection extends ConsumerWidget {
                       child: Text(
                         'Default class length',
                         style: TextStyle(
-                          fontSize: 14.5,
+                          fontSize: AppType.titleLarge,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -199,7 +199,7 @@ class CategoriesSection extends ConsumerWidget {
                         settings.defaultClassDurationMinutes,
                       ),
                       style: TextStyle(
-                        fontSize: 18,
+                        fontSize: AppType.headlineMedium,
                         fontWeight: FontWeight.w800,
                         color: context.palette.accent,
                         letterSpacing: -0.4,

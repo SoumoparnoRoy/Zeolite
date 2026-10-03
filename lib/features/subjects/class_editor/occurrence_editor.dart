@@ -175,7 +175,7 @@ class _OccurrenceFormState extends ConsumerState<_OccurrenceForm> {
           'Changes this week only. Every other week keeps the weekly class as '
           'it is.',
           style: TextStyle(
-            fontSize: 12.5,
+            fontSize: AppType.bodyMedium,
             height: 1.4,
             color: context.palette.textSecondary,
           ),
@@ -215,7 +215,8 @@ class _OccurrenceFormState extends ConsumerState<_OccurrenceForm> {
           const SizedBox(height: AppSpacing.md),
           Text(
             _error!,
-            style: TextStyle(color: context.palette.absent, fontSize: 13),
+            style: TextStyle(
+                color: context.palette.absent, fontSize: AppType.bodyLarge),
           ),
         ],
         const SizedBox(height: AppSpacing.xl),

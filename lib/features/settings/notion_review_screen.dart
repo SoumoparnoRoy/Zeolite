@@ -153,7 +153,7 @@ class _NotionReviewScreenState extends ConsumerState<NotionReviewScreen> {
                     'Anything you keep is written back over the Notion row on '
                     'the next sync.',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: AppType.bodySmall,
                       color: context.palette.textTertiary,
                     ),
                   ),

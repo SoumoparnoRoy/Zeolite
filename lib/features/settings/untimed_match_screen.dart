@@ -96,7 +96,7 @@ class _UntimedMatchScreenState extends ConsumerState<UntimedMatchScreen> {
                 'day, matching files the mark under it, so it shows as marked. '
                 'Status, weight and tags stay as they are.',
                 style: TextStyle(
-                  fontSize: 12.5,
+                  fontSize: AppType.bodyMedium,
                   height: 1.45,
                   color: p.textSecondary,
                 ),
@@ -125,14 +125,18 @@ class _UntimedMatchScreenState extends ConsumerState<UntimedMatchScreen> {
                       : '$stranded ${other}classes have no class of their '
                           'subject on the timetable that day, so they keep no '
                           'time.',
-                  style:
-                      TextStyle(fontSize: 12, height: 1.45, color: p.textFaint),
+                  style: TextStyle(
+                      fontSize: AppType.bodySmall,
+                      height: 1.45,
+                      color: p.textFaint),
                 ),
               if (untimed.isEmpty)
                 Text(
                   'Every class has a time.',
-                  style:
-                      TextStyle(fontSize: 12, height: 1.45, color: p.textFaint),
+                  style: TextStyle(
+                      fontSize: AppType.bodySmall,
+                      height: 1.45,
+                      color: p.textFaint),
                 ),
             ],
           ),
@@ -177,7 +181,7 @@ class _SubjectRow extends StatelessWidget {
                 Text(
                   subject.name,
                   style: TextStyle(
-                    fontSize: 13.5,
+                    fontSize: AppType.titleSmall,
                     height: 1.25,
                     fontWeight: FontWeight.w700,
                     color: ticked ? p.textPrimary : p.textFaint,
@@ -190,7 +194,8 @@ class _SubjectRow extends StatelessWidget {
                           'match · $left with no class to go to'
                       : '${Words.plural(matchable, 'class', 'classes')} to '
                           'match',
-                  style: TextStyle(fontSize: 12, color: p.textTertiary),
+                  style: TextStyle(
+                      fontSize: AppType.bodySmall, color: p.textTertiary),
                 ),
               ],
             ),

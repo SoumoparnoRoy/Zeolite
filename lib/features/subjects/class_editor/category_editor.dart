@@ -208,7 +208,7 @@ class _CategoryFormState extends ConsumerState<_CategoryForm> {
                 Clock.formatDuration(_minutes),
                 textAlign: TextAlign.end,
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: AppType.titleMedium,
                   fontWeight: FontWeight.w700,
                   color: context.palette.accent,
                 ),
@@ -227,7 +227,7 @@ class _CategoryFormState extends ConsumerState<_CategoryForm> {
               : 'Picking a start time for a class in this category fills the '
                   'end time in automatically.',
           style: TextStyle(
-            fontSize: 12,
+            fontSize: AppType.bodySmall,
             height: 1.4,
             color: context.palette.textTertiary,
           ),
@@ -250,7 +250,8 @@ class _CategoryFormState extends ConsumerState<_CategoryForm> {
           const SizedBox(height: AppSpacing.md),
           Text(
             _error!,
-            style: TextStyle(color: context.palette.absent, fontSize: 13),
+            style: TextStyle(
+                color: context.palette.absent, fontSize: AppType.bodyLarge),
           ),
         ],
         const SizedBox(height: AppSpacing.xl),
@@ -289,7 +290,7 @@ class _CategorySubjects extends ConsumerWidget {
       return Text(
         'No subjects yet. Add one and it can be filed here.',
         style: TextStyle(
-          fontSize: 12,
+          fontSize: AppType.bodySmall,
           height: 1.4,
           color: context.palette.textTertiary,
         ),
@@ -356,13 +357,14 @@ class _SubjectToggle extends StatelessWidget {
               child: Text(
                 subject.name,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 14),
+                style: const TextStyle(fontSize: AppType.titleMedium),
               ),
             ),
             if (heldBy != null)
               Text(
                 selected ? 'moved from $heldBy' : 'in $heldBy',
-                style: TextStyle(fontSize: 11.5, color: p.textTertiary),
+                style: TextStyle(
+                    fontSize: AppType.labelLarge, color: p.textTertiary),
               ),
           ],
         ),

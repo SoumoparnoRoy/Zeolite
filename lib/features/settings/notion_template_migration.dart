@@ -363,7 +363,7 @@ class _OldDatabasePickerState extends ConsumerState<_OldDatabasePicker> {
                       Text(
                         old.title,
                         style: const TextStyle(
-                          fontSize: 13.5,
+                          fontSize: AppType.titleSmall,
                           height: 1.25,
                           fontWeight: FontWeight.w700,
                         ),
@@ -372,7 +372,7 @@ class _OldDatabasePickerState extends ConsumerState<_OldDatabasePicker> {
                         Text(
                           label,
                           style: TextStyle(
-                            fontSize: 11.5,
+                            fontSize: AppType.labelLarge,
                             fontWeight: FontWeight.w600,
                             color: context.palette.textTertiary,
                           ),

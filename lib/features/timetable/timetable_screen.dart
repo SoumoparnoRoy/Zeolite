@@ -209,7 +209,7 @@ class _QuietRow extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: AppType.labelSmall,
                 height: 1,
                 fontWeight: FontWeight.w600,
                 color: p.textFaint,
@@ -266,7 +266,7 @@ class _SessionRow extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 12.5,
+                        fontSize: AppType.bodyMedium,
                         height: 1.25,
                         fontWeight: FontWeight.w700,
                         color: p.textPrimary,
@@ -290,7 +290,8 @@ class _SessionRow extends StatelessWidget {
                       ].join(' · '),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: monoStyle(color: p.textTertiary, size: 10),
+                      style: monoStyle(
+                          color: p.textTertiary, size: AppType.captionMedium),
                     ),
                   ],
                 ),
@@ -302,7 +303,7 @@ class _SessionRow extends StatelessWidget {
                 Text(
                   status.label,
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: AppType.labelSmall,
                     fontWeight: FontWeight.w700,
                     color: status.colorIn(p),
                   ),

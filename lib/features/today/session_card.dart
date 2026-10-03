@@ -108,7 +108,7 @@ class _SessionCardState extends State<SessionCard> {
                     softWrap: false,
                     style: monoStyle(
                       color: p.textPrimary,
-                      size: 10.5,
+                      size: AppType.captionLarge,
                       weight: FontWeight.w700,
                       height: 1.2,
                     ),
@@ -123,7 +123,7 @@ class _SessionCardState extends State<SessionCard> {
                     softWrap: false,
                     style: monoStyle(
                       color: p.textFaint,
-                      size: 9,
+                      size: AppType.microLarge,
                       height: 1.2,
                     ),
                   ),
@@ -163,7 +163,7 @@ class _SessionCardState extends State<SessionCard> {
                   session.subject.name,
                   maxLines: 3,
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: AppType.bodyLarge,
                     height: 1.25,
                     fontWeight: FontWeight.w700,
                     color: isCancelled ? p.textTertiary : p.textPrimary,
@@ -182,7 +182,7 @@ class _SessionCardState extends State<SessionCard> {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: 10.5,
+              fontSize: AppType.captionLarge,
               height: 1.3,
               fontWeight: FontWeight.w500,
               color: p.textTertiary,
@@ -241,7 +241,7 @@ class _SessionCardState extends State<SessionCard> {
             child: Text(
               'Marked ${status.label.toLowerCase()}',
               style: TextStyle(
-                fontSize: 10,
+                fontSize: AppType.captionMedium,
                 height: 1,
                 fontWeight: FontWeight.w700,
                 color: color,
@@ -375,7 +375,7 @@ class _StatusButton extends StatelessWidget {
               textAlign: TextAlign.center,
               maxLines: 1,
               style: TextStyle(
-                fontSize: 10.5,
+                fontSize: AppType.captionLarge,
                 height: 1,
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
                 color: selected ? color : p.textSecondary,

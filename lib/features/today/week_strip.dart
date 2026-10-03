@@ -199,7 +199,7 @@ class _DayPill extends StatelessWidget {
                 Text(
                   Dates.weekdayShort(date).toUpperCase(),
                   style: TextStyle(
-                    fontSize: 10,
+                    fontSize: AppType.captionMedium,
                     height: 1.1,
                     fontWeight: selected ? FontWeight.w800 : FontWeight.w700,
                     color: ink,
@@ -208,7 +208,7 @@ class _DayPill extends StatelessWidget {
                 Text(
                   '${date.day}',
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: AppType.titleMedium,
                     height: 1.2,
                     fontWeight: selected ? FontWeight.w800 : FontWeight.w700,
                     color: ink,

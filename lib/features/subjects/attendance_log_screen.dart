@@ -154,7 +154,7 @@ class _LogFigure extends StatelessWidget {
         excludeSemantics: known,
         child: HeaderNumber(
           known ? '${s.percent.round()}' : '—',
-          size: 30,
+          size: AppType.heroLarge,
           unit: known ? '%' : '',
         ),
       ),
@@ -179,7 +179,7 @@ class _CarriedIn extends StatelessWidget {
           Text(
             'Carried in',
             style: TextStyle(
-              fontSize: 13,
+              fontSize: AppType.bodyLarge,
               fontWeight: FontWeight.w600,
               color: p.textFaint,
             ),
@@ -188,7 +188,7 @@ class _CarriedIn extends StatelessWidget {
           Text(
             '${subject.priorAttended} of ${subject.priorHeld} attended before '
             'this app started counting',
-            style: const TextStyle(fontSize: 13, height: 1.35),
+            style: const TextStyle(fontSize: AppType.bodyLarge, height: 1.35),
           ),
         ],
       ),
@@ -292,7 +292,7 @@ class _LogTile extends ConsumerWidget {
                         Text(
                           Dates.formatFull(entry.date),
                           style: TextStyle(
-                            fontSize: 12.5,
+                            fontSize: AppType.bodyMedium,
                             height: 1.2,
                             fontWeight: FontWeight.w700,
                             color: p.textPrimary,
@@ -304,7 +304,7 @@ class _LogTile extends ConsumerWidget {
                           Text(
                             'Not marked',
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: AppType.labelSmall,
                               fontWeight: FontWeight.w700,
                               color: p.warning,
                             ),
@@ -324,7 +324,8 @@ class _LogTile extends ConsumerWidget {
                       // Two: one cut the room off and left a dangling "· …".
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: monoStyle(color: p.textTertiary, size: 10),
+                      style: monoStyle(
+                          color: p.textTertiary, size: AppType.captionMedium),
                     ),
                   ],
                 ),
@@ -357,7 +358,7 @@ class _LogTile extends ConsumerWidget {
                     'elsewhere. ${counts ? 'It still counts' : 'It does not '
                         'count'} towards your percentage.',
                     style: TextStyle(
-                      fontSize: 10.5,
+                      fontSize: AppType.captionLarge,
                       height: 1.4,
                       color: p.textTertiary,
                     ),
@@ -375,7 +376,7 @@ class _LogTile extends ConsumerWidget {
                   foregroundColor: p.absent,
                   padding: const EdgeInsets.symmetric(horizontal: 6),
                   textStyle: const TextStyle(
-                    fontSize: 11.5,
+                    fontSize: AppType.labelLarge,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -425,7 +426,7 @@ extension on _LogTile {
               '${Dates.formatFull(entry.date)} will be deleted'
               '${counts ? ' and will stop counting towards your percentage' : ''}'
               '.',
-              style: const TextStyle(fontSize: 13, height: 1.4),
+              style: const TextStyle(fontSize: AppType.bodyLarge, height: 1.4),
             ),
             actions: <Widget>[
               TextButton(

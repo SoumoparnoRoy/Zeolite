@@ -86,7 +86,7 @@ class TodayDayPage extends ConsumerWidget {
           child: Text(
             _isToday ? "Today's classes" : Dates.formatDayMonth(date),
             style: TextStyle(
-              fontSize: 13,
+              fontSize: AppType.bodyLarge,
               height: 1,
               fontWeight: FontWeight.w800,
               letterSpacing: -0.2,
@@ -103,7 +103,7 @@ class TodayDayPage extends ConsumerWidget {
               child: Text(
                 'All present',
                 style: TextStyle(
-                  fontSize: 10.5,
+                  fontSize: AppType.captionLarge,
                   height: 1,
                   fontWeight: FontWeight.w700,
                   color: p.accent,
@@ -302,7 +302,7 @@ class _UnmarkedBanner extends StatelessWidget {
               '$count past ${count == 1 ? 'class needs' : 'classes need'} '
               'marking',
               style: TextStyle(
-                fontSize: 12,
+                fontSize: AppType.bodySmall,
                 height: 1.2,
                 fontWeight: FontWeight.w700,
                 color: p.textPrimary,
@@ -354,7 +354,7 @@ class _NoticeCard extends StatelessWidget {
                 Text(
                   title,
                   style: TextStyle(
-                    fontSize: 12.5,
+                    fontSize: AppType.bodyMedium,
                     height: 1.15,
                     fontWeight: FontWeight.w700,
                     color: p.textPrimary,
@@ -364,7 +364,7 @@ class _NoticeCard extends StatelessWidget {
                 Text(
                   message,
                   style: TextStyle(
-                    fontSize: 10.5,
+                    fontSize: AppType.captionLarge,
                     height: 1.4,
                     fontWeight: FontWeight.w500,
                     color: p.textTertiary,

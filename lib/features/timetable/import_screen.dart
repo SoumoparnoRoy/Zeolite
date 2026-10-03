@@ -379,7 +379,7 @@ class _ImportTimetableScreenState extends ConsumerState<ImportTimetableScreen> {
                 enableSuggestions: false,
                 style: const TextStyle(
                   fontFamily: 'monospace',
-                  fontSize: 13,
+                  fontSize: AppType.bodyLarge,
                   height: 1.6,
                 ),
                 decoration: const InputDecoration(
@@ -565,14 +565,16 @@ class _BlockWeightChoice extends StatelessWidget {
               children: <Widget>[
                 const Text(
                   'Count a two-block class as two',
-                  style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
+                  style: TextStyle(
+                      fontSize: AppType.titleSmall,
+                      fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'For an institution that counts a two-hour lab twice towards '
                   'attendance. You can change this per class afterwards.',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: AppType.bodySmall,
                     height: 1.4,
                     color: p.textTertiary,
                   ),
@@ -620,7 +622,7 @@ class _LookalikeRow extends StatelessWidget {
       child: Text(
         names.join('  ·  '),
         style: TextStyle(
-          fontSize: 13,
+          fontSize: AppType.bodyLarge,
           fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
           color: context.palette.cancelled,
         ),
@@ -650,7 +652,8 @@ class _ClashRow extends StatelessWidget {
       child: Text(
         '$name, ${kWeekdayNamesLong[weekday - 1]} $start: $subject already '
         'has a class then. Send $name to another subject under Subjects.',
-        style: TextStyle(fontSize: 13, color: context.palette.absent),
+        style: TextStyle(
+            fontSize: AppType.bodyLarge, color: context.palette.absent),
       ),
     );
   }
@@ -673,7 +676,7 @@ class _ProblemRow extends StatelessWidget {
             child: Text(
               'Line ${line.number}',
               style: TextStyle(
-                fontSize: 12,
+                fontSize: AppType.bodySmall,
                 fontWeight: FontWeight.w700,
                 color: context.palette.absent,
               ),
@@ -686,7 +689,7 @@ class _ProblemRow extends StatelessWidget {
                 Text(
                   line.error!,
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: AppType.bodyLarge,
                     color: context.palette.absent,
                   ),
                 ),
@@ -694,7 +697,7 @@ class _ProblemRow extends StatelessWidget {
                   line.text,
                   style: TextStyle(
                     fontFamily: 'monospace',
-                    fontSize: 12,
+                    fontSize: AppType.bodySmall,
                     color: context.palette.textTertiary,
                   ),
                 ),
@@ -746,7 +749,7 @@ class _DayGroup extends StatelessWidget {
                       ' – '
                       '${Clock.format(c.endMinutes, use24Hour: use24Hour)}',
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: AppType.bodySmall,
                         color: context.palette.textSecondary,
                       ),
                     ),
@@ -755,7 +758,7 @@ class _DayGroup extends StatelessWidget {
                     child: Text(
                       nameOf(c),
                       style: const TextStyle(
-                        fontSize: 13.5,
+                        fontSize: AppType.titleSmall,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -764,7 +767,7 @@ class _DayGroup extends StatelessWidget {
                     Text(
                       c.room!,
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: AppType.bodySmall,
                         color: context.palette.textTertiary,
                       ),
                     ),

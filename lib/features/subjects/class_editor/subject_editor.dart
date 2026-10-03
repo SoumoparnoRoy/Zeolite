@@ -205,7 +205,7 @@ class _SubjectFormState extends ConsumerState<_SubjectForm> {
             _overrideTarget
                 ? 'This subject needs ${_target.round()}%'
                 : 'Uses your global target',
-            style: const TextStyle(fontSize: 12.5),
+            style: const TextStyle(fontSize: AppType.bodyMedium),
           ),
         ),
         if (_overrideTarget)
@@ -226,7 +226,7 @@ class _SubjectFormState extends ConsumerState<_SubjectForm> {
           subtitle: const Text(
             'Classes counted before this app, so the percentage is right from '
             'the first mark',
-            style: TextStyle(fontSize: 12.5),
+            style: TextStyle(fontSize: AppType.bodyMedium),
           ),
         ),
         if (_carryBalance) ...<Widget>[
@@ -261,7 +261,8 @@ class _SubjectFormState extends ConsumerState<_SubjectForm> {
           const SizedBox(height: AppSpacing.md),
           Text(
             _error!,
-            style: TextStyle(color: context.palette.absent, fontSize: 13),
+            style: TextStyle(
+                color: context.palette.absent, fontSize: AppType.bodyLarge),
           ),
         ],
         const SizedBox(height: AppSpacing.xl),
@@ -433,7 +434,7 @@ class _CategoryPicker extends ConsumerWidget {
         Text(
           selectedLabel,
           style: TextStyle(
-            fontSize: 12,
+            fontSize: AppType.bodySmall,
             height: 1.4,
             color: context.palette.textTertiary,
           ),
@@ -482,7 +483,7 @@ class _CategoryChip extends StatelessWidget {
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 13.5,
+                  fontSize: AppType.titleSmall,
                   fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                   color: selected
                       ? context.palette.textPrimary
@@ -493,7 +494,7 @@ class _CategoryChip extends StatelessWidget {
               Text(
                 detail,
                 style: TextStyle(
-                  fontSize: 11.5,
+                  fontSize: AppType.labelLarge,
                   fontWeight: FontWeight.w600,
                   color: context.palette.textTertiary,
                 ),

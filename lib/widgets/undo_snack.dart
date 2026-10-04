@@ -5,6 +5,10 @@ import 'package:flutter/material.dart';
 import '../state/actions/action_core.dart';
 import '../state/app_providers.dart';
 
+/// The offer after a mark is cleared, worded the same wherever it happens.
+void showMarkCleared(ScaffoldMessengerState messenger, ActionCore core) =>
+    showUndoSnack(messenger, core, 'Mark cleared');
+
 /// Reports [message] and offers to put the data back.
 ///
 /// Takes the messenger and [core] rather than a context and a `WidgetRef`

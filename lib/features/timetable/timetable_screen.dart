@@ -291,7 +291,7 @@ class _SessionRow extends ConsumerWidget {
     final AttendanceStatus? status = choice.status;
     if (status == null) {
       await attendance.clearMark(session);
-      showUndoSnack(messenger, core, 'Mark cleared');
+      showMarkCleared(messenger, core);
     } else if (status != current) {
       // Not for the current status: mark() reads that tap as clearing it.
       await attendance.mark(session, status);
@@ -304,75 +304,79 @@ class _SessionRow extends ConsumerWidget {
     final AttendanceStatus? status = session.status;
     final bool isCancelled = status == AttendanceStatus.cancelled;
 
-    return InkWell(
-      onTap: () => _chooseMark(context, ref),
-      onLongPress: onLongPress,
-      borderRadius: BorderRadius.circular(12),
-      child: Opacity(
-        opacity: isCancelled ? 0.55 : 1,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          child: Row(
-            children: <Widget>[
-              SubjectAvatar(
-                initials: session.subject.initials,
-                color: session.subject.color,
-                size: 34,
-              ),
-              const SizedBox(width: 11),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      session.subject.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: AppType.bodyMedium,
-                        height: 1.25,
-                        fontWeight: FontWeight.w700,
-                        color: p.textPrimary,
-                        decoration:
-                            isCancelled ? TextDecoration.lineThrough : null,
-                        decorationColor: p.textFaint,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      <String>[
-                        Clock.formatRange(
-                          session.startMinutes,
-                          session.endMinutes,
-                          use24Hour: use24Hour,
-                        ),
-                        if (session.room != null && session.room!.isNotEmpty)
-                          session.room!,
-                        if (session.isExtra) 'One-off',
-                        if (isCancelled) 'Cancelled',
-                      ].join(' · '),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: monoStyle(
-                          color: p.textTertiary, size: AppType.captionMedium),
-                    ),
-                  ],
+    return Semantics(
+      onTapHint: 'Change the mark',
+      onLongPressHint: 'Class options',
+      child: InkWell(
+        onTap: () => _chooseMark(context, ref),
+        onLongPress: onLongPress,
+        borderRadius: BorderRadius.circular(12),
+        child: Opacity(
+          opacity: isCancelled ? 0.55 : 1,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Row(
+              children: <Widget>[
+                SubjectAvatar(
+                  initials: session.subject.initials,
+                  color: session.subject.color,
+                  size: 34,
                 ),
-              ),
-              // Named rather than a coloured dot, which nobody could read as
-              // "you were marked absent" without being told.
-              if (status != null && !isCancelled) ...<Widget>[
-                const SizedBox(width: 8),
-                Text(
-                  status.label,
-                  style: TextStyle(
-                    fontSize: AppType.labelSmall,
-                    fontWeight: FontWeight.w700,
-                    color: status.colorIn(p),
+                const SizedBox(width: 11),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        session.subject.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: AppType.bodyMedium,
+                          height: 1.25,
+                          fontWeight: FontWeight.w700,
+                          color: p.textPrimary,
+                          decoration:
+                              isCancelled ? TextDecoration.lineThrough : null,
+                          decorationColor: p.textFaint,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        <String>[
+                          Clock.formatRange(
+                            session.startMinutes,
+                            session.endMinutes,
+                            use24Hour: use24Hour,
+                          ),
+                          if (session.room != null && session.room!.isNotEmpty)
+                            session.room!,
+                          if (session.isExtra) 'One-off',
+                          if (isCancelled) 'Cancelled',
+                        ].join(' · '),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: monoStyle(
+                            color: p.textTertiary, size: AppType.captionMedium),
+                      ),
+                    ],
                   ),
                 ),
+                // Named rather than a coloured dot, which nobody could read as
+                // "you were marked absent" without being told.
+                if (status != null && !isCancelled) ...<Widget>[
+                  const SizedBox(width: 8),
+                  Text(
+                    status.label,
+                    style: TextStyle(
+                      fontSize: AppType.labelSmall,
+                      fontWeight: FontWeight.w700,
+                      color: status.colorIn(p),
+                    ),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),

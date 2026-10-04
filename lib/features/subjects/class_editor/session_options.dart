@@ -338,7 +338,7 @@ class _SessionOptions {
         onTap: () async {
           Navigator.of(context).pop();
           await ref.read(attendanceActionsProvider).clearMark(session);
-          showUndoSnack(messenger, core, 'Mark cleared');
+          showMarkCleared(messenger, core);
         },
       );
 }

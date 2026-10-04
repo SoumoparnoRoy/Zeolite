@@ -13,6 +13,7 @@ import 'features/launch/launch_screen.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'features/settings/settings_screen.dart';
 import 'features/stats/stats_screen.dart';
+import 'features/stats/stats_view.dart';
 import 'features/timetable/timetable_screen.dart';
 import 'features/timetable/week_widget_image.dart';
 import 'features/today/today_screen.dart';
@@ -133,9 +134,6 @@ class _BootstrapState extends ConsumerState<_Bootstrap> {
 class RootShell extends ConsumerStatefulWidget {
   const RootShell({super.key});
 
-  /// Same order as the shell's screens, so a tab added to one and not the
-  /// other shows. Public so [tabForPayload] and the tests resolve through it
-  /// rather than through a second copy of the ordering.
   /// Reading takes the bar away and reaching back brings it in. Null leaves it
   /// as it is — including for the day pills, which scroll sideways inside the
   /// screen's own list and would otherwise flicker the bar on every day.
@@ -158,26 +156,24 @@ class RootShell extends ConsumerStatefulWidget {
     };
   }
 
-  static const List<String> tabNames = shellTabs;
-
   /// Where a `zeolite://open?tab=` link lands, so each widget opens the screen
   /// it is a view of. An unknown name returns null and the app opens where it
   /// was, which is what a widget older than the tab it names should do.
   static int? tabForLink(Uri? uri) {
     if (uri == null || uri.host != 'open') return null;
-    final int index = tabNames.indexOf(uri.queryParameters['tab'] ?? '');
+    final int index = shellTabs.indexOf(uri.queryParameters['tab'] ?? '');
     return index == -1 ? null : index;
   }
 
   /// Where a tapped notification lands. The warning is about percentages, so
   /// it opens Stats; both reminders are about a class you are meant to mark,
-  /// which is Today. Resolved through [tabNames] so reordering the tabs cannot
+  /// which is Today. Resolved through [shellTabs] so reordering the tabs cannot
   /// leave this pointing at the wrong screen.
   static int? tabForPayload(String? payload) {
     if (payload == null) return null;
-    if (payload == 'danger') return tabNames.indexOf('stats');
+    if (payload == 'danger') return shellTabs.indexOf('stats');
     if (payload == 'evening' || payload.startsWith('class:')) {
-      return tabNames.indexOf('today');
+      return shellTabs.indexOf('today');
     }
     return null;
   }
@@ -193,9 +189,6 @@ class _RootShellState extends ConsumerState<RootShell> with RouteAware {
     StatsScreen(),
     SettingsScreen(),
   ];
-
-  /// Only for a tap; a drag settles on the pager's own spring.
-  static const Duration _slide = Duration(milliseconds: 200);
 
   late final PageController _pages =
       PageController(initialPage: ref.read(selectedTabProvider));
@@ -279,7 +272,7 @@ class _RootShellState extends ConsumerState<RootShell> with RouteAware {
       return;
     }
     unawaited(_pages.animateToPage(index,
-        duration: _slide, curve: Curves.easeOutQuart));
+        duration: AppMotion.pageSlide, curve: AppMotion.pageCurve));
   }
 
   void _openTappedNotification() {
@@ -321,9 +314,13 @@ class _RootShellState extends ConsumerState<RootShell> with RouteAware {
     return false;
   }
 
-  void _report([int? index]) => ref
-      .read(analyticsProvider)
-      .screen(RootShell.tabNames[index ?? ref.read(selectedTabProvider)]);
+  void _report([int? index]) {
+    final String tab = shellTabs[index ?? ref.read(selectedTabProvider)];
+    // Stats reports its own view changes; arriving on it has to say which.
+    final bool counts =
+        tab == 'stats' && ref.read(statsViewProvider) == StatsView.counts;
+    unawaited(ref.read(analyticsProvider).screen(counts ? 'counts' : tab));
+  }
 
   @override
   Widget build(BuildContext context) {

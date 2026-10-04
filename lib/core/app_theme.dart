@@ -629,6 +629,15 @@ class AppFonts {
   static const String mono = 'JetBrains Mono';
 }
 
+/// How a pager moves when it is told to rather than dragged, shared by the
+/// tab pager and the Stats views so the two slides feel the same.
+class AppMotion {
+  const AppMotion._();
+
+  static const Duration pageSlide = Duration(milliseconds: 200);
+  static const Curve pageCurve = Curves.easeOutQuart;
+}
+
 /// Shared spacing / radius scale so layouts stay rhythmically consistent.
 class AppSpacing {
   const AppSpacing._();

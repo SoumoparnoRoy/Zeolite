@@ -10,7 +10,6 @@ import '../../core/report_error.dart';
 import '../../core/words.dart';
 import '../../data/models/class_slot.dart';
 import '../../data/models/subject.dart';
-import '../../domain/attendance_totals_ocr.dart';
 import '../../domain/day_grid.dart';
 import '../../domain/timetable_choices.dart';
 import '../../domain/timetable_import.dart';
@@ -216,18 +215,8 @@ class _ImportTimetableScreenState extends ConsumerState<ImportTimetableScreen> {
       final SheetRead read = await reader.read(bytes);
       if (!mounted) return;
       switch (read) {
-        case TotalsSheet(totals: null):
-          messenger.showSnackBar(const SnackBar(
-            content: Text('That looks like an attendance page, but no course '
-                'rows could be read off it.'),
-          ));
-        case TotalsSheet(:final AttendanceTotals totals):
-          await Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              settings: const RouteSettings(name: 'totals_import'),
-              builder: (_) => TotalsImportScreen(totals: totals),
-            ),
-          );
+        case TotalsSheet():
+          await openTotalsRead(context, read);
         case NoClassesFound(:final bool gridFound):
           messenger.showSnackBar(SnackBar(
             content: Text(gridFound

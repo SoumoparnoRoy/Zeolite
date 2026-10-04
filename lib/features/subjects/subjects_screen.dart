@@ -13,7 +13,7 @@ import '../../state/providers.dart';
 import '../../widgets/common.dart';
 import '../../widgets/gradient_header.dart';
 import '../../widgets/undo_snack.dart';
-import '../stats/stats_view_switch.dart';
+import '../stats/stats_view.dart';
 import 'class_editor_sheets.dart';
 
 /// Every subject in one place: add, edit, recolour and delete.
@@ -79,8 +79,8 @@ class SubjectsScreen extends ConsumerWidget {
 
 enum _SubjectAction { edit, colour, delete }
 
-/// Counted on the Counts page now: a second counter here moved the balance
-/// where Counts adds a mark.
+/// A subject with no classes is kept on the Counts page, so its row sends it
+/// there rather than offering a second way to count.
 class _CountsLink extends ConsumerWidget {
   const _CountsLink({required this.subject});
 
@@ -106,7 +106,7 @@ class _CountsLink extends ConsumerWidget {
             ref
                 .read(selectedTabProvider.notifier)
                 .select(shellTabs.indexOf('stats'));
-            Navigator.of(context).popUntil((Route<dynamic> r) => r.isFirst);
+            Navigator.of(context).popUntil(ModalRoute.withName('/'));
           },
           icon: const Icon(Icons.exposure_plus_1_rounded, size: 18),
           label: const Text('Count on the Stats page'),

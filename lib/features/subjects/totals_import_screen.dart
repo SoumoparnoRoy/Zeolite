@@ -9,9 +9,29 @@ import '../../data/settings/app_settings.dart';
 import '../../domain/attendance_totals_import.dart';
 import '../../domain/attendance_totals_ocr.dart';
 import '../../state/providers.dart';
+import '../../state/timetable_image_reader.dart';
 import '../../widgets/common.dart';
 import '../../widgets/gradient_header.dart';
 import '../../widgets/undo_snack.dart';
+
+/// A read that turned out to be a portal page, from either place that reads
+/// one: the preview when rows came off it, a snackbar when none did.
+Future<void> openTotalsRead(BuildContext context, TotalsSheet read) async {
+  final AttendanceTotals? totals = read.totals;
+  if (totals == null) {
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      content: Text('That looks like an attendance page, but no course rows '
+          'could be read off it.'),
+    ));
+    return;
+  }
+  await Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      settings: const RouteSettings(name: 'totals_import'),
+      builder: (_) => TotalsImportScreen(totals: totals),
+    ),
+  );
+}
 
 /// What a portal page would do to the subjects, row by row, before it does it.
 ///

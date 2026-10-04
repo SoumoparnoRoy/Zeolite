@@ -2,84 +2,68 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/date_utils.dart';
-import '../../data/models/attendance_record.dart';
 import '../../data/models/attendance_status.dart';
 import '../../data/models/subject.dart';
-import '../../data/settings/app_settings.dart';
 import '../../domain/subject_counts.dart';
 import '../app_providers.dart';
 
 import 'action_core.dart';
 
-/// The Counts page's writes. A tap is a mark dated today with no class time; a
-/// typed total moves the carried balance. Going back to counting on the
-/// balance alone is a change to [add] and [remove] and nothing else.
+/// The Counts page's writes, all on the carried balance: it has no dates, so
+/// a count always counts, and it travels with the subject when it syncs.
+///
+/// One write at a time, each reading the subject as it stands when it runs.
+/// Two quick taps read from the screen's copy would both write the same
+/// figure, and one of them would be lost.
 class CountActions {
   CountActions(this._core);
 
   final ActionCore _core;
 
-  Future<void> add(SubjectCounts counts, AttendanceStatus status) async {
-    final int? subjectId = counts.subject.id;
-    if (subjectId == null) return;
-    final DateTime today = Dates.today();
-    final Iterable<AttendanceRecord> sameDay =
-        (await _core.repo.getAttendanceBetween(today, today))
-            .where((AttendanceRecord r) => r.subjectId == subjectId);
-    await _core.repo.setAttendance(
-      AttendanceRecord(
-        subjectId: subjectId,
-        date: today,
-        startMinutes: SubjectCounts.nextUntimedStart(sameDay),
-        status: status,
-        markedAt: DateTime.now(),
-      ),
-    );
-    await _core.refresh();
-    unawaited(_core.analytics.attendanceMarked());
+  Future<void> _last = Future<void>.value();
+
+  Future<T> _inTurn<T>(Future<T> Function() write) {
+    final Future<T> next = _last.then((_) => write());
+    _last = next.then((_) {}, onError: (Object _) {});
+    return next;
   }
 
-  /// Takes back the newest counted mark of [status], then the carried balance
-  /// once those run out. Marks with a class time are left to the log.
-  Future<void> remove(SubjectCounts counts, AttendanceStatus status) async {
-    final int? subjectId = counts.subject.id;
-    if (subjectId == null) return;
-    final AppSettings settings =
-        _core.ref.read(settingsProvider).value ?? const AppSettings();
-    final AttendanceRecord? newest = SubjectCounts.newestUntimed(
-      (await _core.repo.getAttendance()).where(
-        (AttendanceRecord r) =>
-            r.subjectId == subjectId &&
-            settings.countsTowardsPercentage(r.date),
-      ),
-      status,
-    );
-    if (newest != null) {
-      await _core.repo
-          .clearAttendance(subjectId, newest.date, newest.startMinutes);
-    } else if (counts.carriedOf(status) > 0) {
-      await _core.repo.updateSubject(
-        counts.withTotal(status, counts.totalOf(status) - 1)!,
-      );
-    } else {
-      return;
+  SubjectCounts? _now(int subjectId) {
+    for (final SubjectCounts counts in _core.ref.read(subjectCountsProvider)) {
+      if (counts.subject.id == subjectId) return counts;
     }
-    await _core.refresh();
+    return null;
   }
+
+  Future<void> add(int subjectId, AttendanceStatus status) => _inTurn(() async {
+        final SubjectCounts? counts = _now(subjectId);
+        if (counts == null) return;
+        await _save(counts.withTotal(status, counts.totalOf(status) + 1));
+        unawaited(_core.analytics.attendanceMarked());
+      });
+
+  /// Never below what is marked: [SubjectCounts.withTotal] refuses it.
+  Future<void> remove(int subjectId, AttendanceStatus status) =>
+      _inTurn(() async {
+        final SubjectCounts? counts = _now(subjectId);
+        if (counts == null) return;
+        await _save(counts.withTotal(status, counts.totalOf(status) - 1));
+      });
 
   /// False when [total] is below what is already marked, which only the marks
   /// themselves can lower.
-  Future<bool> setTotal(
-    SubjectCounts counts,
-    AttendanceStatus status,
-    int total,
-  ) async {
-    final Subject? subject = counts.withTotal(status, total);
-    if (subject == null) return false;
+  Future<bool> setTotal(int subjectId, AttendanceStatus status, int total) =>
+      _inTurn(() async {
+        final Subject? subject = _now(subjectId)?.withTotal(status, total);
+        if (subject == null) return false;
+        await _save(subject);
+        return true;
+      });
+
+  Future<void> _save(Subject? subject) async {
+    if (subject == null) return;
     await _core.repo.updateSubject(subject);
     await _core.refresh();
-    return true;
   }
 }
 

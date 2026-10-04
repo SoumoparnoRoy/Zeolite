@@ -19,7 +19,7 @@ import 'fake_analytics.dart';
 import 'fake_notifications.dart';
 
 /// The Counts page: three totals made of marks plus a carried balance, where
-/// only the balance can be typed over and a tap is a mark with no time.
+/// taps and typed totals both move only the balance.
 void main() {
   SubjectCounts countsOf(
     Subject subject, {
@@ -130,54 +130,58 @@ void main() {
       return container.read(subjectCountsProvider).single;
     }
 
-    test(
-        'plus files a mark with no time under today, and minus takes the '
-        'newest back before the balance, never a timed mark', () async {
+    test('plus and minus move the carried balance, never a mark', () async {
       final int id = await repo.insertSubject(
-        const Subject(
-          name: 'Course 1',
-          colorValue: 0xFF336699,
-          priorHeld: 1,
-          priorAttended: 1,
-        ),
+        const Subject(name: 'Course 1', colorValue: 0xFF336699),
       );
-      final DateTime today = Dates.today();
       await repo.setAttendance(
         AttendanceRecord(
           subjectId: id,
-          date: today,
+          date: Dates.today(),
           startMinutes: 9 * 60,
           status: AttendanceStatus.present,
         ),
       );
+      await current();
       final CountActions actions = container.read(countActionsProvider);
-      const AttendanceStatus present = AttendanceStatus.present;
 
-      await actions.add(await current(), present);
-      await actions.add(await current(), present);
-      expect(
-        (await repo.getAttendance())
-            .map((AttendanceRecord r) => r.startMinutes)
-            .toList()
-          ..sort(),
-        <int>[-2, -1, 9 * 60],
+      await actions.add(id, AttendanceStatus.present);
+      await actions.add(id, AttendanceStatus.absent);
+      await actions.add(id, AttendanceStatus.cancelled);
+      Subject saved = (await repo.getSubjects()).single;
+      expect(saved.priorAttended, 1);
+      expect(saved.priorHeld, 2);
+      expect(saved.priorCancelled, 1);
+      expect(await repo.getAttendance(), hasLength(1));
+
+      await actions.remove(id, AttendanceStatus.present);
+      await actions.remove(id, AttendanceStatus.present);
+      saved = (await repo.getSubjects()).single;
+      expect(saved.priorAttended, 0);
+      expect(saved.priorHeld, 1, reason: 'the missed one stays');
+      expect((await current()).totalOf(AttendanceStatus.present), 1);
+      expect(await repo.getAttendance(), hasLength(1));
+    });
+
+    test('quick taps each count, however fast they come', () async {
+      final int id = await repo.insertSubject(
+        const Subject(name: 'Course 1', colorValue: 0xFF336699),
       );
-      expect((await current()).totalOf(present), 4);
+      await current();
+      final CountActions actions = container.read(countActionsProvider);
 
-      await actions.remove(await current(), present);
-      expect(await repo.getAttendanceAt(id, today, -2), isNull);
-      expect(await repo.getAttendanceAt(id, today, -1), isNotNull);
+      await Future.wait(<Future<void>>[
+        actions.add(id, AttendanceStatus.present),
+        actions.add(id, AttendanceStatus.present),
+        actions.add(id, AttendanceStatus.present),
+      ]);
+      expect((await repo.getSubjects()).single.priorAttended, 3);
 
-      await actions.remove(await current(), present);
-      await actions.remove(await current(), present);
-      // The balance went once the counted marks had.
-      expect((await repo.getSubjects()).single.priorAttended, 0);
-
-      final SubjectCounts left = await current();
-      expect(left.totalOf(present), 1);
-      expect(left.canRemove(present), isFalse);
-      await actions.remove(left, present);
-      expect(await repo.getAttendanceAt(id, today, 9 * 60), isNotNull);
+      await Future.wait(<Future<void>>[
+        actions.remove(id, AttendanceStatus.present),
+        actions.remove(id, AttendanceStatus.present),
+      ]);
+      expect((await repo.getSubjects()).single.priorAttended, 1);
     });
   });
 }

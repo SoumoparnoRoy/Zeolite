@@ -9,7 +9,6 @@ import '../../data/models/attendance_status.dart';
 import '../../data/models/subject.dart';
 import '../../data/settings/app_settings.dart';
 import '../../domain/attendance_stats.dart';
-import '../../domain/attendance_totals_ocr.dart';
 import '../../domain/subject_counts.dart';
 import '../../state/providers.dart';
 import '../../state/timetable_image_reader.dart';
@@ -27,7 +26,7 @@ class CountsPage extends ConsumerStatefulWidget {
 }
 
 class _CountsPageState extends ConsumerState<CountsPage> {
-  static const double _pad = 20;
+  static const double _pad = StatsPageList.sidePad;
 
   bool _reading = false;
 
@@ -43,22 +42,12 @@ class _CountsPageState extends ConsumerState<CountsPage> {
       final SheetRead read = await reader.read(bytes);
       if (!mounted) return;
       switch (read) {
-        case TotalsSheet(:final AttendanceTotals totals):
-          await Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              settings: const RouteSettings(name: 'totals_import'),
-              builder: (_) => TotalsImportScreen(totals: totals),
-            ),
-          );
         case TotalsSheet():
-          messenger.showSnackBar(const SnackBar(
-            content: Text('That looks like an attendance page, but no course '
-                'rows could be read off it.'),
-          ));
+          await openTotalsRead(context, read);
         case TimetableSheet():
           messenger.showSnackBar(const SnackBar(
-            content: Text('That looks like a timetable. Import it from the '
-                'Timetable tab instead.'),
+            content: Text('That looks like a timetable. Import it from '
+                'Settings → Import timetable.'),
           ));
         case NoClassesFound():
           messenger.showSnackBar(const SnackBar(
@@ -142,6 +131,12 @@ class _CountsCard extends StatelessWidget {
     final SubjectStats stats = counts.stats;
     final Subject subject = counts.subject;
     final int cancelled = counts.totalOf(AttendanceStatus.cancelled);
+    // Only worth saying once there is a cancelled class to explain.
+    final String cancelledNote = cancelled == 0
+        ? ''
+        : cancelledCounts
+            ? ' · cancelled classes count as attended'
+            : " · cancelled classes aren't counted";
 
     return SurfaceCard(
       padding: const EdgeInsets.fromLTRB(14, 13, 10, 12),
@@ -192,10 +187,7 @@ class _CountsCard extends StatelessWidget {
             _CountLine(counts: counts, status: status),
           const SizedBox(height: 4),
           Text(
-            // Only worth saying once there is a cancelled class to explain.
-            'Held ${stats.held}${cancelled == 0 ? '' : cancelledCounts ? ' · '
-                'cancelled classes count as attended' : ' · cancelled '
-                "classes aren't counted"}',
+            'Held ${stats.held}$cancelledNote',
             style:
                 monoStyle(color: p.textTertiary, size: AppType.captionMedium),
           ),
@@ -254,9 +246,10 @@ class _CountLine extends ConsumerWidget {
       ),
     );
     final int? total = typed == null ? null : int.tryParse(typed);
-    if (total == null) return;
+    final int? subjectId = counts.subject.id;
+    if (total == null || subjectId == null) return;
     final bool saved =
-        await ref.read(countActionsProvider).setTotal(counts, status, total);
+        await ref.read(countActionsProvider).setTotal(subjectId, status, total);
     if (!saved) {
       messenger.showSnackBar(SnackBar(
         content: Text('$_label cannot go below $marked — that many are '
@@ -270,6 +263,7 @@ class _CountLine extends ConsumerWidget {
     final AppPalette p = context.palette;
     final Color tint = status.colorIn(p);
     final CountActions actions = ref.read(countActionsProvider);
+    final int? subjectId = counts.subject.id;
 
     return Row(
       children: <Widget>[
@@ -289,8 +283,8 @@ class _CountLine extends ConsumerWidget {
           icon: Icons.remove_rounded,
           tooltip: 'Remove $_noun',
           tint: tint,
-          onTap: counts.canRemove(status)
-              ? () => actions.remove(counts, status)
+          onTap: subjectId != null && counts.canRemove(status)
+              ? () => actions.remove(subjectId, status)
               : null,
         ),
         Tooltip(
@@ -317,7 +311,8 @@ class _CountLine extends ConsumerWidget {
           icon: Icons.add_rounded,
           tooltip: 'Add $_noun',
           tint: tint,
-          onTap: () => actions.add(counts, status),
+          onTap:
+              subjectId == null ? null : () => actions.add(subjectId, status),
         ),
       ],
     );

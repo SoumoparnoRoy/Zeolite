@@ -14,7 +14,7 @@ import 'package:zeolite/data/models/extra_class.dart';
 import 'package:zeolite/data/models/holiday.dart';
 import 'package:zeolite/data/models/subject.dart';
 import 'package:zeolite/data/settings/app_settings.dart';
-import 'package:zeolite/features/stats/stats_view_switch.dart';
+import 'package:zeolite/features/stats/stats_view.dart';
 import 'package:zeolite/features/subjects/subjects_screen.dart';
 import 'package:zeolite/state/providers.dart';
 

@@ -4,15 +4,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zeolite/app.dart';
 import 'package:zeolite/data/models/attendance_status.dart';
 import 'package:zeolite/state/home_widget_providers.dart';
+import 'package:zeolite/state/providers.dart';
 
 String? _screenFor(String? payload) {
   final int? tab = RootShell.tabForPayload(payload);
-  return tab == null ? null : RootShell.tabNames[tab];
+  return tab == null ? null : shellTabs[tab];
 }
 
 String? _screenForLink(String uri) {
   final int? tab = RootShell.tabForLink(Uri.parse(uri));
-  return tab == null ? null : RootShell.tabNames[tab];
+  return tab == null ? null : shellTabs[tab];
 }
 
 void main() {

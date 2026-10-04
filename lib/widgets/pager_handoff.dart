@@ -111,6 +111,14 @@ class _PagerHandoffState extends State<PagerHandoff> {
     _outerPosition = null;
   }
 
+  /// Removed mid-swipe, a drag left running would hold its pager off a page.
+  @override
+  void dispose() {
+    _inner?.cancel();
+    _outer?.cancel();
+    super.dispose();
+  }
+
   static DragStartDetails _startAt(DragUpdateDetails details) =>
       DragStartDetails(
         globalPosition: details.globalPosition,

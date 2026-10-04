@@ -259,7 +259,7 @@ class TodayDayPage extends ConsumerWidget {
     final ActionCore core = ref.read(actionCoreProvider);
     final bool cleared =
         await ref.read(attendanceActionsProvider).mark(session, status);
-    if (cleared) showUndoSnack(messenger, core, 'Mark cleared');
+    if (cleared) showMarkCleared(messenger, core);
   }
 
   static Future<void> _markAllPresent(

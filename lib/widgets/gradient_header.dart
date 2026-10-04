@@ -10,6 +10,8 @@ import '../core/app_theme.dart';
 /// status bar is fixed, so the status bar icons never have to flip contrast
 /// mid-scroll.
 class GradientScaffold extends StatelessWidget {
+  static const double defaultBottomInset = 24;
+
   const GradientScaffold({
     super.key,
     required this.header,
@@ -18,12 +20,15 @@ class GradientScaffold extends StatelessWidget {
     this.onRefresh,
     this.bottom,
     this.headerGap = 20,
-    this.bottomInset = 24,
+    this.bottomInset = defaultBottomInset,
     this.maxContentWidth,
     this.body,
     this.pages,
     this.aboveThePages,
-  });
+  }) : assert(
+            body == null || pages == null,
+            'body and pages both fill the '
+            'sheet; pass one');
 
   /// Drawn on the gradient, below the status bar.
   final Widget header;
@@ -56,7 +61,8 @@ class GradientScaffold extends StatelessWidget {
   final Widget? body;
 
   /// Fills the sheet with a pager under a header that scrolls away but holds
-  /// still while the pages move. Each page's list must be a primary one.
+  /// still while the pages move. Each page's list must be a primary one, and
+  /// supplies its own bottom space; [onRefresh] does not apply.
   final Widget? pages;
 
   /// On the sheet above [pages].

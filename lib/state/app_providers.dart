@@ -519,31 +519,15 @@ final subjectStatsProvider =
 final subjectCountsProvider = Provider<List<SubjectCounts>>((ref) {
   final OverallStats stats = ref.watch(statsProvider);
   final TimetableData? timetable = ref.watch(timetableProvider).value;
-  final AppSettings settings =
-      ref.watch(settingsProvider).value ?? const AppSettings();
   if (timetable == null) return const <SubjectCounts>[];
 
-  final Map<int, Map<AttendanceStatus, int>> untimed =
-      <int, Map<AttendanceStatus, int>>{};
-  for (final AttendanceRecord record in timetable.records) {
-    if (AttendanceRecord.isTimed(record.startMinutes) ||
-        !settings.countsTowardsPercentage(record.date)) {
-      continue;
-    }
-    final Map<AttendanceStatus, int> byStatus =
-        untimed.putIfAbsent(record.subjectId, () => <AttendanceStatus, int>{});
-    byStatus[record.status] = (byStatus[record.status] ?? 0) + 1;
-  }
   final Map<int, SubjectStats> byId = <int, SubjectStats>{
-    for (final SubjectStats s in stats.subjects) s.subject.id!: s,
+    for (final SubjectStats s in stats.subjects)
+      if (s.subject.id case final int id) id: s,
   };
   return <SubjectCounts>[
     for (final Subject subject in timetable.subjects)
-      if (byId[subject.id] case final SubjectStats s)
-        SubjectCounts(
-          stats: s,
-          untimed: untimed[subject.id] ?? const <AttendanceStatus, int>{},
-        ),
+      if (byId[subject.id] case final SubjectStats s) SubjectCounts(stats: s),
   ];
 });
 
@@ -668,7 +652,7 @@ const List<String> shellTabs = <String>[
   'today',
   'timetable',
   'stats',
-  'settings'
+  'settings',
 ];
 
 /// The selected bottom-navigation tab.

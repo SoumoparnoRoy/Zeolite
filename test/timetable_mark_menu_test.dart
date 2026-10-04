@@ -165,6 +165,21 @@ void main() {
     expect(find.text('Clear the mark'), findsNothing);
   });
 
+  testWidgets('a screen reader is told what a tap and a long press do',
+      (WidgetTester tester) async {
+    final SemanticsHandle semantics = tester.ensureSemantics();
+    await _pump(tester);
+
+    expect(
+      tester.getSemantics(find.text('Course 1')),
+      isSemantics(
+        onTapHint: 'Change the mark',
+        onLongPressHint: 'Class options',
+      ),
+    );
+    semantics.dispose();
+  });
+
   testWidgets('each day is headed with its full date',
       (WidgetTester tester) async {
     await _pump(tester);

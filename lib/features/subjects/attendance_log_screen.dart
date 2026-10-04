@@ -172,6 +172,9 @@ class _CarriedIn extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final AppPalette p = context.palette;
+    final String cancelled = subject.priorCancelled > 0
+        ? ', ${subject.priorCancelled} cancelled,'
+        : '';
     return SurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -187,8 +190,7 @@ class _CarriedIn extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             '${subject.priorAttended} of ${subject.priorHeld} attended'
-            '${subject.priorCancelled > 0 ? ', ${subject.priorCancelled} '
-                'cancelled,' : ''} before this app started counting',
+            '$cancelled before this app started counting',
             style: const TextStyle(fontSize: AppType.bodyLarge, height: 1.35),
           ),
         ],
@@ -251,6 +253,10 @@ class _LogTile extends ConsumerWidget {
     final String? tagName =
         ref.watch(timetableProvider).value?.tagById(entry.tagId)?.name;
     final bool counts = _counts(ref.watch(settingsProvider).value);
+    final String why = AttendanceRecord.isTimed(entry.startMinutes)
+        ? 'No class on your timetable sits here — the class moved to another '
+            'day, or this mark was brought in from elsewhere.'
+        : 'Brought in from an import without a class time.';
 
     final String time = entry.endMinutes == null
         ? AttendanceRecord.startLabel(entry.startMinutes, use24Hour: use24Hour)
@@ -354,12 +360,7 @@ class _LogTile extends ConsumerWidget {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    '${AttendanceRecord.isTimed(entry.startMinutes) ? 'No '
-                        'class on your timetable sits here — the class moved '
-                        'to another day, or this mark was brought in from '
-                        'elsewhere.' : 'Counted without a class time, from '
-                        'the Counts page or an import.'} '
-                    '${counts ? 'It still counts' : 'It does not count'} '
+                    '$why ${counts ? 'It still counts' : 'It does not count'} '
                     'towards your percentage.',
                     style: TextStyle(
                       fontSize: AppType.captionLarge,
@@ -414,7 +415,7 @@ extension on _LogTile {
           weight: entry.weight,
           tagId: entry.tagId,
         );
-    if (cleared) showUndoSnack(messenger, core, 'Mark cleared');
+    if (cleared) showMarkCleared(messenger, core);
   }
 
   Future<void> _confirmRemove(BuildContext context, WidgetRef ref) async {

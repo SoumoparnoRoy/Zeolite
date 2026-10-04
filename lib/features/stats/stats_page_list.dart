@@ -8,6 +8,9 @@ import '../../widgets/nav_bar_scroll.dart';
 class StatsPageList extends StatelessWidget {
   const StatsPageList({super.key, required this.slivers});
 
+  /// The pages' own side padding, inside the column's gutters.
+  static const double sidePad = 20;
+
   final List<Widget> slivers;
 
   @override
@@ -19,7 +22,9 @@ class StatsPageList extends StatelessWidget {
         slivers: <Widget>[
           for (final Widget sliver in slivers)
             SliverPadding(padding: inset, sliver: sliver),
-          const SliverToBoxAdapter(child: SizedBox(height: 24)),
+          const SliverToBoxAdapter(
+            child: SizedBox(height: GradientScaffold.defaultBottomInset),
+          ),
         ],
       ),
     );

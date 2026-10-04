@@ -127,6 +127,12 @@ class CountingSection extends ConsumerWidget {
               icon: Icons.event_busy_outlined,
               title: 'Cancelled classes count as attended',
               value: 'Some institutions count them, most do not',
+              onTap: () => controller.save(
+                settings.copyWith(
+                  cancelledCountsAsAttended:
+                      !settings.cancelledCountsAsAttended,
+                ),
+              ),
               trailing: Switch(
                 value: settings.cancelledCountsAsAttended,
                 onChanged: (bool on) => controller.save(
@@ -182,6 +188,7 @@ class HolidaysSection extends ConsumerWidget {
                         ? runs[i].dateLabel
                         : '${runs[i].dateLabel} · ${runs[i].lengthLabel}',
                     trailing: IconButton(
+                      tooltip: 'Delete ${runs[i].name}',
                       onPressed: () => _deleteHolidayRun(context, ref, runs[i]),
                       icon: const Icon(Icons.close_rounded, size: 18),
                       color: context.palette.textTertiary,

@@ -13,6 +13,7 @@ String syncStatusLine(
   SyncRunResult? last, {
   DateTime? storedLastSyncAt,
   String authAdvice = 'Sign out and back in, then try again.',
+  DateTime? now,
 }) {
   switch (status.state) {
     case SyncState.running:
@@ -36,7 +37,7 @@ String syncStatusLine(
       // Rebuilt with the process, so the stored stamp outlives it.
       final DateTime? at = status.lastRunAt ?? storedLastSyncAt;
       if (at == null) return 'Not synced yet.';
-      return 'Synced ${_ago(at)}.${_counts(last)}';
+      return 'Synced ${_ago(at, now ?? DateTime.now())}.${_counts(last)}';
   }
 }
 
@@ -54,8 +55,8 @@ String _counts(SyncRunResult? last) {
   return parts.isEmpty ? '' : ' ${parts.join(', ')}.';
 }
 
-String _ago(DateTime at) {
-  final Duration since = DateTime.now().difference(at);
+String _ago(DateTime at, DateTime now) {
+  final Duration since = now.difference(at);
   if (since.inMinutes < 1) return 'just now';
   if (since.inMinutes < 60) return '${since.inMinutes} min ago';
   if (since.inHours < 24) return '${since.inHours} h ago';

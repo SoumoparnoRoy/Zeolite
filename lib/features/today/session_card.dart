@@ -402,23 +402,26 @@ class _TagButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final AppPalette p = context.palette;
     final Color accent = p.cyan;
-    return Material(
-      color: active ? accent.withValues(alpha: 0.14) : p.surfaceHigh,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-        side: BorderSide(
-          color: active ? accent.withValues(alpha: 0.45) : p.outline,
+    return Tooltip(
+      message: active ? 'Change the tag' : 'Add a tag',
+      child: Material(
+        color: active ? accent.withValues(alpha: 0.14) : p.surfaceHigh,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+          side: BorderSide(
+            color: active ? accent.withValues(alpha: 0.45) : p.outline,
+          ),
         ),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          child: Icon(
-            Icons.sell_outlined,
-            size: 14,
-            color: active ? accent : p.textSecondary,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: Icon(
+              Icons.sell_outlined,
+              size: 14,
+              color: active ? accent : p.textSecondary,
+            ),
           ),
         ),
       ),

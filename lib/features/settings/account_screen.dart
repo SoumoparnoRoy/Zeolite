@@ -170,6 +170,7 @@ class _SyncSection extends ConsumerWidget {
                   last,
                   storedLastSyncAt:
                       ref.watch(settingsProvider).value?.lastSyncAt,
+                  now: ref.watch(minuteTickProvider).value,
                 ),
           value: '',
           danger: !running && status.state != SyncState.idle,
@@ -180,6 +181,9 @@ class _SyncSection extends ConsumerWidget {
           icon: Icons.schedule_rounded,
           title: 'Sync automatically',
           value: 'About 15 seconds after you mark a class',
+          onTap: () => ref.read(settingsProvider.notifier).save(
+                settings.copyWith(accountAutoSync: !settings.accountAutoSync),
+              ),
           trailing: Switch(
             value: settings.accountAutoSync,
             onChanged: (bool on) => ref

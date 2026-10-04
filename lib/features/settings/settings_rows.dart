@@ -83,7 +83,9 @@ class SettingsSwitchRow extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: InkWell(
-              onTap: onTapSubtitle,
+              // The subtitle's own action wins where there is one: the
+              // reminder rows open their time from it.
+              onTap: onTapSubtitle ?? () => onChanged(!value),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                 child: Column(

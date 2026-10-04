@@ -158,6 +158,7 @@ class CategoriesSection extends ConsumerWidget {
                             category: categories[i],
                           ),
                           trailing: IconButton(
+                            tooltip: 'Delete ${categories[i].name}',
                             onPressed: () =>
                                 _deleteCategory(context, ref, categories[i]),
                             icon: const Icon(Icons.close_rounded, size: 18),

@@ -204,6 +204,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               const SizedBox(height: 24),
               SurfaceCard(
                 padding: const EdgeInsets.fromLTRB(14, 10, 12, 10),
+                onTap: () => setState(() => _notifications = !_notifications),
                 child: Row(
                   children: <Widget>[
                     Container(

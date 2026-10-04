@@ -16,6 +16,7 @@ import '../../services/sync/sync_coordinator.dart';
 import '../../state/notion_providers.dart';
 import '../../state/notion_sync_providers.dart';
 import '../../state/providers.dart';
+import '../../state/sync_providers.dart';
 import '../../widgets/common.dart';
 import '../subjects/notion_import_screen.dart';
 
@@ -91,6 +92,11 @@ class NotionSection extends ConsumerWidget {
                 icon: Icons.schedule_rounded,
                 title: 'Sync automatically',
                 value: 'About 15 seconds after you mark a class',
+                onTap: () => ref.read(settingsProvider.notifier).save(
+                      settings.copyWith(
+                        notionAutoSync: !settings.notionAutoSync,
+                      ),
+                    ),
                 trailing: Switch(
                   value: settings.notionAutoSync,
                   onChanged: (bool on) => ref
@@ -277,6 +283,7 @@ class _NotionSyncCard extends ConsumerWidget {
               storedLastSyncAt:
                   ref.watch(settingsProvider).value?.lastNotionSyncAt,
               authAdvice: 'Disconnect Notion and connect it again.',
+              now: ref.watch(minuteTickProvider).value,
             ),
             style: TextStyle(color: context.palette.textSecondary),
           ),

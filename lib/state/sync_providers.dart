@@ -15,6 +15,16 @@ import 'actions/data_actions.dart';
 import 'app_providers.dart';
 import 'auth_providers.dart';
 
+/// The time now and then once a minute, so a "Synced 3 min ago" line goes on
+/// counting while Settings stays open instead of saying "just now" for good.
+final minuteTickProvider = StreamProvider.autoDispose<DateTime>((ref) async* {
+  yield DateTime.now();
+  yield* Stream<DateTime>.periodic(
+    const Duration(minutes: 1),
+    (_) => DateTime.now(),
+  );
+});
+
 /// The account as somewhere to mirror to, or null while signed out. Rebuilt
 /// when the user changes, so signing into a second account cannot go on
 /// writing to the first one's collections.

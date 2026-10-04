@@ -21,19 +21,41 @@ import 'week_grid_view.dart';
 /// would mean two grids that have to be kept looking alike by hand, and the
 /// one thing worth having on a home screen is the week as the app draws it.
 /// The cost is that taps land on a day column, not on a class. A widget
-/// resized while the app is closed keeps the old shape until it is next opened.
+/// resized while the app is closed keeps the old shape until the app is next
+/// opened or returned to.
 final weekWidgetImageProvider = Provider<void>((Ref ref) {
   final ScheduleEngine? engine = ref.watch(scheduleEngineProvider);
   final AppSettings? settings = ref.watch(settingsProvider).value;
   if (engine == null || settings == null) return;
-  unawaited(
-    _render(
-      service: ref.read(homeWidgetServiceProvider),
+
+  final HomeWidgetService service = ref.read(homeWidgetServiceProvider);
+  ({Size cell, DateTime week})? drawn;
+
+  Future<void> draw({required bool onlyIfStale}) async {
+    // The cell the widget actually occupies, written there by its provider,
+    // because Dart has no way to ask. Drawn at that size the grid fills the
+    // widget instead of being centred inside it.
+    final Size cell = await service.weekCellSize() ?? _fallbackSize;
+    final DateTime week = Dates.startOfWeek(Dates.today());
+    if (onlyIfStale && drawn == (cell: cell, week: week)) return;
+    drawn = (cell: cell, week: week);
+    await _render(
+      service: service,
       container: ref.container,
       grid: ref.read(dayGridProvider),
       settings: settings,
-    ),
+      cell: cell,
+    );
+  }
+
+  // A widget placed or resized while the app sat in the background reports
+  // its cell then, and a week can turn over meanwhile too. Anything else
+  // already redraws through the watches above.
+  final AppLifecycleListener listener = AppLifecycleListener(
+    onResume: () => unawaited(draw(onlyIfStale: true)),
   );
+  ref.onDispose(listener.dispose);
+  unawaited(draw(onlyIfStale: false));
 });
 
 /// Only until the widget has drawn once and reported its own cell. The
@@ -59,12 +81,8 @@ Future<void> _render({
   required ProviderContainer container,
   required DayGrid grid,
   required AppSettings settings,
+  required Size cell,
 }) async {
-  // The cell the widget actually occupies, written there by its provider,
-  // because Dart has no way to ask. Drawn at that size the grid fills the
-  // widget instead of being centred inside it.
-  final Size cell = await service.weekCellSize() ?? _fallbackSize;
-
   // A widget cell is far shorter than the grid's own minimum block height
   // times a full day, so asking the grid to draw into it directly clipped
   // the afternoon off. Drawing into a taller box at the cell's own aspect

@@ -71,6 +71,7 @@ class DataSection extends ConsumerWidget {
                 onTap: () => _pickBackupFolder(context, ref),
                 trailing: settings.hasBackupFolder
                     ? IconButton(
+                        tooltip: "Use the app's own folder",
                         onPressed: () => _clearBackupFolder(context, ref),
                         icon: const Icon(Icons.close_rounded, size: 18),
                         color: context.palette.textTertiary,

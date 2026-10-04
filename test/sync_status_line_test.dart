@@ -44,6 +44,19 @@ void main() {
     expect(line, 'Synced just now.');
   });
 
+  test('the line goes on ageing while the screen stays open', () {
+    final DateTime ran = DateTime(2026, 10, 4, 9);
+    String at(Duration later) => syncStatusLine(
+          SyncStatus(state: SyncState.idle, lastRunAt: ran),
+          const SyncRunResult(outcome: SyncRunOutcome.synced),
+          now: ran.add(later),
+        );
+
+    expect(at(Duration.zero), 'Synced just now.');
+    expect(at(const Duration(minutes: 3)), 'Synced 3 min ago.');
+    expect(at(const Duration(hours: 2)), 'Synced 2 h ago.');
+  });
+
   test('rejection by the account tells the user what to do about it', () {
     final String line = syncStatusLine(
       const SyncStatus().failed(SyncFailure.auth),

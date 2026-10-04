@@ -463,6 +463,7 @@ class _UntypedChoice extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: SurfaceCard(
+        onTap: () => onChanged(!counted),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[

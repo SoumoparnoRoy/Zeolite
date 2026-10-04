@@ -186,16 +186,16 @@ class _MappingBody {
     final NotionMappingForm now = await controller.ensureSources();
     if (!context.mounted) return;
 
-    final NotionTableChoice? choice =
-        await showModalBottomSheet<NotionTableChoice>(
+    final NotionTableChoice? choice = await showAppSheet<NotionTableChoice>(
       context: context,
-      builder: (BuildContext context) => SafeArea(
-        child: ListView(
-          shrinkWrap: true,
+      title: 'Courses table',
+      child: Builder(
+        builder: (BuildContext context) => Column(
           children: <Widget>[
             for (final NotionTableChoice option in now.sources)
               if (option.databaseId != now.databaseId)
                 ListTile(
+                  contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.table_chart_outlined),
                   title: Text(option.title),
                   subtitle: switch (now.placeOf(option)) {

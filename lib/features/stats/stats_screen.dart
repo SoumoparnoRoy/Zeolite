@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -13,20 +15,82 @@ import '../../domain/tag_stats.dart';
 import '../../state/providers.dart';
 import '../../widgets/common.dart';
 import '../../widgets/gradient_header.dart';
+import '../../widgets/kept_alive.dart';
+import '../../widgets/pager_handoff.dart';
 import '../../widgets/undo_snack.dart';
 import '../subjects/attendance_log_screen.dart';
 import '../subjects/class_editor_sheets.dart';
+import 'counts_screen.dart';
 import 'simulate_sheet.dart';
+import 'stats_page_list.dart';
 import 'stats_view_switch.dart';
 
-/// Attendance overview: where you stand, and how much room you have left.
-class StatsScreen extends ConsumerWidget {
-  const StatsScreen({super.key, this.onSwitch});
+/// Attendance in two views under one header: where you stand, and the three
+/// counts behind it for anyone who keeps them by hand.
+class StatsScreen extends ConsumerStatefulWidget {
+  const StatsScreen({super.key});
+
+  @override
+  ConsumerState<StatsScreen> createState() => _StatsScreenState();
+}
+
+class _StatsScreenState extends ConsumerState<StatsScreen> {
+  final PageController _views = PageController();
+  StatsView _view = StatsView.overview;
+
+  @override
+  void dispose() {
+    _views.dispose();
+    super.dispose();
+  }
+
+  void _show(StatsView view) => unawaited(_views.animateToPage(
+        view.index,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutQuart,
+      ));
+
+  void _onPageChanged(int page) {
+    setState(() => _view = StatsView.values[page]);
+    unawaited(ref
+        .read(analyticsProvider)
+        .screen(_view == StatsView.counts ? 'counts' : 'stats'));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final OverallStats stats = ref.watch(statsProvider);
+    final AppSettings settings =
+        ref.watch(settingsProvider).value ?? const AppSettings();
+
+    return PagerHandoff(
+      controller: _views,
+      child: GradientScaffold(
+        headerGap: 18,
+        header: OverallStatsHeader(stats: stats, settings: settings),
+        aboveThePages: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+          child: StatsViewSwitch(current: _view, onSelect: _show),
+        ),
+        pages: PageView(
+          controller: _views,
+          physics: const HandoffPagePhysics(),
+          onPageChanged: _onPageChanged,
+          children: const <Widget>[
+            KeptAlive(child: _OverviewPage()),
+            KeptAlive(child: CountsPage()),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Where you stand, and how much room you have left.
+class _OverviewPage extends ConsumerWidget {
+  const _OverviewPage();
 
   static const double _pad = 20;
-
-  /// Moves the shell's pager; null where the screen stands alone.
-  final ValueChanged<StatsView>? onSwitch;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -42,19 +106,8 @@ class StatsScreen extends ConsumerWidget {
     final bool hasTags = tagged.isNotEmpty;
     final OutOfTermMarks strays = ref.watch(outOfTermMarksProvider);
 
-    return GradientScaffold(
-      headerGap: 18,
-      header: OverallStatsHeader(stats: stats, settings: settings),
+    return StatsPageList(
       slivers: <Widget>[
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(_pad, 0, _pad, 16),
-          sliver: SliverToBoxAdapter(
-            child: StatsViewSwitch(
-              current: StatsView.overview,
-              onSelect: (StatsView view) => onSwitch?.call(view),
-            ),
-          ),
-        ),
         // Before the empty state: "no data yet" over a term of marks dated
         // outside the term is the confusion this exists to end.
         if (!strays.isEmpty)

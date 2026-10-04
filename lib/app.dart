@@ -12,9 +12,7 @@ import 'data/settings/app_settings.dart';
 import 'features/launch/launch_screen.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'features/settings/settings_screen.dart';
-import 'features/stats/counts_screen.dart';
 import 'features/stats/stats_screen.dart';
-import 'features/stats/stats_view_switch.dart';
 import 'features/timetable/timetable_screen.dart';
 import 'features/timetable/week_widget_image.dart';
 import 'features/today/today_screen.dart';
@@ -22,6 +20,7 @@ import 'state/home_widget_providers.dart';
 import 'state/notion_sync_providers.dart';
 import 'state/providers.dart';
 import 'state/sync_providers.dart';
+import 'widgets/kept_alive.dart';
 import 'widgets/nav_bar_scroll.dart';
 import 'widgets/shell_routes.dart';
 
@@ -166,29 +165,6 @@ class RootShell extends ConsumerStatefulWidget {
     'settings',
   ];
 
-  /// The pager's pages, in order. Stats holds two, so a drag runs through
-  /// Overview and Counts on its way between Timetable and Settings, and the
-  /// bar shows Stats on both. Also the names analytics sees.
-  static const List<String> pageNames = <String>[
-    'today',
-    'timetable',
-    'stats',
-    'counts',
-    'settings',
-  ];
-
-  static int tabOfPage(int page) {
-    final String name = pageNames[page];
-    return tabNames.indexOf(name == 'counts' ? 'stats' : name);
-  }
-
-  /// [statsPage] is the Stats page last shown, which the Stats tab returns
-  /// to.
-  static int pageOfTab(int tab, {required int statsPage}) {
-    final String name = tabNames[tab];
-    return name == 'stats' ? statsPage : pageNames.indexOf(name);
-  }
-
   /// Where a `zeolite://open?tab=` link lands, so each widget opens the screen
   /// it is a view of. An unknown name returns null and the app opens where it
   /// was, which is what a widget older than the tab it names should do.
@@ -216,28 +192,18 @@ class RootShell extends ConsumerStatefulWidget {
 }
 
 class _RootShellState extends ConsumerState<RootShell> with RouteAware {
-  static final int _overviewPage = RootShell.pageNames.indexOf('stats');
-  static final int _countsPage = RootShell.pageNames.indexOf('counts');
-
-  late final List<Widget> _screens = <Widget>[
-    const TodayScreen(),
-    const TimetableScreen(),
-    StatsScreen(onSwitch: _switchStats),
-    CountsScreen(onSwitch: _switchStats),
-    const SettingsScreen(),
+  static const List<Widget> _screens = <Widget>[
+    TodayScreen(),
+    TimetableScreen(),
+    StatsScreen(),
+    SettingsScreen(),
   ];
-
-  int _statsPage = _overviewPage;
 
   /// Only for a tap; a drag settles on the pager's own spring.
   static const Duration _slide = Duration(milliseconds: 200);
 
-  late final PageController _pages = PageController(
-    initialPage: RootShell.pageOfTab(
-      ref.read(selectedTabProvider),
-      statsPage: _statsPage,
-    ),
-  );
+  late final PageController _pages =
+      PageController(initialPage: ref.read(selectedTabProvider));
 
   // Held rather than read each time: dispose needs it, and ref is gone by then.
   late final ValueNotifier<String?> _tapped =
@@ -300,7 +266,7 @@ class _RootShellState extends ConsumerState<RootShell> with RouteAware {
   void _openLink(Uri? uri) {
     final int? tab = RootShell.tabForLink(uri);
     if (tab == null || !mounted) return;
-    _open(tab);
+    _select(tab);
   }
 
   /// Sliding two screens at once in the time it takes to slide one is a blur,
@@ -320,29 +286,18 @@ class _RootShellState extends ConsumerState<RootShell> with RouteAware {
     final int? tab = RootShell.tabForPayload(_tapped.value);
     if (_tapped.value != null) _tapped.value = null;
     if (tab == null || !mounted) return;
-    _open(tab);
-  }
-
-  /// A tap on the bar; a drag moves the pager itself.
-  void _select(int tab) =>
-      _slideTo(RootShell.pageOfTab(tab, statsPage: _statsPage));
-
-  /// A widget or a notification, which mean the screen as it first opens.
-  void _open(int tab) {
-    _statsPage = _overviewPage;
     _select(tab);
   }
 
-  void _switchStats(StatsView view) =>
-      _slideTo(view == StatsView.counts ? _countsPage : _overviewPage);
+  /// A tap on the bar or a notification; a drag moves the pager itself.
+  void _select(int index) => _slideTo(index);
 
   /// Fires on crossing half way, so the bar lights up before it settles.
-  void _onPageChanged(int page) {
+  void _onPageChanged(int index) {
     // A tab arrived at with the bar hidden would look like it has no way back.
     _showNav(true);
-    if (page == _overviewPage || page == _countsPage) _statsPage = page;
-    ref.read(selectedTabProvider.notifier).select(RootShell.tabOfPage(page));
-    _report(page);
+    ref.read(selectedTabProvider.notifier).select(index);
+    _report(index);
   }
 
   bool _navVisible = true;
@@ -366,13 +321,9 @@ class _RootShellState extends ConsumerState<RootShell> with RouteAware {
     return false;
   }
 
-  void _report([int? page]) => ref.read(analyticsProvider).screen(
-        RootShell.pageNames[page ??
-            RootShell.pageOfTab(
-              ref.read(selectedTabProvider),
-              statsPage: _statsPage,
-            )],
-      );
+  void _report([int? index]) => ref
+      .read(analyticsProvider)
+      .screen(RootShell.tabNames[index ?? ref.read(selectedTabProvider)]);
 
   @override
   Widget build(BuildContext context) {
@@ -391,7 +342,7 @@ class _RootShellState extends ConsumerState<RootShell> with RouteAware {
               // Listened per page rather than around the pager, which would
               // otherwise count as a level and hide every screen's own scroll
               // from [RootShell.navVisibleFor].
-              _KeptAlive(
+              KeptAlive(
                 child: NotificationListener<UserScrollNotification>(
                   onNotification: _onScroll,
                   child: screen,
@@ -455,28 +406,6 @@ class _RootShellState extends ConsumerState<RootShell> with RouteAware {
         ),
       ),
     );
-  }
-}
-
-/// Keeps a built page alive, so a tab holds its scroll position.
-class _KeptAlive extends StatefulWidget {
-  const _KeptAlive({required this.child});
-
-  final Widget child;
-
-  @override
-  State<_KeptAlive> createState() => _KeptAliveState();
-}
-
-class _KeptAliveState extends State<_KeptAlive>
-    with AutomaticKeepAliveClientMixin {
-  @override
-  bool get wantKeepAlive => true;
-
-  @override
-  Widget build(BuildContext context) {
-    super.build(context);
-    return widget.child;
   }
 }
 

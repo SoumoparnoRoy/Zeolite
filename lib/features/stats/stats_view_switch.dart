@@ -12,9 +12,7 @@ enum StatsView {
   final String label;
 }
 
-/// The two Stats pages, as a pill at the top of each. Each page draws its own
-/// with itself picked, so the pill slides across with the page under a drag
-/// rather than having to follow it.
+/// The two Stats pages, as a pill above them both.
 class StatsViewSwitch extends StatelessWidget {
   const StatsViewSwitch({
     super.key,

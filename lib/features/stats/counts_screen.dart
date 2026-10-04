@@ -14,23 +14,19 @@ import '../../domain/subject_counts.dart';
 import '../../state/providers.dart';
 import '../../state/timetable_image_reader.dart';
 import '../../widgets/common.dart';
-import '../../widgets/gradient_header.dart';
 import '../subjects/totals_import_screen.dart';
-import 'stats_screen.dart';
-import 'stats_view_switch.dart';
+import 'stats_page_list.dart';
 
 /// Attendance kept as three numbers per subject, for anyone who would rather
 /// count than put their classes on a timetable.
-class CountsScreen extends ConsumerStatefulWidget {
-  const CountsScreen({super.key, this.onSwitch});
-
-  final ValueChanged<StatsView>? onSwitch;
+class CountsPage extends ConsumerStatefulWidget {
+  const CountsPage({super.key});
 
   @override
-  ConsumerState<CountsScreen> createState() => _CountsScreenState();
+  ConsumerState<CountsPage> createState() => _CountsPageState();
 }
 
-class _CountsScreenState extends ConsumerState<CountsScreen> {
+class _CountsPageState extends ConsumerState<CountsPage> {
   static const double _pad = 20;
 
   bool _reading = false;
@@ -81,24 +77,12 @@ class _CountsScreenState extends ConsumerState<CountsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final OverallStats stats = ref.watch(statsProvider);
     final AppSettings settings =
         ref.watch(settingsProvider).value ?? const AppSettings();
     final List<SubjectCounts> rows = ref.watch(subjectCountsProvider);
 
-    return GradientScaffold(
-      headerGap: 18,
-      header: OverallStatsHeader(stats: stats, settings: settings),
+    return StatsPageList(
       slivers: <Widget>[
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(_pad, 0, _pad, 12),
-          sliver: SliverToBoxAdapter(
-            child: StatsViewSwitch(
-              current: StatsView.counts,
-              onSelect: (StatsView view) => widget.onSwitch?.call(view),
-            ),
-          ),
-        ),
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(_pad, 0, _pad, 16),
           sliver: SliverToBoxAdapter(

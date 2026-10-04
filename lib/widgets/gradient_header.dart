@@ -21,6 +21,8 @@ class GradientScaffold extends StatelessWidget {
     this.bottomInset = 24,
     this.maxContentWidth,
     this.body,
+    this.pages,
+    this.aboveThePages,
   });
 
   /// Drawn on the gradient, below the status bar.
@@ -53,15 +55,28 @@ class GradientScaffold extends StatelessWidget {
   /// its own controls across with the page.
   final Widget? body;
 
+  /// Fills the sheet with a pager under a header that scrolls away but holds
+  /// still while the pages move. Each page's list must be a primary one.
+  final Widget? pages;
+
+  /// On the sheet above [pages].
+  final Widget? aboveThePages;
+
+  /// The gutters [build] uses, for a page that builds its own list.
+  static EdgeInsets columnInset(BuildContext context, {double? cap}) {
+    final Size size = MediaQuery.sizeOf(context);
+    final double limit = cap ?? AppScale.contentWidth(size);
+    return EdgeInsets.symmetric(
+      horizontal: size.width > limit ? (size.width - limit) / 2 : 0,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final AppPalette p = context.palette;
     final double statusBar = MediaQuery.paddingOf(context).top;
-    final Size size = MediaQuery.sizeOf(context);
-    final double width = size.width;
-    final double cap = maxContentWidth ?? AppScale.contentWidth(size);
-    final double gutter = width > cap ? (width - cap) / 2 : 0;
-    final EdgeInsets inset = EdgeInsets.symmetric(horizontal: gutter);
+    final EdgeInsets inset = columnInset(context, cap: maxContentWidth);
+    final double gutter = inset.left;
 
     final Widget headerBlock = DecoratedBox(
       decoration: BoxDecoration(gradient: p.headerGradient),
@@ -103,6 +118,8 @@ class GradientScaffold extends StatelessWidget {
 
     final Future<void> Function()? refresh = onRefresh;
     final Widget? pinned = body;
+    final Widget? paged = pages;
+    final Widget? top = aboveThePages;
 
     // These screens carry a gradient rather than an app bar, so nothing else
     // states the status bar's style for them — and the gradient wants light
@@ -116,6 +133,18 @@ class GradientScaffold extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[headerBlock, Expanded(child: pinned)],
+              )
+            else if (paged != null)
+              NestedScrollView(
+                headerSliverBuilder: (BuildContext context, bool _) => <Widget>[
+                  SliverToBoxAdapter(child: headerBlock),
+                  if (top != null)
+                    SliverPadding(
+                      padding: inset,
+                      sliver: SliverToBoxAdapter(child: top),
+                    ),
+                ],
+                body: paged,
               )
             else if (refresh == null)
               scroller

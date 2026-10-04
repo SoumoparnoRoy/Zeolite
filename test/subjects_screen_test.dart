@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -12,6 +14,7 @@ import 'package:zeolite/data/models/extra_class.dart';
 import 'package:zeolite/data/models/holiday.dart';
 import 'package:zeolite/data/models/subject.dart';
 import 'package:zeolite/data/settings/app_settings.dart';
+import 'package:zeolite/features/stats/stats_view_switch.dart';
 import 'package:zeolite/features/subjects/subjects_screen.dart';
 import 'package:zeolite/state/providers.dart';
 
@@ -210,33 +213,53 @@ void main() {
     expect(find.textContaining('nothing else is lost'), findsNothing);
   });
 
-  testWidgets('a subject with no classes counts by hand',
+  testWidgets('a subject with no classes is sent to the Counts page',
       (WidgetTester tester) async {
+    final GlobalKey<NavigatorState> navigator = GlobalKey<NavigatorState>();
     await tester.pumpWidget(
-      _app(
-        const TimetableData(
-          categories: <ClassCategory>[],
-          subjects: <Subject>[
-            Subject(
-              id: 2,
-              name: 'Mathematics',
-              colorValue: AppColors.defaultSubjectColor,
-              priorHeld: 4,
-              priorAttended: 3,
+      ProviderScope(
+        overrides: [
+          timetableProvider.overrideWith(
+            (Ref ref) async => const TimetableData(
+              categories: <ClassCategory>[],
+              subjects: <Subject>[
+                Subject(
+                  id: 2,
+                  name: 'Mathematics',
+                  colorValue: AppColors.defaultSubjectColor,
+                  priorHeld: 4,
+                  priorAttended: 3,
+                ),
+              ],
+              slots: <ClassSlot>[],
+              extras: <ExtraClass>[],
+              holidays: <Holiday>[],
+              records: <AttendanceRecord>[],
             ),
-          ],
-          slots: <ClassSlot>[],
-          extras: <ExtraClass>[],
-          holidays: <Holiday>[],
-          records: <AttendanceRecord>[],
+          ),
+          settingsProvider.overrideWith(_StaticSettings.new),
+        ],
+        child: MaterialApp(
+          navigatorKey: navigator,
+          home: const Text('Tabs'),
         ),
       ),
     );
+    unawaited(navigator.currentState!.push(
+      MaterialPageRoute<void>(builder: (_) => const SubjectsScreen()),
+    ));
     await tester.pumpAndSettle();
+    final ProviderContainer container =
+        ProviderScope.containerOf(tester.element(find.byType(SubjectsScreen)));
 
     expect(find.text('3 of 4 attended'), findsOneWidget);
-    expect(find.byIcon(Icons.check_rounded), findsOneWidget);
-    expect(find.byIcon(Icons.close_rounded), findsOneWidget);
     expect(find.text('75%'), findsOneWidget);
+
+    await tester.tap(find.text('Count on the Stats page'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tabs'), findsOneWidget);
+    expect(container.read(statsViewProvider), StatsView.counts);
+    expect(container.read(selectedTabProvider), shellTabs.indexOf('stats'));
   });
 }

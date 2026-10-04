@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
 import '../../widgets/common.dart';
@@ -11,6 +12,17 @@ enum StatsView {
 
   final String label;
 }
+
+/// The Stats view showing, which another screen sets to open Stats on Counts.
+class StatsViewController extends Notifier<StatsView> {
+  @override
+  StatsView build() => StatsView.overview;
+
+  void show(StatsView view) => state = view;
+}
+
+final statsViewProvider =
+    NotifierProvider<StatsViewController, StatsView>(StatsViewController.new);
 
 /// The two Stats pages, as a pill above them both.
 class StatsViewSwitch extends StatelessWidget {

@@ -158,12 +158,7 @@ class RootShell extends ConsumerStatefulWidget {
     };
   }
 
-  static const List<String> tabNames = <String>[
-    'today',
-    'timetable',
-    'stats',
-    'settings',
-  ];
+  static const List<String> tabNames = shellTabs;
 
   /// Where a `zeolite://open?tab=` link lands, so each widget opens the screen
   /// it is a view of. An unknown name returns null and the app opens where it
@@ -223,6 +218,11 @@ class _RootShellState extends ConsumerState<RootShell> with RouteAware {
       },
     );
     _tapped.addListener(_openTappedNotification);
+    // Set by a link elsewhere too. A swipe sets it already on the page, which
+    // the check leaves alone.
+    ref.listenManual<int>(selectedTabProvider, (int? _, int tab) {
+      if (_pages.hasClients && _pages.page?.round() != tab) _slideTo(tab);
+    });
     // The stream carries a tap that arrived while the app was running; only
     // the launch link carries the one that started it. Not app_links — a
     // widget tap comes in on home_widget's LAUNCH action, not as a VIEW.

@@ -662,6 +662,15 @@ final undoOnScreenProvider =
 
 // Navigation
 
+/// The shell's tabs in order. Here rather than on the shell, so a screen can
+/// send the user to a tab without importing it.
+const List<String> shellTabs = <String>[
+  'today',
+  'timetable',
+  'stats',
+  'settings'
+];
+
 /// The selected bottom-navigation tab.
 ///
 /// Held here rather than in the shell's own state because a tapped

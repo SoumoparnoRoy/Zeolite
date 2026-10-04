@@ -35,8 +35,22 @@ class StatsScreen extends ConsumerStatefulWidget {
 }
 
 class _StatsScreenState extends ConsumerState<StatsScreen> {
-  final PageController _views = PageController();
-  StatsView _view = StatsView.overview;
+  late final PageController _views =
+      PageController(initialPage: ref.read(statsViewProvider).index);
+
+  @override
+  void initState() {
+    super.initState();
+    ref.listenManual<StatsView>(statsViewProvider,
+        (StatsView? _, StatsView view) {
+      if (!_views.hasClients || _views.page?.round() == view.index) return;
+      unawaited(_views.animateToPage(
+        view.index,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutQuart,
+      ));
+    });
+  }
 
   @override
   void dispose() {
@@ -44,17 +58,12 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
     super.dispose();
   }
 
-  void _show(StatsView view) => unawaited(_views.animateToPage(
-        view.index,
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOutQuart,
-      ));
-
   void _onPageChanged(int page) {
-    setState(() => _view = StatsView.values[page]);
+    final StatsView view = StatsView.values[page];
+    ref.read(statsViewProvider.notifier).show(view);
     unawaited(ref
         .read(analyticsProvider)
-        .screen(_view == StatsView.counts ? 'counts' : 'stats'));
+        .screen(view == StatsView.counts ? 'counts' : 'stats'));
   }
 
   @override
@@ -70,7 +79,10 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
         header: OverallStatsHeader(stats: stats, settings: settings),
         aboveThePages: Padding(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-          child: StatsViewSwitch(current: _view, onSelect: _show),
+          child: StatsViewSwitch(
+            current: ref.watch(statsViewProvider),
+            onSelect: ref.read(statsViewProvider.notifier).show,
+          ),
         ),
         pages: PageView(
           controller: _views,

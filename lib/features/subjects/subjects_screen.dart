@@ -13,6 +13,7 @@ import '../../state/providers.dart';
 import '../../widgets/common.dart';
 import '../../widgets/gradient_header.dart';
 import '../../widgets/undo_snack.dart';
+import '../stats/stats_view_switch.dart';
 import 'class_editor_sheets.dart';
 
 /// Every subject in one place: add, edit, recolour and delete.
@@ -78,26 +79,12 @@ class SubjectsScreen extends ConsumerWidget {
 
 enum _SubjectAction { edit, colour, delete }
 
-/// Counting for a subject that has no classes on the timetable — a portal that
-/// reports totals is the only record it has, so a class is recorded by moving
-/// the balance rather than by marking an occurrence that does not exist.
-///
-/// Both buttons only ever add. A mis-tap is corrected by opening the subject
-/// and typing the two numbers, which is exact and one tap away, rather than by
-/// a second pair of controls that would double the width of this row.
-class _BalanceCounter extends ConsumerWidget {
-  const _BalanceCounter({required this.subject});
+/// Counted on the Counts page now: a second counter here moved the balance
+/// where Counts adds a mark.
+class _CountsLink extends ConsumerWidget {
+  const _CountsLink({required this.subject});
 
   final Subject subject;
-
-  Future<void> _add(WidgetRef ref, {required bool attended}) {
-    return ref.read(subjectActionsProvider).updateSubject(
-          subject.copyWith(
-            priorHeld: subject.priorHeld + 1,
-            priorAttended: subject.priorAttended + (attended ? 1 : 0),
-          ),
-        );
-  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -107,61 +94,24 @@ class _BalanceCounter extends ConsumerWidget {
         Expanded(
           child: Text(
             '${subject.priorAttended} of ${subject.priorHeld} attended',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style:
                 monoStyle(color: p.textTertiary, size: AppType.captionMedium),
           ),
         ),
-        _CountButton(
-          icon: Icons.check_rounded,
-          label: 'Attended',
-          tint: p.present,
-          onTap: () => _add(ref, attended: true),
+        TextButton.icon(
+          onPressed: () {
+            ref.read(statsViewProvider.notifier).show(StatsView.counts);
+            ref
+                .read(selectedTabProvider.notifier)
+                .select(shellTabs.indexOf('stats'));
+            Navigator.of(context).popUntil((Route<dynamic> r) => r.isFirst);
+          },
+          icon: const Icon(Icons.exposure_plus_1_rounded, size: 18),
+          label: const Text('Count on the Stats page'),
         ),
-        const SizedBox(width: 6),
-        _CountButton(
-          icon: Icons.close_rounded,
-          label: 'Missed',
-          tint: p.absent,
-          onTap: () => _add(ref, attended: false),
-        ),
-        const SizedBox(width: 8),
       ],
-    );
-  }
-}
-
-class _CountButton extends StatelessWidget {
-  const _CountButton({
-    required this.icon,
-    required this.label,
-    required this.tint,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final Color tint;
-  final Future<void> Function() onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: label,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(999),
-        child: Container(
-          // 44 high keeps the target reachable where the icon alone would not.
-          constraints: const BoxConstraints(minWidth: 52, minHeight: 44),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: tint.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Icon(icon, size: 17, color: tint),
-        ),
-      ),
     );
   }
 }
@@ -337,7 +287,7 @@ class _SubjectRow extends ConsumerWidget {
           ),
           if (countsByHand) ...<Widget>[
             const SizedBox(height: 10),
-            _BalanceCounter(subject: subject),
+            _CountsLink(subject: subject),
           ],
         ],
       ),

@@ -11,6 +11,7 @@ import 'package:zeolite/data/models/holiday.dart';
 import 'package:zeolite/data/models/subject.dart';
 import 'package:zeolite/data/settings/app_settings.dart';
 import 'package:zeolite/features/stats/stats_screen.dart';
+import 'package:zeolite/features/stats/stats_view_switch.dart';
 import 'package:zeolite/state/providers.dart';
 import 'package:zeolite/widgets/pager_handoff.dart';
 
@@ -137,6 +138,17 @@ void main() {
     await tester.pumpAndSettle();
     expect(_counts, findsOneWidget);
     expect(tester.getTopLeft(_header), headerAt);
+  });
+
+  testWidgets('another screen can open Stats on Counts',
+      (WidgetTester tester) async {
+    await _pump(tester);
+    ProviderScope.containerOf(tester.element(find.byType(StatsScreen)))
+        .read(statsViewProvider.notifier)
+        .show(StatsView.counts);
+    await tester.pumpAndSettle();
+
+    expect(_counts, findsOneWidget);
   });
 
   testWidgets('past the first view, the same swipe reaches the tab before',

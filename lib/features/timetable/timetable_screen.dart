@@ -12,6 +12,7 @@ import '../../domain/schedule_engine.dart';
 import '../../state/providers.dart';
 import '../../widgets/common.dart';
 import '../../widgets/gradient_header.dart';
+import '../../widgets/undo_snack.dart';
 import '../subjects/class_editor_sheets.dart';
 
 /// The weekly view: every class, day by day, with the tools to add, edit and
@@ -46,7 +47,8 @@ class TimetableScreen extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 HeaderEyebrow(
-                  'Timetable · ${Dates.formatWeekRange(weekStart, weekEnd)}',
+                  'Timetable · '
+                  '${Dates.formatWeekRange(weekStart, weekEnd, year: true)}',
                 ),
                 const SizedBox(height: 7),
                 HeaderTitle(
@@ -112,11 +114,11 @@ class TimetableScreen extends ConsumerWidget {
                   settings: settings,
                   holidayName: engine?.holidayOn(day)?.name,
                   onAdd: () => showAddClassSheet(context, initialDate: day),
-                  onTapSession: (ClassSession session) =>
-                      showSessionEditor(context, ref, session),
+                  // A tap marks here, so the sheet carries the editor and
+                  // leaves clearing to the tap's own menu.
                   onLongPressSession: (ClassSession session) =>
                       showSessionOptions(context, ref, session,
-                          tapOpensEditor: true),
+                          marksInline: true),
                 );
               },
             ),
@@ -135,7 +137,6 @@ class _DaySection extends StatelessWidget {
     required this.sessions,
     required this.settings,
     required this.onAdd,
-    required this.onTapSession,
     required this.onLongPressSession,
     this.holidayName,
   });
@@ -144,7 +145,6 @@ class _DaySection extends StatelessWidget {
   final List<ClassSession> sessions;
   final AppSettings settings;
   final VoidCallback onAdd;
-  final ValueChanged<ClassSession> onTapSession;
   final ValueChanged<ClassSession> onLongPressSession;
   final String? holidayName;
 
@@ -159,7 +159,7 @@ class _DaySection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           DayRule(
-            label: '${Dates.weekdayShort(day)} ${day.day}'
+            label: '${Dates.weekdayShort(day)} ${Dates.formatFull(day)}'
                 '${isToday ? ' · Today' : ''}',
             highlighted: isToday,
             onAdd: onAdd,
@@ -173,7 +173,6 @@ class _DaySection extends StatelessWidget {
               _SessionRow(
                 session: session,
                 use24Hour: settings.use24HourTime,
-                onTap: () => onTapSession(session),
                 onLongPress: () => onLongPressSession(session),
               ),
         ],
@@ -219,27 +218,94 @@ class _QuietRow extends StatelessWidget {
   }
 }
 
-class _SessionRow extends StatelessWidget {
+/// What the mark menu can do: set a status, or take the mark off.
+enum _MarkChoice {
+  present(AttendanceStatus.present),
+  absent(AttendanceStatus.absent),
+  cancelled(AttendanceStatus.cancelled),
+  clear(null);
+
+  const _MarkChoice(this.status);
+
+  final AttendanceStatus? status;
+}
+
+class _SessionRow extends ConsumerWidget {
   const _SessionRow({
     required this.session,
     required this.use24Hour,
-    required this.onTap,
     required this.onLongPress,
   });
 
   final ClassSession session;
   final bool use24Hour;
-  final VoidCallback onTap;
   final VoidCallback onLongPress;
 
+  /// Opens beside the row's right edge, where its status is written.
+  Future<void> _chooseMark(BuildContext context, WidgetRef ref) async {
+    final AppPalette p = context.palette;
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    final ActionCore core = ref.read(actionCoreProvider);
+    final AttendanceActions attendance = ref.read(attendanceActionsProvider);
+    final RenderBox row = context.findRenderObject()! as RenderBox;
+    final RenderBox overlay =
+        Navigator.of(context).overlay!.context.findRenderObject()! as RenderBox;
+    final Rect at =
+        row.localToGlobal(Offset.zero, ancestor: overlay) & row.size;
+    final AttendanceStatus? current = session.status;
+
+    final _MarkChoice? choice = await showMenu<_MarkChoice>(
+      context: context,
+      position: RelativeRect.fromRect(
+        Rect.fromLTRB(at.right, at.top, at.right, at.bottom),
+        Offset.zero & overlay.size,
+      ),
+      items: <PopupMenuEntry<_MarkChoice>>[
+        for (final _MarkChoice c in _MarkChoice.values)
+          if (c.status case final AttendanceStatus status)
+            PopupMenuItem<_MarkChoice>(
+              value: c,
+              child: _MarkItem(
+                icon: status == current
+                    ? Icons.radio_button_checked_rounded
+                    : Icons.radio_button_unchecked_rounded,
+                label: status.label,
+                color: status.colorIn(p),
+                picked: status == current,
+              ),
+            ),
+        if (current != null) ...<PopupMenuEntry<_MarkChoice>>[
+          const PopupMenuDivider(),
+          PopupMenuItem<_MarkChoice>(
+            value: _MarkChoice.clear,
+            child: _MarkItem(
+              icon: Icons.undo_rounded,
+              label: 'Clear the mark',
+              color: p.textSecondary,
+            ),
+          ),
+        ],
+      ],
+    );
+    if (choice == null) return;
+    final AttendanceStatus? status = choice.status;
+    if (status == null) {
+      await attendance.clearMark(session);
+      showUndoSnack(messenger, core, 'Mark cleared');
+    } else if (status != current) {
+      // Not for the current status: mark() reads that tap as clearing it.
+      await attendance.mark(session, status);
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final AppPalette p = context.palette;
     final AttendanceStatus? status = session.status;
     final bool isCancelled = status == AttendanceStatus.cancelled;
 
     return InkWell(
-      onTap: onTap,
+      onTap: () => _chooseMark(context, ref),
       onLongPress: onLongPress,
       borderRadius: BorderRadius.circular(12),
       child: Opacity(
@@ -310,6 +376,40 @@ class _SessionRow extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _MarkItem extends StatelessWidget {
+  const _MarkItem({
+    required this.icon,
+    required this.label,
+    required this.color,
+    this.picked = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+  final bool picked;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: <Widget>[
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: AppSpacing.md),
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: AppType.titleMedium,
+              fontWeight: picked ? FontWeight.w700 : FontWeight.w500,
+              color: context.palette.textPrimary,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -100,6 +100,53 @@ void main() {
     expect(after.single.uuid, isNotEmpty);
   });
 
+  test('a file from before carried cancelled classes still restores', () async {
+    final Map<String, Object?> data = <String, Object?>{
+      'app': BackupService.appTag,
+      'formatVersion': 5,
+      'subjects': <Object?>[
+        <String, Object?>{
+          'id': 1,
+          'name': 'Subject 1',
+          'color': 0xFF336699,
+          'created_at': 1,
+          'prior_held': 6,
+          'prior_attended': 5,
+        },
+      ],
+    };
+
+    final ZeoliteRepository target = await repoAt('target');
+    final ImportResult result = await BackupService(target, SettingsService())
+        .importFromJsonString(jsonEncode(data));
+
+    expect(result.outcome, ImportOutcome.restored);
+    final Subject restored = (await target.getSubjects()).single;
+    expect(restored.priorHeld, 6);
+    expect(restored.priorAttended, 5);
+    expect(restored.priorCancelled, 0);
+  });
+
+  test('a file from a newer build is refused, not half read', () async {
+    final ZeoliteRepository target = await repoAt('target');
+    await target.insertSubject(
+      const Subject(name: 'Keep me', colorValue: 0xFF336699),
+    );
+
+    final ImportResult result = await BackupService(target, SettingsService())
+        .importFromJsonString(jsonEncode(<String, Object?>{
+      'app': BackupService.appTag,
+      'formatVersion': BackupService.formatVersion + 1,
+      'subjects': <Object?>[],
+    }));
+
+    expect(result.outcome, ImportOutcome.tooNew);
+    expect(
+      (await target.getSubjects()).map((Subject s) => s.name),
+      <String>['Keep me'],
+    );
+  });
+
   test('a malformed backup leaves the current database untouched', () async {
     final ZeoliteRepository repository = await repoAt('target');
     await repository.insertSubject(

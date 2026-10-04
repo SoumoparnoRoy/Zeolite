@@ -67,14 +67,15 @@ class BackupService {
   final BackupFolder _folder;
 
   /// v2 added class categories, v3 the saved room list and the day-grid
-  /// settings, v4 attendance tags, v5 what a class counts as. Older backups
-  /// still import: a missing key just means that feature was unused when the
-  /// file was written, which is exactly what an empty list, a zero block
-  /// length or a weight of one already mean.
+  /// settings, v4 attendance tags, v5 what a class counts as, v6 carried
+  /// cancelled classes. Older backups still import: a missing key just means
+  /// that feature was unused when the file was written, which is exactly what
+  /// an empty list, a zero block length, a weight of one or no carried
+  /// cancelled classes already mean.
   ///
-  /// Bumped for v5 rather than left alone so an older build refuses the file
-  /// outright instead of dropping the weights on the way back in.
-  static const int formatVersion = 5;
+  /// Bumped for each rather than left alone so an older build refuses the
+  /// file outright instead of dropping the new field on the way back in.
+  static const int formatVersion = 6;
 
   /// Written into every export so an import can tell our files from anything
   /// else pasted in.

@@ -10,6 +10,7 @@ import 'package:zeolite/data/db/app_database.dart';
 import 'package:zeolite/data/db/zeolite_repository.dart';
 import 'package:zeolite/data/models/subject.dart';
 import 'package:zeolite/data/settings/app_settings.dart';
+import 'package:zeolite/domain/sync/sync_merge.dart';
 import 'package:zeolite/domain/sync/sync_target.dart';
 import 'package:zeolite/services/sync/sync_coordinator.dart';
 import 'package:zeolite/state/auth_providers.dart';
@@ -128,6 +129,70 @@ void main() {
 
     expect(rewritten.outcome, SyncRunOutcome.synced);
     expect(rewritten.pushed, greaterThan(0));
+  });
+
+  group('a first merge over what the account already holds', () {
+    Future<int> linkCount() async {
+      int n = 0;
+      for (final SyncKind kind in SyncKind.values) {
+        n += (await repo.getRemoteLinks('fake', kind)).length;
+      }
+      return n;
+    }
+
+    Future<void> connectedBefore() async {
+      await make().run(force: true);
+      await farSideHoldsWhatWasPushed();
+      // A device meeting this account for the first time has no ledger.
+      await repo.deleteRemoteLinksFor('fake');
+      target.calls.clear();
+    }
+
+    test('links the identical rows without writing them', () async {
+      await connectedBefore();
+      final int rows = target.remote!.length;
+
+      final SyncRunResult merged =
+          await make().run(force: true, merge: const <String, SyncSide>{});
+
+      expect(merged.outcome, SyncRunOutcome.synced);
+      expect(merged.pushed, 0);
+      expect(merged.linked, rows);
+      expect(target.calls.where((String c) => c != 'fetch'), isEmpty);
+      expect(await linkCount(), rows);
+
+      // Linked properly: the next run has nothing left to do.
+      final SyncRunResult next = await make().run(force: true);
+      expect(next.pushed, 0);
+      expect(next.linked, 0);
+      expect(next.pulled, 0);
+    });
+
+    test('still writes a row that changed since', () async {
+      await connectedBefore();
+      final Subject subject = (await repo.getSubjects()).single;
+      await repo.updateSubject(subject.copyWith(name: 'Generic Course 2'));
+
+      final SyncRunResult merged = await make().run(
+        force: true,
+        merge: <String, SyncSide>{subject.uuid!: SyncSide.here},
+      );
+
+      expect(merged.pushed, 1);
+      expect(merged.linked, target.remote!.length - 1);
+      expect(target.calls, contains(startsWith('update')));
+    });
+
+    test('still writes where pulls are not trusted', () async {
+      await connectedBefore();
+      target.trustsPulls = false;
+
+      final SyncRunResult merged =
+          await make().run(force: true, merge: const <String, SyncSide>{});
+
+      expect(merged.linked, 0);
+      expect(merged.pushed, greaterThan(0));
+    });
   });
 
   test('an ordinary run still asks when both sides hold something', () async {

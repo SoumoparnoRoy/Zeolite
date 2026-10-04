@@ -35,6 +35,16 @@ void main() {
     expect(line, contains('2 replaced there'));
   });
 
+  test('rows linked without a write are not reported as sent', () {
+    final String line = syncStatusLine(
+      SyncStatus(state: SyncState.idle, lastRunAt: justNow),
+      const SyncRunResult(outcome: SyncRunOutcome.synced, linked: 170),
+    );
+
+    expect(line, contains('170 already matched'));
+    expect(line, isNot(contains('sent')));
+  });
+
   test('a run that moved nothing does not pad the line with zeroes', () {
     final String line = syncStatusLine(
       SyncStatus(state: SyncState.idle, lastRunAt: justNow),

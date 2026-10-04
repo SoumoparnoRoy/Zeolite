@@ -45,6 +45,7 @@ String _counts(SyncRunResult? last) {
   if (last == null) return '';
   final List<String> parts = <String>[
     if (last.pushed > 0) '${last.pushed} sent',
+    if (last.linked > 0) '${last.linked} already matched',
     if (last.pulled > 0) '${last.pulled} received',
     if (last.overwritten > 0) '${last.overwritten} replaced there',
     // Removals are counted too, or unmarking a class reads exactly like a run

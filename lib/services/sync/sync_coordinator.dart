@@ -36,6 +36,7 @@ class SyncRunResult {
   const SyncRunResult({
     required this.outcome,
     this.pushed = 0,
+    this.linked = 0,
     this.pulled = 0,
     this.pulledKeys = const <SyncKind, List<String>>{},
     this.archived = 0,
@@ -48,6 +49,9 @@ class SyncRunResult {
 
   final SyncRunOutcome outcome;
   final int pushed;
+
+  /// Rows found identical on both sides and linked without a write.
+  final int linked;
   final int pulled;
 
   /// Which rows [pulled] counted, by kind. Undo needs them by name — see
@@ -352,6 +356,7 @@ class SyncCoordinator {
         return SyncRunResult(
           outcome: SyncRunOutcome.failed,
           pushed: tally.pushed,
+          linked: tally.linked,
           pulled: tally.pulled,
           archived: tally.archived,
           overwritten: tally.overwritten,
@@ -367,6 +372,7 @@ class SyncCoordinator {
     return SyncRunResult(
       outcome: SyncRunOutcome.synced,
       pushed: tally.pushed,
+      linked: tally.linked,
       pulled: tally.pulled,
       pulledKeys: tally.pulledKeys,
       archived: tally.archived,
@@ -489,6 +495,33 @@ class SyncCoordinator {
 
       final String? remoteId = push.remoteId;
       final SyncOrigin origin = push.link?.origin ?? _originFor(push.kind);
+
+      // A first merge finds the account already holding this row exactly; a
+      // write would change nothing. Never on a rewrite, which exists to write
+      // everything again, and only where pulls are trusted: there the far hash
+      // is the content's own, while an adopt on Notion also claims the page.
+      if (push.kind == SyncPushKind.adopt &&
+          !rewrite &&
+          target.trustsPulls &&
+          state != null &&
+          !state.deleted &&
+          state.hash == push.item.hash) {
+        write.add(
+          RemoteLink(
+            id: push.link?.id,
+            target: target.id,
+            kind: kind,
+            localKey: push.item.localKey,
+            remoteId: remoteId ?? state.remoteId,
+            localHash: push.item.hash,
+            remoteHash: state.hash,
+            origin: origin,
+            syncedAt: _now(),
+          ),
+        );
+        tally.linked++;
+        continue;
+      }
       final SyncOutcome outcome = remoteId == null
           ? await target.create(push.item)
           : await target.update(
@@ -887,6 +920,7 @@ enum _Merge { proceed, review }
 
 class _Tally {
   int pushed = 0;
+  int linked = 0;
   int pulled = 0;
   int archived = 0;
   int overwritten = 0;

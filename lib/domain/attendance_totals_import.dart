@@ -37,6 +37,10 @@ class TotalsPlanRow {
     return marksInTerm > 0 ? TotalsMatch.overlap : TotalsMatch.update;
   }
 
+  /// Carried cancelled classes the import sets to zero: the page has no
+  /// cancelled column, and its held figure may already count them.
+  int get cancelledCleared => subject?.priorCancelled ?? 0;
+
   /// What the subject reads today, for the preview to show beside the new
   /// figures. Null for a subject that does not exist yet.
   String? get current {

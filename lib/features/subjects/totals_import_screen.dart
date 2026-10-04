@@ -277,6 +277,18 @@ class _RowCard extends StatelessWidget {
                     '${row.current == null ? '' : '  (now ${row.current})'}',
             style: monoStyle(color: p.textTertiary, size: AppType.captionLarge),
           ),
+          if (!refused && row.cancelledCleared > 0) ...<Widget>[
+            const SizedBox(height: 6),
+            Text(
+              'Clears its ${Words.plural(row.cancelledCleared, 'cancelled class', 'cancelled classes')}'
+              ' — the page has no cancelled column.',
+              style: TextStyle(
+                fontSize: AppType.bodySmall,
+                height: 1.4,
+                color: p.textTertiary,
+              ),
+            ),
+          ],
           if (warning != null) ...<Widget>[
             const SizedBox(height: 8),
             Text(

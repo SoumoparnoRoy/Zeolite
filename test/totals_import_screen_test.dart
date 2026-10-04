@@ -33,7 +33,12 @@ TimetableData _fixture() {
     categories: const <ClassCategory>[],
     subjects: const <Subject>[
       Subject(id: 1, name: 'Signal Theory', colorValue: 0xFF7C6BFF),
-      Subject(id: 2, name: 'Control Systems', colorValue: 0xFF7C6BFF),
+      Subject(
+        id: 2,
+        name: 'Control Systems',
+        colorValue: 0xFF7C6BFF,
+        priorCancelled: 2,
+      ),
     ],
     slots: const <ClassSlot>[],
     extras: const <ExtraClass>[],
@@ -110,6 +115,10 @@ void main() {
 
     // Two of the three are ready; the conflict starts unticked.
     expect(find.text('Bring in 2'), findsOneWidget);
+
+    // Only the subject that carries cancelled classes says it will lose them.
+    expect(
+        find.textContaining('Clears its 2 cancelled classes'), findsOneWidget);
   });
 
   testWidgets('ticking the conflict brings it back in',

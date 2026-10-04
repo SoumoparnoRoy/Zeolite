@@ -83,15 +83,20 @@ class SubjectStats {
 
   int get priorHeld => subject.priorHeld;
   int get priorAttended => subject.priorAttended;
+  int get priorCancelled => subject.priorCancelled;
+
+  /// The figure to show; [cancelled] stays what was marked here, like
+  /// [present].
+  int get cancelledTotal => cancelled + priorCancelled;
 
   /// Classes that count towards the percentage. Cancelled ones don't, unless
   /// the institution says otherwise.
   int get held =>
-      present + absent + priorHeld + (cancelledCounts ? cancelled : 0);
+      present + absent + priorHeld + (cancelledCounts ? cancelledTotal : 0);
 
   /// [present] stays what was marked here, so the log still reconciles.
   int get attended =>
-      present + priorAttended + (cancelledCounts ? cancelled : 0);
+      present + priorAttended + (cancelledCounts ? cancelledTotal : 0);
 
   /// Derived from the term total when there is one, so nothing has to be kept
   /// up to date: every class marked moves [held] and this follows.
@@ -249,8 +254,8 @@ class OverallStats {
   int get absent =>
       subjects.fold<int>(0, (int sum, SubjectStats s) => sum + s.absent);
 
-  int get cancelled =>
-      subjects.fold<int>(0, (int sum, SubjectStats s) => sum + s.cancelled);
+  int get cancelled => subjects.fold<int>(
+      0, (int sum, SubjectStats s) => sum + s.cancelledTotal);
 
   /// Carried balances included, so the total agrees with the cards above it.
   int get attended =>

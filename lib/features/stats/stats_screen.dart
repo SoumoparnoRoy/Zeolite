@@ -17,12 +17,16 @@ import '../../widgets/undo_snack.dart';
 import '../subjects/attendance_log_screen.dart';
 import '../subjects/class_editor_sheets.dart';
 import 'simulate_sheet.dart';
+import 'stats_view_switch.dart';
 
 /// Attendance overview: where you stand, and how much room you have left.
 class StatsScreen extends ConsumerWidget {
-  const StatsScreen({super.key});
+  const StatsScreen({super.key, this.onSwitch});
 
   static const double _pad = 20;
+
+  /// Moves the shell's pager; null where the screen stands alone.
+  final ValueChanged<StatsView>? onSwitch;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -40,8 +44,17 @@ class StatsScreen extends ConsumerWidget {
 
     return GradientScaffold(
       headerGap: 18,
-      header: _OverallHeader(stats: stats, settings: settings),
+      header: OverallStatsHeader(stats: stats, settings: settings),
       slivers: <Widget>[
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(_pad, 0, _pad, 16),
+          sliver: SliverToBoxAdapter(
+            child: StatsViewSwitch(
+              current: StatsView.overview,
+              onSelect: (StatsView view) => onSwitch?.call(view),
+            ),
+          ),
+        ),
         // Before the empty state: "no data yet" over a term of marks dated
         // outside the term is the confusion this exists to end.
         if (!strays.isEmpty)
@@ -126,8 +139,12 @@ class StatsScreen extends ConsumerWidget {
 /// The term's percentage, set in type at the size the ring used to be. The
 /// ring spent its whole area on one number; the three counts it hid now sit
 /// beside it as a legend.
-class _OverallHeader extends StatelessWidget {
-  const _OverallHeader({required this.stats, required this.settings});
+class OverallStatsHeader extends StatelessWidget {
+  const OverallStatsHeader({
+    super.key,
+    required this.stats,
+    required this.settings,
+  });
 
   final OverallStats stats;
   final AppSettings settings;
@@ -457,7 +474,7 @@ class _SubjectDetail extends ConsumerWidget {
         ),
         _MetricTile(
           label: 'Cancelled',
-          value: '${stats.cancelled}',
+          value: '${stats.cancelledTotal}',
           color: p.cancelled,
         ),
       ]),

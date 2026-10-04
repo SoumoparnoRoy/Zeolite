@@ -29,7 +29,7 @@ class AppDatabase {
   // install finds its data, so renaming it would strand every database in
   // place and read as a wipe. It is never shown to the user.
   static const String fileName = 'attend_it.db';
-  static const int schemaVersion = 14;
+  static const int schemaVersion = 15;
 
   Database? _db;
 
@@ -200,6 +200,14 @@ class AppDatabase {
               );
             }
           }
+          if (oldVersion < 15) {
+            // v15 lets the counts page carry cancelled classes beside the
+            // other two. Zero changes no figure on any existing install.
+            await db.execute(
+              'ALTER TABLE subjects ADD COLUMN prior_cancelled INTEGER NOT NULL '
+              'DEFAULT 0',
+            );
+          }
           await db.execute(_slotOverrideIndex);
           await db.execute(_subjectUuidIndex);
           await db.execute(_slotUuidIndex);
@@ -345,6 +353,7 @@ class AppDatabase {
         prior_held     INTEGER NOT NULL DEFAULT 0,
         prior_attended INTEGER NOT NULL DEFAULT 0,
         expected_total INTEGER,
+        prior_cancelled INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE SET NULL
       )
     ''');

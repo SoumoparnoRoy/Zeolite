@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../core/app_theme.dart';
 import '../domain/attendance_stats.dart';
@@ -620,6 +621,9 @@ class SheetTextForm extends StatefulWidget {
     this.hintText,
     this.maxLines = 1,
     this.textCapitalization = TextCapitalization.sentences,
+    this.keyboardType,
+    this.inputFormatters,
+    this.selectInitial = false,
     this.emptyFallback,
   });
 
@@ -633,6 +637,12 @@ class SheetTextForm extends StatefulWidget {
   final String? hintText;
   final int maxLines;
   final TextCapitalization textCapitalization;
+  final TextInputType? keyboardType;
+  final List<TextInputFormatter>? inputFormatters;
+
+  /// Starts with [initial] selected, for a figure that is usually typed over
+  /// rather than edited.
+  final bool selectInitial;
 
   /// Popped when the field is left empty. Without one, submitting an empty
   /// field does nothing rather than saving a blank name.
@@ -643,8 +653,14 @@ class SheetTextForm extends StatefulWidget {
 }
 
 class _SheetTextFormState extends State<SheetTextForm> {
-  late final TextEditingController _input =
-      TextEditingController(text: widget.initial);
+  late final TextEditingController _input = TextEditingController.fromValue(
+    TextEditingValue(
+      text: widget.initial,
+      selection: widget.selectInitial
+          ? TextSelection(baseOffset: 0, extentOffset: widget.initial.length)
+          : TextSelection.collapsed(offset: widget.initial.length),
+    ),
+  );
 
   @override
   void dispose() {
@@ -676,6 +692,8 @@ class _SheetTextFormState extends State<SheetTextForm> {
           autofocus: true,
           maxLines: widget.maxLines,
           textCapitalization: widget.textCapitalization,
+          keyboardType: widget.keyboardType,
+          inputFormatters: widget.inputFormatters,
           decoration: InputDecoration(
             labelText: widget.labelText,
             hintText: widget.hintText,

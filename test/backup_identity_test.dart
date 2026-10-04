@@ -152,6 +152,7 @@ void main() {
         categoryId: lab,
         priorHeld: 4,
         priorAttended: 3,
+        priorCancelled: 2,
         expectedTotal: 40,
       ),
     );
@@ -217,5 +218,7 @@ void main() {
           _ => node,
         };
     expect(withoutIds(jsonDecode(second)), withoutIds(jsonDecode(first)));
+    // Equal exports prove nothing if a field never reached the database.
+    expect((await target.getSubjects()).single.priorCancelled, 2);
   });
 }

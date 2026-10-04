@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -14,6 +16,8 @@ import 'package:zeolite/domain/attendance_stats.dart';
 import 'package:zeolite/features/today/today_screen.dart';
 import 'package:zeolite/services/notification_service.dart';
 import 'package:zeolite/state/providers.dart';
+import 'package:zeolite/widgets/shell_routes.dart';
+import 'package:zeolite/widgets/undo_snack.dart';
 
 class _StaticSettings extends SettingsController {
   @override
@@ -26,6 +30,20 @@ class _Alerts extends Notifier<List<SubjectStats>> {
   List<SubjectStats> build() => const <SubjectStats>[];
 
   void raise(List<SubjectStats> alerts) => state = alerts;
+}
+
+/// An undo that takes a moment and then leaves no subject below target, the
+/// way restoring before an import does.
+class _SlowUndo extends ActionCore {
+  _SlowUndo(super.ref);
+
+  @override
+  Future<bool> undo(int token) async {
+    // Longer than the bar takes to close, as a whole-database restore is.
+    await Future<void>.delayed(const Duration(seconds: 1));
+    ref.read(_alerts.notifier).raise(const <SubjectStats>[]);
+    return true;
+  }
 }
 
 final NotifierProvider<_Alerts, List<SubjectStats>> _alerts =
@@ -55,14 +73,19 @@ const TimetableData _timetable = TimetableData(
   records: <AttendanceRecord>[],
 );
 
-Widget _host() {
+Widget _host({bool slowUndo = false}) {
   return ProviderScope(
     overrides: [
+      if (slowUndo) actionCoreProvider.overrideWith(_SlowUndo.new),
       timetableProvider.overrideWith((Ref ref) async => _timetable),
       settingsProvider.overrideWith(_StaticSettings.new),
       inAppAlertsProvider.overrideWith((Ref ref) => ref.watch(_alerts)),
     ],
-    child: MaterialApp(theme: AppTheme.light(), home: const TodayScreen()),
+    child: MaterialApp(
+      theme: AppTheme.light(),
+      navigatorObservers: <NavigatorObserver>[shellRoutes],
+      home: const TodayScreen(),
+    ),
   );
 }
 
@@ -99,5 +122,79 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text(title), findsOneWidget);
+  });
+
+  testWidgets(
+      'an alert raised under a pushed page waits for it, so the page can '
+      'still close itself', (WidgetTester tester) async {
+    await tester.pumpWidget(_host());
+    await tester.pumpAndSettle();
+    final ProviderContainer container =
+        ProviderScope.containerOf(tester.element(find.byType(TodayScreen)));
+    final NavigatorState navigator = tester.state(find.byType(Navigator));
+    unawaited(navigator.push(MaterialPageRoute<void>(
+      builder: (_) => const Scaffold(body: Text('Import')),
+    )));
+    await tester.pumpAndSettle();
+
+    container.read(_alerts.notifier).raise(const <SubjectStats>[_below]);
+    await tester.pumpAndSettle();
+    expect(find.text(title), findsNothing);
+
+    // The way an import closes: whatever route is on top.
+    navigator.pop();
+    await tester.pumpAndSettle();
+    expect(find.text('Import'), findsNothing);
+    expect(find.text(title), findsOneWidget);
+  });
+
+  testWidgets('an alert waits for an Undo offer to go',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(_host());
+    await tester.pumpAndSettle();
+    final ProviderContainer container =
+        ProviderScope.containerOf(tester.element(find.byType(TodayScreen)));
+    final ActionCore core = container.read(actionCoreProvider);
+    core.arm(<String, List<Map<String, Object?>>>{});
+    showUndoSnack(
+      ScaffoldMessenger.of(tester.element(find.byType(TodayScreen))),
+      core,
+      'Brought in 1 subject',
+    );
+    container.read(_alerts.notifier).raise(const <SubjectStats>[_below]);
+    await tester.pumpAndSettle();
+    expect(find.text('Undo'), findsOneWidget);
+    expect(find.text(title), findsNothing);
+
+    await tester.pump(const Duration(seconds: 7));
+    await tester.pumpAndSettle();
+    expect(find.text('Undo'), findsNothing);
+    expect(find.text(title), findsOneWidget);
+  });
+
+  testWidgets('undoing what raised an alert leaves nothing to warn about',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(_host(slowUndo: true));
+    await tester.pumpAndSettle();
+    final ProviderContainer container =
+        ProviderScope.containerOf(tester.element(find.byType(TodayScreen)));
+    final ActionCore core = container.read(actionCoreProvider);
+    core.arm(<String, List<Map<String, Object?>>>{});
+    showUndoSnack(
+      ScaffoldMessenger.of(tester.element(find.byType(TodayScreen))),
+      core,
+      'Brought in 1 subject',
+    );
+    container.read(_alerts.notifier).raise(const <SubjectStats>[_below]);
+    await tester.pumpAndSettle();
+
+    // The bar closes on the tap, before the restore has finished.
+    await tester.tap(find.text('Undo'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+    expect(find.text('Put back'), findsOneWidget);
+    expect(find.text(title), findsNothing);
   });
 }

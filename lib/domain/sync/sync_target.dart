@@ -117,6 +117,10 @@ class SyncItem {
         'targetPercent': subject.targetPercent,
         'priorHeld': subject.priorHeld,
         'priorAttended': subject.priorAttended,
+        // Null hashes as absent, so the subjects pushed before v15 do not all
+        // read as changed.
+        'priorCancelled':
+            subject.priorCancelled == 0 ? null : subject.priorCancelled,
         'expectedTotal': subject.expectedTotal,
         'category': categoryName,
       },

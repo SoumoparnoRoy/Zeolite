@@ -61,7 +61,7 @@ class AttendanceLogScreen extends ConsumerWidget {
         subtitle: attended,
         actions: figure,
         slivers: <Widget>[
-          if (subject.priorHeld > 0)
+          if (subject.priorHeld > 0 || subject.priorCancelled > 0)
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
               sliver: SliverToBoxAdapter(child: _CarriedIn(subject: subject)),
@@ -87,7 +87,7 @@ class AttendanceLogScreen extends ConsumerWidget {
       ].join(' · '),
       actions: figure,
       slivers: <Widget>[
-        if (subject.priorHeld > 0)
+        if (subject.priorHeld > 0 || subject.priorCancelled > 0)
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
             sliver: SliverToBoxAdapter(child: _CarriedIn(subject: subject)),
@@ -186,8 +186,9 @@ class _CarriedIn extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            '${subject.priorAttended} of ${subject.priorHeld} attended before '
-            'this app started counting',
+            '${subject.priorAttended} of ${subject.priorHeld} attended'
+            '${subject.priorCancelled > 0 ? ', ${subject.priorCancelled} '
+                'cancelled,' : ''} before this app started counting',
             style: const TextStyle(fontSize: AppType.bodyLarge, height: 1.35),
           ),
         ],
@@ -353,10 +354,13 @@ class _LogTile extends ConsumerWidget {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    'No class on your timetable sits here — the class moved '
-                    'to another day, or this mark was brought in from '
-                    'elsewhere. ${counts ? 'It still counts' : 'It does not '
-                        'count'} towards your percentage.',
+                    '${AttendanceRecord.isTimed(entry.startMinutes) ? 'No '
+                        'class on your timetable sits here — the class moved '
+                        'to another day, or this mark was brought in from '
+                        'elsewhere.' : 'Counted without a class time, from '
+                        'the Counts page or an import.'} '
+                    '${counts ? 'It still counts' : 'It does not count'} '
+                    'towards your percentage.',
                     style: TextStyle(
                       fontSize: AppType.captionLarge,
                       height: 1.4,

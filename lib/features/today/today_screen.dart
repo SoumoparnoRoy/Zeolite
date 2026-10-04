@@ -15,6 +15,7 @@ import '../../services/notification_service.dart';
 import '../../state/providers.dart';
 import '../../widgets/gradient_header.dart';
 import '../../widgets/nav_bar_scroll.dart';
+import '../../widgets/shell_routes.dart';
 import '../subjects/class_editor_sheets.dart';
 import '../timetable/week_grid_view.dart';
 import 'day_page.dart';
@@ -74,7 +75,7 @@ class TodayScreen extends ConsumerStatefulWidget {
   ConsumerState<TodayScreen> createState() => _TodayScreenState();
 }
 
-class _TodayScreenState extends ConsumerState<TodayScreen> {
+class _TodayScreenState extends ConsumerState<TodayScreen> with RouteAware {
   static const double _gridBottomPad = TodayScreen._gridBottomPad;
 
   /// Fixed for the life of the screen: a pager whose origin moved at midnight
@@ -104,19 +105,40 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
     // dialog out of the build phase; the announced set stops a repeat.
     ref.listenManual<List<SubjectStats>>(
       inAppAlertsProvider,
-      (List<SubjectStats>? _, List<SubjectStats> __) =>
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _showPendingAlerts(context, ref);
-      }),
+      (List<SubjectStats>? _, List<SubjectStats> __) => _alertSoon(),
       fireImmediately: true,
     );
+    ref.listenManual<int>(undoOnScreenProvider, (int? _, int showing) {
+      if (showing == 0) _alertSoon();
+    });
   }
+
+  void _alertSoon() {
+    WidgetsBinding.instance
+      ..addPostFrameCallback((_) {
+        if (mounted) _showPendingAlerts(context, ref);
+      })
+      // A snackbar that has finished closing leaves no frame coming.
+      ..ensureVisualUpdate();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final ModalRoute<void>? route = ModalRoute.of(context);
+    if (route != null) shellRoutes.subscribe(this, route);
+  }
+
+  /// A page, sheet or dialog that held an alert back has closed.
+  @override
+  void didPopNext() => _alertSoon();
 
   PageController _pagesFor(HomeView view) =>
       view == HomeView.grid ? _weekPages : _dayPages;
 
   @override
   void dispose() {
+    shellRoutes.unsubscribe(this);
     _dayPages.dispose();
     _weekPages.dispose();
     super.dispose();
@@ -279,6 +301,13 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
 
     final List<SubjectStats> pending = announced.pending(alerts);
     if (pending.isEmpty) return;
+    // Held, not dropped. Opened over a page or sheet, the alert is what that
+    // page's own pop closes, leaving the page up; over an Undo it covers the
+    // one way back from whatever caused it.
+    if (!(ModalRoute.of(context)?.isCurrent ?? true) ||
+        ref.read(undoOnScreenProvider) > 0) {
+      return;
+    }
 
     // Recorded before awaiting the dialog so a rebuild mid-flight cannot open
     // a second copy of it.

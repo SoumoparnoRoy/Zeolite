@@ -71,6 +71,7 @@ const Subject _signals = Subject(
   colorValue: 0xFF7C6BFF,
   priorHeld: 4,
   priorAttended: 3,
+  priorCancelled: 2,
 );
 
 TimetableData _data() => const TimetableData(
@@ -143,6 +144,7 @@ void main() {
     expect(saved.id, 1);
     expect(saved.priorHeld, 16);
     expect(saved.priorAttended, 14);
+    expect(saved.priorCancelled, 0);
     // Everything the portal knows nothing about survives.
     expect(saved.name, 'Signal Theory');
     expect(saved.colorValue, 0xFF7C6BFF);

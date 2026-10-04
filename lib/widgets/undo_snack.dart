@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../state/actions/action_core.dart';
+import '../state/app_providers.dart';
 
 /// Reports [message] and offers to put the data back.
 ///
@@ -16,9 +19,11 @@ void showUndoSnack(
   String message,
 ) {
   final int? token = core.pendingUndoToken;
+  final Completer<void> restoring = Completer<void>();
 
   messenger.hideCurrentSnackBar();
-  messenger.showSnackBar(
+  final ScaffoldFeatureController<SnackBar, SnackBarClosedReason> shown =
+      messenger.showSnackBar(
     SnackBar(
       content: Text(message),
       duration: const Duration(seconds: 6),
@@ -30,7 +35,8 @@ void showUndoSnack(
           : SnackBarAction(
               label: 'Undo',
               onPressed: () async {
-                final bool restored = await core.undo(token);
+                final bool restored =
+                    await core.undo(token).whenComplete(restoring.complete);
                 messenger.hideCurrentSnackBar();
                 messenger.showSnackBar(
                   SnackBar(
@@ -46,4 +52,13 @@ void showUndoSnack(
             ),
     ),
   );
+  if (token == null) return;
+  final UndoOnScreen onScreen = core.ref.read(undoOnScreenProvider.notifier);
+  onScreen.shown();
+  // A tap closes the bar at once, but the alert must judge the data the
+  // restore leaves, not what it is about to remove.
+  unawaited(shown.closed.then((SnackBarClosedReason reason) async {
+    if (reason == SnackBarClosedReason.action) await restoring.future;
+    onScreen.closed();
+  }));
 }

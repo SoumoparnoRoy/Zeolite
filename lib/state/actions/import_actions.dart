@@ -248,6 +248,10 @@ class ImportActions {
           existing.copyWith(
             priorHeld: row.held,
             priorAttended: row.attended,
+            // A portal prints no cancelled column, and its held figure may
+            // already have them in it, so keeping the old count could add
+            // them twice.
+            priorCancelled: 0,
             expectedTotal: row.expectedTotal,
           ),
         );

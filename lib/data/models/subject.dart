@@ -21,6 +21,7 @@ class Subject {
     this.updatedAt,
     this.priorHeld = 0,
     this.priorAttended = 0,
+    this.priorCancelled = 0,
     this.expectedTotal,
   });
 
@@ -54,6 +55,10 @@ class Subject {
   /// attended. Carried rather than invented as records: they have no dates.
   final int priorHeld;
   final int priorAttended;
+
+  /// Cancelled classes counted the same way. Kept apart from [priorHeld]
+  /// because whether they count is a setting, applied when stats are built.
+  final int priorCancelled;
 
   /// Classes this subject holds all term. Null leaves the projection to
   /// [ScheduleEngine], which can only work from the slots.
@@ -92,6 +97,7 @@ class Subject {
     DateTime? updatedAt,
     int? priorHeld,
     int? priorAttended,
+    int? priorCancelled,
     int? expectedTotal,
     bool clearExpectedTotal = false,
   }) {
@@ -109,6 +115,7 @@ class Subject {
       updatedAt: updatedAt ?? this.updatedAt,
       priorHeld: priorHeld ?? this.priorHeld,
       priorAttended: priorAttended ?? this.priorAttended,
+      priorCancelled: priorCancelled ?? this.priorCancelled,
       expectedTotal:
           clearExpectedTotal ? null : (expectedTotal ?? this.expectedTotal),
     );
@@ -127,6 +134,7 @@ class Subject {
         if (updatedAt != null) 'updated_at': updatedAt!.millisecondsSinceEpoch,
         'prior_held': priorHeld,
         'prior_attended': priorAttended,
+        'prior_cancelled': priorCancelled,
         'expected_total': expectedTotal,
       };
 
@@ -152,6 +160,8 @@ class Subject {
       priorHeld: held,
       // A hand-edited backup must not attend more classes than it held.
       priorAttended: math.min(attended, held),
+      priorCancelled:
+          math.max(0, (map['prior_cancelled'] as num?)?.toInt() ?? 0),
       expectedTotal: (map['expected_total'] as num?)?.toInt(),
     );
   }

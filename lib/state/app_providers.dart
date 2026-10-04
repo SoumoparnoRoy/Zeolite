@@ -25,6 +25,7 @@ import '../domain/attendance_stats.dart';
 import '../domain/class_weight.dart';
 import '../domain/day_grid.dart';
 import '../domain/schedule_engine.dart';
+import '../domain/subject_counts.dart';
 import '../domain/sync/sync_target.dart';
 import '../domain/tag_stats.dart';
 import '../domain/untimed_match.dart';
@@ -513,6 +514,39 @@ final subjectStatsProvider =
   return null;
 });
 
+/// The Counts page, in the subjects' own order rather than by how they are
+/// doing: a row that moved on every tap could not be tapped twice.
+final subjectCountsProvider = Provider<List<SubjectCounts>>((ref) {
+  final OverallStats stats = ref.watch(statsProvider);
+  final TimetableData? timetable = ref.watch(timetableProvider).value;
+  final AppSettings settings =
+      ref.watch(settingsProvider).value ?? const AppSettings();
+  if (timetable == null) return const <SubjectCounts>[];
+
+  final Map<int, Map<AttendanceStatus, int>> untimed =
+      <int, Map<AttendanceStatus, int>>{};
+  for (final AttendanceRecord record in timetable.records) {
+    if (AttendanceRecord.isTimed(record.startMinutes) ||
+        !settings.countsTowardsPercentage(record.date)) {
+      continue;
+    }
+    final Map<AttendanceStatus, int> byStatus =
+        untimed.putIfAbsent(record.subjectId, () => <AttendanceStatus, int>{});
+    byStatus[record.status] = (byStatus[record.status] ?? 0) + 1;
+  }
+  final Map<int, SubjectStats> byId = <int, SubjectStats>{
+    for (final SubjectStats s in stats.subjects) s.subject.id!: s,
+  };
+  return <SubjectCounts>[
+    for (final Subject subject in timetable.subjects)
+      if (byId[subject.id] case final SubjectStats s)
+        SubjectCounts(
+          stats: s,
+          untimed: untimed[subject.id] ?? const <AttendanceStatus, int>{},
+        ),
+  ];
+});
+
 // Tags
 
 /// Every tag with the marks carrying it.
@@ -607,6 +641,24 @@ final untimedMatchesProvider = Provider<List<UntimedMatch>>((ref) {
   if (engine == null || timetable == null) return const <UntimedMatch>[];
   return matchUntimed(engine: engine, records: timetable.records);
 });
+
+// Undo
+
+/// Undo snackbars on screen. The in-app alert waits for none, so a warning
+/// never covers the only chance to take back what caused it.
+class UndoOnScreen extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void shown() => state++;
+
+  void closed() {
+    if (state > 0) state--;
+  }
+}
+
+final undoOnScreenProvider =
+    NotifierProvider<UndoOnScreen, int>(UndoOnScreen.new);
 
 // Navigation
 

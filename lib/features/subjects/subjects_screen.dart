@@ -396,6 +396,8 @@ class _SubjectRow extends ConsumerWidget {
       // to delete a subject's whole history under "nothing else is lost".
       if (subject.priorHeld > 0)
         '${subject.priorAttended} of ${subject.priorHeld} carried in',
+      if (subject.priorCancelled > 0)
+        '${Words.plural(subject.priorCancelled, 'cancelled class', 'cancelled classes')} carried in',
     ];
 
     final String message = losses.isEmpty

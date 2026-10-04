@@ -201,6 +201,36 @@ void main() {
     expect(await repo.getAttendanceAt(written.id!, _day, untimed), isNotNull);
   });
 
+  test('a carried cancelled count travels, and none hashes as before v15',
+      () async {
+    const String uuid = 'aaaaaaaabbbbccccddddeeeeeeeeeeee';
+    final RemoteState row = subjectRow(uuid);
+    target.remote = <RemoteState>[
+      RemoteState(
+        kind: row.kind,
+        localKey: row.localKey,
+        remoteId: row.remoteId,
+        hash: row.hash,
+        fields: <String, Object?>{...row.fields, 'priorCancelled': 2},
+        editedAt: row.editedAt,
+      ),
+    ];
+
+    await coordinator().run();
+    final Subject written = (await repo.getSubjects()).single;
+    expect(written.priorCancelled, 2);
+    expect(SyncItem.subject(written).fields['priorCancelled'], 2);
+
+    // A subject pushed before the column existed must not read as changed.
+    final SyncItem none = SyncItem.subject(written.copyWith(priorCancelled: 0));
+    final SyncItem older = SyncItem(
+      kind: SyncKind.subject,
+      localKey: none.localKey,
+      fields: <String, Object?>{...none.fields}..remove('priorCancelled'),
+    );
+    expect(none.hash, older.hash);
+  });
+
   /// A mark imported with no time, synced, then matched to a 10:00 class.
   Future<(Subject, String, String)> syncThenMatch() async {
     final int untimed = AttendanceRecord.untimed(1);

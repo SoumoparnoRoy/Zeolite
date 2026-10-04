@@ -218,6 +218,7 @@ class SyncPullApplier {
       updatedAt: state.editedAt,
       priorHeld: readInt(f['priorHeld']) ?? 0,
       priorAttended: readInt(f['priorAttended']) ?? 0,
+      priorCancelled: readInt(f['priorCancelled']) ?? 0,
       expectedTotal: readInt(f['expectedTotal']),
     );
 

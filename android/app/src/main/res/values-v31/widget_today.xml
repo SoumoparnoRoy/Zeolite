@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12 and up: the rows scroll, and stack under their buttons when
+     narrow, so the widget can go down to two columns. -->
+<resources>
+    <dimen name="widget_today_min_resize_width">140dp</dimen>
+    <item name="widget_today_initial" type="layout">@layout/widget_today_list</item>
+</resources>

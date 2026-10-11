@@ -26,9 +26,14 @@ class WeekGridView extends ConsumerWidget {
     super.key,
     required this.weekStart,
     this.availableHeight,
+    this.today,
   });
 
   final DateTime weekStart;
+
+  /// The day whose column is picked out, when it is not the real today: the
+  /// home-screen widget draws the coming days ahead of time.
+  final DateTime? today;
 
   /// Room the viewport can give the grid, when the caller knows it. The blocks
   /// share it out; without it they fall back to [_minBlockHeight].
@@ -136,7 +141,12 @@ class WeekGridView extends ConsumerWidget {
               SizedBox(width: gutterWidth),
               for (int i = 0; i < 7; i++) ...<Widget>[
                 SizedBox(width: gap),
-                Expanded(child: _DayHeader(date: Dates.addDays(weekStart, i))),
+                Expanded(
+                  child: _DayHeader(
+                    date: Dates.addDays(weekStart, i),
+                    today: today ?? Dates.today(),
+                  ),
+                ),
               ],
             ],
           ),
@@ -223,14 +233,15 @@ class _NotConfigured extends StatelessWidget {
 }
 
 class _DayHeader extends StatelessWidget {
-  const _DayHeader({required this.date});
+  const _DayHeader({required this.date, required this.today});
 
   final DateTime date;
+  final DateTime today;
 
   @override
   Widget build(BuildContext context) {
     final AppPalette p = context.palette;
-    final bool isToday = Dates.isSameDay(date, Dates.today());
+    final bool isToday = Dates.isSameDay(date, today);
     final bool weekend =
         date.weekday == DateTime.saturday || date.weekday == DateTime.sunday;
     final Color ink =

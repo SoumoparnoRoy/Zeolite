@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Below Android 12 the Today rows sit beside their three buttons and cannot
+     scroll or stack, so the widget cannot be made narrower than they need. -->
+<resources>
+    <dimen name="widget_today_min_resize_width">250dp</dimen>
+    <item name="widget_today_initial" type="layout">@layout/widget_today</item>
+</resources>

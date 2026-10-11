@@ -2,7 +2,8 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Local notifications: reminders before class, the evening nudge and
-         attendance alerts. Scheduling survives a reboot. -->
+         attendance alerts. Scheduling survives a reboot, as does the widgets'
+         midnight redraw. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
@@ -223,12 +224,31 @@
                 android:resource="@xml/widget_stats_info" />
         </receiver>
 
+        <!-- Where a Today widget status button lands: draws the tap at once, then
+             passes it on to the receiver below. -->
+        <receiver
+            android:name=".widget.WidgetMarkReceiver"
+            android:exported="false" />
+
         <!-- Wakes a background isolate when a widget status button is tapped. -->
         <receiver
             android:name="es.antonborri.home_widget.HomeWidgetBackgroundReceiver"
             android:exported="false">
             <intent-filter>
                 <action android:name="es.antonborri.home_widget.action.BACKGROUND" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Redraws the widgets at midnight, when each picks the new day out of
+             what the app last pushed, and re-arms that after a reboot or an
+             update. -->
+        <receiver
+            android:name="es.antonborri.home_widget.HomeWidgetScheduledUpdateReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
             </intent-filter>
         </receiver>
 

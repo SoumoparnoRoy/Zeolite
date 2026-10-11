@@ -29,7 +29,7 @@ abstract class ZeoliteWidgetProvider : HomeWidgetProvider() {
 }
 
 /** Two columns on a phone is about 140dp, three about 210dp. */
-private const val NARROW_DP = 180
+const val NARROW_CELL_DP = 180f
 
 /**
  * Whether a cell is too narrow to set text beside a 32sp figure. An unreported
@@ -38,7 +38,7 @@ private const val NARROW_DP = 180
  */
 fun isNarrowCell(options: Bundle?): Boolean {
     val widthDp = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0) ?: 0
-    return widthDp in 1 until NARROW_DP
+    return widthDp in 1 until NARROW_CELL_DP.toInt()
 }
 
 /**

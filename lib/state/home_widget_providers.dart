@@ -35,18 +35,20 @@ final homeWidgetSyncProvider = Provider<void>((Ref ref) {
   if (engine == null || settings == null) return;
   final OverallStats stats = ref.watch(statsProvider);
   final HomeWidgetService service = ref.watch(homeWidgetServiceProvider);
+  final List<ClassSession> upcoming = HomeWidgetPayload.upcoming(engine);
 
   unawaited(
     service.push(
       today: HomeWidgetPayload.today(engine: engine, settings: settings),
-      week: HomeWidgetPayload.week(engine: engine),
+      week: HomeWidgetPayload.week(),
       standing: HomeWidgetPayload.standing(
-        engine: engine,
+        upcoming: upcoming,
         stats: stats,
         settings: settings,
       ),
       subjects: HomeWidgetPayload.subjects(stats),
       theme: HomeWidgetPayload.theme(settings),
+      classStarts: _startsOf(upcoming),
     ),
   );
 });
@@ -88,12 +90,20 @@ class ExternalMarkRequest {
     required this.dateKey,
     required this.startMinutes,
     required this.status,
+    this.drawnAt,
   });
 
   final int subjectId;
   final int dateKey;
   final int startMinutes;
   final AttendanceStatus status;
+
+  /// Stamped by `WidgetMarkReceiver` when it drew this tap on the widget.
+  final String? drawnAt;
+
+  /// What the widget drew for this tap, to take back once it is saved.
+  PendingTap get drawn =>
+      (key: '$subjectId:$dateKey:$startMinutes', at: drawnAt);
 
   static ExternalMarkRequest? fromWidget(Uri? uri) {
     if (uri == null || uri.host != 'mark') return null;
@@ -103,6 +113,7 @@ class ExternalMarkRequest {
       date: q['date'],
       start: q['start'],
       status: q['status'],
+      drawnAt: q['drawn'],
     );
   }
 
@@ -124,6 +135,7 @@ class ExternalMarkRequest {
     required String? date,
     required String? start,
     required String? status,
+    String? drawnAt,
   }) {
     final int? subjectId = int.tryParse(subject ?? '');
     final int? dateKey = int.tryParse(date ?? '');
@@ -140,6 +152,7 @@ class ExternalMarkRequest {
       dateKey: dateKey,
       startMinutes: startMinutes,
       status: parsedStatus,
+      drawnAt: drawnAt,
     );
   }
 }
@@ -155,7 +168,9 @@ class ExternalMarkRequest {
 Future<void> handleWidgetTap(Uri? uri) async {
   final ExternalMarkRequest? request = ExternalMarkRequest.fromWidget(uri);
   if (request == null) return;
-  await _handleExternalMark(request, source: 'Widget', toggles: true);
+  await oneAtATime(
+    () => _handleExternalMark(request, source: 'Widget', toggles: true),
+  );
 }
 
 /// Handles an action without opening the app, including from a killed process.
@@ -164,8 +179,24 @@ Future<void> handleNotificationAction(NotificationResponse response) async {
   final ExternalMarkRequest? request =
       ExternalMarkRequest.fromNotification(response);
   if (request == null) return;
-  await _handleExternalMark(request, source: 'Notification', toggles: false);
+  await oneAtATime(
+    () => _handleExternalMark(request, source: 'Notification', toggles: false),
+  );
 }
+
+/// Taps that land together are handled one after another, each reading the
+/// class as the last one left it. The plugin hands queued taps to this
+/// isolate back to back, and run side by side two quick taps on one button
+/// both read the old status: the second, which should have cleared the mark,
+/// was lost.
+@visibleForTesting
+Future<T> oneAtATime<T>(Future<T> Function() work) {
+  final Future<T> next = _lastTap.then((_) => work());
+  _lastTap = next.then((_) {}, onError: (Object _) {});
+  return next;
+}
+
+Future<void> _lastTap = Future<void>.value();
 
 Future<void> _handleExternalMark(
   ExternalMarkRequest request, {
@@ -175,44 +206,25 @@ Future<void> _handleExternalMark(
   WidgetsFlutterBinding.ensureInitialized();
   final ProviderContainer container = ProviderContainer();
   try {
-    // Reminders carry the standing, so a mark made here has to reschedule them
-    // the same way one made in the app does. Best-effort: the service logs and
-    // swallows its own failures.
-    await NotificationService.instance.init(
-      backgroundAction: handleNotificationAction,
+    final bool marked = await applyExternalMark(
+      container,
+      request,
+      toggles: toggles,
+      redraw: () => _pushFromContainer(container, settles: request.drawn),
     );
-    // Both, and awaited: the engine and the payload read settings, and an
-    // isolate that has only asked for them still holds an unresolved future —
-    // which silently skipped the redraw and left the widget on the old status.
-    await container.read(settingsProvider.future);
-    await container.read(timetableProvider.future);
-    final ScheduleEngine? engine = container.read(scheduleEngineProvider);
-    if (engine == null) return;
-
-    final DateTime date = Dates.fromKey(request.dateKey);
-    ClassSession? session;
-    for (final ClassSession candidate in engine.sessionsOn(date)) {
-      if (candidate.subject.id == request.subjectId &&
-          candidate.startMinutes == request.startMinutes) {
-        session = candidate;
-        break;
-      }
-    }
-    if (session == null) return;
-
-    // A widget tap is a gesture and behaves like the Today screen: tapping the
-    // status a class already has clears it. A notification action is not —
-    // the same action can arrive twice, and the second must not undo the first.
-    if (toggles || session.status != request.status) {
-      await container
-          .read(attendanceActionsProvider)
-          .mark(session, request.status);
-    }
-    await _pushFromContainer(container);
+    if (!marked) return;
     await HomeWidget.saveWidgetData<String>(
       HomeWidgetService.markEpochKey,
       DateTime.now().microsecondsSinceEpoch.toString(),
     );
+    // Reminders carry the standing, so a mark made here has to reschedule them
+    // the same way one made in the app does. After the redraw, because on a
+    // cold start this is most of the wait. Best-effort: the service logs and
+    // swallows its own failures.
+    await NotificationService.instance.init(
+      backgroundAction: handleNotificationAction,
+    );
+    await container.read(actionCoreProvider).refreshNotifications();
   } catch (error, stack) {
     reportError(error, stack, where: '$source mark');
   } finally {
@@ -220,22 +232,124 @@ Future<void> _handleExternalMark(
   }
 }
 
+/// Saves [request] and then calls [redraw], which runs whatever happened
+/// first — a class that has gone, a refused tap, a database that would not
+/// open. The Today widget may already be showing the tap as made (the native
+/// receiver draws it before Dart wakes), and only a redraw puts it right.
+/// True when a mark was written; the reminders are left to the caller.
+@visibleForTesting
+Future<bool> applyExternalMark(
+  ProviderContainer container,
+  ExternalMarkRequest request, {
+  required bool toggles,
+  required Future<void> Function() redraw,
+}) async {
+  container.read(actionCoreProvider).holdNotifications = true;
+  try {
+    // Both, and awaited: the engine and the payload read settings, and an
+    // isolate that has only asked for them still holds an unresolved future —
+    // which silently skipped the redraw and left the widget on the old status.
+    await container.read(settingsProvider.future);
+    await container.read(timetableProvider.future);
+    final ScheduleEngine? engine = container.read(scheduleEngineProvider);
+    if (engine == null) return false;
+
+    ClassSession? session;
+    for (final ClassSession candidate
+        in engine.sessionsOn(Dates.fromKey(request.dateKey))) {
+      if (candidate.subject.id == request.subjectId &&
+          candidate.startMinutes == request.startMinutes) {
+        session = candidate;
+        break;
+      }
+    }
+    // A widget tap is a gesture and behaves like the Today screen: tapping the
+    // status a class already has clears it. A notification action is not —
+    // the same action can arrive twice, and the second must not undo the first.
+    if (session == null || (!toggles && session.status == request.status)) {
+      return false;
+    }
+    await container
+        .read(attendanceActionsProvider)
+        .mark(session, request.status);
+    return true;
+  } finally {
+    try {
+      await redraw();
+    } catch (error, stack) {
+      // Never in place of whatever is already on its way out of the try.
+      reportError(error, stack, where: 'widget redraw after a mark');
+    }
+  }
+}
+
 /// The JSON half of [homeWidgetSyncProvider], for the isolate that has no view
-/// to draw the week image into.
-Future<void> _pushFromContainer(ProviderContainer container) async {
+/// to draw the week image into. With nothing to build a payload from — the
+/// database or settings failed to load — it only takes back what the widget
+/// drew for the tap, so the last payload shows instead.
+Future<void> _pushFromContainer(
+  ProviderContainer container, {
+  required PendingTap settles,
+}) async {
+  const HomeWidgetService service = HomeWidgetService();
+  final _WidgetPayload? payload;
+  try {
+    payload = _payloadFrom(container);
+  } catch (error, stack) {
+    reportError(error, stack, where: 'widget payload after a mark');
+    await service.settleOnly(settles);
+    return;
+  }
+  if (payload == null) {
+    await service.settleOnly(settles);
+    return;
+  }
+  await service.push(
+    today: payload.today,
+    week: payload.week,
+    standing: payload.standing,
+    subjects: payload.subjects,
+    theme: payload.theme,
+    classStarts: payload.classStarts,
+    settles: settles,
+  );
+}
+
+List<DateTime> _startsOf(List<ClassSession> upcoming) => <DateTime>[
+      for (final ClassSession session in upcoming) session.startDateTime,
+    ];
+
+typedef _WidgetPayload = ({
+  Map<String, Object?> today,
+  Map<String, Object?> week,
+  Map<String, Object?> standing,
+  Map<String, Object?> subjects,
+  Map<String, Object?>? theme,
+  List<DateTime> classStarts,
+});
+
+_WidgetPayload? _payloadFrom(ProviderContainer container) {
   final ScheduleEngine? engine = container.read(scheduleEngineProvider);
   final AppSettings? settings = container.read(settingsProvider).value;
-  if (engine == null || settings == null) return;
-  await const HomeWidgetService().push(
+  if (engine == null || settings == null) return null;
+  final OverallStats stats = container.read(statsProvider);
+  final List<ClassSession> upcoming = HomeWidgetPayload.upcoming(engine);
+  return (
     today: HomeWidgetPayload.today(engine: engine, settings: settings),
-    week: HomeWidgetPayload.week(engine: engine),
+    week: HomeWidgetPayload.week(),
     standing: HomeWidgetPayload.standing(
-      engine: engine,
-      stats: container.read(statsProvider),
+      upcoming: upcoming,
+      stats: stats,
       settings: settings,
     ),
-    subjects: HomeWidgetPayload.subjects(container.read(statsProvider)),
-    theme: HomeWidgetPayload.theme(settings),
+    classStarts: _startsOf(upcoming),
+    subjects: HomeWidgetPayload.subjects(stats),
+    // Android tells a background engine nothing about dark mode, so System
+    // would always read as light here and turn the widget white on every
+    // widget mark. The colours the app last wrote in the foreground stand.
+    theme: settings.themeMode == AppThemeMode.system
+        ? null
+        : HomeWidgetPayload.theme(settings),
   );
 }
 

@@ -25,10 +25,13 @@ class WeekWidgetProvider : ZeoliteWidgetProvider() {
         widgetData: SharedPreferences,
     ) {
         val theme = WidgetTheme.of(context)
-        val week = WidgetData.read(context, "week")
+        val week = WidgetData.today(WidgetData.read(context, "week"))
         val monday = week?.optInt("monday") ?: 0
-        val unmarked = week?.optJSONArray("unmarked")
-        val image = WidgetData.raw(context, "weekImage")
+        // Drawn per day, since today's column is picked out in the picture.
+        val image = WidgetData.read(context, "weekImageDates")
+            ?.optString(WidgetData.todayKey().toString())
+            ?.takeIf { it.isNotBlank() }
+            ?.let { WidgetData.raw(context, it) }
             ?.let { BitmapFactory.decodeFile(it) }
 
         appWidgetIds.forEach { widgetId ->
@@ -58,7 +61,8 @@ class WeekWidgetProvider : ZeoliteWidgetProvider() {
                 )
 
                 // Absent until the app has been opened once since the widget
-                // was placed: the render needs a view to draw into.
+                // was placed, or after a week unopened: the render needs a
+                // view to draw into.
                 setViewVisibility(R.id.week_image, if (image != null) View.VISIBLE else View.GONE)
                 setViewVisibility(
                     R.id.week_placeholder,
@@ -67,16 +71,12 @@ class WeekWidgetProvider : ZeoliteWidgetProvider() {
                 if (image != null) setImageViewBitmap(R.id.week_image, image)
 
                 DAY_COLUMNS.forEachIndexed { index, columnId ->
-                    val pending = unmarked?.optInt(index, 0) ?: 0
                     setOnClickPendingIntent(
                         columnId,
                         HomeWidgetLaunchIntent.getActivity(
                             context,
                             MainActivity::class.java,
-                            Uri.parse(
-                                "zeolite://open?tab=timetable" +
-                                    "&day=${monday + index}&pending=$pending",
-                            ),
+                            Uri.parse("zeolite://open?tab=timetable&day=${monday + index}"),
                         ),
                     )
                 }

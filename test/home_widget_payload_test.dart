@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zeolite/core/date_utils.dart';
 import 'package:zeolite/data/models/attendance_record.dart';
 import 'package:zeolite/data/models/attendance_status.dart';
+import 'package:zeolite/data/models/class_session.dart';
 import 'package:zeolite/data/models/class_slot.dart';
 import 'package:zeolite/data/models/extra_class.dart';
 import 'package:zeolite/data/models/holiday.dart';
@@ -28,6 +29,7 @@ ClassSlot slot({int start = 9 * 60, int end = 10 * 60}) => ClassSlot(
     );
 
 ScheduleEngine engineWith({
+  List<ExtraClass> extras = const <ExtraClass>[],
   List<Holiday> holidays = const <Holiday>[],
   List<AttendanceRecord> records = const <AttendanceRecord>[],
   DateTime? termStart,
@@ -36,7 +38,7 @@ ScheduleEngine engineWith({
     ScheduleEngine(
       subjects: <Subject>[subject],
       slots: <ClassSlot>[slot()],
-      extras: const <ExtraClass>[],
+      extras: extras,
       holidays: holidays,
       records: records,
       termStart: termStart,
@@ -47,7 +49,7 @@ void main() {
   group('the day the widget is told about', () {
     test('names the four states apart rather than sending an empty list', () {
       expect(
-        HomeWidgetPayload.today(
+        HomeWidgetPayload.day(
           engine: engineWith(),
           settings: const AppSettings(),
           on: monday,
@@ -57,7 +59,7 @@ void main() {
 
       // Tuesday: the rule does not apply, but the term is running.
       expect(
-        HomeWidgetPayload.today(
+        HomeWidgetPayload.day(
           engine: engineWith(),
           settings: const AppSettings(),
           on: Dates.addDays(monday, 1),
@@ -65,7 +67,7 @@ void main() {
         'empty',
       );
 
-      final Map<String, Object?> holiday = HomeWidgetPayload.today(
+      final Map<String, Object?> holiday = HomeWidgetPayload.day(
         engine: engineWith(
           holidays: <Holiday>[Holiday(date: monday, name: 'Founders Day')],
         ),
@@ -76,7 +78,7 @@ void main() {
       expect(holiday['holiday'], 'Founders Day');
 
       expect(
-        HomeWidgetPayload.today(
+        HomeWidgetPayload.day(
           engine: engineWith(
             termStart: monday,
             termEnd: Dates.addDays(monday, 3),
@@ -89,7 +91,7 @@ void main() {
     });
 
     test('carries the natural key a mark can be replayed from', () {
-      final List<Object?> classes = HomeWidgetPayload.today(
+      final List<Object?> classes = HomeWidgetPayload.day(
         engine: engineWith(
           records: <AttendanceRecord>[
             AttendanceRecord(
@@ -110,6 +112,85 @@ void main() {
       expect(first['startMinutes'], 9 * 60);
       expect(first['status'], 'present');
       expect(first['time'], '9:00 AM – 10:00 AM');
+    });
+  });
+
+  group('the days written ahead for the launcher', () {
+    test('each carries its own state, so midnight can move to the next', () {
+      // From the Sunday before: a holiday on Monday, a plain Tuesday, and the
+      // term over by Thursday.
+      final List<Object?> days = HomeWidgetPayload.today(
+        engine: engineWith(
+          holidays: <Holiday>[Holiday(date: monday, name: 'Founders Day')],
+          termEnd: Dates.addDays(monday, 2),
+        ),
+        settings: const AppSettings(),
+        on: Dates.addDays(monday, -1),
+      )['days']! as List<Object?>;
+
+      final List<Map<String, Object?>> byDay =
+          days.cast<Map<String, Object?>>();
+      expect(byDay, hasLength(HomeWidgetPayload.daysAhead));
+      expect(byDay.map((Map<String, Object?> d) => d['date']).take(4),
+          <int>[20260802, 20260803, 20260804, 20260805]);
+      expect(byDay[1]['state'], 'holiday');
+      expect(byDay[2]['state'], 'empty');
+      expect(byDay[4]['state'], 'outside');
+
+      // The week columns follow the day across Monday.
+      final List<Object?> weeks = HomeWidgetPayload.week(
+        on: Dates.addDays(monday, -1),
+      )['days']! as List<Object?>;
+      expect((weeks[0]! as Map<String, Object?>)['monday'], 20260727);
+      expect((weeks[1]! as Map<String, Object?>)['monday'], 20260803);
+    });
+
+    test('the next class moves on at each start and at midnight', () {
+      final DateTime classDay = DateTime(2026, 10, 12);
+      ExtraClass at(int hour) => ExtraClass(
+            subjectId: 1,
+            date: classDay,
+            startMinutes: hour * 60,
+            endMinutes: hour * 60 + 50,
+          );
+      final ScheduleEngine engine = ScheduleEngine(
+        subjects: <Subject>[subject],
+        slots: const <ClassSlot>[],
+        extras: <ExtraClass>[at(9), at(11)],
+        holidays: const <Holiday>[],
+        records: const <AttendanceRecord>[],
+      );
+      List<Map<String, Object?>> upcomingAt(DateTime now) =>
+          (HomeWidgetPayload.standing(
+            upcoming: HomeWidgetPayload.upcoming(engine, now: now),
+            stats: OverallStats(subjects: const <SubjectStats>[], target: 0.75),
+            settings: const AppSettings(),
+            now: now,
+          )['upcoming']! as List<Object?>)
+              .cast<Map<String, Object?>>();
+
+      final List<Map<String, Object?>> evening =
+          upcomingAt(DateTime(2026, 10, 11, 20));
+      expect(
+        evening.map((Map<String, Object?> c) => c['at']),
+        <int>[
+          DateTime(2026, 10, 12, 9).millisecondsSinceEpoch,
+          DateTime(2026, 10, 12, 11).millisecondsSinceEpoch,
+        ],
+      );
+      // Nothing for the day after the class, so the line goes rather than
+      // naming a class that has already happened.
+      expect(evening.first['when'], <String, String>{
+        '20261011': 'Tomorrow, 9:00 AM',
+        '20261012': 'Today, 9:00 AM',
+      });
+
+      // Once the 9:00 has started it is no longer offered.
+      expect(
+        upcomingAt(DateTime(2026, 10, 12, 9, 30))
+            .map((Map<String, Object?> c) => c['at']),
+        <int>[DateTime(2026, 10, 12, 11).millisecondsSinceEpoch],
+      );
     });
   });
 
@@ -168,7 +249,7 @@ void main() {
     );
 
     final Map<String, Object?> standing = HomeWidgetPayload.standing(
-      engine: engineWith(),
+      upcoming: const <ClassSession>[],
       stats: stats,
       settings: const AppSettings(),
     );

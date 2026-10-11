@@ -135,9 +135,10 @@ class Dates {
   static String formatMonthYear(DateTime date) =>
       '${kMonthNamesLong[date.month - 1]} ${date.year}';
 
-  /// A friendly label for dates near today.
-  static String relativeLabel(DateTime date) {
-    final int diff = daysBetween(today(), date);
+  /// A friendly label for dates near today, or near [from] when the label is
+  /// written ahead for a later day to show.
+  static String relativeLabel(DateTime date, {DateTime? from}) {
+    final int diff = daysBetween(from ?? today(), date);
     switch (diff) {
       case 0:
         return 'Today';

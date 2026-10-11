@@ -64,8 +64,13 @@ class ActionCore {
   Future<void> _reload() async {
     ref.invalidate(timetableProvider);
     await ref.read(timetableProvider.future);
-    await _syncNotifications();
+    if (!holdNotifications) await _syncNotifications();
   }
+
+  /// Set by a mark made from outside the app, which redraws the widget before
+  /// laying the reminders down again and calls [refreshNotifications] itself:
+  /// on a cold start the reminders are most of the wait.
+  bool holdNotifications = false;
 
   /// A run writes straight through the repository and the settings service, so
   /// without this nothing reading either provider knows the database moved.

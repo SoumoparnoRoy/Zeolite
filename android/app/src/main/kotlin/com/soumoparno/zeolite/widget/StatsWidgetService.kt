@@ -55,43 +55,13 @@ class StatsRowFactory(private val context: Context, private val widgetId: Int) :
 
     override fun getCount(): Int = subjects.size
 
-    override fun getViewAt(position: Int): RemoteViews {
-        val subject = subjects[position]
-        val hasData = subject.optBoolean("hasData")
-        val tint = health(theme, subject.optString("health"))
+    override fun getViewAt(position: Int): RemoteViews =
+        statsRow(context, theme, subjects[position], rowLayout)
 
-        return RemoteViews(context.packageName, rowLayout).apply {
-            setInt(R.id.stat_stripe, "setBackgroundColor", subject.optInt("colour", theme.accent))
-            setTextColor(R.id.stat_name, theme.textPrimary)
-            setTextColor(R.id.stat_counts, theme.textTertiary)
-            setTextColor(R.id.stat_percent, if (hasData) tint else theme.textTertiary)
-
-            setTextViewText(R.id.stat_name, subject.optString("name"))
-            setTextViewText(R.id.stat_counts, subject.optString("counts"))
-            setTextViewText(
-                R.id.stat_percent,
-                if (hasData) "${subject.optInt("percent")}%" else "—",
-            )
-
-            // Calm by default: the colour is spent only on the subjects that
-            // need attention, so a healthy column reads as one quiet grey.
-            setViewVisibility(R.id.stat_headline, if (hasData) View.VISIBLE else View.GONE)
-            if (hasData) {
-                setTextViewText(R.id.stat_headline, subject.optString("headline"))
-                setTextColor(
-                    R.id.stat_headline,
-                    if (subject.optBoolean("meetsTarget")) theme.textTertiary else tint,
-                )
-            }
-
-            // A row in a collection cannot carry its own intent, so it fills in
-            // the list's template instead. Empty: every row wants the same
-            // screen, and the template already names it.
-            setOnClickFillInIntent(R.id.stat_row, Intent())
-        }
-    }
-
-    /** Blank rather than Android's own "Loading…" — see [TodayRowFactory]. */
+    /**
+     * Blank rather than Android's own "Loading…", which the list otherwise
+     * blinks through every time an update re-attaches its adapter.
+     */
     override fun getLoadingView(): RemoteViews =
         RemoteViews(context.packageName, rowLayout).apply {
             setInt(R.id.stat_stripe, "setBackgroundColor", theme.canvas)
@@ -108,11 +78,47 @@ class StatsRowFactory(private val context: Context, private val widgetId: Int) :
     override fun getItemId(position: Int): Long = position.toLong()
 
     override fun hasStableIds(): Boolean = true
+}
 
-    private fun health(theme: WidgetTheme, name: String): Int = when (name) {
-        "safe" -> theme.present
-        "tight" -> theme.warning
-        "atRisk", "lost" -> theme.absent
-        else -> theme.textTertiary
+/** One subject's row, for the inline list and the service alike. */
+fun statsRow(context: Context, theme: WidgetTheme, subject: JSONObject, layout: Int): RemoteViews {
+    val hasData = subject.optBoolean("hasData")
+    val tint = health(theme, subject.optString("health"))
+
+    return RemoteViews(context.packageName, layout).apply {
+        setInt(R.id.stat_stripe, "setBackgroundColor", subject.optInt("colour", theme.accent))
+        setTextColor(R.id.stat_name, theme.textPrimary)
+        setTextColor(R.id.stat_counts, theme.textTertiary)
+        setTextColor(R.id.stat_percent, if (hasData) tint else theme.textTertiary)
+
+        setTextViewText(R.id.stat_name, subject.optString("name"))
+        setTextViewText(R.id.stat_counts, subject.optString("counts"))
+        setTextViewText(
+            R.id.stat_percent,
+            if (hasData) "${subject.optInt("percent")}%" else "—",
+        )
+
+        // Calm by default: the colour is spent only on the subjects that
+        // need attention, so a healthy column reads as one quiet grey.
+        setViewVisibility(R.id.stat_headline, if (hasData) View.VISIBLE else View.GONE)
+        if (hasData) {
+            setTextViewText(R.id.stat_headline, subject.optString("headline"))
+            setTextColor(
+                R.id.stat_headline,
+                if (subject.optBoolean("meetsTarget")) theme.textTertiary else tint,
+            )
+        }
+
+        // A row in a collection cannot carry its own intent, so it fills in
+        // the list's template instead. Empty: every row wants the same
+        // screen, and the template already names it.
+        setOnClickFillInIntent(R.id.stat_row, Intent())
     }
+}
+
+private fun health(theme: WidgetTheme, name: String): Int = when (name) {
+    "safe" -> theme.present
+    "tight" -> theme.warning
+    "atRisk", "lost" -> theme.absent
+    else -> theme.textTertiary
 }

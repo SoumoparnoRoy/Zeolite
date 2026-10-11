@@ -17,15 +17,46 @@ import 'schedule_engine.dart';
 class HomeWidgetPayload {
   const HomeWidgetPayload._();
 
-  /// The day is described by a state rather than by an empty list, because
-  /// "nothing scheduled", "a holiday" and "outside the term" are three
-  /// different things to be told on a home screen.
+  /// Every payload that depends on the date is written for this many days,
+  /// starting today. The launcher redraws at midnight with the app closed and
+  /// picks the new day's entry, so this is how long a widget stays right
+  /// without the app being opened.
+  static const int daysAhead = 7;
+
+  /// The midnights the launcher has to redraw at, one per day after today
+  /// that [daysAhead] covers, plus the one that runs off the end so the widget
+  /// can say it has nothing for that day.
+  static List<DateTime> dayChanges({DateTime? from}) {
+    final DateTime today = Dates.dayOf(from ?? DateTime.now());
+    return <DateTime>[
+      for (int i = 1; i <= daysAhead; i++) Dates.addDays(today, i),
+    ];
+  }
+
+  /// The Today widget's days, keyed by date for the launcher to look up.
   static Map<String, Object?> today({
     required ScheduleEngine engine,
     required AppSettings settings,
     DateTime? on,
   }) {
-    final DateTime day = Dates.dayOf(on ?? DateTime.now());
+    final DateTime first = Dates.dayOf(on ?? DateTime.now());
+    return <String, Object?>{
+      'days': <Map<String, Object?>>[
+        for (int i = 0; i < daysAhead; i++)
+          day(engine: engine, settings: settings, on: Dates.addDays(first, i)),
+      ],
+    };
+  }
+
+  /// The day is described by a state rather than by an empty list, because
+  /// "nothing scheduled", "a holiday" and "outside the term" are three
+  /// different things to be told on a home screen.
+  static Map<String, Object?> day({
+    required ScheduleEngine engine,
+    required AppSettings settings,
+    required DateTime on,
+  }) {
+    final DateTime day = Dates.dayOf(on);
     final Holiday? holiday = engine.holidayOn(day);
     final List<ClassSession> sessions = engine.sessionsOn(day);
 
@@ -52,24 +83,18 @@ class HomeWidgetPayload {
     };
   }
 
-  /// The whole week keyed by date, for the grid image and its day columns.
-  static Map<String, Object?> week({
-    required ScheduleEngine engine,
-    DateTime? on,
-  }) {
-    final DateTime monday =
-        Dates.startOfWeek(Dates.dayOf(on ?? DateTime.now()));
-    final Map<int, List<ClassSession>> byDay = engine.sessionsForWeekOf(monday);
+  /// The week each of the coming days falls in, for the day columns laid over
+  /// the grid image. The image itself is drawn per day, by
+  /// `weekWidgetImageProvider`.
+  static Map<String, Object?> week({DateTime? on}) {
+    final DateTime first = Dates.dayOf(on ?? DateTime.now());
     return <String, Object?>{
-      'monday': Dates.keyOf(monday),
-      'label': '${Dates.formatDayMonth(monday)} – '
-          '${Dates.formatDayMonth(Dates.addDays(monday, 6))}',
-      'unmarked': <int>[
-        for (int i = 0; i < 7; i++)
-          (byDay[Dates.keyOf(Dates.addDays(monday, i))] ??
-                  const <ClassSession>[])
-              .where((ClassSession s) => s.needsMarking)
-              .length,
+      'days': <Map<String, Object?>>[
+        for (int i = 0; i < daysAhead; i++)
+          <String, Object?>{
+            'date': Dates.keyOf(Dates.addDays(first, i)),
+            'monday': Dates.keyOf(Dates.startOfWeek(Dates.addDays(first, i))),
+          },
       ],
     };
   }
@@ -77,26 +102,71 @@ class HomeWidgetPayload {
   /// The one figure the app exists to answer, worded exactly as the home
   /// screen words it — [OverallStats.verdict] is the same string the header
   /// shows, so the two can never drift apart.
+  ///
+  /// [upcoming] is [HomeWidgetPayload.upcoming]: the caller schedules a redraw
+  /// at each of those starts too, so it is worked out once and handed to both.
   static Map<String, Object?> standing({
-    required ScheduleEngine engine,
+    required List<ClassSession> upcoming,
     required OverallStats stats,
     required AppSettings settings,
+    DateTime? now,
   }) {
-    final ClassSession? next = engine.nextSession();
     return <String, Object?>{
       'verdict': stats.verdict,
       'hasData': stats.hasData,
       'percent': stats.hasData ? stats.percent.round() : null,
       'target': (stats.target * 100).round(),
       'meetsTarget': stats.meetsTarget,
-      'next': next == null
-          ? null
-          : <String, Object?>{
-              'subject': next.subject.name,
-              'when': '${Dates.relativeLabel(next.date)}, '
-                  '${Clock.format(next.startMinutes, use24Hour: settings.use24HourTime)}',
-            },
+      // Every class still to start, not just the next: the launcher shows the
+      // first that has not started when it draws, so the line moves on at
+      // each class start with the app closed.
+      'upcoming': <Map<String, Object?>>[
+        for (final ClassSession session in upcoming)
+          <String, Object?>{
+            'subject': session.subject.name,
+            'at': session.startDateTime.millisecondsSinceEpoch,
+            'when': _whenByDay(session, settings, on: now),
+          },
+      ],
     };
+  }
+
+  /// The classes the Stats widget's "Next" line can name, in order: those
+  /// starting within [daysAhead], or failing that the next one inside a
+  /// fortnight, which is how far the app looks for one.
+  static List<ClassSession> upcoming(ScheduleEngine engine, {DateTime? now}) {
+    final DateTime at = now ?? DateTime.now();
+    final DateTime today = Dates.dayOf(at);
+    final DateTime windowEnd = Dates.addDays(today, daysAhead);
+    final List<ClassSession> starting = engine
+        .sessionsBetween(today, Dates.addDays(today, 14))
+        .where((ClassSession s) => s.startDateTime.isAfter(at))
+        .toList();
+    final List<ClassSession> within =
+        starting.where((ClassSession s) => s.date.isBefore(windowEnd)).toList();
+    return within.isNotEmpty ? within : starting.take(1).toList();
+  }
+
+  /// "Tomorrow, 9:00 AM" stops being true at midnight, so the label is
+  /// written for each day up to the class's own, keyed by date, and the
+  /// launcher shows the one for the day it draws on. Past the class's day
+  /// there is no entry and the line is hidden.
+  static Map<String, String> _whenByDay(
+    ClassSession next,
+    AppSettings settings, {
+    DateTime? on,
+  }) {
+    final DateTime today = Dates.dayOf(on ?? DateTime.now());
+    final String time =
+        Clock.format(next.startMinutes, use24Hour: settings.use24HourTime);
+    final Map<String, String> when = <String, String>{};
+    for (int i = 0; i < daysAhead; i++) {
+      final DateTime day = Dates.addDays(today, i);
+      if (day.isAfter(next.date)) break;
+      when['${Dates.keyOf(day)}'] =
+          '${Dates.relativeLabel(next.date, from: day)}, $time';
+    }
+    return when;
   }
 
   /// Every subject, weakest first.

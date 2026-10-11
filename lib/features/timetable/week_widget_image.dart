@@ -23,40 +23,74 @@ import 'week_grid_view.dart';
 /// The cost is that taps land on a day column, not on a class. A widget
 /// resized while the app is closed keeps the old shape until the app is next
 /// opened or returned to.
+///
+/// One picture per coming day, because the grid picks out today's column and
+/// the launcher swaps pictures at midnight with the app closed.
 final weekWidgetImageProvider = Provider<void>((Ref ref) {
   final ScheduleEngine? engine = ref.watch(scheduleEngineProvider);
   final AppSettings? settings = ref.watch(settingsProvider).value;
   if (engine == null || settings == null) return;
 
   final HomeWidgetService service = ref.read(homeWidgetServiceProvider);
-  ({Size cell, DateTime week})? drawn;
+  ({Size cell, DateTime day})? drawn;
+  Timer? comingDays;
+
+  Future<void> render(Size cell, DateTime day) => _render(
+        service: service,
+        container: ref.container,
+        grid: ref.read(dayGridProvider),
+        settings: settings,
+        cell: cell,
+        day: day,
+      );
+
+  Future<void> drawComingDays(Size cell, DateTime today) async {
+    for (int i = 1; i < HomeWidgetPayload.daysAhead; i++) {
+      if (!ref.mounted) return;
+      await render(cell, Dates.addDays(today, i));
+    }
+  }
 
   Future<void> draw({required bool onlyIfStale}) async {
     // The cell the widget actually occupies, written there by its provider,
     // because Dart has no way to ask. Drawn at that size the grid fills the
     // widget instead of being centred inside it.
     final Size cell = await service.weekCellSize() ?? _fallbackSize;
-    final DateTime week = Dates.startOfWeek(Dates.today());
-    if (onlyIfStale && drawn == (cell: cell, week: week)) return;
-    drawn = (cell: cell, week: week);
-    await _render(
-      service: service,
-      container: ref.container,
-      grid: ref.read(dayGridProvider),
-      settings: settings,
-      cell: cell,
+    final DateTime today = Dates.today();
+    if (onlyIfStale && drawn == (cell: cell, day: today)) return;
+    drawn = (cell: cell, day: today);
+    await render(cell, today);
+
+    // Six more renders on every mark would be felt, and the launcher needs
+    // none of them before midnight, so they wait for the timetable to settle.
+    comingDays?.cancel();
+    comingDays = Timer(
+      _settleBeforeComingDays,
+      () => unawaited(drawComingDays(cell, today)),
     );
   }
 
   // A widget placed or resized while the app sat in the background reports
-  // its cell then, and a week can turn over meanwhile too. Anything else
-  // already redraws through the watches above.
+  // its cell then, and a day can turn over meanwhile too. Anything else
+  // already redraws through the watches above. Leaving the app does not wait
+  // for the timer: the picture needs a view to render into.
   final AppLifecycleListener listener = AppLifecycleListener(
     onResume: () => unawaited(draw(onlyIfStale: true)),
+    onHide: () {
+      final ({Size cell, DateTime day})? last = drawn;
+      if (last == null || !(comingDays?.isActive ?? false)) return;
+      comingDays!.cancel();
+      unawaited(drawComingDays(last.cell, last.day));
+    },
   );
-  ref.onDispose(listener.dispose);
+  ref.onDispose(() {
+    comingDays?.cancel();
+    listener.dispose();
+  });
   unawaited(draw(onlyIfStale: false));
 });
+
+const Duration _settleBeforeComingDays = Duration(seconds: 3);
 
 /// Only until the widget has drawn once and reported its own cell. The
 /// minimum `widget_week_info.xml` declares, so a first render has the widget's
@@ -82,6 +116,7 @@ Future<void> _render({
   required DayGrid grid,
   required AppSettings settings,
   required Size cell,
+  required DateTime day,
 }) async {
   // A widget cell is far shorter than the grid's own minimum block height
   // times a full day, so asking the grid to draw into it directly clipped
@@ -96,12 +131,14 @@ Future<void> _render({
     _WeekGridSnapshot(
       container: container,
       settings: settings,
+      day: day,
       size: size,
       // The grid runs to the widget's own edges, so nothing else can round
       // its corners for it. Drawn at [zoom] and shown scaled back down,
       // which the radius has to be multiplied by to survive the trip.
       cornerRadius: AppSpacing.radiusLg * zoom,
     ),
+    day: day,
     size: size,
   );
 }
@@ -123,12 +160,14 @@ class _WeekGridSnapshot extends StatelessWidget {
   const _WeekGridSnapshot({
     required this.container,
     required this.settings,
+    required this.day,
     required this.size,
     required this.cornerRadius,
   });
 
   final ProviderContainer container;
   final AppSettings settings;
+  final DateTime day;
   final Size size;
   final double cornerRadius;
 
@@ -153,7 +192,8 @@ class _WeekGridSnapshot extends StatelessWidget {
             child: SizedBox.fromSize(
               size: size,
               child: WeekGridView(
-                weekStart: Dates.startOfWeek(Dates.today()),
+                weekStart: Dates.startOfWeek(day),
+                today: day,
                 availableHeight: size.height,
               ),
             ),

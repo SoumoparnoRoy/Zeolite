@@ -194,6 +194,10 @@ class LaunchPainter extends CustomPainter {
   final Paint _stroke = Paint()..style = PaintingStyle.stroke;
   final Paint _fill = Paint()..style = PaintingStyle.fill;
 
+  // Painted with a dotless ı: the accent dot is the i's only dot. The font's
+  // own square dot showed white behind the round one and before it landed.
+  static const String _word = 'Zeolıte';
+
   @override
   void paint(Canvas canvas, Size size) {
     final double raw = _clock.value;
@@ -657,7 +661,7 @@ class LaunchPainter extends CustomPainter {
     required double t,
   }) {
     final double reveal = easeInOut(seg(t, from, to));
-    final TextPainter word = _text('Zeolite', fontSize, colors.text);
+    final TextPainter word = _text(_word, fontSize, colors.text);
     final double x = size.width / 2 - word.width / 2;
     final double edge = lerpd(x - 24, x + word.width + 6, reveal);
 
@@ -692,12 +696,12 @@ class LaunchPainter extends CustomPainter {
     required double opacity,
   }) {
     final TextPainter word =
-        _text('Zeolite', fontSize, colors.text.withValues(alpha: opacity));
+        _text(_word, fontSize, colors.text.withValues(alpha: opacity));
     final double x = size.width / 2 - word.width / 2;
     final double top = cy - word.height / 2;
 
     if (ghost) {
-      _text('Zeolite', fontSize, colors.text.withValues(alpha: 0.05))
+      _text(_word, fontSize, colors.text.withValues(alpha: 0.05))
           .paint(canvas, Offset(x, top));
     }
 
@@ -729,7 +733,7 @@ class LaunchPainter extends CustomPainter {
     double? dropFrom,
   }) {
     final double lead = _text('Zeol', fontSize, colors.text).width;
-    final double stem = _text('i', fontSize, colors.text).width;
+    final double stem = _text('ı', fontSize, colors.text).width;
     final double cx = x + lead + stem / 2;
     final double rest = baseline - fontSize * 0.64;
     final double cy =
@@ -749,10 +753,10 @@ class LaunchPainter extends CustomPainter {
     final double fontSize = lerpd(m.wordmarkSize, m.headingSize, e);
     final TextPainter pre = _text('Welcome to ', m.headingSize, colors.text);
     final TextPainter whole =
-        _text('Welcome to Zeolite', m.headingSize, colors.text);
+        _text('Welcome to $_word', m.headingSize, colors.text);
     final double lineX = size.width / 2 - whole.width / 2;
 
-    final TextPainter word = _text('Zeolite', fontSize, colors.text);
+    final TextPainter word = _text(_word, fontSize, colors.text);
     final double x =
         lerpd(size.width / 2 - word.width / 2, lineX + pre.width, e);
     // Interpolated as a box top so it leaves the wordmark exactly where the

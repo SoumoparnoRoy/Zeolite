@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { after, before, test } from "node:test";
 import { createApp } from "../src/index.js";
+import { createSessionStore } from "../src/sessions.js";
 
 process.env.NOTION_CLIENT_ID = "test-client";
 process.env.NOTION_CLIENT_SECRET = "test-secret";
@@ -28,6 +29,13 @@ async function fetchStub(_url, options) {
   }
   if (upstreamMode === "failure") {
     return new Response("provider-private-error", { status: 400 });
+  }
+  if (upstreamMode === "tokenless") {
+    return new Response(JSON.stringify({ workspace_name: "generic" }), { status: 200 });
+  }
+  // Answers, but only after the session it was asked for has run out.
+  if (upstreamMode === "outlived") {
+    currentTime += 5 * 60 * 1000;
   }
   const body = JSON.parse(options.body);
   const payload =
@@ -122,6 +130,25 @@ test("callback hides an upstream failure", async () => {
   upstreamMode = "success";
 });
 
+test("pressing Cancel on Notion says so, and the pages carry a policy", async () => {
+  const response = await fetch(`${baseUrl}/notion/callback?error=access_denied&state=anything`);
+  assert.equal(response.status, 400);
+  assert.match(await response.text(), /Connection cancelled/);
+  assert.match(response.headers.get("content-security-policy"), /frame-ancestors 'none'/);
+  assert.equal(response.headers.get("x-powered-by"), null);
+});
+
+test("a reply from Notion without a token is not a connection", async () => {
+  upstreamMode = "tokenless";
+  const started = await startSession();
+  const response = await fetch(
+    `${baseUrl}/notion/callback?code=generic-code&state=${encodeURIComponent(started.state)}`,
+  );
+  upstreamMode = "success";
+  assert.equal(response.status, 502);
+  assert.doesNotMatch(await response.text(), /Connection ready/);
+});
+
 test("a stalled Notion gives up instead of holding the request open", async () => {
   upstreamMode = "stalled";
   const started = await startSession();
@@ -141,6 +168,53 @@ test("a stalled Notion gives up instead of holding the request open", async () =
   // The extra session spends a start from the per-minute allowance the later
   // tests are counting on.
   currentTime += 61_000;
+});
+
+test("reloading the ready page shows it again, and the session stays claimable", async () => {
+  upstreamMode = "success";
+  const started = await startSession();
+  const callbackUrl = `${baseUrl}/notion/callback?code=generic-code&state=${encodeURIComponent(started.state)}`;
+  const first = await (await fetch(callbackUrl)).text();
+
+  // Notion refuses a code it has already exchanged.
+  upstreamMode = "failure";
+  const reload = await fetch(callbackUrl);
+  upstreamMode = "success";
+  assert.equal(reload.status, 200);
+  assert.equal(await reload.text(), first);
+
+  const session = first.match(/session=([A-Za-z0-9_-]+)/)[1];
+  const claim = await fetch(`${baseUrl}/notion/claim`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ session, verifier }),
+  });
+  assert.deepEqual(await claim.json(), tokenPayload);
+});
+
+test("a session that runs out during the exchange is not shown as ready", async () => {
+  upstreamMode = "outlived";
+  const started = await startSession();
+  const response = await fetch(
+    `${baseUrl}/notion/callback?code=generic-code&state=${encodeURIComponent(started.state)}`,
+  );
+  upstreamMode = "success";
+  assert.equal(response.status, 400);
+  assert.match(await response.text(), /This link expired/);
+  currentTime += 61_000;
+});
+
+test("the session store refuses new sessions once full, until some expire", () => {
+  let time = 0;
+  const store = createSessionStore({ now: () => time });
+  for (let index = 0; index < 5000; index += 1) {
+    assert.ok(store.create(challenge));
+  }
+  assert.equal(store.create(challenge), undefined);
+  time += 5 * 60 * 1000;
+  const fresh = store.create(challenge);
+  assert.equal(store.getByState(fresh.state), fresh);
+  assert.equal(store.getByPairingCode(fresh.pairingCode.toLowerCase()), fresh);
 });
 
 test("claim rejects the wrong verifier", async () => {
@@ -231,6 +305,52 @@ test("refresh rejects a missing token without blaming the provider", async () =>
     body: JSON.stringify({}),
   });
   assert.equal(response.status, 400);
+});
+
+test("a body that is not JSON is refused in JSON, counted, and kept out of the log", async () => {
+  currentTime += 61_000;
+  let stderr = "";
+  const originalWrite = process.stderr.write;
+  process.stderr.write = (chunk) => {
+    stderr += String(chunk);
+    return true;
+  };
+  const statuses = [];
+  try {
+    for (let attempt = 0; attempt < 11; attempt += 1) {
+      const response = await fetch(`${baseUrl}/notion/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: '{"refresh_token": "generic-refresh-fragment',
+      });
+      statuses.push(response.status);
+      if (attempt === 0) {
+        assert.deepEqual(await response.json(), { error: "Invalid request." });
+      }
+    }
+  } finally {
+    process.stderr.write = originalWrite;
+  }
+  assert.deepEqual(statuses, [...Array(10).fill(400), 429]);
+  assert.doesNotMatch(stderr, /generic-refresh-fragment/);
+
+  const unknown = await fetch(`${baseUrl}/notion/nowhere`);
+  assert.equal(unknown.status, 404);
+  assert.deepEqual(await unknown.json(), { error: "Not found." });
+  currentTime += 61_000;
+});
+
+test("a mistyped number in the config stops the start", () => {
+  try {
+    process.env.AI_DAILY_CALLS = "18O";
+    assert.throws(() => createApp(), /AI_DAILY_CALLS/);
+    process.env.AI_DAILY_CALLS = "";
+    process.env.TRUST_PROXY = "true";
+    assert.throws(() => createApp(), /TRUST_PROXY/);
+  } finally {
+    delete process.env.AI_DAILY_CALLS;
+    delete process.env.TRUST_PROXY;
+  }
 });
 
 test("claim rate limit returns 429", async () => {

@@ -1,9 +1,11 @@
 import { createHash, timingSafeEqual } from "node:crypto";
-import { Router } from "express";
+import express, { Router } from "express";
+import { failureOf } from "./failure.js";
 import { exchangeCode, refreshToken } from "./oauth.js";
 
 const CHALLENGE_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const INVALID_CLAIM = { error: "Unable to claim this connection." };
+const PAGE_POLICY = "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'";
 
 function challengeFor(verifier) {
   return createHash("sha256").update(verifier).digest("base64url");
@@ -33,6 +35,7 @@ function callbackSuccess(session, appScheme) {
 
 export function createNotionRouter({ config, sessions, limit, fetchImpl }) {
   const router = Router();
+  const parseBody = express.json();
 
   router.get("/start", limit("/notion/start", 10), (request, response) => {
     const { challenge } = request.query;
@@ -42,6 +45,10 @@ export function createNotionRouter({ config, sessions, limit, fetchImpl }) {
     }
 
     const session = sessions.create(challenge);
+    if (!session) {
+      response.status(503).json({ error: "Unable to start a connection right now." });
+      return;
+    }
     const authorizationUrl = new URL("https://api.notion.com/v1/oauth/authorize");
     authorizationUrl.searchParams.set("client_id", config.clientId);
     authorizationUrl.searchParams.set("response_type", "code");
@@ -52,13 +59,34 @@ export function createNotionRouter({ config, sessions, limit, fetchImpl }) {
   });
 
   router.get("/callback", limit("/notion/callback", 30), async (request, response) => {
+    response.set("Content-Security-Policy", PAGE_POLICY);
     const { code, state, error } = request.query;
+    if (error !== undefined) {
+      response
+        .status(400)
+        .type("html")
+        .send(
+          callbackFailure(
+            "Connection cancelled. You can close this tab and try again from Zeolite.",
+          ),
+        );
+      return;
+    }
+
     const session = typeof state === "string" ? sessions.getByState(state) : undefined;
-    if (error !== undefined || typeof code !== "string" || !session) {
+    const expired = () =>
       response
         .status(400)
         .type("html")
         .send(callbackFailure("This link expired. Try connecting again."));
+    if (typeof code !== "string" || !session) {
+      expired();
+      return;
+    }
+
+    // A reload of the "ready" tab brings back a code Notion has already spent.
+    if (session.status !== "pending") {
+      response.status(200).type("html").send(callbackSuccess(session, config.appScheme));
       return;
     }
 
@@ -73,11 +101,23 @@ export function createNotionRouter({ config, sessions, limit, fetchImpl }) {
         },
         fetchImpl,
       );
-      session.tokenPayload = tokenPayload;
-      session.status = "ready";
+      // The session may have expired, or another callback finished, meanwhile.
+      if (sessions.getById(session.id) !== session) {
+        expired();
+        return;
+      }
+      if (session.status === "pending") {
+        session.tokenPayload = tokenPayload;
+        session.status = "ready";
+      }
       response.status(200).type("html").send(callbackSuccess(session, config.appScheme));
     } catch (error) {
-      process.stderr.write(`Notion code exchange failed: ${error.message}\n`);
+      process.stderr.write(`Notion code exchange failed: ${failureOf(error)}\n`);
+      // A duplicate callback fails on the code the first one already spent.
+      if (session.status === "ready" && sessions.getById(session.id) === session) {
+        response.status(200).type("html").send(callbackSuccess(session, config.appScheme));
+        return;
+      }
       response
         .status(502)
         .type("html")
@@ -85,7 +125,7 @@ export function createNotionRouter({ config, sessions, limit, fetchImpl }) {
     }
   });
 
-  router.post("/claim", limit("/notion/claim", 20), (request, response) => {
+  router.post("/claim", limit("/notion/claim", 20), parseBody, (request, response) => {
     const body = request.body ?? {};
     const session =
       typeof body.session === "string"
@@ -107,7 +147,7 @@ export function createNotionRouter({ config, sessions, limit, fetchImpl }) {
     response.status(200).json(tokenPayload);
   });
 
-  router.post("/refresh", limit("/notion/refresh", 10), async (request, response) => {
+  router.post("/refresh", limit("/notion/refresh", 10), parseBody, async (request, response) => {
     const value = request.body?.refresh_token;
     if (typeof value !== "string" || value.length === 0) {
       response.status(400).json({ error: "Invalid request." });
@@ -126,7 +166,7 @@ export function createNotionRouter({ config, sessions, limit, fetchImpl }) {
       );
       response.status(200).json(tokenPayload);
     } catch (error) {
-      process.stderr.write(`Notion token refresh failed: ${error.message}\n`);
+      process.stderr.write(`Notion token refresh failed: ${failureOf(error)}\n`);
       response.status(502).json({ error: "Unable to refresh the connection." });
     }
   });

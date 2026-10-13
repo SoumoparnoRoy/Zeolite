@@ -4,6 +4,10 @@ const SESSION_TTL_MS = 5 * 60 * 1000;
 const SWEEP_INTERVAL_MS = 60 * 1000;
 const PAIRING_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
 
+// Anyone can start a session, so many addresses would grow this without end;
+// one app never has thousands of people connecting in the same five minutes.
+const MOST_SESSIONS = 5000;
+
 function randomPairingCode() {
   let code = "";
   for (let index = 0; index < 8; index += 1) {
@@ -13,16 +17,30 @@ function randomPairingCode() {
 }
 
 export function createSessionStore({ now = Date.now } = {}) {
-  const sessions = new Map();
+  const byId = new Map();
+  const byState = new Map();
+  const byPairingCode = new Map();
 
   function isExpired(session) {
     return now() - session.createdAt >= SESSION_TTL_MS;
   }
 
+  function add(session) {
+    byId.set(session.id, session);
+    byState.set(session.state, session);
+    byPairingCode.set(session.pairingCode, session);
+  }
+
+  function remove(session) {
+    byId.delete(session.id);
+    byState.delete(session.state);
+    byPairingCode.delete(session.pairingCode);
+  }
+
   function removeExpired() {
-    for (const [id, session] of sessions) {
+    for (const session of byId.values()) {
       if (isExpired(session)) {
-        sessions.delete(id);
+        remove(session);
       }
     }
   }
@@ -32,45 +50,55 @@ export function createSessionStore({ now = Date.now } = {}) {
   sweepTimer.unref();
 
   function create(challenge) {
+    if (byId.size >= MOST_SESSIONS) {
+      removeExpired();
+      if (byId.size >= MOST_SESSIONS) {
+        return undefined;
+      }
+    }
+    // A shared code would leave one of the two sessions unreachable by code.
+    let pairingCode;
+    do {
+      pairingCode = randomPairingCode();
+    } while (byPairingCode.has(pairingCode));
+
     const session = {
       id: randomBytes(32).toString("base64url"),
       state: randomBytes(32).toString("base64url"),
       challenge,
-      pairingCode: randomPairingCode(),
+      pairingCode,
       createdAt: now(),
       status: "pending",
     };
-    sessions.set(session.id, session);
+    add(session);
     return session;
   }
 
-  function find(predicate) {
-    for (const [id, session] of sessions) {
-      if (predicate(session)) {
-        if (isExpired(session)) {
-          sessions.delete(id);
-          return undefined;
-        }
-        return session;
-      }
+  function live(session) {
+    if (session && isExpired(session)) {
+      remove(session);
+      return undefined;
     }
-    return undefined;
+    return session;
   }
 
   return {
     create,
     getById(id) {
-      return find((session) => session.id === id);
+      return live(byId.get(id));
     },
     getByState(state) {
-      return find((session) => session.state === state);
+      return live(byState.get(state));
     },
     getByPairingCode(code) {
       const normalizedCode = typeof code === "string" ? code.toUpperCase() : "";
-      return find((session) => session.pairingCode === normalizedCode);
+      return live(byPairingCode.get(normalizedCode));
     },
     delete(id) {
-      sessions.delete(id);
+      const session = byId.get(id);
+      if (session) {
+        remove(session);
+      }
     },
   };
 }

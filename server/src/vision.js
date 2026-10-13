@@ -1,13 +1,11 @@
+import { classesIn } from "./reply.js";
+
 const RUN_URL = "https://api.cloudflare.com/client/v4/accounts";
 
 // The default is 256, which cuts a week off partway and arrives looking like a
 // malformed reply rather than a long one. The ceiling also bounds how long the
 // model can run: given 4096 it talked itself into Cloudflare's own timeout.
 const MAX_TOKENS = 2048;
-
-// A week has 7 days and no sheet prints more than a few dozen periods; anything
-// past this is a model that has started repeating itself.
-const MOST_CLASSES = 250;
 
 // The times this returns are not usable and asking differently does not help:
 // minutes after midnight come back with no relationship to the sheet, quoted
@@ -70,220 +68,6 @@ function requestBody(image, text) {
   };
 }
 
-const DAYS = [
-  ["monday", "mon", "mo"],
-  ["tuesday", "tue", "tu"],
-  ["wednesday", "wed", "we"],
-  ["thursday", "thu", "th"],
-  ["friday", "fri", "fr"],
-  ["saturday", "sat", "sa"],
-  ["sunday", "sun", "su"],
-];
-
-const CLOCK = /^\s*(\d{1,2})[:.](\d{2})/;
-const SPAN = /(\d{1,2})[:.](\d{2})\s*(?:-|–|—|to)\s*(\d{1,2})[:.](\d{2})/;
-const BRACKETED = /^(.*?)[\s,]*\(([^)]*)\)[\s.]*$/;
-const TRAILING = /^(.*?),\s*([^,\s]{1,12})[\s.]*$/;
-
-function minutes(hour, minute) {
-  const h = Number(hour);
-  const m = Number(minute);
-  return h > 23 || m > 59 ? undefined : h * 60 + m;
-}
-
-// Times come back as the printed string when asked for, and as a bare number
-// when the model reverts to counting minutes itself. A bare number is taken as
-// minutes after midnight, which is the only reading it can be given: 1000 is
-// as plausibly 10:00 written without its colon as it is 16:40, and guessing
-// between them silently would be worse than being consistent.
-function timeOf(value) {
-  if (typeof value === "string") {
-    const clock = CLOCK.exec(value);
-    return clock ? minutes(clock[1], clock[2]) : undefined;
-  }
-  if (Number.isInteger(value) && value >= 0 && value <= 24 * 60 - 1) {
-    return value;
-  }
-  return undefined;
-}
-
-function weekdayOf(value) {
-  if (Number.isInteger(value) && value >= 1 && value <= 7) {
-    return value;
-  }
-  return typeof value === "string" ? weekdayIn(value) : undefined;
-}
-
-function weekdayIn(line) {
-  const words = line.toLowerCase().match(/[a-z]+/g) ?? [];
-  for (let day = 0; day < DAYS.length; day++) {
-    if (words.some((word) => DAYS[day].includes(word))) {
-      return day + 1;
-    }
-  }
-  return undefined;
-}
-
-// No sheet prints more columns than this, and nothing this small is a clock.
-const MOST_PERIODS = 20;
-
-function periodOf(value) {
-  return Number.isInteger(value) && value >= 1 && value <= MOST_PERIODS ? value : undefined;
-}
-
-// A class arrives either as the two column numbers asked for or, when the model
-// reverts to clocks, as two times. The two cannot be mistaken for each other:
-// a period is at most 20 and a time is minutes after midnight, so the smallest
-// clock this would accept is still an order of magnitude larger.
-function classOf(subject, weekday, first, second, room) {
-  const named = typeof subject === "string" ? subject.trim() : "";
-  const day = weekdayOf(weekday);
-  if (named.length === 0 || named.length > 60 || day === undefined) {
-    return undefined;
-  }
-  const where = typeof room === "string" ? room.trim() : "";
-  const at = {
-    subject: named,
-    weekday: day,
-    room: where.length > 0 && where.length <= 30 ? where : null,
-  };
-
-  const from = periodOf(first);
-  const to = periodOf(second);
-  if (from !== undefined && to !== undefined) {
-    return to < from ? undefined : { ...at, first: from, last: to };
-  }
-
-  const start = timeOf(first);
-  const end = timeOf(second);
-  if (start === undefined || end === undefined || end <= start) {
-    return undefined;
-  }
-  return { ...at, from: start, to: end };
-}
-
-// Models wrap JSON in prose or a fence however firmly they are told not to.
-function jsonIn(text) {
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start < 0 || end <= start) {
-    return undefined;
-  }
-  try {
-    return JSON.parse(text.slice(start, end + 1));
-  } catch {
-    return undefined;
-  }
-}
-
-// Entries arrive as positional tuples when the shape above is followed, and
-// sometimes with a sixth field for the teacher that nothing asked for.
-function fromJson(reply) {
-  const parsed = typeof reply === "string" ? jsonIn(reply) : reply;
-  const entries = Array.isArray(parsed?.classes) ? parsed.classes : undefined;
-  if (!entries) {
-    return [];
-  }
-  const classes = [];
-  for (const entry of entries.slice(0, MOST_CLASSES)) {
-    const one = Array.isArray(entry)
-      ? classOf(entry[0], entry[1], entry[2], entry[3], entry[4])
-      : classOf(
-          entry?.subject,
-          entry?.weekday,
-          entry?.firstPeriod ?? entry?.period ?? entry?.from,
-          entry?.lastPeriod ?? entry?.period ?? entry?.to,
-          entry?.room,
-        );
-    if (one) {
-      classes.push(one);
-    }
-  }
-  return classes;
-}
-
-// The room is printed either in brackets or after a comma, depending on how the
-// model feels about the sheet. A comma only counts when what follows looks like
-// a room rather than the rest of a sentence, and where brackets hold both a room
-// and a teacher the room comes first.
-function split(rest) {
-  const bracketed = BRACKETED.exec(rest);
-  if (bracketed) {
-    return { subject: bracketed[1].trim(), room: bracketed[2].split(",")[0].trim() };
-  }
-  const trailing = TRAILING.exec(rest);
-  if (trailing) {
-    return { subject: trailing[1].trim(), room: trailing[2].trim() };
-  }
-  return { subject: rest.trim(), room: "" };
-}
-
-// A line at a time, ignoring everything that is not one. A heading, an apology
-// or a closing remark simply fails to be a class, which is what makes this
-// tolerant of a reply that was never going to be JSON.
-function fromLines(text) {
-  const classes = [];
-  let day;
-
-  for (const raw of text.split("\n")) {
-    const line = raw
-      .replace(/[*#_`]/g, "")
-      .replace(/^[\s\-•]+/, "")
-      .trim();
-    if (line.length === 0) {
-      continue;
-    }
-
-    const span = SPAN.exec(line);
-    if (!span) {
-      day = weekdayIn(line) ?? day;
-      continue;
-    }
-
-    // A line naming its own day beats whatever heading came before it.
-    const before = line.slice(0, span.index);
-    const rest = line.slice(span.index + span[0].length).replace(/^[\s:,\-–—]+/, "");
-    const { subject: trailingName, room: trailingRoom } = split(rest);
-
-    // The subject sits on whichever side of the time the model felt like:
-    // "9:10-10:00: SUBJECT (room)" reading the image alone, "SUBJECT: 9:10-10:00
-    // (room)" once a transcript is there to read from. A name before the time is
-    // unambiguous, so it wins, and whatever trails the time is then the room.
-    const leadingName = before
-      .replace(new RegExp(`\\b(${DAYS.flat().join("|")})\\b`, "gi"), "")
-      .replace(/[\s:,\-–—]+$/, "")
-      .replace(/^[\s:,\-–—]+/, "")
-      .trim();
-    const subject = leadingName.length > 0 ? leadingName : trailingName;
-    const room = leadingName.length > 0 && trailingRoom.length === 0 ? trailingName : trailingRoom;
-
-    const one = classOf(
-      subject,
-      weekdayIn(before) ?? day,
-      `${span[1]}:${span[2]}`,
-      `${span[3]}:${span[4]}`,
-      room,
-    );
-    if (one) {
-      classes.push(one);
-    }
-    if (classes.length >= MOST_CLASSES) {
-      break;
-    }
-  }
-
-  return classes;
-}
-
-export function classesIn(reply) {
-  const structured = fromJson(reply);
-  if (structured.length > 0) {
-    return structured;
-  }
-  const lines = typeof reply === "string" ? fromLines(reply) : [];
-  return lines.length > 0 ? lines : undefined;
-}
-
 // The app waits 120 seconds and a dense sheet takes up to about 115, so this
 // sits just under the app's limit: the student gets the server's answer rather
 // than a timeout of their own while the model is still working.
@@ -305,11 +89,20 @@ export async function readTimetable(
 
   if (!response.ok) {
     process.stderr.write(`Workers AI request failed (${response.status})\n`);
-    throw new Error("Workers AI request failed");
+    const error = new Error("Workers AI request failed");
+    error.upstreamStatus = response.status;
+    throw error;
   }
 
-  const body = await response.json();
-  const reply = body?.result?.response ?? "";
+  // Nothing from upstream is logged, and a parse error would quote the reply.
+  const body = await response.json().catch(() => {
+    throw new Error(`Workers AI sent a reply that is not JSON (${response.status})`);
+  });
+  const reply = body?.result?.response;
+  if (reply === undefined || reply === null) {
+    process.stderr.write("Workers AI reply has no response field\n");
+    throw new Error("Workers AI reply has no response field");
+  }
   const classes = classesIn(reply);
   if (!classes) {
     const length = typeof reply === "string" ? reply.length : JSON.stringify(reply).length;

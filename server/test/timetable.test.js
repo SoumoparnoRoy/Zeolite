@@ -36,7 +36,10 @@ function attestation(key, { project = projectNumber, expiresIn = "1h" } = {}) {
 
 let upstreamReply = "Monday\n* 09:10-10:00: ABC1234 (R101)";
 let upstreamOk = true;
+let upstreamStatus = 429;
 let upstreamStalled = false;
+// A 200 whose body is not the JSON Workers AI normally sends.
+let upstreamRaw;
 let lastRequest;
 let currentTime = 1_760_000_000_000;
 
@@ -50,8 +53,13 @@ async function fetchStub(url, options) {
   if (upstreamStalled) {
     return stalled(options);
   }
+  if (upstreamRaw !== undefined) {
+    return new Response(upstreamRaw, { status: 200 });
+  }
   if (!upstreamOk) {
-    return new Response("provider-private-error: token test-cloudflare-token", { status: 429 });
+    return new Response("provider-private-error: token test-cloudflare-token", {
+      status: upstreamStatus,
+    });
   }
   return new Response(JSON.stringify({ result: { response: upstreamReply } }), {
     status: 200,
@@ -162,7 +170,7 @@ test("the subject is found on either side of the time", async () => {
   upstreamReply = [
     "**Monday**",
     "*   09:10-10:00: ABC1234 (R101)",
-    "*   DEF5678: 10:00-10:50 (R102, PRG)",
+    "*   DEF5678: 10:00-10:50 (R102, RKM)",
     "*   GHI9012, 11:00-11:50, R103",
   ].join("\n");
   const body = await read(configured, { image }).then((r) => r.json());
@@ -204,6 +212,58 @@ test("a line that cannot be a class is dropped", async () => {
   );
 });
 
+test("only a heading moves the day, and a subject code is never one", async () => {
+  upstreamOk = true;
+  upstreamReply = [
+    "**Monday**",
+    "*   FR201: 09:10-10:00 (B204)",
+    "Below we list the rest.",
+    "*   10:10-11:00: ABC1234",
+    "Thu",
+    "*   09:10-10:00: DEF5678",
+    "5. Friday",
+    "*   09:10-10:00: GHI9012",
+  ].join("\n");
+  const body = await read(configured, { image }).then((r) => r.json());
+  assert.deepEqual(
+    body.classes.map((c) => `${c.subject}@${c.weekday}`),
+    ["FR201@1", "ABC1234@1", "DEF5678@4", "GHI9012@5"],
+  );
+});
+
+test("a sheet in 12-hour time keeps its afternoon", async () => {
+  upstreamOk = true;
+  upstreamReply = [
+    "**Monday**",
+    "*   1:30-2:20 PM: ABC1234",
+    "*   11:00-12:50 PM: DEF5678",
+    "*   9:00 a.m. - 9:50 a.m.: GHI9012",
+    "*   10:00-11:00 AMS101",
+    "*   2:30 PM-3:20: JKL3456",
+    "*   13:30 PM-14:20 PM: MNO7890",
+  ].join("\n");
+  const body = await read(configured, { image }).then((r) => r.json());
+  assert.deepEqual(
+    body.classes.map((c) => `${c.subject} ${c.from}-${c.to}`),
+    [
+      "ABC1234 810-860",
+      "DEF5678 660-770",
+      "GHI9012 540-590",
+      "AMS101 600-660",
+      "JKL3456 870-920",
+      "MNO7890 810-860",
+    ],
+  );
+});
+
+test("a reply that found no classes is an answer, not a failure", async () => {
+  upstreamOk = true;
+  upstreamReply = '{"classes":[]}';
+  const response = await read(configured, { image });
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { classes: [] });
+});
+
 test("an upstream failure says nothing about the upstream", async () => {
   upstreamOk = false;
   let stderr = "";
@@ -217,13 +277,46 @@ test("an upstream failure says nothing about the upstream", async () => {
   });
   const text = await response.text();
 
-  assert.equal(response.status, 502);
+  assert.equal(response.status, 429);
   assert.doesNotMatch(text, /test-cloudflare-token/);
   assert.doesNotMatch(text, /provider-private-error/);
   assert.doesNotMatch(text, /429/);
   assert.doesNotMatch(stderr, /test-cloudflare-token/);
   assert.doesNotMatch(stderr, /provider-private-error/);
   assert.match(stderr, /Workers AI request failed \(429\)/);
+});
+
+// Only an unreadable reply blames the photo; the rest land on what the app
+// already tells the student for "not available" and "used up today".
+test("an upstream refusal is not reported as an unreadable sheet", async () => {
+  upstreamOk = false;
+  const answers = [];
+  for (const status of [401, 403, 429, 500]) {
+    upstreamStatus = status;
+    answers.push((await read(configured, { image })).status);
+  }
+  upstreamStatus = 429;
+  upstreamOk = true;
+  assert.deepEqual(answers, [503, 503, 429, 502]);
+});
+
+test("a reply that is not JSON is logged without its body", async () => {
+  upstreamOk = true;
+  let stderr = "";
+  const originalWrite = process.stderr.write;
+  process.stderr.write = (chunk) => {
+    stderr += String(chunk);
+    return true;
+  };
+  upstreamRaw = "provider-private-error: token test-cloudflare-token";
+  const response = await read(configured, { image }).finally(() => {
+    process.stderr.write = originalWrite;
+    upstreamRaw = undefined;
+  });
+
+  assert.equal(response.status, 502);
+  assert.doesNotMatch(stderr, /provider-private-error|test-cloudflare-token/);
+  assert.match(stderr, /not JSON \(200\)/);
 });
 
 test("a stalled model gives up before the app does", async () => {
@@ -233,8 +326,7 @@ test("a stalled model gives up before the app does", async () => {
     upstreamStalled = false;
   });
 
-  assert.equal(response.status, 502);
-  assert.deepEqual(await response.json(), { error: "Unable to read that image." });
+  assert.equal(response.status, 504);
   assert.ok(lastRequest.options.signal instanceof AbortSignal);
 });
 
@@ -256,12 +348,39 @@ test("only a read attested for this project reaches the upstream", async () => {
   const otherProject = await attestation(signingKey, { project: "987654321" });
   const expired = await attestation(signingKey, { expiresIn: "-1m" });
 
-  for (const attested of [null, "", "not.a.token", forged, otherProject, expired]) {
-    const response = await read(configured, { image }, attested);
-    assert.equal(response.status, 401);
-    assert.deepEqual(await response.json(), { error: "Invalid request." });
+  let stderr = "";
+  const originalWrite = process.stderr.write;
+  process.stderr.write = (chunk) => {
+    stderr += String(chunk);
+    return true;
+  };
+  try {
+    for (const attested of [null, "", "not.a.token", forged, otherProject, expired]) {
+      const response = await read(configured, { image }, attested);
+      assert.equal(response.status, 401);
+      assert.deepEqual(await response.json(), { error: "Invalid request." });
+    }
+  } finally {
+    process.stderr.write = originalWrite;
   }
   assert.equal(lastRequest, undefined);
+
+  // A genuine token for another project is what a wrong project number looks
+  // like, so it alone is logged; a forged or expired one stays quiet.
+  const logged = stderr.split("\n").filter((line) => line.startsWith("App Check not verified"));
+  assert.equal(logged.length, 1);
+  assert.match(logged[0], /ERR_JWT_CLAIM_VALIDATION_FAILED|claim/);
+  assert.ok(!stderr.includes(otherProject));
+});
+
+test("an unattested body is turned away before it is read", async () => {
+  currentTime += 61_000;
+  const response = await fetch(`${configured}/timetable/read`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: '{"image": "not finished',
+  });
+  assert.equal(response.status, 401);
 });
 
 test("a refused attestation leaves the day's allowance alone", async () => {

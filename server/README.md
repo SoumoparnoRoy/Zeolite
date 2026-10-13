@@ -12,7 +12,7 @@ This standalone service holds the secrets Zeolite cannot ship inside the mobile 
 | `GET /notion/callback` | Exchanges Notion's authorization code and returns to the app. |
 | `POST /notion/claim` | Releases the token payload after verifier proof. |
 | `POST /notion/refresh` | Exchanges a refresh token for a fresh token payload. |
-| `POST /timetable/read` | Sends an image, and the text recognition already done on it, to Workers AI and returns the classes it found. Needs a Firebase App Check token in `X-Firebase-AppCheck` and answers `401` without one. Answers `503` when image reading is not configured. |
+| `POST /timetable/read` | Sends an image, and the text recognition already done on it, to Workers AI and returns the classes it found. Needs a Firebase App Check token in `X-Firebase-AppCheck` and answers `401` without one. Answers `503` when image reading is not configured or Cloudflare refuses the token, `429` when the day's reads are used up, and `504` when the model runs out of time. |
 | `GET /health` | Returns `ok`. The app calls it when the connect screen opens, so a host that has spun the service down is awake before anyone taps Connect. |
 
 ## Environment variables
@@ -20,6 +20,7 @@ This standalone service holds the secrets Zeolite cannot ship inside the mobile 
 - `NOTION_CLIENT_ID` — required Notion OAuth client ID
 - `NOTION_CLIENT_SECRET` — required Notion OAuth client secret
 - `REDIRECT_URI` — required callback URL configured in Notion
+- `NODE_ENV` — set it to `production` wherever the service is deployed
 - `PORT` — optional server port, default `8080`
 - `APP_SCHEME` — optional mobile URL scheme, default `zeolite`
 - `TRUST_PROXY` — number of proxies in front of the service, default `0`. Set

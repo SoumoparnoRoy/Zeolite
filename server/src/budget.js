@@ -8,6 +8,10 @@ function utcDay(at) {
 
 // The rate limiter guards a caller. This guards the account, whose free
 // allocation is one pool shared by everyone using the app.
+//
+// Kept in memory, so a restart or deploy starts the day's count again and a
+// day with deploys can pass the cap. That is a soft cap only: Workers AI stops
+// at its own ceiling rather than billing.
 export function createDailyBudget({ maximum, now = Date.now } = {}) {
   let day = -1;
   let spent = 0;

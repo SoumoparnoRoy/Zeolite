@@ -1,4 +1,5 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
+import { failureOf } from "./failure.js";
 
 const JWKS_URL = "https://firebaseappcheck.googleapis.com/v1/jwks";
 const ISSUER = "https://firebaseappcheck.googleapis.com/";
@@ -20,8 +21,24 @@ export function createAppCheckVerifier({ projectNumber, keys = firebaseKeys }) {
         audience: `projects/${projectNumber}`,
       });
       return true;
-    } catch {
+    } catch (error) {
+      if (!isCallersFault(error)) {
+        process.stderr.write(`App Check not verified: ${failureOf(error)}\n`);
+      }
       return false;
     }
   };
+}
+
+// Ours, not the caller's: no key set (a network error has no jose code), or a
+// real token for another project, which is a wrong FIREBASE_PROJECT_NUMBER.
+const OURS = new Set([
+  "ERR_JWKS_TIMEOUT",
+  "ERR_JWKS_INVALID",
+  "ERR_JOSE_GENERIC",
+  "ERR_JWT_CLAIM_VALIDATION_FAILED",
+]);
+
+function isCallersFault(error) {
+  return typeof error?.code === "string" && error.code.startsWith("ERR_J") && !OURS.has(error.code);
 }

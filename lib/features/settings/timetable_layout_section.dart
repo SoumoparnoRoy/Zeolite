@@ -24,11 +24,15 @@ import '../../widgets/undo_snack.dart';
 class DayGridSection extends ConsumerWidget {
   const DayGridSection({super.key});
 
+  static int _blockOf(double value) {
+    final int minutes = (value / 5).round() * 5;
+    return minutes < 15 ? 0 : minutes;
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final AppSettings settings =
         ref.watch(settingsProvider).value ?? const AppSettings();
-    final DayGrid grid = settings.dayGrid;
     final bool use24Hour = settings.use24HourTime;
     final SettingsController controller = ref.read(settingsProvider.notifier);
 
@@ -65,54 +69,70 @@ class DayGridSection extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: AppSpacing.lg),
-              Row(
-                children: <Widget>[
-                  const Expanded(
-                    child: Text(
-                      'One block is',
-                      style: TextStyle(
-                        fontSize: AppType.titleLarge,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    settings.blockMinutes <= 0
-                        ? 'Not set'
-                        : Clock.formatDuration(settings.blockMinutes),
-                    style: TextStyle(
-                      fontSize: AppType.headlineMedium,
-                      fontWeight: FontWeight.w800,
-                      color: context.palette.accent,
-                      letterSpacing: -0.4,
-                    ),
-                  ),
-                ],
-              ),
-              Slider(
-                // Zero is a real state — "the day is not divided up" — so the
-                // track starts one step below the shortest usable block and
-                // that step clears the grid rather than setting a 5-minute one.
+              SettledSlider(
                 value: settings.blockMinutes.toDouble().clamp(0, 180),
-                max: 180,
-                divisions: 36,
-                label: settings.blockMinutes <= 0
-                    ? 'Not divided'
-                    : Clock.formatDuration(settings.blockMinutes),
-                onChanged: (double value) {
-                  final int minutes = (value / 5).round() * 5;
-                  unawaited(controller.save(
-                    settings.copyWith(
-                      blockMinutes: minutes < 15 ? 0 : minutes,
-                    ),
-                  ));
+                onSettled: (double value) => unawaited(controller.save(
+                  settings.copyWith(blockMinutes: _blockOf(value)),
+                )),
+                builder: (BuildContext context,
+                    double shown,
+                    ValueChanged<double> onChanged,
+                    ValueChanged<double> onChangeEnd) {
+                  // The preview below follows the drag; only the release is
+                  // saved.
+                  final AppSettings draft =
+                      settings.copyWith(blockMinutes: _blockOf(shown));
+                  final DayGrid grid = draft.dayGrid;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      Row(
+                        children: <Widget>[
+                          const Expanded(
+                            child: Text(
+                              'One block is',
+                              style: TextStyle(
+                                fontSize: AppType.titleLarge,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            draft.blockMinutes <= 0
+                                ? 'Not set'
+                                : Clock.formatDuration(draft.blockMinutes),
+                            style: TextStyle(
+                              fontSize: AppType.headlineMedium,
+                              fontWeight: FontWeight.w800,
+                              color: context.palette.accent,
+                              letterSpacing: -0.4,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Slider(
+                        // Zero is a real state — "the day is not divided up" —
+                        // so the track starts one step below the shortest
+                        // usable block and that step clears the grid rather
+                        // than setting a 5-minute one.
+                        value: shown,
+                        max: 180,
+                        divisions: 36,
+                        label: draft.blockMinutes <= 0
+                            ? 'Not divided'
+                            : Clock.formatDuration(draft.blockMinutes),
+                        onChanged: onChanged,
+                        onChangeEnd: onChangeEnd,
+                      ),
+                      if (grid.isConfigured) ...<Widget>[
+                        const SizedBox(height: AppSpacing.lg),
+                        _BreakField(grid: grid, settings: draft),
+                      ],
+                      _GridPreview(grid: grid, use24Hour: use24Hour),
+                    ],
+                  );
                 },
               ),
-              if (grid.isConfigured) ...<Widget>[
-                const SizedBox(height: AppSpacing.lg),
-                _BreakField(grid: grid, settings: settings),
-              ],
-              _GridPreview(grid: grid, use24Hour: use24Hour),
             ],
           ),
         ),
@@ -140,36 +160,9 @@ class _BreakField extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        Row(
-          children: <Widget>[
-            const Expanded(
-              child: Text(
-                'Break',
-                style: TextStyle(
-                    fontSize: AppType.titleLarge, fontWeight: FontWeight.w600),
-              ),
-            ),
-            Text(
-              grid.hasBreak
-                  ? Clock.formatDuration(settings.breakMinutes)
-                  : 'None',
-              style: TextStyle(
-                fontSize: AppType.headlineMedium,
-                fontWeight: FontWeight.w800,
-                color: context.palette.accent,
-                letterSpacing: -0.4,
-              ),
-            ),
-          ],
-        ),
-        Slider(
+        SettledSlider(
           value: settings.breakMinutes.toDouble().clamp(0, 90),
-          max: 90,
-          divisions: 18,
-          label: settings.breakMinutes <= 0
-              ? 'None'
-              : Clock.formatDuration(settings.breakMinutes),
-          onChanged: (double value) {
+          onSettled: (double value) {
             final int minutes = (value / 5).round() * 5;
             unawaited(controller.save(
               settings.copyWith(
@@ -180,6 +173,50 @@ class _BreakField extends ConsumerWidget {
                     : settings.breakAfterBlock,
               ),
             ));
+          },
+          builder: (BuildContext context,
+              double shown,
+              ValueChanged<double> onChanged,
+              ValueChanged<double> onChangeEnd) {
+            final int minutes = (shown / 5).round() * 5;
+            // At rest the grid decides, as before: a length with no block to
+            // follow is no break.
+            final bool hasBreak =
+                minutes == settings.breakMinutes ? grid.hasBreak : minutes > 0;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Row(
+                  children: <Widget>[
+                    const Expanded(
+                      child: Text(
+                        'Break',
+                        style: TextStyle(
+                            fontSize: AppType.titleLarge,
+                            fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    Text(
+                      hasBreak ? Clock.formatDuration(minutes) : 'None',
+                      style: TextStyle(
+                        fontSize: AppType.headlineMedium,
+                        fontWeight: FontWeight.w800,
+                        color: context.palette.accent,
+                        letterSpacing: -0.4,
+                      ),
+                    ),
+                  ],
+                ),
+                Slider(
+                  value: shown,
+                  max: 90,
+                  divisions: 18,
+                  label: minutes <= 0 ? 'None' : Clock.formatDuration(minutes),
+                  onChanged: onChanged,
+                  onChangeEnd: onChangeEnd,
+                ),
+              ],
+            );
           },
         ),
         if (settings.breakMinutes > 0) ...<Widget>[

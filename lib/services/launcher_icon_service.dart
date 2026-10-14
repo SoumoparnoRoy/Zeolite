@@ -1,5 +1,7 @@
 import 'package:flutter/services.dart';
 
+import '../core/report_error.dart';
+
 /// A launcher icon the user can pick.
 ///
 /// [wire] is the activity-alias the manifest declares and the launcher records,
@@ -47,7 +49,8 @@ class LauncherIconService {
       return LauncherIcon.fromWire(
         await _channel.invokeMethod<String>('current'),
       );
-    } on PlatformException {
+    } on PlatformException catch (error, stack) {
+      reportError(error, stack, where: 'reading the launcher icon');
       return LauncherIcon.standard;
     } on MissingPluginException {
       return LauncherIcon.standard;

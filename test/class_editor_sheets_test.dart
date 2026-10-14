@@ -842,6 +842,34 @@ void main() {
       expect(saved.single.expectedTotal, 18);
     });
 
+    testWidgets('an edit keeps the cancelled classes set on Counts',
+        (WidgetTester tester) async {
+      // With the balance folded away the sheet does not scroll, so Save has
+      // to fit on the screen.
+      tester.view.physicalSize = const Size(800, 1200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final List<Subject> saved = <Subject>[];
+      await tester.pumpWidget(
+        _host(
+          (c, _) => showSubjectEditor(
+            c,
+            subject: _fixture().subjects[1].copyWith(priorCancelled: 3),
+          ),
+          subjects: (Ref ref) =>
+              _SubjectRecorder(ActionCore(ref), saved: saved),
+        ),
+      );
+      await _openSheet(tester);
+
+      await tester.enterText(
+          find.widgetWithText(TextField, 'Maths'), 'Algebra');
+      await _tapButton(tester, 'Save');
+
+      expect(saved.single.name, 'Algebra');
+      expect(saved.single.priorCancelled, 3);
+    });
+
     testWidgets('refuses to attend more classes than were held',
         (WidgetTester tester) async {
       final List<Subject> saved = await save(tester, held: '5', attended: '9');

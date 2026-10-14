@@ -83,22 +83,6 @@ class HomeWidgetPayload {
     };
   }
 
-  /// The week each of the coming days falls in, for the day columns laid over
-  /// the grid image. The image itself is drawn per day, by
-  /// `weekWidgetImageProvider`.
-  static Map<String, Object?> week({DateTime? on}) {
-    final DateTime first = Dates.dayOf(on ?? DateTime.now());
-    return <String, Object?>{
-      'days': <Map<String, Object?>>[
-        for (int i = 0; i < daysAhead; i++)
-          <String, Object?>{
-            'date': Dates.keyOf(Dates.addDays(first, i)),
-            'monday': Dates.keyOf(Dates.startOfWeek(Dates.addDays(first, i))),
-          },
-      ],
-    };
-  }
-
   /// The one figure the app exists to answer, worded exactly as the home
   /// screen words it — [OverallStats.verdict] is the same string the header
   /// shows, so the two can never drift apart.

@@ -56,6 +56,7 @@ class AttendanceLogScreen extends ConsumerWidget {
         entries.where((AttendanceLogEntry e) => e.isMarked).length;
 
     if (entries.isEmpty) {
+      final AsyncValue<TimetableData> loaded = ref.watch(timetableProvider);
       return PushScaffold(
         title: subject.name,
         subtitle: attended,
@@ -66,12 +67,22 @@ class AttendanceLogScreen extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
               sliver: SliverToBoxAdapter(child: _CarriedIn(subject: subject)),
             ),
-          const SliverFillRemaining(
+          SliverFillRemaining(
             hasScrollBody: false,
-            child: _LogEmpty(
-              message: 'Once this subject has had a class, every one of them '
-                  'shows up here to mark or correct.',
-            ),
+            // No entries is also what a timetable that never loaded gives.
+            child: loaded.hasValue
+                ? const _LogEmpty(
+                    message: 'Once this subject has had a class, every one of '
+                        'them shows up here to mark or correct.',
+                  )
+                : loaded.hasError
+                    ? Padding(
+                        padding: const EdgeInsets.only(top: 40, bottom: 60),
+                        child: LoadFailed(
+                          onRetry: () => ref.invalidate(timetableProvider),
+                        ),
+                      )
+                    : const SizedBox.shrink(),
           ),
         ],
       );

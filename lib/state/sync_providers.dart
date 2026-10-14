@@ -106,11 +106,17 @@ class SyncController extends Notifier<SyncStatus> {
     if (coordinator == null) return null;
 
     state = coordinator.status.running();
-    final SyncRunResult result = await ref
-        .read(dataActionsProvider)
-        .applySyncMerge(coordinator, decisions);
+    final SyncRunResult result;
+    try {
+      result = await ref
+          .read(dataActionsProvider)
+          .applySyncMerge(coordinator, decisions);
+    } finally {
+      // Left on running, every later [run] turns itself away. The merge
+      // screen reports the throw.
+      state = coordinator.status;
+    }
     _last = result;
-    state = coordinator.status;
     // `applySyncMerge` has already reloaded, so only the stamp is left.
     if (result.ok) await _stampLastSync(coordinator.status.lastRunAt);
     return result;
@@ -138,19 +144,18 @@ class SyncController extends Notifier<SyncStatus> {
           target: 'account',
           outcome: result.outcome.name,
         ));
-    if (result.ok) {
-      // Reload before stamping, not after: a pulled settings row is written
-      // through the service, so `settingsProvider` still holds the pre-run
-      // value and stamping from it would push the pulled settings straight
-      // back out.
-      if (result.pulled > 0) {
-        await ref.read(actionCoreProvider).reloadAfterSync(
-              target: coordinator.target.id,
-              pulled: result.pulledKeys,
-            );
-      }
-      await _stampLastSync(coordinator.status.lastRunAt);
+    // Reload before stamping, not after: a pulled settings row is written
+    // through the service, so `settingsProvider` still holds the pre-run
+    // value and stamping from it would push the pulled settings straight
+    // back out. A failed run can have pulled too, before the kind that
+    // stopped it.
+    if (result.pulled > 0) {
+      await ref.read(actionCoreProvider).reloadAfterSync(
+            target: coordinator.target.id,
+            pulled: result.pulledKeys,
+          );
     }
+    if (result.ok) await _stampLastSync(coordinator.status.lastRunAt);
     return result;
   }
 

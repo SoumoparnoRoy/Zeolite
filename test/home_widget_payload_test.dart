@@ -136,13 +136,6 @@ void main() {
       expect(byDay[1]['state'], 'holiday');
       expect(byDay[2]['state'], 'empty');
       expect(byDay[4]['state'], 'outside');
-
-      // The week columns follow the day across Monday.
-      final List<Object?> weeks = HomeWidgetPayload.week(
-        on: Dates.addDays(monday, -1),
-      )['days']! as List<Object?>;
-      expect((weeks[0]! as Map<String, Object?>)['monday'], 20260727);
-      expect((weeks[1]! as Map<String, Object?>)['monday'], 20260803);
     });
 
     test('the next class moves on at each start and at midnight', () {

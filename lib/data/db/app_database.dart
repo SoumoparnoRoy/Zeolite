@@ -217,11 +217,6 @@ class AppDatabase {
     );
   }
 
-  /// Uniqueness lives in an index rather than a column constraint so the
-  /// create path and the v8 migration can run the exact same statement —
-  /// `ALTER TABLE ... ADD COLUMN` cannot carry `UNIQUE`.
-  /// One row per rule per date, so the create path and the v13 migration run
-  /// the same statement — the reason every other index here is separate too.
   static const String _slotOverridesTable = '''
     CREATE TABLE IF NOT EXISTS slot_overrides (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -238,10 +233,15 @@ class AppDatabase {
     )
   ''';
 
+  /// One row per rule per date, so the create path and the v13 migration run
+  /// the same statement — the reason every other index here is separate too.
   static const String _slotOverrideIndex =
       'CREATE UNIQUE INDEX IF NOT EXISTS idx_slot_overrides_slot_date '
       'ON slot_overrides (slot_id, date)';
 
+  /// Uniqueness lives in an index rather than a column constraint so the
+  /// create path and the v8 migration can run the exact same statement —
+  /// `ALTER TABLE ... ADD COLUMN` cannot carry `UNIQUE`.
   static const String _subjectUuidIndex =
       'CREATE UNIQUE INDEX IF NOT EXISTS idx_subjects_uuid ON subjects (uuid)';
 

@@ -1,5 +1,6 @@
 package com.soumoparno.zeolite
 
+import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -34,8 +35,11 @@ class MainActivity : FlutterActivity() {
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "open" -> {
-                        openNotificationSettings(call.argument<String>("channel"))
-                        result.success(null)
+                        if (openNotificationSettings(call.argument<String>("channel"))) {
+                            result.success(null)
+                        } else {
+                            result.error("no_settings", "No settings screen to open", null)
+                        }
                     }
                     else -> result.notImplemented()
                 }
@@ -44,7 +48,7 @@ class MainActivity : FlutterActivity() {
 
     // Below Android 8 there are no channels and no notification screen of the
     // app's own, so the app info page is the nearest thing.
-    private fun openNotificationSettings(channel: String?) {
+    private fun openNotificationSettings(channel: String?): Boolean {
         val intent = when {
             Build.VERSION.SDK_INT < Build.VERSION_CODES.O ->
                 Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
@@ -57,8 +61,22 @@ class MainActivity : FlutterActivity() {
                 Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
                     .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
         }
-        startActivity(intent)
+        // Some OEM and Go builds ship without the notification screens, and an
+        // uncaught throw here takes the app down from a settings row.
+        return start(intent) ||
+            start(
+                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                    .setData(Uri.fromParts("package", packageName, null))
+            )
     }
+
+    private fun start(intent: Intent): Boolean =
+        try {
+            startActivity(intent)
+            true
+        } catch (e: ActivityNotFoundException) {
+            false
+        }
 
     private fun current(): String =
         ICONS.firstOrNull {

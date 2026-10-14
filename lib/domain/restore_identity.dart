@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:meta/meta.dart';
 
 /// A row reduced to what identity matching needs: the natural key it can be
 /// recognised by, and the identity it already carries. A null [uuid] is a row

@@ -212,6 +212,41 @@ void main() {
     expect(result.body!['next_cursor'], 'cur-2');
   });
 
+  test('a walk cut short at the cap says so, and a finished one does not',
+      () async {
+    int calls = 0;
+    final NotionClient endless = _client(MockClient((http.Request r) async {
+      calls++;
+      return http.Response(
+        jsonEncode(<String, Object?>{
+          'results': <Object?>[
+            <String, Object?>{'id': 'p$calls'},
+          ],
+          'has_more': true,
+          'next_cursor': 'c$calls',
+        }),
+        200,
+      );
+    }));
+
+    final NotionRows cut = await endless.queryAllPages('ds-1');
+
+    expect(calls, NotionClient.maxPages);
+    expect(cut.truncated, isTrue);
+
+    final NotionClient short = _client(MockClient((http.Request r) async {
+      return http.Response(
+        jsonEncode(<String, Object?>{
+          'results': <Object?>[],
+          'has_more': false,
+        }),
+        200,
+      );
+    }));
+
+    expect((await short.queryAllPages('ds-1')).truncated, isFalse);
+  });
+
   test('requests are spaced so a large push does not rate-limit itself',
       () async {
     final List<DateTime> sentAt = <DateTime>[];

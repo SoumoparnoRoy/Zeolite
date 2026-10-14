@@ -380,7 +380,8 @@ class _MappingBody {
       if (!form.complete) ...<Widget>[
         const SizedBox(height: AppSpacing.sm),
         Text(
-          'Course, Date and Status are needed before anything can be synced.',
+          'Course, Date, Status and Zeolite ID are needed before anything '
+          'can be synced.',
           style: TextStyle(
               fontSize: AppType.bodySmall, color: context.palette.textTertiary),
         ),

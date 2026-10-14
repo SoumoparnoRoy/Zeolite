@@ -4,8 +4,10 @@ import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../core/date_utils.dart';
+import '../core/report_error.dart';
 import '../core/words.dart';
 import '../data/db/zeolite_repository.dart';
 import '../data/models/attendance_record.dart';
@@ -32,6 +34,7 @@ import '../domain/untimed_match.dart';
 import '../services/analytics_service.dart';
 import '../services/backup_folder.dart';
 import '../services/backup_service.dart';
+import '../services/class_log_mapping_store.dart';
 import '../services/launcher_icon_service.dart';
 import '../services/notification_service.dart';
 import '../services/timetable/vision_client.dart';
@@ -68,6 +71,16 @@ final analyticsProvider = Provider<Analytics>(
   (ref) => Firebase.apps.isEmpty
       ? const NoAnalytics()
       : FirebaseAnalyticsService(FirebaseAnalytics.instance),
+);
+
+/// Remembers how each class-log layout was mapped, so a second file of the
+/// same shape skips the matching step.
+final classLogMappingStoreProvider =
+    Provider<ClassLogMappingStore>((ref) => ClassLogMappingStore());
+
+/// The version the build was made as, for the Settings footer.
+final appVersionProvider = FutureProvider<String>(
+  (ref) async => (await PackageInfo.fromPlatform()).version,
 );
 
 /// Whether the chosen backup folder can still be written to. Asked when
@@ -131,9 +144,16 @@ class LauncherIconController extends AsyncNotifier<LauncherIcon> {
   /// it — the state is set first so the picker is correct if the app survives,
   /// and read again from the platform on the next launch if it does not.
   Future<void> select(LauncherIcon icon) async {
-    if (state.value == icon) return;
+    final LauncherIcon? previous = state.value;
+    if (previous == icon) return;
     state = AsyncData<LauncherIcon>(icon);
-    await ref.read(launcherIconServiceProvider).select(icon);
+    try {
+      await ref.read(launcherIconServiceProvider).select(icon);
+    } catch (_) {
+      // The picker would otherwise show an icon the launcher never got.
+      if (previous != null) state = AsyncData<LauncherIcon>(previous);
+      rethrow;
+    }
   }
 }
 
@@ -144,7 +164,12 @@ class LauncherIconController extends AsyncNotifier<LauncherIcon> {
 class SettingsController extends AsyncNotifier<AppSettings> {
   @override
   Future<AppSettings> build() async {
-    return ref.watch(settingsServiceProvider).load();
+    try {
+      return await ref.watch(settingsServiceProvider).load();
+    } catch (error, stack) {
+      reportError(error, stack, where: 'settings load');
+      rethrow;
+    }
   }
 
   /// Every settings write goes through here, which is why the sync stamp is
@@ -158,8 +183,16 @@ class SettingsController extends AsyncNotifier<AppSettings> {
         ? settings.copyWith(scheduleChangedAt: DateTime.now())
         : settings;
 
+    final AsyncValue<AppSettings> previous = state;
     state = AsyncValue<AppSettings>.data(next);
-    await ref.read(settingsServiceProvider).save(next);
+    try {
+      await ref.read(settingsServiceProvider).save(next);
+    } catch (_) {
+      // Shown but never stored, the change would quietly undo itself at the
+      // next launch.
+      state = previous;
+      rethrow;
+    }
     // Settings do not go through `_refresh`, so the one row with no table
     // would otherwise wait for a resume to travel.
     if (scheduleMoved) ref.read(localChangesProvider.notifier).announce();
@@ -326,6 +359,16 @@ class TimetableData {
 /// is both simpler and faster than querying per screen.
 final timetableProvider = FutureProvider<TimetableData>((ref) async {
   final ZeoliteRepository repo = ref.watch(repositoryProvider);
+  try {
+    return await _readTimetable(repo);
+  } catch (error, stack) {
+    // Reported here, once per read, rather than by each screen that shows it.
+    reportError(error, stack, where: 'timetable read');
+    rethrow;
+  }
+});
+
+Future<TimetableData> _readTimetable(ZeoliteRepository repo) async {
   final List<ClassCategory> categories = await repo.getCategories();
   final List<Subject> subjects = await repo.getSubjects();
   final List<ClassSlot> slots = await repo.getSlots();
@@ -346,7 +389,7 @@ final timetableProvider = FutureProvider<TimetableData>((ref) async {
     rooms: rooms,
     tags: tags,
   );
-});
+}
 
 /// The expansion engine, rebuilt whenever data or term bounds change.
 final scheduleEngineProvider = Provider<ScheduleEngine?>((ref) {

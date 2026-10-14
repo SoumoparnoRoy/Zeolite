@@ -162,9 +162,8 @@ class WelcomeMetrics {
 
 /// The launch sequence: one painter, one clock, no second animation.
 ///
-/// The prototype at `Documents/Apps/Zeolite/launch-sequence-prototype.html` is
-/// the spec — `paintNodes`, `paintCages` and `headingFromWordmark` there are
-/// what these methods are ported from.
+/// Ported from the HTML prototype the sequence was designed in, so the methods
+/// keep its split: cages, nodes, and the heading taken from the wordmark.
 class LaunchPainter extends CustomPainter {
   LaunchPainter({
     required Animation<double> clock,
@@ -198,8 +197,24 @@ class LaunchPainter extends CustomPainter {
   // own square dot showed white behind the round one and before it landed.
   static const String _word = 'Zeolıte';
 
+  /// Every [TextPainter] laid out for the frame being painted. Each holds a
+  /// native paragraph, so they are disposed when the frame is done rather
+  /// than left for the collector, sixty frames a second.
+  final List<TextPainter> _laidOut = <TextPainter>[];
+
   @override
   void paint(Canvas canvas, Size size) {
+    try {
+      _paintFrame(canvas, size);
+    } finally {
+      for (final TextPainter painter in _laidOut) {
+        painter.dispose();
+      }
+      _laidOut.clear();
+    }
+  }
+
+  void _paintFrame(Canvas canvas, Size size) {
     final double raw = _clock.value;
     final double t = math.min(raw, totalEnd);
     canvas.drawRect(Offset.zero & size, _fill..color = colors.canvas);
@@ -634,7 +649,7 @@ class LaunchPainter extends CustomPainter {
       painter.computeDistanceToActualBaseline(TextBaseline.alphabetic);
 
   TextPainter _text(String value, double size, Color color) {
-    return TextPainter(
+    final TextPainter painter = TextPainter(
       text: TextSpan(
         text: value,
         style: TextStyle(
@@ -647,6 +662,8 @@ class LaunchPainter extends CustomPainter {
       ),
       textDirection: TextDirection.ltr,
     )..layout();
+    _laidOut.add(painter);
+    return painter;
   }
 
   void _paintWord(

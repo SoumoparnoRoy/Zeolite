@@ -192,7 +192,12 @@ class SyncCoordinator {
     final List<SyncMergeRow> agreed = <SyncMergeRow>[];
 
     for (final SyncKind kind in _kinds) {
-      final List<RemoteState>? remote = await target.fetch(kind);
+      final List<RemoteState>? remote;
+      try {
+        remote = await target.fetch(kind);
+      } on SyncRefused {
+        return null;
+      }
       if (remote == null) return null;
       final SyncMergePlan part =
           SyncMergePlan.from(local: local.items[kind]!, remote: remote);
@@ -273,6 +278,14 @@ class SyncCoordinator {
   }) async {
     try {
       return await _attempt(force: force, merge: merge, rewrite: rewrite);
+    } on SyncRefused catch (refused) {
+      // Raised by a fetch, so before anything was written either way.
+      _status = _status.failed(refused.failure, message: refused.message);
+      return SyncRunResult(
+        outcome: SyncRunOutcome.failed,
+        failure: refused.failure,
+        message: refused.message,
+      );
     } catch (error, stack) {
       // Anything unforeseen still has to end the run, or the status stays on
       // running and every later run is turned away as already in progress.
@@ -300,10 +313,14 @@ class SyncCoordinator {
       for (final SyncKind kind in _kinds)
         kind: await _repository.getRemoteLinks(target.id, kind),
     };
+    // Once one read finds the far side unreachable the rest would only wait out
+    // the same timeout one after another, which offline was most of a minute.
     final Map<SyncKind, List<RemoteState>?> remote =
-        <SyncKind, List<RemoteState>?>{
-      for (final SyncKind kind in _kinds) kind: await target.fetch(kind),
-    };
+        <SyncKind, List<RemoteState>?>{};
+    for (final SyncKind kind in _kinds) {
+      remote[kind] =
+          remote.containsValue(null) ? null : await target.fetch(kind);
+    }
 
     // Ahead of the local read and of the check below, which would otherwise
     // call two reconcilable sides disjoint.
@@ -358,6 +375,9 @@ class SyncCoordinator {
           pushed: tally.pushed,
           linked: tally.linked,
           pulled: tally.pulled,
+          // Kinds before the one that stopped have already been written, and
+          // Undo has to know about them just as after a clean run.
+          pulledKeys: tally.pulledKeys,
           archived: tally.archived,
           overwritten: tally.overwritten,
           unreadable: tally.unreadable,
@@ -366,6 +386,19 @@ class SyncCoordinator {
           message: tally.message,
         );
       }
+    }
+
+    // A far side that could not be read and took no write was never reached.
+    // Calling that synced told an offline device with nothing new to send that
+    // it was up to date. A push that landed proves the far side answered.
+    if (remote.containsValue(null) && tally.pushed + tally.archived == 0) {
+      _status = _status.failed(SyncFailure.offline);
+      return SyncRunResult(
+        outcome: SyncRunOutcome.failed,
+        linked: tally.linked,
+        unreadable: tally.unreadable,
+        failure: SyncFailure.offline,
+      );
     }
 
     _status = _status.succeeded(_now());

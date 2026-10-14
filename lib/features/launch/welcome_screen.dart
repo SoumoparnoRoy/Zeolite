@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/app_theme.dart';
+import '../../core/endpoints.dart';
 import 'launch_geometry.dart';
 import 'launch_painter.dart';
 
@@ -36,9 +37,8 @@ class WelcomeCopy extends StatefulWidget {
   /// rather than as the whole app.
   static const String caption = 'Everything works offline. Sync is optional.';
 
-  static final Uri termsUrl = Uri.parse('https://zeolite-app.web.app/terms');
-  static final Uri privacyUrl =
-      Uri.parse('https://zeolite-app.web.app/privacy');
+  static final Uri termsUrl = Endpoints.terms;
+  static final Uri privacyUrl = Endpoints.privacy;
 
   final WelcomeMetrics metrics;
   final LaunchColors colors;
@@ -64,7 +64,13 @@ class _WelcomeCopyState extends State<WelcomeCopy> {
   }
 
   TapGestureRecognizer _open(Uri url) => TapGestureRecognizer()
-    ..onTap = () => launchUrl(url, mode: LaunchMode.inAppBrowserView);
+    ..onTap = () async {
+      // Some devices have no in-app browser to offer; a full browser still
+      // shows the page.
+      if (!await launchUrl(url, mode: LaunchMode.inAppBrowserView)) {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      }
+    };
 
   WelcomeMetrics get metrics => widget.metrics;
   LaunchColors get colors => widget.colors;

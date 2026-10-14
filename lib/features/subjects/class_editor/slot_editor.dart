@@ -310,13 +310,17 @@ class _SlotFormState extends ConsumerState<_SlotForm> {
   /// same weekday would share one attendance key, so marking one would mark
   /// the other. They are rejected rather than silently merged.
   String? _validateClashes() {
+    // In the format the fields above the message are showing.
+    final bool use24Hour =
+        ref.read(settingsProvider).value?.use24HourTime ?? false;
     for (int i = 0; i < _times.length; i++) {
       for (int j = i + 1; j < _times.length; j++) {
         if (_times[i].weekday == _times[j].weekday &&
             _times[i].startMinutes == _times[j].startMinutes) {
           return 'Two classes on '
               '${kWeekdayNamesLong[_times[i].weekday - 1]} start at '
-              '${Clock.format(_times[i].startMinutes)}. Give them different '
+              '${Clock.format(_times[i].startMinutes, use24Hour: use24Hour)}. '
+              'Give them different '
               'start times.';
         }
       }
@@ -332,7 +336,7 @@ class _SlotFormState extends ConsumerState<_SlotForm> {
             slot.startMinutes == time.startMinutes) {
           return 'This subject already has a class on '
               '${kWeekdayNamesLong[time.weekday - 1]} at '
-              '${Clock.format(time.startMinutes)}.';
+              '${Clock.format(time.startMinutes, use24Hour: use24Hour)}.';
         }
       }
     }
@@ -355,7 +359,7 @@ class _SlotFormState extends ConsumerState<_SlotForm> {
         );
         if (on != null) {
           return 'A one-off class for this subject is already at '
-              '${Clock.format(time.startMinutes)} on '
+              '${Clock.format(time.startMinutes, use24Hour: use24Hour)} on '
               '${Dates.formatDayMonth(on)}, which this weekly class would land '
               'on too. They would share one attendance mark.';
         }

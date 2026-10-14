@@ -362,7 +362,11 @@ class HeaderStepper extends StatelessWidget {
       ),
       child: Row(
         children: <Widget>[
-          _Arrow(icon: Icons.chevron_left_rounded, onTap: onBack),
+          _Arrow(
+            icon: Icons.chevron_left_rounded,
+            label: 'Previous',
+            onTap: onBack,
+          ),
           Expanded(
             child: InkWell(
               onTap: onTapLabel,
@@ -384,7 +388,11 @@ class HeaderStepper extends StatelessWidget {
               ),
             ),
           ),
-          _Arrow(icon: Icons.chevron_right_rounded, onTap: onForward),
+          _Arrow(
+            icon: Icons.chevron_right_rounded,
+            label: 'Next',
+            onTap: onForward,
+          ),
         ],
       ),
     );
@@ -392,19 +400,24 @@ class HeaderStepper extends StatelessWidget {
 }
 
 class _Arrow extends StatelessWidget {
-  const _Arrow({required this.icon, required this.onTap});
+  const _Arrow({required this.icon, required this.label, required this.onTap});
 
   final IconData icon;
+  final String label;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(13),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Icon(icon, size: 18, color: Colors.white),
+    return Semantics(
+      button: true,
+      label: label,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(13),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Icon(icon, size: 18, color: Colors.white),
+        ),
       ),
     );
   }

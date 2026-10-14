@@ -179,6 +179,8 @@ class _ExtraClassFormState extends ConsumerState<_ExtraClassForm> {
     );
 
     final TimetableData? timetable = ref.read(timetableProvider).value;
+    final bool use24Hour =
+        ref.read(settingsProvider).value?.use24HourTime ?? false;
     if (timetable != null &&
         ClassClash.forOneOff(
           slots: timetable.slots,
@@ -187,7 +189,8 @@ class _ExtraClassFormState extends ConsumerState<_ExtraClassForm> {
         )) {
       setState(() {
         _error = 'This subject already has a class at '
-            '${Clock.format(_start)} on ${Dates.formatDayMonth(_date)}. '
+            '${Clock.format(_start, use24Hour: use24Hour)} on '
+            '${Dates.formatDayMonth(_date)}. '
             'Attendance is recorded per subject and start time, so the two '
             'would share one mark.';
       });

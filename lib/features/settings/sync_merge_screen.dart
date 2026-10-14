@@ -79,10 +79,7 @@ class _SyncMergeScreenState extends ConsumerState<SyncMergeScreen> {
     showUndoSnack(
       messenger,
       core,
-      result != null && result.ok
-          ? 'Merged. ${Words.plural(result.pushed, 'row')} sent, '
-              '${Words.plural(result.pulled, 'row')} brought down.'
-          : 'The merge did not finish. Nothing on this device changed.',
+      _mergeLine(result),
     );
   }
 
@@ -163,6 +160,19 @@ class _SyncMergeScreenState extends ConsumerState<SyncMergeScreen> {
   }
 }
 
+String _mergeLine(SyncRunResult? result) {
+  if (result != null && result.ok) {
+    return 'Merged. ${Words.plural(result.pushed, 'row')} sent, '
+        '${Words.plural(result.pulled, 'row')} brought down.';
+  }
+  // A merge that stops part way has still written what it pulled before it.
+  final int pulled = result?.pulled ?? 0;
+  return pulled > 0
+      ? 'The merge did not finish. '
+          '${Words.plural(pulled, 'row')} came in before it stopped.'
+      : 'The merge did not finish. Nothing on this device changed.';
+}
+
 /// Attendance rows are keyed on their subject's uuid, and a row that only the
 /// account holds names a subject this device may not have yet — so the account
 /// side has to be able to supply the name too.
@@ -189,7 +199,7 @@ String _titleOf(SyncMergeRow row, Map<String, String> names) {
     SyncKind.settings => 'Term and teaching day',
     SyncKind.category => 'Class type · ${row.localKey}',
     SyncKind.room => 'Room · ${row.localKey}',
-    SyncKind.tag => 'Label · ${row.localKey}',
+    SyncKind.tag => 'Tag · ${row.localKey}',
     SyncKind.holiday => 'Holiday · ${_day(row.localKey)}',
     SyncKind.subject => names[row.localKey] ?? 'A subject',
     SyncKind.slot ||

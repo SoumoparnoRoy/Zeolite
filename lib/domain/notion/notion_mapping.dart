@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:meta/meta.dart';
 
 /// A column on a Notion data source.
 ///
@@ -446,11 +446,10 @@ class NotionMapping {
   /// Everything still waiting on a choice, labelled as the mapping screen
   /// labels it.
   ///
-  /// [isComplete] covers only the three fields a row cannot be read without,
-  /// so a drifted schema maps far enough to save and leaves the rest unset —
-  /// `Zeolite ID` above all, without which a sync can only push and never
-  /// recognises a page it wrote. [categoryNames] are this device's own, since
-  /// the schema cannot say which `Type` options are missing.
+  /// [isComplete] covers only the four fields a sync cannot run without, so a
+  /// drifted schema maps far enough to save and leaves the rest unset.
+  /// [categoryNames] are this device's own, since the schema cannot say which
+  /// `Type` options are missing.
   List<String> unmapped({List<String> categoryNames = const <String>[]}) {
     return <String>[
       for (final NotionField field in NotionField.values)

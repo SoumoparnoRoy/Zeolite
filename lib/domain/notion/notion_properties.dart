@@ -267,8 +267,6 @@ class NotionProperties {
     return option.trim().toLowerCase();
   }
 
-  /// A select and a status column take the same envelope under different
-  /// names, and sending the wrong one is a validation error on every row.
   /// Null when there is no page to point at, which leaves the cell alone
   /// rather than clearing it — a run that could not read the Courses table
   /// must not wipe relations a previous run set.
@@ -281,6 +279,8 @@ class NotionProperties {
     };
   }
 
+  /// A select and a status column take the same envelope under different
+  /// names, and sending the wrong one is a validation error on every row.
   static Object? _named(NotionProperty property, String? value) {
     if (value == null || value.isEmpty) return null;
     return switch (property.type) {
@@ -398,11 +398,6 @@ class NotionProperties {
     return date is Map<String, Object?> ? date['start'] as String? : null;
   }
 
-  /// `uuid:20260304:540` — the day is the middle part, and the key is the only
-  /// place a mark's date survives into a page.
-  ///
-  /// Written as a plain date with no time, because a mark belongs to a day and
-  /// an instant would carry a timezone Notion would then shift.
   /// The same key's third part as `HH:mm`.
   ///
   /// Always 24-hour, never the user's display format: a value that changed
@@ -418,6 +413,11 @@ class NotionProperties {
     return '$hour:$minute';
   }
 
+  /// `uuid:20260304:540` — the day is the middle part, and the key is the only
+  /// place a mark's date survives into a page.
+  ///
+  /// Written as a plain date with no time, because a mark belongs to a day and
+  /// an instant would carry a timezone Notion would then shift.
   static String? _dayOf(String localKey) {
     final List<String> parts = localKey.split(':');
     if (parts.length < 2) return null;

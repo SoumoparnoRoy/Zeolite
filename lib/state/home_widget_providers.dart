@@ -40,7 +40,6 @@ final homeWidgetSyncProvider = Provider<void>((Ref ref) {
   unawaited(
     service.push(
       today: HomeWidgetPayload.today(engine: engine, settings: settings),
-      week: HomeWidgetPayload.week(),
       standing: HomeWidgetPayload.standing(
         upcoming: upcoming,
         stats: stats,
@@ -64,16 +63,23 @@ final homeWidgetMarkWatcherProvider = Provider<void>((Ref ref) {
   bool primed = false;
 
   Future<void> check() async {
-    final String? stamp = await HomeWidget.getWidgetData<String>(
-      HomeWidgetService.markEpochKey,
-    );
-    if (stamp == null || stamp == seen) return;
-    seen = stamp;
-    if (!primed) {
-      primed = true;
-      return;
+    try {
+      final String? stamp = await HomeWidget.getWidgetData<String>(
+        HomeWidgetService.markEpochKey,
+      );
+      if (stamp == null || stamp == seen) return;
+      if (!primed) {
+        primed = true;
+        seen = stamp;
+        return;
+      }
+      await ref.read(actionCoreProvider).reloadAfterWidgetMark();
+      // Only once the reload has happened, so a failed one is tried again at
+      // the next resume rather than skipped until another mark comes in.
+      seen = stamp;
+    } catch (error, stack) {
+      reportError(error, stack, where: 'widget mark reload');
     }
-    await ref.read(actionCoreProvider).reloadAfterWidgetMark();
   }
 
   final AppLifecycleListener listener =
@@ -306,7 +312,6 @@ Future<void> _pushFromContainer(
   }
   await service.push(
     today: payload.today,
-    week: payload.week,
     standing: payload.standing,
     subjects: payload.subjects,
     theme: payload.theme,
@@ -321,7 +326,6 @@ List<DateTime> _startsOf(List<ClassSession> upcoming) => <DateTime>[
 
 typedef _WidgetPayload = ({
   Map<String, Object?> today,
-  Map<String, Object?> week,
   Map<String, Object?> standing,
   Map<String, Object?> subjects,
   Map<String, Object?>? theme,
@@ -336,7 +340,6 @@ _WidgetPayload? _payloadFrom(ProviderContainer container) {
   final List<ClassSession> upcoming = HomeWidgetPayload.upcoming(engine);
   return (
     today: HomeWidgetPayload.today(engine: engine, settings: settings),
-    week: HomeWidgetPayload.week(),
     standing: HomeWidgetPayload.standing(
       upcoming: upcoming,
       stats: stats,

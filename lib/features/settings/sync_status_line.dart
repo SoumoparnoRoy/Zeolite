@@ -1,4 +1,5 @@
 import '../../core/date_utils.dart';
+import '../../core/words.dart';
 import '../../domain/sync/sync_status.dart';
 import '../../domain/sync/sync_target.dart';
 import '../../services/sync/sync_coordinator.dart';
@@ -24,8 +25,17 @@ String syncStatusLine(
       // The advice differs by target — an account is signed into, a workspace
       // is connected — and sending someone to the wrong one is worse than
       // saying nothing.
-      return status.failure == SyncFailure.auth
-          ? 'The last sync was refused. $authAdvice'
+      if (status.failure == SyncFailure.auth) {
+        return 'The last sync was refused. $authAdvice';
+      }
+      if (status.message == SyncRefused.tooManyRows) {
+        return 'The table has more rows than Zeolite can read, so nothing '
+            'was synced.';
+      }
+      final int pulled = last?.pulled ?? 0;
+      return pulled > 0
+          ? 'The last sync did not finish. '
+              '${Words.plural(pulled, 'row')} came in before it stopped.'
           : 'The last sync did not finish. Nothing on this device changed.';
     case SyncState.idle:
       if (last?.outcome == SyncRunOutcome.reviewNeeded) {

@@ -10,6 +10,16 @@
     <string name="widget_stats_title">Attendance</string>
     <string name="widget_stats_description">Where you stand, and every subject against your target</string>
     <string name="widget_empty_preview">Nothing to show yet</string>
+    <!-- Drawn inside the widgets. -->
+    <string name="widget_next">Next: %1$s · %2$s</string>
+    <plurals name="widget_more_classes">
+        <item quantity="one">%d more class</item>
+        <item quantity="other">%d more classes</item>
+    </plurals>
+    <string name="widget_today_holiday">Holiday</string>
+    <string name="widget_today_outside">Outside the term</string>
+    <string name="widget_today_stale">Open Zeolite to see today</string>
+    <string name="widget_today_none">Nothing on today</string>
     <!-- The widget's buttons are square and show only the status mark; the
          full words stay as their content descriptions. -->
     <string name="widget_present_short">✓</string>

@@ -11,6 +11,10 @@ linter:
     unnecessary_lambdas: true
 
 analyzer:
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
   errors:
     # Treat accidental context-after-await as an error rather than a hint.
     use_build_context_synchronously: error

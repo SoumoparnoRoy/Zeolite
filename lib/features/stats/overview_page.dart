@@ -33,6 +33,7 @@ class OverviewPage extends ConsumerWidget {
         .toList();
     final bool hasTags = tagged.isNotEmpty;
     final OutOfTermMarks strays = ref.watch(outOfTermMarksProvider);
+    final AsyncValue<TimetableData> loaded = ref.watch(timetableProvider);
 
     return StatsPageList(
       slivers: <Widget>[
@@ -45,7 +46,19 @@ class OverviewPage extends ConsumerWidget {
               child: OutOfTermNotice(marks: strays, settings: settings),
             ),
           ),
-        if (stats.subjects.isEmpty)
+        if (!loaded.hasValue)
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: loaded.hasError
+                ? Padding(
+                    padding: const EdgeInsets.only(top: 40, bottom: 80),
+                    child: LoadFailed(
+                      onRetry: () => ref.invalidate(timetableProvider),
+                    ),
+                  )
+                : const SizedBox.shrink(),
+          )
+        else if (stats.subjects.isEmpty)
           const SliverFillRemaining(
             hasScrollBody: false,
             child: Padding(

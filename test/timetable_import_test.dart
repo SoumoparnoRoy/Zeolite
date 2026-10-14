@@ -84,6 +84,13 @@ void main() {
           contains('before it starts'));
     });
 
+    test('a time no clock shows is refused rather than stored', () {
+      expect(_parse('GEN201, Mo, 23:30-24:30').problems.single.error,
+          contains('not a time of day'));
+      expect(_parse('GEN201, Mo, 9:75-10:40').problems.single.error,
+          contains('not a time of day'));
+    });
+
     test('block numbers need a grid to count against', () {
       final TimetableImportResult result =
           TimetableImport.parse('GEN201, Mo, 5', grid: DayGrid.none);

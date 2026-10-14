@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:meta/meta.dart';
 
 import '../core/date_utils.dart';
 import '../data/models/attendance_record.dart';

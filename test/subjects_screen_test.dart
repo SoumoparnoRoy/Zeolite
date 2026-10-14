@@ -150,6 +150,36 @@ void main() {
     expect(find.text('Add subject'), findsNothing);
   });
 
+  testWidgets('a read that fails says so instead of offering a first subject',
+      (WidgetTester tester) async {
+    int reads = 0;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          timetableProvider.overrideWith((Ref ref) async {
+            reads++;
+            if (reads == 1) throw StateError('database is locked');
+            return _fixture();
+          }),
+          settingsProvider.overrideWith(_StaticSettings.new),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.dark(),
+          home: const SubjectsScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Could not load your data'), findsOneWidget);
+    expect(find.text('No subjects yet'), findsNothing);
+
+    await tester.tap(find.text('Try again'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Physics'), findsOneWidget);
+  });
+
   testWidgets('the delete dialog spells out exactly what is lost',
       (WidgetTester tester) async {
     await tester.pumpWidget(_app(_fixture()));

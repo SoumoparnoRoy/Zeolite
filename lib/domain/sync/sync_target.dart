@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:meta/meta.dart';
 
 import '../../core/date_utils.dart';
 import '../../data/models/attendance_record.dart';
@@ -439,6 +439,22 @@ class SyncClaim {
 /// [auth] stops the run and asks the user, the rest are retried with backoff.
 enum SyncFailure { offline, auth, rateLimited, rejected, unknown }
 
+/// Thrown by [SyncTarget.fetch] when the far side answered and said no. Kept
+/// apart from a null, which makes the run push-only and still report it as
+/// synced: a refusal read that way would hide a broken setup for good.
+class SyncRefused implements Exception {
+  const SyncRefused(this.failure, {this.message});
+
+  /// The [message] for a table too large to read whole.
+  static const String tooManyRows = 'too_many_rows';
+
+  final SyncFailure failure;
+  final String? message;
+
+  @override
+  String toString() => 'SyncRefused(${failure.name}, $message)';
+}
+
 /// The result of one create, update or archive.
 @immutable
 class SyncOutcome {
@@ -489,7 +505,8 @@ abstract class SyncTarget {
   Set<SyncKind> get kinds => SyncKind.values.toSet();
 
   /// What the target holds now, or null when it could not be read this run —
-  /// the planner then pushes without claiming to know the far side.
+  /// the planner then pushes without claiming to know the far side. Throws
+  /// [SyncRefused] when it could be reached and refused the read.
   Future<List<RemoteState>?> fetch(SyncKind kind);
 
   /// Rows [fetch] could not key that are these [unlinked] rows all the same,

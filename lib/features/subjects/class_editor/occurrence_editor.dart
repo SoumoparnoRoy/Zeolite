@@ -92,7 +92,7 @@ class _OccurrenceFormState extends ConsumerState<_OccurrenceForm> {
       if (isStart) {
         final int length = _end - _start;
         _start = value;
-        _end = value + (length > 0 ? length : 60);
+        _end = Clock.endFromStart(value, length > 0 ? length : 60);
       } else {
         _end = value;
       }
@@ -129,9 +129,11 @@ class _OccurrenceFormState extends ConsumerState<_OccurrenceForm> {
       return;
     }
     if (_collides(subjectId, _start)) {
+      final bool use24Hour =
+          ref.read(settingsProvider).value?.use24HourTime ?? false;
       setState(() {
         _error = 'This subject already has a class at '
-            '${Clock.format(_start)} on '
+            '${Clock.format(_start, use24Hour: use24Hour)} on '
             '${Dates.formatDayMonth(widget.date)}. Attendance is recorded per '
             'subject and start time, so the two would share one mark.';
       });

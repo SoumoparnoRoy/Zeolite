@@ -95,7 +95,7 @@ enum SettingsItem {
   Future<void> open(BuildContext context, WidgetRef ref) async {
     switch (this) {
       case importClassLog:
-        return importClassLogFile(context);
+        return importClassLogFile(context, ref);
       case privacy:
         unawaited(launchUrl(WelcomeCopy.privacyUrl,
             mode: LaunchMode.inAppBrowserView));
@@ -224,7 +224,7 @@ class SettingsItemRow extends ConsumerWidget {
           ref.watch(trayAccessProvider).value ?? TrayAccess.open,
         ),
       SettingsItem.account => ref.watch(signedInUserProvider).value?.email ??
-          'Not signed in — nothing is backed up',
+          'Not signed in — nothing is synced',
       SettingsItem.notion =>
         ref.watch(notionConnectionProvider).value?.workspaceName ??
             'Not connected',

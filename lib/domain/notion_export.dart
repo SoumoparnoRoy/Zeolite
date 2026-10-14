@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
-import 'package:flutter/foundation.dart';
+import 'package:meta/meta.dart';
 
 import '../core/date_utils.dart';
+import '../core/report_error.dart';
 import '../core/words.dart';
 import '../data/models/attendance_status.dart';
 
@@ -221,7 +223,10 @@ class NotionExport {
     final Archive archive;
     try {
       archive = ZipDecoder().decodeBytes(bytes);
-    } on Object {
+    } on Object catch (error, stack) {
+      // Reported as no CSV found, which is true of a zip that will not open;
+      // the log keeps the difference.
+      reportError(error, stack, where: 'opening a Notion export');
       return null;
     }
 
@@ -286,8 +291,6 @@ class NotionExport {
     return raw == 'absent' ? credit > 0 : credit == 0;
   }
 
-  /// `Thermodynamics (https://notion.so/...)` — Notion appends the page link
-  /// to every relation cell.
   /// `09:00` as minutes past midnight, or null.
   static int? timeOf(String? text) {
     if (text == null) return null;
@@ -299,6 +302,8 @@ class NotionExport {
     return hour * 60 + minute;
   }
 
+  /// `Thermodynamics (https://notion.so/...)` — Notion appends the page link
+  /// to every relation cell.
   static String courseName(String cell) {
     final int link = cell.indexOf(' (http');
     return (link < 0 ? cell : cell.substring(0, link)).trim();

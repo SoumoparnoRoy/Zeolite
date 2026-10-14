@@ -464,6 +464,81 @@ void main() {
     expect((await sync.run()).outcome, SyncRunOutcome.deferred);
   });
 
+  // Airplane mode on the emulator: every read failed, nothing was due to go
+  // out, and the status line said "Synced 1 min ago".
+  test('an unreadable far side with nothing written is offline, not synced',
+      () async {
+    await seed(status: AttendanceStatus.present);
+    expect((await coordinator().run()).outcome, SyncRunOutcome.synced);
+    target.remote = null;
+    final int fetchesBefore =
+        target.calls.where((String c) => c == 'fetch').length;
+
+    final SyncCoordinator sync = coordinator();
+    final SyncRunResult result = await sync.run();
+
+    expect(result.outcome, SyncRunOutcome.failed);
+    expect(result.failure, SyncFailure.offline);
+    expect(sync.status.lastRunAt, isNull);
+    // One unreachable read is enough; the other kinds are not each waited on.
+    expect(
+      target.calls.where((String c) => c == 'fetch').length - fetchesBefore,
+      1,
+    );
+  });
+
+  test('a push that lands still counts when the read failed', () async {
+    await seed(status: AttendanceStatus.present);
+    target.remote = null;
+
+    final SyncRunResult result = await coordinator().run();
+
+    expect(result.outcome, SyncRunOutcome.synced);
+    expect(result.pushed, greaterThan(0));
+  });
+
+  test('a refused read fails the run rather than pushing past it', () async {
+    await seed(status: AttendanceStatus.present);
+    target.refuseFetch = SyncFailure.auth;
+
+    final SyncCoordinator sync = coordinator();
+    final SyncRunResult result = await sync.run();
+
+    expect(result.outcome, SyncRunOutcome.failed);
+    expect(result.failure, SyncFailure.auth);
+    expect(sync.status.state, SyncState.failed);
+    expect(target.calls.where((String c) => c != 'fetch'), isEmpty);
+  });
+
+  test('a run that stops part way still names what it pulled', () async {
+    final Subject subject = await seed();
+    await coordinator().run();
+
+    await repo.setAttendance(
+      AttendanceRecord(
+        subjectId: subject.id!,
+        date: _day,
+        startMinutes: 540,
+        status: AttendanceStatus.present,
+        markedAt: _early,
+      ),
+    );
+    const String other = 'aaaaaaaabbbbccccddddeeeeeeeeeeee';
+    target
+      ..remote = <RemoteState>[subjectRow(other)]
+      ..failNext = SyncFailure.offline;
+
+    final SyncRunResult result = await coordinator().run();
+
+    // Subjects run before marks, so the new one is already in the database
+    // when the push of the mark fails.
+    expect(result.outcome, SyncRunOutcome.failed);
+    expect(result.pulled, 1);
+    expect(result.pulledKeys[SyncKind.subject], <String>[other]);
+    expect(
+        (await repo.getSubjects()).map((Subject s) => s.uuid), contains(other));
+  });
+
   test('a target is never asked to file a kind it does not keep', () async {
     await seed(status: AttendanceStatus.present);
     target.kinds = <SyncKind>{SyncKind.attendance};

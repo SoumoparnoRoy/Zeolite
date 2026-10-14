@@ -210,6 +210,7 @@ class ImportActions {
         _core.ref.read(settingsProvider).value ?? const AppSettings();
     final List<int> palette = AppColors.subjectPalette;
 
+    int written = 0;
     await _core.repo.transaction((ZeoliteRepository repository) async {
       int created = 0;
       for (final TotalsDecision decision in decisions) {
@@ -227,6 +228,7 @@ class ImportActions {
             ),
           );
           created++;
+          written++;
           continue;
         }
 
@@ -255,13 +257,16 @@ class ImportActions {
             expectedTotal: row.expectedTotal,
           ),
         );
+        written++;
       }
     });
 
     await _core.refresh();
     _core.arm(before);
     unawaited(_core.analytics.timetableImported('totals'));
-    return decisions.length;
+    // What was written, not what was asked: a subject deleted since the
+    // preview is skipped and is not one of them.
+    return written;
   }
 
   /// Writes a Notion class log as marks against the subjects it names.
@@ -288,11 +293,6 @@ class ImportActions {
     final bool switches = settings != null &&
         cancelledCounts != null &&
         cancelledCounts != settings.cancelledCountsAsAttended;
-    if (switches) {
-      await _core.ref
-          .read(settingsProvider.notifier)
-          .save(settings.copyWith(cancelledCountsAsAttended: cancelledCounts));
-    }
     final List<int> palette = AppColors.subjectPalette;
 
     // A tag per label the file actually uses, matched against the user's own
@@ -406,6 +406,14 @@ class ImportActions {
 
       await repository.setManyAttendance(records);
     });
+    // After the rows are in, so an import that fails leaves the setting as it
+    // found it. Settings are not in the database, so they cannot share its
+    // transaction.
+    if (switches) {
+      await _core.ref
+          .read(settingsProvider.notifier)
+          .save(settings.copyWith(cancelledCountsAsAttended: cancelledCounts));
+    }
     await _core.refresh();
     _core.arm(before, settings: switches ? settings : null);
     unawaited(_core.analytics.timetableImported('notion'));

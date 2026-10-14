@@ -60,12 +60,21 @@ class AccountScreen extends ConsumerWidget {
   }
 }
 
-class _SignedIn extends ConsumerWidget {
+class _SignedIn extends ConsumerStatefulWidget {
   const _SignedIn({required this.user});
 
   final User user;
 
-  Future<void> _delete(BuildContext context, WidgetRef ref) async {
+  @override
+  ConsumerState<_SignedIn> createState() => _SignedInState();
+}
+
+class _SignedInState extends ConsumerState<_SignedIn> {
+  /// A delete is several batches long, and a second tap during it would start
+  /// another one over the same documents.
+  bool _deleting = false;
+
+  Future<void> _delete() async {
     final bool confirmed = await showDialog<bool>(
           context: context,
           builder: (BuildContext context) => AlertDialog(
@@ -81,17 +90,22 @@ class _SignedIn extends ConsumerWidget {
               ),
               TextButton(
                 onPressed: () => Navigator.of(context).pop(true),
+                style: TextButton.styleFrom(
+                  foregroundColor: context.palette.absent,
+                ),
                 child: const Text('Delete'),
               ),
             ],
           ),
         ) ??
         false;
-    if (!confirmed || !context.mounted) return;
+    if (!confirmed || !mounted) return;
 
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    setState(() => _deleting = true);
     final AuthResult result =
         await ref.read(authServiceProvider).deleteAccount();
+    if (mounted) setState(() => _deleting = false);
     if (!result.ok) {
       messenger.showSnackBar(
           SnackBar(content: Text(authFailureMessage(result.failure!))));
@@ -99,7 +113,7 @@ class _SignedIn extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
@@ -108,7 +122,7 @@ class _SignedIn extends ConsumerWidget {
           children: <Widget>[
             SettingsRow(
               icon: Icons.person_outline_rounded,
-              title: user.email ?? 'This device',
+              title: widget.user.email ?? 'This device',
               value: 'Backups go to this account',
             ),
             SettingsRow(
@@ -131,10 +145,10 @@ class _SignedIn extends ConsumerWidget {
             padding: EdgeInsets.zero,
             child: SettingsRow(
               icon: Icons.delete_forever_outlined,
-              title: 'Delete my account',
+              title: _deleting ? 'Deleting…' : 'Delete my account',
               value: 'Removes the account and everything backed up to it',
               danger: true,
-              onTap: () => _delete(context, ref),
+              onTap: _deleting ? null : _delete,
             ),
           ),
         ),

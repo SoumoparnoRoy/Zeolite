@@ -223,7 +223,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> with RouteAware {
             child: RefreshIndicator(
               color: p.accent,
               backgroundColor: p.surface,
-              onRefresh: () async => ref.invalidate(timetableProvider),
+              onRefresh: () => ref.refresh(timetableProvider.future),
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: <Widget>[

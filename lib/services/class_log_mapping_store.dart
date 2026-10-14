@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../core/report_error.dart';
 import '../domain/class_log.dart';
 
 /// Remembers how a class log was read, keyed by its headers, so a later file
@@ -21,7 +22,8 @@ class ClassLogMappingStore {
     try {
       final String? raw = await _prefs.getString('$_prefix${table.layout}');
       return raw == null ? null : ClassLogMapping.fromJson(jsonDecode(raw));
-    } on Object {
+    } on Object catch (error, stack) {
+      reportError(error, stack, where: 'reading a class log mapping');
       return null;
     }
   }

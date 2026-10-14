@@ -49,15 +49,20 @@ class BackupActions {
 
     _autoBackupRunning = true;
     try {
-      final bool written = await _ref.read(backupServiceProvider).runAutoBackup(
-            enabled: settings.autoBackupEnabled,
-            lastAt: settings.lastAutoBackupAt,
-            folderUri: settings.backupFolderUri,
+      final BackupDestination? written =
+          await _ref.read(backupServiceProvider).runAutoBackup(
+                enabled: settings.autoBackupEnabled,
+                lastAt: settings.lastAutoBackupAt,
+                folderUri: settings.backupFolderUri,
+              );
+      if (written == null) return;
+      await _ref.read(settingsProvider.notifier).save(
+            settings.copyWith(
+              lastAutoBackupAt: DateTime.now(),
+              lastAutoBackupFellBack: settings.hasBackupFolder &&
+                  written == BackupDestination.appFolder,
+            ),
           );
-      if (!written) return;
-      await _ref
-          .read(settingsProvider.notifier)
-          .save(settings.copyWith(lastAutoBackupAt: DateTime.now()));
     } catch (error, stack) {
       // A failed backup must not take the app down with it. The next launch
       // tries again, and the stamp is only written on success so a failure
@@ -162,7 +167,15 @@ class BackupActions {
       reportError(error, stack, where: 'reading a backup file');
       return const ImportResult(ImportOutcome.unreadable);
     }
-    if (result.success) await _core.reloadAfterImport();
+    if (result.success) {
+      try {
+        await _core.reloadAfterImport();
+      } catch (error, stack) {
+        // The restore itself is in the database; only the screens are behind,
+        // and the next launch reads it fresh.
+        reportError(error, stack, where: 'reload after restore');
+      }
+    }
     return result;
   }
 }

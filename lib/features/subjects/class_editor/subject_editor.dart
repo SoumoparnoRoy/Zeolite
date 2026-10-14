@@ -121,6 +121,8 @@ class _SubjectFormState extends ConsumerState<_SubjectForm> {
       createdAt: widget.subject?.createdAt,
       priorHeld: held,
       priorAttended: attended,
+      // Set on Counts, not here, so it is carried through untouched.
+      priorCancelled: widget.subject?.priorCancelled ?? 0,
       expectedTotal: total,
     );
 
@@ -184,8 +186,8 @@ class _SubjectFormState extends ConsumerState<_SubjectForm> {
         const SizedBox(height: AppSpacing.xl),
         const SectionHeader('Colour'),
         Wrap(
-          spacing: AppSpacing.md,
-          runSpacing: AppSpacing.md,
+          spacing: _ColorDot.gap,
+          runSpacing: _ColorDot.gap,
           children: <Widget>[
             for (final int value in AppColors.subjectPalette)
               _ColorDot(
@@ -319,8 +321,8 @@ Future<void> showSubjectColorPicker(
       children: <Widget>[
         const SectionHeader('Colour'),
         Wrap(
-          spacing: AppSpacing.md,
-          runSpacing: AppSpacing.md,
+          spacing: _ColorDot.gap,
+          runSpacing: _ColorDot.gap,
           children: <Widget>[
             for (final int value in AppColors.subjectPalette)
               _ColorDot(
@@ -352,26 +354,40 @@ class _ColorDot extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
+  /// Each dot carries 4 px of its own tap area on every side, so the gaps
+  /// between them are that much smaller and the dots land where they always
+  /// did.
+  static const double gap = AppSpacing.md - 2 * AppSpacing.xs;
+
   @override
   Widget build(BuildContext context) {
     final Color color = Color(value);
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: selected ? 1 : 0.35),
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: selected ? Colors.white : Colors.transparent,
-            width: 2,
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: 'Subject colour',
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.xs),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: selected ? 1 : 0.35),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: selected ? Colors.white : Colors.transparent,
+                width: 2,
+              ),
+            ),
+            child: selected
+                ? const Icon(Icons.check_rounded, size: 20, color: Colors.white)
+                : null,
           ),
         ),
-        child: selected
-            ? const Icon(Icons.check_rounded, size: 20, color: Colors.white)
-            : null,
       ),
     );
   }

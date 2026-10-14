@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:meta/meta.dart';
 
 import 'day_grid.dart';
 import 'timetable_ocr.dart';
@@ -289,10 +289,16 @@ class TimetableImport {
         RegExp(r'^(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})$');
     final RegExpMatch? clock = pattern.firstMatch(token);
     if (clock == null) return null;
-    final int start =
-        int.parse(clock.group(1)!) * 60 + int.parse(clock.group(2)!);
-    final int end =
-        int.parse(clock.group(3)!) * 60 + int.parse(clock.group(4)!);
+    final List<int> parts = <int>[
+      for (int i = 1; i <= 4; i++) int.parse(clock.group(i)!),
+    ];
+    // Stored as it stands, a 25:00 or a 9:75 would be refused by every other
+    // device that pulls it.
+    if (parts[0] > 23 || parts[2] > 23 || parts[1] > 59 || parts[3] > 59) {
+      return _Span.bad('that is not a time of day');
+    }
+    final int start = parts[0] * 60 + parts[1];
+    final int end = parts[2] * 60 + parts[3];
     if (end <= start) return _Span.bad('ends before it starts');
     return _Span(
       start,

@@ -421,6 +421,27 @@ void main() {
     expect(calls, 0);
   });
 
+  test('a refused read is a refusal, and only an unreachable one is null',
+      () async {
+    final NotionSyncTarget refused = _target(
+      MockClient((http.Request r) async =>
+          http.Response('{"code":"unauthorized"}', 401)),
+    );
+    await expectLater(
+      refused.fetch(SyncKind.attendance),
+      throwsA(
+        isA<SyncRefused>()
+            .having((SyncRefused e) => e.failure, 'failure', SyncFailure.auth),
+      ),
+    );
+
+    final NotionSyncTarget unreachable = _target(
+      MockClient((http.Request r) async =>
+          throw http.ClientException('no route to host')),
+    );
+    expect(await unreachable.fetch(SyncKind.attendance), isNull);
+  });
+
   test('without the key column nothing is written at all', () async {
     int calls = 0;
     final NotionSyncTarget target = _target(

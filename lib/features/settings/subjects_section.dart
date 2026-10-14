@@ -30,6 +30,7 @@ import 'settings_rows.dart';
 /// before — goes straight to the preview; anything else is matched first.
 Future<void> importClassLogFile(
   BuildContext context,
+  WidgetRef ref,
 ) async {
   final PlatformFile? picked = await FilePicker.pickFile(
     dialogTitle: 'Choose a class log (CSV or Notion export)',
@@ -46,7 +47,7 @@ Future<void> importClassLogFile(
     return;
   }
 
-  final ClassLogMappingStore store = ClassLogMappingStore();
+  final ClassLogMappingStore store = ref.read(classLogMappingStoreProvider);
   ClassLogMapping? mapping =
       ((await store.load(table)) ?? ClassLogMapping.guess(table))
           .withGuessedWords(table);
@@ -182,50 +183,57 @@ class CategoriesSection extends ConsumerWidget {
           note: 'Used for subjects that are not in a category. Setting a '
               'class start time fills the end time in from this.',
           child: SurfaceCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: <Widget>[
-                Row(
+            child: SettledSlider(
+              value: settings.defaultClassDurationMinutes
+                  .toDouble()
+                  .clamp(15, 300),
+              onSettled: (double value) => controller.save(
+                settings.copyWith(
+                  defaultClassDurationMinutes: (value / 5).round() * 5,
+                ),
+              ),
+              builder: (BuildContext context,
+                  double shown,
+                  ValueChanged<double> onChanged,
+                  ValueChanged<double> onChangeEnd) {
+                final int minutes = (shown / 5).round() * 5;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: <Widget>[
-                    const Expanded(
-                      child: Text(
-                        'Default class length',
-                        style: TextStyle(
-                          fontSize: AppType.titleLarge,
-                          fontWeight: FontWeight.w600,
+                    Row(
+                      children: <Widget>[
+                        const Expanded(
+                          child: Text(
+                            'Default class length',
+                            style: TextStyle(
+                              fontSize: AppType.titleLarge,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
-                      ),
+                        Text(
+                          Clock.formatDuration(minutes),
+                          style: TextStyle(
+                            fontSize: AppType.headlineMedium,
+                            fontWeight: FontWeight.w800,
+                            color: context.palette.accent,
+                            letterSpacing: -0.4,
+                          ),
+                        ),
+                      ],
                     ),
-                    Text(
-                      Clock.formatDuration(
-                        settings.defaultClassDurationMinutes,
-                      ),
-                      style: TextStyle(
-                        fontSize: AppType.headlineMedium,
-                        fontWeight: FontWeight.w800,
-                        color: context.palette.accent,
-                        letterSpacing: -0.4,
-                      ),
+                    Slider(
+                      value: shown,
+                      min: 15,
+                      max: 300,
+                      divisions: 57,
+                      label: Clock.formatDuration(minutes),
+                      onChanged: onChanged,
+                      onChangeEnd: onChangeEnd,
                     ),
                   ],
-                ),
-                Slider(
-                  value: settings.defaultClassDurationMinutes
-                      .toDouble()
-                      .clamp(15, 300),
-                  min: 15,
-                  max: 300,
-                  divisions: 57,
-                  label: Clock.formatDuration(
-                    settings.defaultClassDurationMinutes,
-                  ),
-                  onChanged: (double value) => controller.save(
-                    settings.copyWith(
-                      defaultClassDurationMinutes: (value / 5).round() * 5,
-                    ),
-                  ),
-                ),
-              ],
+                );
+              },
             ),
           ),
         ),

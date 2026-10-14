@@ -6,6 +6,8 @@ import 'package:saf_stream/saf_stream_platform_interface.dart';
 import 'package:saf_util/saf_util.dart';
 import 'package:saf_util/saf_util_platform_interface.dart';
 
+import '../core/report_error.dart';
+
 /// One file in the chosen folder. The SAF types stop here.
 class BackupFile {
   const BackupFile({required this.name, required this.uri});
@@ -55,7 +57,8 @@ class BackupFolder {
         checkWrite: true,
       );
       return granted && await _util.exists(treeUri, true);
-    } catch (_) {
+    } catch (error, stack) {
+      reportError(error, stack, where: 'checking the backup folder');
       return false;
     }
   }
@@ -82,7 +85,8 @@ class BackupFolder {
       final SafDocumentFile? dir =
           await _util.documentFileFromUri(treeUri, true);
       return dir?.name == folderName ? dir : null;
-    } catch (_) {
+    } catch (error, stack) {
+      reportError(error, stack, where: 'reading the backup folder');
       return null;
     }
   }

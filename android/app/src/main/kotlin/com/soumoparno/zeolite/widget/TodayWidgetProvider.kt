@@ -72,8 +72,15 @@ class TodayWidgetProvider : ZeoliteWidgetProvider() {
                 )
                 return@forEach
             }
-            val fits = WidgetScale.rowsThatFit(options, PADDING_DP, ROW_DP)
-            val shown = minOf(count, fits, SLOTS.size)
+            val fits = minOf(WidgetScale.rowsThatFit(options, PADDING_DP, ROW_DP), SLOTS.size)
+            // A day that overflows needs the "N more" line as well, or it is
+            // squeezed into whatever the rows leave and clipped out of sight.
+            val room = if (count > fits) {
+                minOf(WidgetScale.rowsThatFit(options, PADDING_DP + MORE_DP, ROW_DP), SLOTS.size)
+            } else {
+                fits
+            }
+            val shown = minOf(count, room)
 
             val views = RemoteViews(context.packageName, layoutFor(shown)).apply {
                 setTintedBackground(R.id.today_root, theme.canvas)
@@ -86,7 +93,7 @@ class TodayWidgetProvider : ZeoliteWidgetProvider() {
                 if (count == 0) {
                     setTextViewText(
                         R.id.today_empty,
-                        emptyMessage(state, today?.optString("holiday")),
+                        emptyMessage(context, state, today?.optString("holiday")),
                     )
                 }
 
@@ -151,7 +158,10 @@ class TodayWidgetProvider : ZeoliteWidgetProvider() {
             setRemoteAdapter(R.id.today_list, items.build())
             setEmptyView(R.id.today_list, R.id.today_empty)
             if (count == 0) {
-                setTextViewText(R.id.today_empty, emptyMessage(state, today?.optString("holiday")))
+                setTextViewText(
+                    R.id.today_empty,
+                    emptyMessage(context, state, today?.optString("holiday")),
+                )
             }
         }
     }
@@ -218,7 +228,7 @@ class TodayWidgetProvider : ZeoliteWidgetProvider() {
         setTextColor(R.id.more_label, theme.textTertiary)
         setTextViewText(
             R.id.more_label,
-            if (hidden == 1) "1 more class" else "$hidden more classes",
+            context.resources.getQuantityString(R.plurals.widget_more_classes, hidden, hidden),
         )
         setOnClickPendingIntent(R.id.more_label, openToday(context))
     }
@@ -263,12 +273,14 @@ class TodayWidgetProvider : ZeoliteWidgetProvider() {
         )
     }
 
-    private fun emptyMessage(state: String, holiday: String?): String = when (state) {
-        "holiday" -> holiday?.takeIf { it.isNotBlank() && it != "null" } ?: "Holiday"
-        "outside" -> "Outside the term"
-        "stale" -> "Open Zeolite to see today"
-        else -> "Nothing on today"
-    }
+    private fun emptyMessage(context: Context, state: String, holiday: String?): String =
+        when (state) {
+            "holiday" -> holiday?.takeIf { it.isNotBlank() && it != "null" }
+                ?: context.getString(R.string.widget_today_holiday)
+            "outside" -> context.getString(R.string.widget_today_outside)
+            "stale" -> context.getString(R.string.widget_today_stale)
+            else -> context.getString(R.string.widget_today_none)
+        }
 
     private fun layoutFor(rows: Int): Int = when (rows) {
         0 -> R.layout.widget_today_0
@@ -346,5 +358,8 @@ class TodayWidgetProvider : ZeoliteWidgetProvider() {
 
         /** A row: two lines of text beside a 40dp button, plus its margin. */
         const val ROW_DP = 54f
+
+        /** The "N more classes" line: 11sp text and its 10dp of padding. */
+        const val MORE_DP = 26f
     }
 }

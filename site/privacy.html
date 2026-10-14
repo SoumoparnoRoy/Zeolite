@@ -10,7 +10,7 @@
 <header>
   <a href="/">Zeolite</a>
   <h1>Privacy Policy</h1>
-  <p class="updated">Last updated 12 September 2026</p>
+  <p class="updated">Last updated 14 October 2026</p>
 </header>
 
 <p class="lead">Zeolite is an attendance tracker for students, published by
@@ -30,9 +30,9 @@ attendance marks, tags, notes and holidays — is written to a database inside
 the app's own private storage on your device. It is not uploaded, and the
 developer cannot see it.</p>
 
-<p>Two things still leave the device even without an account, and neither
-carries anything you entered: the usage measurement described below, and the
-ML Kit diagnostics described further down.</p>
+<p>Three things still leave the device even without an account, and none of
+them carries anything you entered: the usage measurement and the crash reports
+described below, and the ML Kit diagnostics described further down.</p>
 
 <p>One further thing can leave the device, and it does carry what you are
 reading: a timetable image you explicitly choose to have checked with AI. It is
@@ -95,9 +95,25 @@ discards it.</p>
 advertising permissions from the app, so this measurement is not tied to an
 advertising ID and cannot be used to target you.</p>
 
+<h3>Crash reports</h3>
+
+<p>When something goes wrong in the app, Zeolite sends a crash report through
+Firebase Crashlytics, from Google, so its developer can find and fix the
+fault. A report holds the kind of error, where in the app's code it happened,
+the app version, the device model and Android version, and a random identifier
+for the installation so that one fault on one phone is counted once.</p>
+
+<p><strong>A report never includes your timetable, your attendance, your
+subjects, your notes, or anything else you entered.</strong> For a fault in
+the app's own code, Zeolite leaves the error's message out on purpose, because
+an error's text can quote what it failed on. A crash inside Android itself
+carries Android's description of the fault, which names the app's code, not
+your data. Uninstalling the app or clearing its data discards the
+identifier.</p>
+
 <h3>What is not collected</h3>
 
-<p>There is no advertising, no crash reporting, and no tracking of you across
+<p>There is no advertising, and no tracking of you across
 other apps or websites. Nothing is sold, and nothing is shared with anyone for
 marketing.</p>
 
@@ -187,7 +203,7 @@ Zeolite account. If you turn it on:</p>
   <tr><td><code>SCHEDULE_EXACT_ALARM</code></td><td>So a reminder arrives at the minute you chose. Optional — decline it and reminders still work, less precisely.</td></tr>
   <tr><td><code>RECEIVE_BOOT_COMPLETED</code></td><td>To restore scheduled reminders after a restart.</td></tr>
   <tr><td><code>VIBRATE</code></td><td>To vibrate for a reminder.</td></tr>
-  <tr><td><code>INTERNET</code></td><td>To sync to your account or to Notion, to check a sheet with AI when you ask for it, and for the usage measurement and the ML Kit side effect described above.</td></tr>
+  <tr><td><code>INTERNET</code></td><td>To sync to your account or to Notion, to check a sheet with AI when you ask for it, and for the usage measurement, the crash reports and the ML Kit side effect described above.</td></tr>
   <tr><td><code>ACCESS_NETWORK_STATE</code></td><td>So syncing can tell it is offline and wait, rather than failing repeatedly.</td></tr>
 </table>
 
@@ -201,6 +217,10 @@ Zeolite account. If you turn it on:</p>
   <dt>Google — Firebase Analytics</dt>
   <dd>Always. Receives the usage measurement described above, and nothing you
       entered.</dd>
+
+  <dt>Google — Firebase Crashlytics</dt>
+  <dd>When something goes wrong. Receives the crash report described above,
+      and nothing you entered.</dd>
 
   <dt>Google — ML Kit</dt>
   <dd>Only if you read from an image. The recognition happens on your device;

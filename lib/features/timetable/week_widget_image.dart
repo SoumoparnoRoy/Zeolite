@@ -20,7 +20,7 @@ import 'week_grid_view.dart';
 /// A picture rather than a native grid: rebuilding this layout in RemoteViews
 /// would mean two grids that have to be kept looking alike by hand, and the
 /// one thing worth having on a home screen is the week as the app draws it.
-/// The cost is that taps land on a day column, not on a class. A widget
+/// The cost is that a tap can only open Timetable, not a class. A widget
 /// resized while the app is closed keeps the old shape until the app is next
 /// opened or returned to.
 ///
@@ -97,14 +97,6 @@ const Duration _settleBeforeComingDays = Duration(seconds: 3);
 /// shape and room for the grid's empty state.
 const Size _fallbackSize = Size(250, 290);
 
-/// [WeekGridView]'s own floors and spacing, which are what a widget cell
-/// cannot meet: a block will not go under [_minBlockHeight], so a full day
-/// needs more height than any cell has.
-const double _minBlockHeight = 46;
-const double _blockGap = 4;
-const double _gridHeaderHeight = 40;
-const double _breakBandHeight = 26;
-
 /// Past this the week stops being readable, and showing the morning at a
 /// legible size beats showing the whole day at none. The widget asks for a
 /// tall cell so this bound is rarely the one that bites.
@@ -148,9 +140,9 @@ Future<void> _render({
 /// already tall enough; capped, since past a point the week is a smear.
 double _zoomOut(DayGrid grid, double cellHeight) {
   if (!grid.isConfigured || cellHeight <= 0) return 1;
-  final double needed = _gridHeaderHeight +
-      grid.blockCount * (_minBlockHeight + _blockGap) +
-      (grid.hasBreak ? _breakBandHeight : 0);
+  // A block will not go under its floor, so a full day needs more height than
+  // any cell has.
+  final double needed = WeekGridView.minimumHeight(grid);
   return (needed / cellHeight).clamp(1.0, _maxZoomOut);
 }
 

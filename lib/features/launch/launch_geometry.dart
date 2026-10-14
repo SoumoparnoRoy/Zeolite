@@ -87,9 +87,9 @@ class LaunchNode {
   bool get isCell => col != null;
 }
 
-/// Timeline, in milliseconds from zero. The prototype at
-/// `Documents/Apps/Zeolite/launch-sequence-prototype.html` is the spec these
-/// come from; where the two disagree it is right and this is wrong.
+/// Timeline, in milliseconds from zero, as tuned in the HTML prototype the
+/// sequence was designed in. Change them as a set: the beats are spaced
+/// against each other, not against the clock.
 class LaunchTiming {
   static const double markStart = 750;
   static const double foldStart = 1950;

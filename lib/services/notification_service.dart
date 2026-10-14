@@ -74,6 +74,10 @@ class NotificationService {
 
   bool _ready = false;
 
+  /// Kept from the first [init], so a retry after a failed one still wires up
+  /// the action buttons.
+  DidReceiveNotificationResponseCallback? _backgroundAction;
+
   /// The payload of the notification the user last tapped, or null once the
   /// app has acted on it. A value rather than a stream because the tap that
   /// launches the app arrives during [init], before anything is listening.
@@ -151,6 +155,7 @@ class NotificationService {
     DidReceiveNotificationResponseCallback? backgroundAction,
   }) async {
     if (_ready) return;
+    _backgroundAction = backgroundAction ?? _backgroundAction;
     try {
       tzdata.initializeTimeZones();
       final tz.Location? local = _resolveLocalLocation();
@@ -172,7 +177,7 @@ class NotificationService {
         onDidReceiveNotificationResponse: (NotificationResponse response) {
           tappedPayload.value = response.payload;
         },
-        onDidReceiveBackgroundNotificationResponse: backgroundAction,
+        onDidReceiveBackgroundNotificationResponse: _backgroundAction,
       );
 
       // A tap that launched the app from cold does not reach the callback
@@ -223,19 +228,15 @@ class NotificationService {
   }
 
   /// Asks for the Android 13+ POST_NOTIFICATIONS permission. Exact alarms are
-  /// requested separately and are optional — we degrade to inexact scheduling.
+  /// asked only from the *Exact timing* row: on Android 14+ asking means
+  /// leaving the app for a system screen, which needs the row's explanation.
+  /// Without them reminders are scheduled inexactly.
   Future<bool> requestPermissions() async {
     final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
         _plugin.resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>();
     if (androidPlugin == null) return false;
-    final bool granted =
-        await androidPlugin.requestNotificationsPermission() ?? false;
-    if (granted) {
-      // Best effort: without this, reminders may fire a few minutes late.
-      await androidPlugin.requestExactAlarmsPermission();
-    }
-    return granted;
+    return await androidPlugin.requestNotificationsPermission() ?? false;
   }
 
   /// Whether reminders can be scheduled to the minute. Only Android 12+ can
@@ -339,7 +340,29 @@ class NotificationService {
 
   /// Rebuilds every scheduled notification from the current timetable and
   /// settings. Called whenever classes, marks or settings change.
+  ///
+  /// Never throws. It runs inside every write's refresh, after the write has
+  /// landed, so a plugin failure here would otherwise cost the user the Undo
+  /// offer for a change that did save.
   Future<void> rescheduleAll({
+    required AppSettings settings,
+    required List<ClassSession> upcoming,
+    required List<ClassSession> eveningSessions,
+    required OverallStats stats,
+  }) async {
+    try {
+      await _rescheduleAll(
+        settings: settings,
+        upcoming: upcoming,
+        eveningSessions: eveningSessions,
+        stats: stats,
+      );
+    } catch (error, stack) {
+      reportError(error, stack, where: 'reschedule notifications');
+    }
+  }
+
+  Future<void> _rescheduleAll({
     required AppSettings settings,
     required List<ClassSession> upcoming,
     required List<ClassSession> eveningSessions,
@@ -430,9 +453,31 @@ class NotificationService {
     await _rememberWarned(<int>{});
   }
 
+  /// Cancels only the ids in use: an alarm still to fire, or a notification
+  /// still in the tray. Asking about every id in every range was about 150
+  /// platform calls on every mark.
   Future<void> _cancelRange(int base, int count) async {
-    for (int i = 0; i < count; i++) {
-      await _plugin.cancel(id: base + i);
+    final Set<int>? live = await _liveIds();
+    for (int id = base; id < base + count; id++) {
+      if (live == null || live.contains(id)) await _plugin.cancel(id: id);
+    }
+  }
+
+  /// Null when Android would not say, which falls back to cancelling the
+  /// whole range: a stale reminder is worse than the extra calls.
+  Future<Set<int>?> _liveIds() async {
+    try {
+      return <int>{
+        for (final PendingNotificationRequest pending
+            in await _plugin.pendingNotificationRequests())
+          pending.id,
+        for (final ActiveNotification shown
+            in await _plugin.getActiveNotifications())
+          if (shown.id != null) shown.id!,
+      };
+    } catch (error, stack) {
+      reportError(error, stack, where: 'reading scheduled notifications');
+      return null;
     }
   }
 

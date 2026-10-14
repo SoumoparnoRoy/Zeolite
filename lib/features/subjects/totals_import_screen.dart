@@ -21,7 +21,7 @@ Future<void> openTotalsRead(BuildContext context, TotalsSheet read) async {
   if (totals == null) {
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
       content: Text('That looks like an attendance page, but no course rows '
-          'could be read off it.'),
+          'could be read off it'),
     ));
     return;
   }

@@ -67,6 +67,15 @@ test('a timestamp that is not a number is refused', async () => {
   await assertFails(setDoc(ref, { ...mark, deletedAt: 1.5 }));
 });
 
+test('text longer than anyone types is refused', async () => {
+  const ref = doc(me(), 'users/me/attendance/x');
+  await assertSucceeds(setDoc(ref, { ...mark, note: 'n'.repeat(5000) }));
+  await assertFails(setDoc(ref, { ...mark, note: 'n'.repeat(5001) }));
+  await assertFails(
+    setDoc(doc(me(), 'users/me/subjects/x'), { name: 's'.repeat(501) }),
+  );
+});
+
 test('a tombstone can be merged onto an existing row', async () => {
   const ref = doc(me(), 'users/me/attendance/x');
   await setDoc(ref, mark);
@@ -92,5 +101,13 @@ test('deleting an account can clear its rows and its user document', async () =>
     await setDoc(doc(ctx.firestore(), 'users/me'), { note: 'seeded' });
   });
   await assertSucceeds(deleteDoc(doc(me(), 'users/me/attendance/x')));
+  await assertSucceeds(deleteDoc(doc(me(), 'users/me')));
+});
+
+test('the user document can be deleted but not read', async () => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'users/me'), { note: 'seeded' });
+  });
+  await assertFails(getDoc(doc(me(), 'users/me')));
   await assertSucceeds(deleteDoc(doc(me(), 'users/me')));
 });

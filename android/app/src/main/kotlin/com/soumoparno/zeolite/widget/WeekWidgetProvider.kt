@@ -14,7 +14,7 @@ import es.antonborri.home_widget.HomeWidgetLaunchIntent
 /**
  * The week as the app draws it — a picture rendered by Flutter rather than a
  * grid rebuilt here, so the two can never end up looking like different
- * products. Taps land on a day, which is as fine as an image allows.
+ * products. A tap anywhere opens Timetable.
  */
 class WeekWidgetProvider : ZeoliteWidgetProvider() {
 
@@ -25,8 +25,6 @@ class WeekWidgetProvider : ZeoliteWidgetProvider() {
         widgetData: SharedPreferences,
     ) {
         val theme = WidgetTheme.of(context)
-        val week = WidgetData.today(WidgetData.read(context, "week"))
-        val monday = week?.optInt("monday") ?: 0
         // Drawn per day, since today's column is picked out in the picture.
         val image = WidgetData.read(context, "weekImageDates")
             ?.optString(WidgetData.todayKey().toString())
@@ -49,8 +47,6 @@ class WeekWidgetProvider : ZeoliteWidgetProvider() {
 
                 setTintedBackground(R.id.week_root, theme.canvas)
                 setTextColor(R.id.week_placeholder, theme.textTertiary)
-                // On the root now the header has gone. The day columns sit
-                // above it and keep their own taps.
                 setOnClickPendingIntent(
                     R.id.week_root,
                     HomeWidgetLaunchIntent.getActivity(
@@ -69,17 +65,6 @@ class WeekWidgetProvider : ZeoliteWidgetProvider() {
                     if (image != null) View.GONE else View.VISIBLE,
                 )
                 if (image != null) setImageViewBitmap(R.id.week_image, image)
-
-                DAY_COLUMNS.forEachIndexed { index, columnId ->
-                    setOnClickPendingIntent(
-                        columnId,
-                        HomeWidgetLaunchIntent.getActivity(
-                            context,
-                            MainActivity::class.java,
-                            Uri.parse("zeolite://open?tab=timetable&day=${monday + index}"),
-                        ),
-                    )
-                }
             }
             appWidgetManager.updateAppWidget(widgetId, views)
         }
@@ -90,12 +75,5 @@ class WeekWidgetProvider : ZeoliteWidgetProvider() {
         val height = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0) ?: 0
         if (width <= 0 || height <= 0) return
         WidgetData.write(context, "weekCell", "${width}x$height")
-    }
-
-    private companion object {
-        val DAY_COLUMNS = listOf(
-            R.id.week_day_0, R.id.week_day_1, R.id.week_day_2, R.id.week_day_3,
-            R.id.week_day_4, R.id.week_day_5, R.id.week_day_6,
-        )
     }
 }

@@ -88,7 +88,18 @@ class NotionSyncTarget implements SyncTarget {
     _claimed.clear();
     _related.clear();
     final NotionRows rows = await _client.queryAllPages(_mapping.dataSourceId);
-    if (!rows.ok) return null;
+    if (!rows.ok) {
+      // Only an unreachable Notion is a push-only run; a refusal is said as
+      // one, or a run with nothing to send would report it as being offline.
+      if (rows.failure == SyncFailure.offline) return null;
+      throw SyncRefused(rows.failure!, message: rows.code);
+    }
+    if (rows.truncated) {
+      throw const SyncRefused(
+        SyncFailure.rejected,
+        message: SyncRefused.tooManyRows,
+      );
+    }
 
     final List<RemoteState> found = <RemoteState>[];
     final List<Map<String, Object?>> unkeyed = <Map<String, Object?>>[];

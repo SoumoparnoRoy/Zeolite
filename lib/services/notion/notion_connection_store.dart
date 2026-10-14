@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../../core/report_error.dart';
 import '../../domain/notion/notion_mapping.dart';
 import 'notion_auth_client.dart';
 
@@ -30,7 +31,8 @@ class NotionConnectionStore {
     Object? decoded;
     try {
       decoded = jsonDecode(raw);
-    } on FormatException {
+    } on FormatException catch (error, stack) {
+      reportError(error, stack, where: 'reading the Notion connection');
       return null;
     }
     if (decoded is! Map<String, Object?>) return null;
@@ -111,7 +113,8 @@ class NotionConnectionStore {
     Object? decoded;
     try {
       decoded = jsonDecode(raw);
-    } on FormatException {
+    } on FormatException catch (error, stack) {
+      reportError(error, stack, where: 'reading retired Notion databases');
       return <RetiredNotionDatabase>[];
     }
     final List<Object?> entries = switch (decoded) {
@@ -173,7 +176,8 @@ class NotionConnectionStore {
     Object? decoded;
     try {
       decoded = jsonDecode(raw);
-    } on FormatException {
+    } on FormatException catch (error, stack) {
+      reportError(error, stack, where: 'reading the Notion mapping');
       return null;
     }
     if (decoded is! Map<String, Object?>) return null;
@@ -205,7 +209,8 @@ class NotionConnectionStore {
     Object? decoded;
     try {
       decoded = jsonDecode(raw);
-    } on FormatException {
+    } on FormatException catch (error, stack) {
+      reportError(error, stack, where: 'reading a pending Notion connect');
       return null;
     }
     if (decoded is! Map<String, Object?>) return null;

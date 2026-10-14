@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -102,6 +103,32 @@ void main() {
         )
         .first;
     expect(tester.getSize(band).width, closeTo(grid, 0.5));
+  });
+
+  testWidgets('the height the widget plans its zoom on is the height drawn',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(_app(_fixture(), settings: _withBreak));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.getSize(find.byType(WeekGridView)).height,
+      moreOrLessEquals(WeekGridView.minimumHeight(_withBreak.dayGrid)),
+    );
+  });
+
+  testWidgets('a larger system font widens the time ruler, not clips it',
+      (WidgetTester tester) async {
+    tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await tester.pumpWidget(_app(_fixture()));
+    await tester.pumpAndSettle();
+
+    final RenderParagraph label =
+        tester.renderObject<RenderParagraph>(find.text('10:40 AM'));
+    expect(
+      label.getMaxIntrinsicWidth(double.infinity),
+      lessThanOrEqualTo(label.size.width + 0.01),
+    );
   });
 
   testWidgets('no break, no row', (WidgetTester tester) async {

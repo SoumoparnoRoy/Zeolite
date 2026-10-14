@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -16,6 +17,7 @@ import 'state/home_widget_providers.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  _routeUncaughtErrors();
   _registerFontLicences();
 
   // Options come from google-services.json via the Gradle plugin rather than a
@@ -32,6 +34,11 @@ Future<void> main() async {
           ? const AndroidPlayIntegrityProvider()
           : const AndroidDebugProvider(),
     );
+    // Debug and profile builds keep their failures to the log: a crash on the
+    // development tablet is not a user's.
+    await FirebaseCrashlytics.instance
+        .setCrashlyticsCollectionEnabled(kReleaseMode);
+    if (kReleaseMode) errorSink = _toCrashlytics;
   } catch (error, stack) {
     reportError(error, stack, where: 'Firebase start-up');
   }
@@ -62,6 +69,51 @@ Future<void> main() async {
   unawaited(registerHomeWidgetCallbacks());
 
   runApp(const ProviderScope(child: ZeoliteApp()));
+}
+
+/// The type and the stack, never the message: an exception's text can quote
+/// what it failed on, and that may be something the user typed.
+void _toCrashlytics(Object error, StackTrace? stack, String where) {
+  unawaited(
+    FirebaseCrashlytics.instance.recordError(
+      error.runtimeType.toString(),
+      stack,
+      reason: where,
+      // Only what nothing caught counts as a crash; a caught failure the app
+      // carried on past stays a non-fatal.
+      fatal: where == _uncaught || where == _framework,
+    ),
+  );
+}
+
+const String _uncaught = 'uncaught';
+const String _framework = 'Flutter framework';
+
+/// Sends what nothing caught to [reportError], the same place as every caught
+/// failure, so the crash reporter behind it sees both.
+void _routeUncaughtErrors() {
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+    reportError(details.exception, details.stack, where: _framework);
+  };
+  PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
+    reportError(error, stack, where: _uncaught);
+    return true;
+  };
+  // Release builds would otherwise paint a bare grey box where a widget
+  // failed to build. Debug keeps Flutter's red screen, which says why.
+  if (kReleaseMode) {
+    ErrorWidget.builder = (FlutterErrorDetails details) => const Center(
+          child: Padding(
+            padding: EdgeInsets.all(16),
+            child: Text(
+              'This part of the screen could not be shown.',
+              textAlign: TextAlign.center,
+              textDirection: TextDirection.ltr,
+            ),
+          ),
+        );
+  }
 }
 
 /// The OFL requires its text to travel with the fonts it covers, so the two

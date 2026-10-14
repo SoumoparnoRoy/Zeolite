@@ -39,16 +39,20 @@ class NotionResult {
 /// deleted.
 @immutable
 class NotionRows {
-  const NotionRows.done(this.pages)
+  const NotionRows.done(this.pages, {this.truncated = false})
       : failure = null,
         code = null;
 
   const NotionRows.failed(this.failure, {this.code})
-      : pages = const <Map<String, Object?>>[];
+      : pages = const <Map<String, Object?>>[],
+        truncated = false;
 
   final List<Map<String, Object?>> pages;
   final SyncFailure? failure;
   final String? code;
+
+  /// The walk stopped at [NotionClient.maxPages] with rows still to come.
+  final bool truncated;
 
   bool get ok => failure == null;
 }
@@ -102,7 +106,7 @@ class NotionClient {
   /// How many rows one query asks for before the cursor is followed again.
   static const int queryPageSize = 100;
 
-  static const int maxPages = 20;
+  static const int maxPages = 100;
 
   /// The tables the connection can see. `database` is not a value search
   /// takes any more, and asking for one is a validation error rather than an
@@ -146,8 +150,6 @@ class NotionClient {
         },
       );
 
-  /// One page, for the far side of a relation — a relation cell holds ids and
-  /// no names, so the course it points at has to be read to be named.
   /// The blocks directly under a page. Used to find the databases inside a
   /// duplicated template, which arrive as `child_database` blocks.
   Future<NotionResult> blockChildren(String blockId) => _send(
@@ -155,6 +157,8 @@ class NotionClient {
         '/v1/blocks/$blockId/children?page_size=100',
       );
 
+  /// One page, for the far side of a relation — a relation cell holds ids and
+  /// no names, so the course it points at has to be read to be named.
   Future<NotionResult> page(String pageId) => _send('GET', '/v1/pages/$pageId');
 
   /// One block, for walking up to whatever page holds it.
@@ -163,13 +167,15 @@ class NotionClient {
 
   /// Walks the cursor to the end of a data source.
   ///
-  /// [maxPages] stops a run pulling a whole workspace into memory on a
-  /// database somebody else fills too, and a walk that ends there is still
-  /// reported as done: the alternative is refusing to read a large table at
-  /// all.
+  /// [maxPages] (10,000 rows, far past any one student's term) stops a run
+  /// pulling a whole workspace into memory on a database somebody else fills
+  /// too. A walk that ends there says so in [NotionRows.truncated]: an import
+  /// can still use the rows it has, but a sync cannot, since every row it
+  /// did not see would look unpushed and be filed again.
   Future<NotionRows> queryAllPages(String dataSourceId) async {
     final List<Map<String, Object?>> pages = <Map<String, Object?>>[];
     String? cursor;
+    bool more = false;
     for (int walked = 0; walked < maxPages; walked++) {
       final NotionResult result = await queryDataSource(
         dataSourceId,
@@ -187,11 +193,15 @@ class NotionClient {
         }
       }
 
-      if (result.body?['has_more'] != true) break;
+      more = result.body?['has_more'] == true;
+      if (!more) break;
       cursor = result.body?['next_cursor'] as String?;
-      if (cursor == null) break;
+      if (cursor == null) {
+        more = false;
+        break;
+      }
     }
-    return NotionRows.done(pages);
+    return NotionRows.done(pages, truncated: more);
   }
 
   Future<NotionResult> createPage({

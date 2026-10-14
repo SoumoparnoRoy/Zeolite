@@ -55,6 +55,14 @@ class WeekGridView extends ConsumerWidget {
 
   static const double _headerHeight = 34;
 
+  /// The unscaled height a whole [grid] needs with every block at its floor.
+  /// The home-screen widget zooms out by this, so it has to be the grid's own
+  /// arithmetic rather than a copy that can drift from it.
+  static double minimumHeight(DayGrid grid) =>
+      _headerHeight +
+      grid.blockCount * (_minBlockHeight + _gap) +
+      (grid.hasBreak ? _BreakBand.height + _gap : 0);
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // The cells carry text, so their geometry has to ride the same ramp the
@@ -67,10 +75,16 @@ class WeekGridView extends ConsumerWidget {
     final ScheduleEngine? engine = ref.watch(scheduleEngineProvider);
     final bool use24Hour =
         ref.watch(settingsProvider).value?.use24HourTime ?? false;
-    final double gutterWidth =
-        (use24Hour ? _gutterWidth : _gutterWidthMeridiem) * scale;
-
     if (!grid.isConfigured) return const _NotConfigured();
+
+    // Never narrower than its labels: a larger system font widens them past
+    // the fixed width, which then clipped "10:10 AM" to "10:10 /".
+    final double gutterWidth = _TimeGutter.widthFor(
+      context,
+      grid,
+      use24Hour: use24Hour,
+      atLeast: (use24Hour ? _gutterWidth : _gutterWidthMeridiem) * scale,
+    );
 
     final Map<int, List<ClassSession>> byDay =
         engine?.sessionsForWeekOf(weekStart) ?? <int, List<ClassSession>>{};
@@ -203,8 +217,8 @@ class _BreakBand extends StatelessWidget {
         softWrap: false,
         overflow: TextOverflow.ellipsis,
         style: monoStyle(
-          color: p.textFaint,
-          size: AppType.microSmall,
+          color: p.textTertiary,
+          size: AppType.captionMedium,
           weight: FontWeight.w700,
         ),
       ),
@@ -298,8 +312,47 @@ class _TimeGutter extends StatelessWidget {
   /// Through `Clock.format` rather than a formatter of its own: the ruler used
   /// to drop the meridiem to fit a narrower gutter, which is the one place a
   /// 12-hour time appeared without it.
-  String _label(int index) =>
+  static String _label(DayGrid grid, int index, bool use24Hour) =>
       Clock.format(grid.startOf(index), use24Hour: use24Hour);
+
+  // As large as "12:20 PM" can go in mono and still sit inside the 12-hour
+  // gutter at the default text size.
+  static TextStyle _style(BuildContext context) => monoStyle(
+        color: context.palette.textTertiary,
+        size: AppType.captionSmall,
+        weight: FontWeight.w700,
+      );
+
+  /// The widest label as it will be drawn, scaled text included, or [atLeast]
+  /// when every label fits that.
+  static double widthFor(
+    BuildContext context,
+    DayGrid grid, {
+    required bool use24Hour,
+    required double atLeast,
+  }) {
+    final TextPainter painter = TextPainter(
+      textDirection: TextDirection.ltr,
+      textScaler: MediaQuery.textScalerOf(context),
+      maxLines: 1,
+    );
+    // Merged the way `Text` merges it, or the theme's letter spacing goes
+    // unmeasured.
+    final TextStyle style =
+        DefaultTextStyle.of(context).style.merge(_style(context));
+    double widest = atLeast;
+    try {
+      for (int i = 0; i < grid.blockCount; i++) {
+        painter
+          ..text = TextSpan(text: _label(grid, i, use24Hour), style: style)
+          ..layout();
+        if (painter.width > widest) widest = painter.width;
+      }
+    } finally {
+      painter.dispose();
+    }
+    return widest.ceilToDouble();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -313,14 +366,10 @@ class _TimeGutter extends StatelessWidget {
               height: blockHeight,
               child: Center(
                 child: Text(
-                  _label(i),
+                  _label(grid, i, use24Hour),
                   maxLines: 1,
                   softWrap: false,
-                  style: monoStyle(
-                    color: context.palette.textFaint,
-                    size: AppType.microSmall,
-                    weight: FontWeight.w700,
-                  ),
+                  style: _style(context),
                 ),
               ),
             ),
@@ -520,19 +569,23 @@ class _EmptyCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final AppPalette p = context.palette;
-    return Material(
-      color: p.isDark
-          ? Colors.white.withValues(alpha: dimmed ? 0.02 : 0.04)
-          : Colors.white.withValues(alpha: dimmed ? 0.28 : 0.5),
-      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-      child: InkWell(
-        onTap: onTap,
+    return Semantics(
+      button: true,
+      label: 'Add a class here',
+      child: Material(
+        color: p.isDark
+            ? Colors.white.withValues(alpha: dimmed ? 0.02 : 0.04)
+            : Colors.white.withValues(alpha: dimmed ? 0.28 : 0.5),
         borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-        child: Center(
-          child: Icon(
-            Icons.add_rounded,
-            size: 12,
-            color: p.textFaint.withValues(alpha: dimmed ? 0.25 : 0.4),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+          child: Center(
+            child: Icon(
+              Icons.add_rounded,
+              size: 12,
+              color: p.textFaint.withValues(alpha: dimmed ? 0.25 : 0.4),
+            ),
           ),
         ),
       ),
@@ -566,91 +619,104 @@ class _ClassCell extends StatelessWidget {
     final AttendanceStatus? status = session.status;
     final bool cancelled = status == AttendanceStatus.cancelled;
 
-    return Opacity(
-      opacity: cancelled ? 0.5 : 1,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-          boxShadow: p.isDark
-              ? const <BoxShadow>[]
-              : <BoxShadow>[
-                  BoxShadow(
-                    color: p.cardShadow,
-                    blurRadius: 9,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-        ),
-        child: Material(
-          color: p.surface,
-          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: onTap,
-            onLongPress: onLongPress,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: <Widget>[
-                Container(width: 3, color: color),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(4, 5, 3, 5),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: <Widget>[
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            Expanded(
-                              child: Text(
-                                session.subject.initials,
-                                maxLines: 1,
-                                overflow: TextOverflow.clip,
-                                style: TextStyle(
-                                  fontSize: AppType.microSmall,
-                                  height: 1,
-                                  fontWeight: FontWeight.w800,
-                                  color: p.textPrimary,
-                                  decoration: cancelled
-                                      ? TextDecoration.lineThrough
-                                      : null,
-                                  decorationColor: p.textFaint,
+    // The cell itself shows only initials, which a screen reader cannot turn
+    // back into a class.
+    return Semantics(
+      button: true,
+      excludeSemantics: true,
+      label: '${session.subject.name}, ${Clock.formatRange(
+        session.startMinutes,
+        session.endMinutes,
+        use24Hour: use24Hour,
+      )}${status == null ? '' : ', ${status.label}'}',
+      onTap: onTap,
+      onLongPress: onLongPress,
+      child: Opacity(
+        opacity: cancelled ? 0.5 : 1,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+            boxShadow: p.isDark
+                ? const <BoxShadow>[]
+                : <BoxShadow>[
+                    BoxShadow(
+                      color: p.cardShadow,
+                      blurRadius: 9,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+          ),
+          child: Material(
+            color: p.surface,
+            borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: onTap,
+              onLongPress: onLongPress,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  Container(width: 3, color: color),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(4, 5, 3, 5),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: <Widget>[
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Expanded(
+                                child: Text(
+                                  session.subject.initials,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.clip,
+                                  style: TextStyle(
+                                    fontSize: AppType.microSmall,
+                                    height: 1,
+                                    fontWeight: FontWeight.w800,
+                                    color: p.textPrimary,
+                                    decoration: cancelled
+                                        ? TextDecoration.lineThrough
+                                        : null,
+                                    decorationColor: p.textFaint,
+                                  ),
                                 ),
                               ),
-                            ),
-                            if (status != null && !cancelled)
-                              Container(
-                                width: 4,
-                                height: 4,
-                                margin: const EdgeInsets.only(top: 1),
-                                decoration: BoxDecoration(
-                                  color: status.colorIn(p),
-                                  shape: BoxShape.circle,
+                              if (status != null && !cancelled)
+                                Container(
+                                  width: 4,
+                                  height: 4,
+                                  margin: const EdgeInsets.only(top: 1),
+                                  decoration: BoxDecoration(
+                                    color: status.colorIn(p),
+                                    shape: BoxShape.circle,
+                                  ),
                                 ),
-                              ),
-                          ],
-                        ),
-                        Text(
-                          offGrid
-                              ? Clock.format(
-                                  session.startMinutes,
-                                  use24Hour: use24Hour,
-                                )
-                              : (session.room ?? ''),
-                          maxLines: 1,
-                          overflow: TextOverflow.clip,
-                          style: monoStyle(
-                            color: offGrid ? p.warning : p.textTertiary,
-                            size: AppType.microXs,
-                            weight: FontWeight.w600,
+                            ],
                           ),
-                        ),
-                      ],
+                          Text(
+                            offGrid
+                                ? Clock.format(
+                                    session.startMinutes,
+                                    use24Hour: use24Hour,
+                                  )
+                                : (session.room ?? ''),
+                            maxLines: 1,
+                            overflow: TextOverflow.clip,
+                            style: monoStyle(
+                              color: offGrid ? p.warning : p.textTertiary,
+                              size: AppType.microXs,
+                              weight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

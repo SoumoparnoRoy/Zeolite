@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../core/report_error.dart';
 import '../state/actions/action_core.dart';
 import '../state/app_providers.dart';
 
@@ -39,8 +40,13 @@ void showUndoSnack(
           : SnackBarAction(
               label: 'Undo',
               onPressed: () async {
-                final bool restored =
-                    await core.undo(token).whenComplete(restoring.complete);
+                bool restored = false;
+                try {
+                  restored =
+                      await core.undo(token).whenComplete(restoring.complete);
+                } catch (error, stack) {
+                  reportError(error, stack, where: 'undo');
+                }
                 messenger.hideCurrentSnackBar();
                 messenger.showSnackBar(
                   SnackBar(
@@ -48,7 +54,7 @@ void showUndoSnack(
                       restored
                           ? 'Put back'
                           : 'Too much has changed since — that can no longer '
-                              'be undone.',
+                              'be undone',
                     ),
                   ),
                 );

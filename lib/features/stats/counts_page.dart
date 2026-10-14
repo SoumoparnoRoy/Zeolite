@@ -51,13 +51,13 @@ class _CountsPageState extends ConsumerState<CountsPage> {
           ));
         case NoClassesFound():
           messenger.showSnackBar(const SnackBar(
-            content: Text('Could not find an attendance table in that image.'),
+            content: Text('Could not find an attendance table in that image'),
           ));
       }
     } catch (error, stack) {
       reportError(error, stack, where: 'portal image read');
       messenger.showSnackBar(
-        const SnackBar(content: Text('Could not read that image.')),
+        const SnackBar(content: Text('Could not read that image')),
       );
     } finally {
       if (mounted) setState(() => _reading = false);
@@ -136,7 +136,7 @@ class _CountsCard extends StatelessWidget {
         ? ''
         : cancelledCounts
             ? ' · cancelled classes count as attended'
-            : " · cancelled classes aren't counted";
+            : ' · cancelled classes are not counted';
 
     return SurfaceCard(
       padding: const EdgeInsets.fromLTRB(14, 13, 10, 12),
@@ -253,7 +253,7 @@ class _CountLine extends ConsumerWidget {
     if (!saved) {
       messenger.showSnackBar(SnackBar(
         content: Text('$_label cannot go below $marked — that many are '
-            'marked in the app.'),
+            'marked in the app'),
       ));
     }
   }

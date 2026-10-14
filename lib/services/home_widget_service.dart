@@ -18,7 +18,6 @@ class HomeWidgetService {
   const HomeWidgetService();
 
   static const String todayKey = 'today';
-  static const String weekKey = 'week';
 
   /// One picture per weekday, since the grid marks today's column and so
   /// changes at every midnight. Seven days ahead never hold the same weekday
@@ -61,7 +60,6 @@ class HomeWidgetService {
 
   Future<void> push({
     required Map<String, Object?> today,
-    required Map<String, Object?> week,
     required Map<String, Object?> standing,
     required Map<String, Object?> subjects,
     required Map<String, Object?>? theme,
@@ -70,7 +68,6 @@ class HomeWidgetService {
   }) async {
     try {
       await HomeWidget.saveWidgetData<String>(todayKey, jsonEncode(today));
-      await HomeWidget.saveWidgetData<String>(weekKey, jsonEncode(week));
       await HomeWidget.saveWidgetData<String>(
         standingKey,
         jsonEncode(standing),
@@ -185,11 +182,13 @@ class HomeWidgetService {
   }
 
   /// Before one picture per day there was one under `weekImage`; clearing the
-  /// key deletes its file. Once per run is enough.
+  /// key deletes its file. `week` held the dates behind the old per-day taps.
+  /// Once per run is enough.
   static bool _singleWeekImageGone = false;
   Future<void> _forgetSingleWeekImage() async {
     if (_singleWeekImageGone) return;
     await HomeWidget.saveWidgetData<String>('weekImage', null);
+    await HomeWidget.saveWidgetData<String>('week', null);
     _singleWeekImageGone = true;
   }
 

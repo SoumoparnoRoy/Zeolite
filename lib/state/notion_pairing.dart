@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../core/report_error.dart';
 import '../domain/sync/sync_target.dart';
 import '../services/notion/notion_auth_client.dart';
 import '../services/notion/pkce.dart';
@@ -121,8 +122,20 @@ class NotionPairingController extends Notifier<NotionPairing> {
       return NotionClaimOutcome.refused;
     }
 
-    await ref.read(notionConnectionStoreProvider).clearPending();
-    await ref.read(notionConnectionProvider.notifier).connect(result.tokens!);
+    try {
+      await ref.read(notionConnectionStoreProvider).clearPending();
+      await ref.read(notionConnectionProvider.notifier).connect(result.tokens!);
+    } catch (error, stack) {
+      // Left on claiming, the screen would spin with nothing to retry.
+      reportError(error, stack, where: 'Notion connect');
+      if (!ref.mounted) return null;
+      state = NotionPairing(
+        stage: NotionPairingStage.waiting,
+        verifier: verifier,
+        error: _messageFor(null),
+      );
+      return NotionClaimOutcome.refused;
+    }
     if (!ref.mounted) return null;
 
     // The template is the schema this app authored, so mapping it is a fact

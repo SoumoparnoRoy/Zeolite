@@ -1,5 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/report_error.dart';
+
 /// The subjects a wiped install left keys under on one target, as the first
 /// run there found them, so rows that run could not settle stay claimable.
 class SyncStrayStore {
@@ -14,7 +16,8 @@ class SyncStrayStore {
     try {
       return (await _prefs.getStringList('$_prefix$targetId'))?.toSet() ??
           <String>{};
-    } on Object {
+    } on Object catch (error, stack) {
+      reportError(error, stack, where: 'reading sync strays');
       return <String>{};
     }
   }

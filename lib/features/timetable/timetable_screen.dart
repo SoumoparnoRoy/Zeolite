@@ -26,8 +26,8 @@ class TimetableScreen extends ConsumerWidget {
     final ScheduleEngine? engine = ref.watch(scheduleEngineProvider);
     final AppSettings settings =
         ref.watch(settingsProvider).value ?? const AppSettings();
-    final List<ClassSlot> slots =
-        ref.watch(timetableProvider).value?.slots ?? <ClassSlot>[];
+    final AsyncValue<TimetableData> loaded = ref.watch(timetableProvider);
+    final List<ClassSlot> slots = loaded.value?.slots ?? <ClassSlot>[];
 
     final Map<int, List<ClassSession>> byDay =
         engine?.sessionsForWeekOf(weekStart) ?? <int, List<ClassSession>>{};
@@ -83,7 +83,19 @@ class TimetableScreen extends ConsumerWidget {
               onPressed: () => showAddClassSheet(context),
             ),
       slivers: <Widget>[
-        if (slots.isEmpty && weekTotal == 0)
+        if (!loaded.hasValue)
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: loaded.hasError
+                ? Padding(
+                    padding: const EdgeInsets.only(top: 40, bottom: 80),
+                    child: LoadFailed(
+                      onRetry: () => ref.invalidate(timetableProvider),
+                    ),
+                  )
+                : const SizedBox.shrink(),
+          )
+        else if (slots.isEmpty && weekTotal == 0)
           SliverFillRemaining(
             hasScrollBody: false,
             child: Padding(

@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../core/report_error.dart';
 import '../../domain/sync/sync_target.dart';
 
 /// The user's own account as a [SyncTarget], which is what makes attendance
@@ -14,6 +17,15 @@ class FirestoreSyncTarget implements SyncTarget {
 
   final String uid;
   final FirebaseFirestore _firestore;
+
+  /// Offline, a write does not fail: it waits in the local cache for a server
+  /// that never answers, and the run sits on "Syncing" for good. Past this a
+  /// call counts as offline.
+  static const Duration _timeout = Duration(seconds: 30);
+
+  /// The app keeps its own ledger, so the far side is only worth reading from
+  /// the server. A cached answer offline would look like a real one.
+  static const GetOptions _fromServer = GetOptions(source: Source.server);
 
   @override
   String get id => 'firebase';
@@ -70,8 +82,11 @@ class FirestoreSyncTarget implements SyncTarget {
     final DocumentReference<Map<String, Object?>> root =
         firestore.collection('users').doc(uid);
     for (final String name in _collections.values) {
-      QuerySnapshot<Map<String, Object?>> page =
-          await root.collection(name).limit(400).get();
+      QuerySnapshot<Map<String, Object?>> page = await root
+          .collection(name)
+          .limit(400)
+          .get(_fromServer)
+          .timeout(_timeout);
       while (page.docs.isNotEmpty) {
         final WriteBatch batch = firestore.batch();
         for (final QueryDocumentSnapshot<Map<String, Object?>> doc
@@ -79,11 +94,15 @@ class FirestoreSyncTarget implements SyncTarget {
           batch.delete(doc.reference);
         }
         removed += page.docs.length;
-        await batch.commit();
-        page = await root.collection(name).limit(400).get();
+        await batch.commit().timeout(_timeout);
+        page = await root
+            .collection(name)
+            .limit(400)
+            .get(_fromServer)
+            .timeout(_timeout);
       }
     }
-    await root.delete();
+    await root.delete().timeout(_timeout);
     return removed;
   }
 
@@ -109,14 +128,21 @@ class FirestoreSyncTarget implements SyncTarget {
   Future<List<RemoteState>?> fetch(SyncKind kind) async {
     try {
       final QuerySnapshot<Map<String, Object?>> snapshot =
-          await _collection(kind).get();
+          await _collection(kind).get(_fromServer).timeout(_timeout);
       return snapshot.docs
           .map((QueryDocumentSnapshot<Map<String, Object?>> doc) =>
               _stateFrom(kind, doc.id, doc.data()))
           .toList();
-    } on FirebaseException {
-      // Null says the far side could not be read, which turns the run into a
-      // push-only one rather than one that concludes everything was deleted.
+    } on FirebaseException catch (error, stack) {
+      // Null says the far side could not be reached, which turns the run into
+      // a push-only one rather than one that concludes everything was deleted.
+      // Anything else is the account or the rules saying no, and a push-only
+      // run would report that as synced.
+      final SyncFailure reason = _reasonFor(error.code);
+      if (reason == SyncFailure.offline) return null;
+      reportError(error, stack, where: 'firestore fetch');
+      throw SyncRefused(reason, message: error.code);
+    } on TimeoutException {
       return null;
     }
   }
@@ -154,7 +180,7 @@ class FirestoreSyncTarget implements SyncTarget {
           'deletedAt': DateTime.now().millisecondsSinceEpoch,
         },
         SetOptions(merge: true),
-      );
+      ).timeout(_timeout);
       return SyncOutcome.done(remoteId: remoteId, remoteHash: _deletedHash);
     });
   }
@@ -165,7 +191,7 @@ class FirestoreSyncTarget implements SyncTarget {
         ...item.fields,
         'changedAt': item.changedAt?.millisecondsSinceEpoch,
         'deletedAt': null,
-      });
+      }).timeout(_timeout);
       return SyncOutcome.done(remoteId: remoteId, remoteHash: item.hash);
     });
   }
@@ -210,7 +236,10 @@ class FirestoreSyncTarget implements SyncTarget {
       return await run();
     } on FirebaseException catch (error) {
       return SyncOutcome.failed(_reasonFor(error.code), message: error.code);
-    } catch (error) {
+    } on TimeoutException {
+      return const SyncOutcome.failed(SyncFailure.offline, message: 'timeout');
+    } catch (error, stack) {
+      reportError(error, stack, where: 'firestore write');
       return SyncOutcome.failed(SyncFailure.unknown, message: '$error');
     }
   }

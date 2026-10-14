@@ -26,12 +26,6 @@ final notionConnectionProvider =
   NotionConnectionController.new,
 );
 
-/// Calls to Notion, holding no token of its own.
-///
-/// The controller supplies both callbacks because it owns the connection:
-/// that is what makes one refresh run however many calls meet a 401 together,
-/// and what lets a connection that has genuinely ended reach the screen
-/// instead of only the caller.
 /// The databases a template migration left behind, until the user retires
 /// them. Oldest first.
 final retiredNotionDatabasesProvider =
@@ -42,6 +36,12 @@ final retiredNotionDatabasesProvider =
   return ref.read(notionConnectionStoreProvider).readRetired();
 });
 
+/// Calls to Notion, holding no token of its own.
+///
+/// The controller supplies both callbacks because it owns the connection:
+/// that is what makes one refresh run however many calls meet a 401 together,
+/// and what lets a connection that has genuinely ended reach the screen
+/// instead of only the caller.
 final notionClientProvider = Provider<NotionClient>((ref) {
   final NotionConnectionController connection =
       ref.watch(notionConnectionProvider.notifier);

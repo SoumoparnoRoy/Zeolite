@@ -34,12 +34,16 @@ class DataActions {
 
   Future<void> resetEverything() async {
     final DatabaseSnapshot before = await _core.repo.snapshot();
-    await _core.repo.clearAll();
-    // Put back as on install: without them there is nothing to give a new
-    // subject a type, which is what the type sent to Notion comes from.
-    for (final ClassCategory category in ClassCategory.defaults) {
-      await _core.repo.insertCategory(category);
-    }
+    // One transaction, or a failure between the two steps leaves an install
+    // with no class types at all.
+    await _core.repo.transaction((ZeoliteRepository repository) async {
+      await repository.clearAll();
+      // Put back as on install: without them there is nothing to give a new
+      // subject a type, which is what the type sent to Notion comes from.
+      for (final ClassCategory category in ClassCategory.defaults) {
+        await repository.insertCategory(category);
+      }
+    });
     await _core.ref.read(notificationsProvider).cancelAll();
     await _core.refresh();
     _core.arm(before);

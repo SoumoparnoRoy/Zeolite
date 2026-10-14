@@ -825,7 +825,9 @@ class AppTheme {
           final bool selected = states.contains(WidgetState.selected);
           return IconThemeData(
             size: 23,
-            color: selected ? p.accent : p.textFaint,
+            // Not textFaint: that is below AA on both palettes, and these are
+            // the app's main way around.
+            color: selected ? p.accent : p.textTertiary,
           );
         }),
         labelTextStyle: WidgetStateProperty.resolveWith<TextStyle>((states) {
@@ -834,7 +836,7 @@ class AppTheme {
             fontFamily: AppFonts.sans,
             fontSize: AppType.labelSmall,
             fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-            color: selected ? p.accent : p.textFaint,
+            color: selected ? p.accent : p.textTertiary,
           );
         }),
       ),

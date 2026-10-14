@@ -76,6 +76,7 @@ class AppSettings {
     this.notifyAttendanceDanger = true,
     this.autoBackupEnabled = false,
     this.lastAutoBackupAt,
+    this.lastAutoBackupFellBack = false,
     this.lastSyncAt,
     this.lastNotionSyncAt,
     this.syncedAccountId,
@@ -120,8 +121,8 @@ class AppSettings {
 
   final bool use24HourTime;
 
-  /// The app has always been dark-first, so an existing install keeps that
-  /// look after updating; light and system are opt-in.
+  /// Follows the system on a fresh install. A choice already stored stays, so
+  /// an install from the dark-first days keeps its look after updating.
   final AppThemeMode themeMode;
 
   /// Master switch. When false nothing is posted to the system tray at all,
@@ -158,6 +159,11 @@ class AppSettings {
   /// another phone would tell that phone a backup had already been taken.
   final DateTime? lastAutoBackupAt;
 
+  /// The last automatic backup could not reach the chosen folder and went to
+  /// the app's own, which is removed with the app. Kept so Settings can say
+  /// so; device state like [lastAutoBackupAt], and out of the export with it.
+  final bool lastAutoBackupFellBack;
+
   /// When a sync run last succeeded. Persisted rather than left on the
   /// coordinator so that "resume when the last run is stale" survives the
   /// process being killed — in memory it would be null at every cold launch,
@@ -182,13 +188,6 @@ class AppSettings {
   /// Settings reported a successful run.
   final String? syncedNotionDatabaseId;
 
-  /// Whether marking also writes to Notion without being asked.
-  ///
-  /// Off until it is asked for: this writes into a workspace the person also
-  /// edits by hand, and a wrong mapping there is not something the app can
-  /// take back.
-  /// Device-local, like the connection it belongs to, so it stays out of the
-  /// synced settings row.
   /// Device-local like [themeMode], and out of the sync hash for the same
   /// reason: a phone and a tablet can be tinted differently.
   final AccentColour accentColour;
@@ -198,6 +197,12 @@ class AppSettings {
   /// Synced rather than device-local: it decides what a percentage means.
   final bool cancelledCountsAsAttended;
 
+  /// Whether marking also writes to Notion without being asked.
+  ///
+  /// Off until it is asked for: this writes into a workspace the person also
+  /// edits by hand, and a wrong mapping there is not something the app can
+  /// take back. Device-local, like the connection it belongs to, so it stays
+  /// out of the synced settings row.
   final bool notionAutoSync;
 
   /// Off for the same reason as [notionAutoSync], and device-local because it
@@ -323,6 +328,7 @@ class AppSettings {
     bool? notifyAttendanceDanger,
     bool? autoBackupEnabled,
     DateTime? lastAutoBackupAt,
+    bool? lastAutoBackupFellBack,
     DateTime? lastSyncAt,
     DateTime? lastNotionSyncAt,
     String? syncedAccountId,
@@ -367,6 +373,8 @@ class AppSettings {
           notifyAttendanceDanger ?? this.notifyAttendanceDanger,
       autoBackupEnabled: autoBackupEnabled ?? this.autoBackupEnabled,
       lastAutoBackupAt: lastAutoBackupAt ?? this.lastAutoBackupAt,
+      lastAutoBackupFellBack:
+          lastAutoBackupFellBack ?? this.lastAutoBackupFellBack,
       lastSyncAt: lastSyncAt ?? this.lastSyncAt,
       lastNotionSyncAt: clearLastNotionSync
           ? null
@@ -505,6 +513,7 @@ class SettingsService {
   static const String _kAutoBackup = 'ut.autoBackup';
   static const String _kCountOutsideTerm = 'ut.countOutsideTerm';
   static const String _kLastAutoBackup = 'ut.lastAutoBackup';
+  static const String _kLastAutoBackupFellBack = 'ut.lastAutoBackupFellBack';
   static const String _kLastSync = 'ut.lastSync';
   static const String _kLastNotionSync = 'ut.lastNotionSync';
   static const String _kSyncedAccount = 'ut.syncedAccount';
@@ -555,6 +564,8 @@ class SettingsService {
         final int ms => DateTime.fromMillisecondsSinceEpoch(ms),
         null => null,
       },
+      lastAutoBackupFellBack:
+          await prefs.getBool(_kLastAutoBackupFellBack) ?? false,
       lastSyncAt: switch (await prefs.getInt(_kLastSync)) {
         final int ms => DateTime.fromMillisecondsSinceEpoch(ms),
         null => null,
@@ -631,6 +642,10 @@ class SettingsService {
         settings.scheduleChangedAt!.millisecondsSinceEpoch,
       );
     }
+    await prefs.setBool(
+      _kLastAutoBackupFellBack,
+      settings.lastAutoBackupFellBack,
+    );
     if (settings.lastAutoBackupAt == null) {
       await prefs.remove(_kLastAutoBackup);
     } else {

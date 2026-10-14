@@ -7,7 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:home_widget/home_widget.dart';
 
 import 'core/app_theme.dart';
-import 'core/report_error.dart';
 import 'data/settings/app_settings.dart';
 import 'features/launch/launch_screen.dart';
 import 'features/onboarding/onboarding_screen.dart';
@@ -21,6 +20,7 @@ import 'state/home_widget_providers.dart';
 import 'state/notion_sync_providers.dart';
 import 'state/providers.dart';
 import 'state/sync_providers.dart';
+import 'widgets/common.dart';
 import 'widgets/kept_alive.dart';
 import 'widgets/nav_bar_scroll.dart';
 import 'widgets/shell_routes.dart';
@@ -99,21 +99,11 @@ class _BootstrapState extends ConsumerState<_Bootstrap> {
       // The sequence draws in the chosen accent, so it waits for the stored
       // choice rather than starting violet and changing colour part way.
       loading: () => ColoredBox(color: context.palette.canvas),
-      error: (Object error, StackTrace stack) {
-        reportError(error, stack, where: 'settings load');
-        return Scaffold(
-          body: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.xl),
-              child: Text(
-                'Could not load your settings.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: context.palette.textSecondary),
-              ),
-            ),
-          ),
-        );
-      },
+      // Reported where the load fails, in SettingsController, not from here:
+      // build runs again on every frame the error stays up.
+      error: (Object error, StackTrace stack) => Scaffold(
+        body: LoadFailed(onRetry: () => ref.invalidate(settingsProvider)),
+      ),
       data: (AppSettings value) {
         if (!_launched) {
           return LaunchScreen(
@@ -287,6 +277,8 @@ class _RootShellState extends ConsumerState<RootShell> with RouteAware {
 
   /// Fires on crossing half way, so the bar lights up before it settles.
   void _onPageChanged(int index) {
+    // A field left focused on the page behind would raise the keyboard here.
+    dropFocus();
     // A tab arrived at with the bar hidden would look like it has no way back.
     _showNav(true);
     ref.read(selectedTabProvider.notifier).select(index);

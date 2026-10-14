@@ -34,6 +34,12 @@ Color healthFill(AttendanceHealth health, AppPalette palette) {
   );
 }
 
+/// Takes the keyboard down for good. `FocusScope.unfocus()` leaves the field
+/// in the scope's history, so the next sheet or page to close hands focus back
+/// to it and the keyboard rises over whatever screen is showing.
+void dropFocus() => FocusManager.instance.primaryFocus
+    ?.unfocus(disposition: UnfocusDisposition.previouslyFocusedChild);
+
 /// Times, dates, room codes and counts.
 ///
 /// Anything the eye scans down a column rather than reads as a sentence goes
@@ -271,6 +277,70 @@ class EmptyState extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Stands where a screen's empty state would when its data could not be read.
+/// Without it a failed read looks exactly like a fresh install and offers to
+/// add a first class.
+class LoadFailed extends StatelessWidget {
+  const LoadFailed({super.key, required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return EmptyState(
+      icon: Icons.error_outline_rounded,
+      title: 'Could not load your data',
+      message: 'Zeolite could not read what is saved on this device. Try '
+          'again, and restart the app if this keeps happening.',
+      action: FilledButton(onPressed: onRetry, child: const Text('Try again')),
+    );
+  }
+}
+
+/// A slider over a stored setting that saves once, when the drag ends.
+///
+/// Saving a setting writes all of them, stamps the schedule and wakes sync,
+/// which on every tick of a drag is dozens of writes for one decision.
+/// [builder] lays out the slider together with whatever shows its value, and
+/// is handed the value under the thumb so that still follows the drag.
+class SettledSlider extends StatefulWidget {
+  const SettledSlider({
+    super.key,
+    required this.value,
+    required this.onSettled,
+    required this.builder,
+  });
+
+  final double value;
+  final ValueChanged<double> onSettled;
+  final Widget Function(
+    BuildContext context,
+    double shown,
+    ValueChanged<double> onChanged,
+    ValueChanged<double> onChangeEnd,
+  ) builder;
+
+  @override
+  State<SettledSlider> createState() => _SettledSliderState();
+}
+
+class _SettledSliderState extends State<SettledSlider> {
+  double? _dragging;
+
+  @override
+  Widget build(BuildContext context) {
+    return widget.builder(
+      context,
+      _dragging ?? widget.value,
+      (double value) => setState(() => _dragging = value),
+      (double value) {
+        widget.onSettled(value);
+        setState(() => _dragging = null);
+      },
     );
   }
 }

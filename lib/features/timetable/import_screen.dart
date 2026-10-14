@@ -186,11 +186,22 @@ class _ImportTimetableScreenState extends ConsumerState<ImportTimetableScreen> {
     final ActionCore core = ref.read(actionCoreProvider);
     final ImportActions imports = ref.read(importActionsProvider);
     final int count = result.classes.length;
-    await imports.importTimetable(
-      result,
-      weighByBlocks: weighByBlocks,
-      into: into,
-    );
+    try {
+      await imports.importTimetable(
+        result,
+        weighByBlocks: weighByBlocks,
+        into: into,
+      );
+    } catch (error, stack) {
+      reportError(error, stack, where: 'timetable import');
+      if (mounted) setState(() => _saving = false);
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Could not add those classes. Try again.'),
+        ),
+      );
+      return;
+    }
     // Asked before the pop, while this route still has a context to ask from.
     // A match replaces the import's Undo offer with its own.
     final bool matched = mounted && await offerUntimedMatch(context, ref);
@@ -230,7 +241,7 @@ class _ImportTimetableScreenState extends ConsumerState<ImportTimetableScreen> {
     } catch (error, stack) {
       reportError(error, stack, where: 'timetable image read');
       messenger.showSnackBar(
-        const SnackBar(content: Text('Could not read that image.')),
+        const SnackBar(content: Text('Could not read that image')),
       );
     } finally {
       if (mounted) setState(() => _reading = false);
@@ -365,7 +376,7 @@ class _ImportTimetableScreenState extends ConsumerState<ImportTimetableScreen> {
                 autocorrect: false,
                 enableSuggestions: false,
                 style: const TextStyle(
-                  fontFamily: 'monospace',
+                  fontFamily: AppFonts.mono,
                   fontSize: AppType.bodyLarge,
                   height: 1.6,
                 ),
@@ -683,7 +694,7 @@ class _ProblemRow extends StatelessWidget {
                 Text(
                   line.text,
                   style: TextStyle(
-                    fontFamily: 'monospace',
+                    fontFamily: AppFonts.mono,
                     fontSize: AppType.bodySmall,
                     color: context.palette.textTertiary,
                   ),

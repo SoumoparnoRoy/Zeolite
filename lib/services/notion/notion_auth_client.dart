@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import '../../core/endpoints.dart';
 import '../../core/report_error.dart';
 import '../../domain/sync/sync_target.dart';
 
@@ -80,7 +81,7 @@ class NotionAuthClient {
       : _http = httpClient ?? http.Client(),
         _base = baseUri ?? Uri.parse(defaultBaseUrl);
 
-  static const String defaultBaseUrl = 'https://zeolite.onrender.com';
+  static const String defaultBaseUrl = Endpoints.server;
 
   /// A free host spins the service down when it is idle, and waking it takes
   /// far longer than any request it then serves. Both calls that can be the

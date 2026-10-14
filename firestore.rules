@@ -5,8 +5,10 @@ rules_version = '2';
 // that is not their own. Isolation is the part that has to be right.
 //
 // Writes are also held to the shape of what the app files: one of its own
-// collections, a bounded number of fields, and timestamps that are numbers.
-// That keeps one account from filling the free quota every account shares.
+// collections, a bounded number of fields, timestamps that are numbers, and
+// text no longer than anything a person types. That bounds each document, not
+// how many an account keeps: the quota every account shares is guarded by App
+// Check enforcement and a budget alert, which live in the console.
 // Field types beyond the two timestamps are deliberately not checked here: the
 // app reads every field defensively, and a second copy of the schema would
 // drift from FirestoreSyncTarget and turn the drift into refused writes.
@@ -27,17 +29,35 @@ service cloud.firestore {
       return !(field in data) || data[field] == null || data[field] is int;
     }
 
+    // Only a string is measured, so a field that later holds something else
+    // is not refused for it.
+    function shortText(data, field, most) {
+      return !(field in data) || !(data[field] is string)
+        || data[field].size() <= most;
+    }
+
     // The widest row the app writes has eleven fields, so forty leaves room
-    // for the schema to grow without a rules change.
+    // for the schema to grow without a rules change. The text caps sit far
+    // above anything typed into the app, which has no limits of its own.
     function isAppShaped(data) {
       return data.size() <= 40
         && timeOrNull(data, 'changedAt')
-        && timeOrNull(data, 'deletedAt');
+        && timeOrNull(data, 'deletedAt')
+        && shortText(data, 'note', 5000)
+        && shortText(data, 'name', 500)
+        && shortText(data, 'code', 500)
+        && shortText(data, 'teacher', 500)
+        && shortText(data, 'room', 500)
+        && shortText(data, 'tag', 500)
+        && shortText(data, 'category', 500)
+        && shortText(data, 'subject', 500)
+        && shortText(data, 'status', 500);
     }
 
     // Deleting an account removes the user document after its collections.
+    // The app never writes or reads the document itself.
     match /users/{uid} {
-      allow read, delete: if isOwner(uid);
+      allow delete: if isOwner(uid);
     }
 
     match /users/{uid}/{collection}/{doc} {

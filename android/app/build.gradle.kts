@@ -16,6 +16,9 @@ plugins {
     // Reads google-services.json, which is gitignored, so a fresh clone has to
     // supply its own before this configures.
     id("com.google.gms.google-services")
+    // Uploads the R8 mapping with a release build, so a Java stack trace in a
+    // crash report reads as the code rather than as minified names.
+    id("com.google.firebase.crashlytics")
 }
 
 android {

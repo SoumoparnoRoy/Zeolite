@@ -49,9 +49,13 @@ class NotificationsSection extends ConsumerWidget {
     AppSettings next, {
     bool ask = false,
   }) async {
-    if (ask) await ref.read(notificationsProvider).requestPermissions();
+    // A refusal keeps the switch on: the blocked row then says why nothing
+    // arrives, and its tap is the second ask, which ends on Android's screen.
+    if (ask && !await ref.read(notificationsProvider).requestPermissions()) {
+      ref.invalidate(trayAccessProvider);
+    }
     await ref.read(settingsProvider.notifier).save(next);
-    await ref.read(actionCoreProvider).reloadAfterImport();
+    await ref.read(actionCoreProvider).refreshNotifications();
   }
 
   Widget _masterCard(WidgetRef ref, AppSettings settings, TrayAccess tray) {

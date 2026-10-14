@@ -1338,12 +1338,6 @@ class TimetableOcr {
   /// span two periods is centred over the divider and sits near half and half.
   static const double _astride = 0.25;
 
-  /// Splits one cell into the classes it offers.
-  ///
-  /// Text stacks vertically whichever way the sheet is drawn, so sub-rows group
-  /// by y in both layouts. A sub-row naming a subject opens a candidate;
-  /// anything else — a room, initials, the prose course name, a `PRACTICAL`
-  /// badge — is detail belonging to the one above it.
   /// The tokens this sheet only ever prints in a cell's last line.
   ///
   /// `LT201` is a lecture theatre and `PQR3011` is a course, and no regex tells
@@ -1400,6 +1394,12 @@ class TimetableOcr {
     };
   }
 
+  /// Splits one cell into the classes it offers.
+  ///
+  /// Text stacks vertically whichever way the sheet is drawn, so sub-rows group
+  /// by y in both layouts. A sub-row naming a subject opens a candidate;
+  /// anything else — a room, initials, the prose course name, a `PRACTICAL`
+  /// badge — is detail belonging to the one above it.
   static List<_Candidate> _candidatesIn(
     List<OcrLine> cell,
     Set<String> rooms,
@@ -1616,9 +1616,6 @@ class TimetableOcr {
     return OcrBox(l, t, r, b);
   }
 
-  /// The clock span a candidate covers, widened across every period band it
-  /// overlaps — which is how a lab drawn as one wide cell keeps its real length
-  /// instead of collapsing to a single period.
   /// Every period's clock span, read once.
   ///
   /// Two things go wrong in a header row and they have to be told apart. These
@@ -1739,6 +1736,9 @@ class TimetableOcr {
     return null;
   }
 
+  /// The clock span a candidate covers, widened across every period band it
+  /// overlaps — which is how a lab drawn as one wide cell keeps its real length
+  /// instead of collapsing to a single period.
   static (int, int)? _spanOf(
       OcrBox box, TimetableGrid grid, List<(int, int)?> schedule) {
     final bool acrossX = grid.axis == GridAxis.daysAsRows;

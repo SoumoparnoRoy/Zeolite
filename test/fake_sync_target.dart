@@ -33,6 +33,9 @@ class FakeSyncTarget implements SyncTarget {
   /// Null makes [fetch] report that it could not read the far side.
   List<RemoteState>? remote = <RemoteState>[];
 
+  /// Set to make [fetch] refuse, as an account whose rules say no does.
+  SyncFailure? refuseFetch;
+
   final List<String> calls = <String>[];
 
   /// Pages [update] was told a person made.
@@ -54,6 +57,8 @@ class FakeSyncTarget implements SyncTarget {
   Future<List<RemoteState>?> fetch(SyncKind kind) async {
     if (hold != null) await hold;
     calls.add('fetch');
+    final SyncFailure? refusal = refuseFetch;
+    if (refusal != null) throw SyncRefused(refusal);
     return remote
         ?.where((RemoteState state) => state.kind == kind)
         .toList(growable: false);

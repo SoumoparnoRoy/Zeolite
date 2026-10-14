@@ -1,4 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 import 'package:zeolite/data/settings/app_settings.dart';
 import 'package:zeolite/services/backup_service.dart';
@@ -119,6 +121,25 @@ void main() {
         ).toJson(),
       );
       expect(restored.lastAutoBackupAt, isNull);
+    });
+
+    test('a fallback to the app folder is kept on the device, not exported',
+        () async {
+      SharedPreferencesAsyncPlatform.instance =
+          InMemorySharedPreferencesAsync.empty();
+      final SettingsService service = SettingsService();
+      await service.save(
+        const AppSettings(
+            autoBackupEnabled: true, lastAutoBackupFellBack: true),
+      );
+
+      expect((await service.load()).lastAutoBackupFellBack, isTrue);
+      expect(
+        AppSettings.fromJson(
+          const AppSettings(lastAutoBackupFellBack: true).toJson(),
+        ).lastAutoBackupFellBack,
+        isFalse,
+      );
     });
 
     test('an older backup restores with it off', () {

@@ -110,7 +110,7 @@ class StatsWidgetProvider : ZeoliteWidgetProvider() {
     ): RemoteViews {
         val hasData = standing?.optBoolean("hasData") ?: false
         val meetsTarget = standing?.optBoolean("meetsTarget") ?: true
-        val next = nextLine(standing)
+        val next = nextLine(context, standing)
 
         return RemoteViews(context.packageName, layout).apply {
             setTintedBackground(R.id.stats_root, theme.canvas)
@@ -141,7 +141,9 @@ class StatsWidgetProvider : ZeoliteWidgetProvider() {
             // same destination handed to them as a template.
             setPendingIntentTemplate(R.id.stats_rows, openStats)
             setEmptyView(R.id.stats_rows, R.id.stats_empty)
-            if (count == 0) setTextViewText(R.id.stats_empty, "No data yet")
+            if (count == 0) {
+                setTextViewText(R.id.stats_empty, context.getString(R.string.widget_empty_preview))
+            }
         }
     }
 
@@ -151,7 +153,7 @@ class StatsWidgetProvider : ZeoliteWidgetProvider() {
      * at every midnight, both with the app closed; the widget is redrawn at
      * each of those moments.
      */
-    private fun nextLine(standing: JSONObject?): String? {
+    private fun nextLine(context: Context, standing: JSONObject?): String? {
         val upcoming = standing?.optJSONArray("upcoming") ?: return null
         val now = System.currentTimeMillis()
         for (index in 0 until upcoming.length()) {
@@ -160,7 +162,7 @@ class StatsWidgetProvider : ZeoliteWidgetProvider() {
             val label = next.optJSONObject("when")
                 ?.optString(WidgetData.todayKey().toString())
                 ?.takeIf { it.isNotBlank() } ?: return null
-            return "Next: ${next.optString("subject")} · $label"
+            return context.getString(R.string.widget_next, next.optString("subject"), label)
         }
         return null
     }

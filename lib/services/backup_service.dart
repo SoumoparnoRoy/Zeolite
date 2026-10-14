@@ -130,8 +130,8 @@ class BackupService {
 
   /// Writes the backup to the app's documents directory and returns the file.
   ///
-  /// This location needs no storage permission on modern Android and is
-  /// reachable from a file manager under `Android/data/<package>/files`.
+  /// This location needs no storage permission, and it is private to the app:
+  /// no file manager reaches it, and uninstalling removes it.
   Future<File> exportToFile() async {
     final String json = await exportToJsonString();
     final Directory dir = await getApplicationDocumentsDirectory();
@@ -171,11 +171,11 @@ class BackupService {
   }
 
   /// Writes one automatic backup and prunes the oldest beyond
-  /// [keepAutoBackups]. False when nothing was due.
+  /// [keepAutoBackups]. Returns where it went, or null when nothing was due.
   ///
   /// Goes to the user's chosen folder when there is one and it is still
   /// writable, and to the app's own documents directory otherwise.
-  Future<bool> runAutoBackup({
+  Future<BackupDestination?> runAutoBackup({
     required bool enabled,
     required DateTime? lastAt,
     String? folderUri,
@@ -183,7 +183,7 @@ class BackupService {
   }) async {
     final DateTime now = nowOverride ?? DateTime.now();
     if (!isAutoBackupDue(enabled: enabled, lastAt: lastAt, now: now)) {
-      return false;
+      return null;
     }
 
     final bool usable = folderUri != null && await _folder.isUsable(folderUri);
@@ -193,16 +193,17 @@ class BackupService {
     if (destination == BackupDestination.chosenFolder) {
       try {
         await _writeToFolder(folderUri!);
-        return true;
-      } catch (_) {
+        return BackupDestination.chosenFolder;
+      } catch (error, stack) {
         // Whatever went wrong out there, a backup somewhere beats losing the
-        // day's backup entirely.
+        // day's backup entirely. The caller records the fallback.
+        reportError(error, stack, where: 'backup to chosen folder');
       }
     }
 
     await exportToFile();
     await pruneAutoBackups();
-    return true;
+    return BackupDestination.appFolder;
   }
 
   /// Where a backup goes, given a folder that may or may not still be writable.

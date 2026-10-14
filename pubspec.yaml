@@ -45,14 +45,17 @@ dependencies:
   # Firebase bump can drop without warning.
   http: ^1.6.0
   crypto: ^3.0.7
+  # `@immutable` for `lib/domain`, which keeps Flutter out of the pure layer.
+  # Ships with the SDK; BSD-3-Clause.
+  meta: ^1.15.0
   firebase_core: ^4.14.0
   firebase_auth: ^6.6.1
   cloud_firestore: ^6.9.0
   google_sign_in: ^7.2.0
-  # Not imported from Dart: the Android SDK auto-collects opens, sessions and
-  # engagement on its own, which is the whole reason it is here. The ad-ID half
-  # is switched off in the manifest, so this reports usage without an
-  # advertising identifier.
+  # The Android SDK collects opens, sessions and engagement on its own; Dart
+  # adds the screen views and the few typed events in AnalyticsService. The
+  # ad-ID half is switched off in the manifest, so this reports usage without
+  # an advertising identifier.
   firebase_analytics: ^12.5.0
   # The AI timetable check sends a token from this, and the server refuses
   # reads without one. BSD-3-Clause.
@@ -67,6 +70,13 @@ dependencies:
   # payload into the launcher's own store and wakes a Dart isolate when a button
   # is tapped. BSD-3-Clause.
   home_widget: ^0.9.4
+  # The version in the Settings footer, read from the build so it cannot drift
+  # from this file. Declares no permissions. BSD-3-Clause.
+  package_info_plus: ^10.2.2
+  # Release builds only (switched on in main.dart). Errors go up as their type
+  # and stack, never their message, so nothing typed into the app can ride
+  # along. BSD-3-Clause.
+  firebase_crashlytics: ^5.4.0
 
 dev_dependencies:
   flutter_test:

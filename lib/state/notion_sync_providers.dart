@@ -146,15 +146,16 @@ class NotionSyncController extends Notifier<SyncStatus> {
           target: 'notion',
           outcome: result.outcome.name,
         ));
+    // A run writes through the repository, so without this a row edited in
+    // Notion sits in the database unseen until something else reloads. That
+    // holds for a run that failed after pulling, too.
+    if (result.pulled > 0) {
+      await ref.read(actionCoreProvider).reloadAfterSync(
+            target: coordinator.target.id,
+            pulled: result.pulledKeys,
+          );
+    }
     if (result.ok) {
-      // A run writes through the repository, so without this a row edited in
-      // Notion sits in the database unseen until something else reloads.
-      if (result.pulled > 0) {
-        await ref.read(actionCoreProvider).reloadAfterSync(
-              target: coordinator.target.id,
-              pulled: result.pulledKeys,
-            );
-      }
       await _stamp(coordinator.status.lastRunAt);
       // Off the back of a run: the workspace has just been reached, and the
       // name is only ever shown, so nothing needs it any sooner than this.

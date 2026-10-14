@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
+import '../../core/report_error.dart';
 import '../../core/words.dart';
 import '../../data/settings/app_settings.dart';
 import '../../state/providers.dart';
@@ -61,27 +62,40 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   Future<void> _finish() async {
     setState(() => _saving = true);
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
 
-    if (_notifications) {
-      await ref.read(notificationsProvider).requestPermissions();
+    try {
+      // A refusal still saves the choices on. Notifications settings then
+      // shows "Blocked in Android settings", which is where to fix it.
+      if (_notifications) {
+        await ref.read(notificationsProvider).requestPermissions();
+      }
+
+      // Merged, not a fresh object: the welcome screen has already run, and a
+      // bare `AppSettings(...)` would default its answer away and ask again.
+      final AppSettings current =
+          ref.read(settingsProvider).value ?? const AppSettings();
+
+      await ref.read(settingsProvider.notifier).save(
+            current.copyWith(
+              termStart: _start,
+              termEnd: _end,
+              targetPercent: _target,
+              notifyBeforeClass: _notifications,
+              notifyEveningReminder: _notifications,
+              notifyAttendanceDanger: _notifications,
+              onboarded: true,
+            ),
+          );
+    } catch (error, stack) {
+      // The button is the only way past this screen, so it has to come back.
+      reportError(error, stack, where: 'onboarding');
+      if (!mounted) return;
+      setState(() => _saving = false);
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Could not save that. Try again.')),
+      );
     }
-
-    // Merged, not a fresh object: the welcome screen has already run, and a
-    // bare `AppSettings(...)` would default its answer away and ask again.
-    final AppSettings current =
-        ref.read(settingsProvider).value ?? const AppSettings();
-
-    await ref.read(settingsProvider.notifier).save(
-          current.copyWith(
-            termStart: _start,
-            termEnd: _end,
-            targetPercent: _target,
-            notifyBeforeClass: _notifications,
-            notifyEveningReminder: _notifications,
-            notifyAttendanceDanger: _notifications,
-            onboarded: true,
-          ),
-        );
   }
 
   @override

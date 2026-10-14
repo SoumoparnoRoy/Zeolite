@@ -76,6 +76,18 @@ void main() {
     expect(line, contains('Sign out'));
   });
 
+  test('a run that failed after pulling does not deny the rows it brought', () {
+    final String line = syncStatusLine(
+      const SyncStatus().failed(SyncFailure.unknown),
+      const SyncRunResult(outcome: SyncRunOutcome.failed, pulled: 3),
+    );
+
+    expect(
+        line,
+        'The last sync did not finish. 3 rows came in before it '
+        'stopped.');
+  });
+
   test('being offline never suggests anything was lost', () {
     final String line = syncStatusLine(
       const SyncStatus().failed(SyncFailure.offline),

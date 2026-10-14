@@ -210,7 +210,8 @@ void main() {
       TotalsDecision(row: _row('Control Systems')),
     ]);
 
-    expect(count, 2);
+    // The count is what the snackbar reports, so the skipped one is not in it.
+    expect(count, 1);
     expect(repo.updated, isEmpty);
     expect(repo.inserted, hasLength(1));
   });

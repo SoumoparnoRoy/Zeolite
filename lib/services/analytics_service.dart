@@ -36,8 +36,13 @@ class FirebaseAnalyticsService implements Analytics {
   final FirebaseAnalytics _analytics;
 
   @override
-  Future<void> screen(String name) =>
-      _analytics.logScreenView(screenName: name);
+  Future<void> screen(String name) async {
+    try {
+      await _analytics.logScreenView(screenName: name);
+    } catch (_) {
+      // As in [_log]: offline, or the SDK disabled itself.
+    }
+  }
 
   @override
   Future<void> attendanceMarked() => _log('attendance_marked');

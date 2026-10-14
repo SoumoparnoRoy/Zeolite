@@ -540,7 +540,7 @@ class FieldButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
+    final Widget field = Material(
       color: context.palette.surfaceHigher,
       borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
       child: InkWell(
@@ -584,18 +584,38 @@ class FieldButton extends StatelessWidget {
                 ),
               ),
               if (onClear != null)
-                GestureDetector(
-                  onTap: onClear,
-                  child: Icon(
-                    Icons.close_rounded,
-                    size: 16,
-                    color: context.palette.textTertiary,
-                  ),
+                Icon(
+                  Icons.close_rounded,
+                  size: 16,
+                  color: context.palette.textTertiary,
                 ),
             ],
           ),
         ),
       ),
+    );
+    if (onClear == null) return field;
+    // The × is drawn small, but the strip over it takes the tap across the
+    // field's whole height, so it is a finger's width without growing the
+    // field or moving anything in it.
+    return Stack(
+      children: <Widget>[
+        field,
+        Positioned(
+          top: 0,
+          right: 0,
+          bottom: 0,
+          width: 48,
+          child: Semantics(
+            button: true,
+            label: 'Clear',
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onClear,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

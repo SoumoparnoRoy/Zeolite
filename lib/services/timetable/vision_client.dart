@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:http/http.dart' as http;
 
+import '../../core/endpoints.dart';
 import '../../core/report_error.dart';
 import '../../domain/vision_read.dart';
 
@@ -23,7 +24,7 @@ class VisionClient {
         _appCheckToken =
             appCheckToken ?? (() => FirebaseAppCheck.instance.getToken());
 
-  static const String defaultBaseUrl = 'https://zeolite.onrender.com';
+  static const String defaultBaseUrl = Endpoints.server;
 
   /// Long, for the same reason the Notion client's wake timeout is: a free
   /// host spins down when idle, and this call is usually the one waking it.
@@ -81,7 +82,13 @@ class VisionClient {
         return const VisionRead.failed(VisionFailure.failed);
     }
 
-    final Object? body = jsonDecode(response.body);
+    final Object? body;
+    try {
+      body = jsonDecode(response.body);
+    } on FormatException {
+      // The service answered, so this is not being offline.
+      return const VisionRead.failed(VisionFailure.failed);
+    }
     if (body is! Map<String, Object?>) {
       return const VisionRead.failed(VisionFailure.failed);
     }

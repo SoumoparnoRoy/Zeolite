@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
+import '../../core/date_utils.dart';
 import '../../core/report_error.dart';
 import '../../core/words.dart';
 import '../../data/models/attendance_record.dart';
@@ -58,6 +59,7 @@ class DataSection extends ConsumerWidget {
                 subtitle: settings.autoBackupEnabled
                     ? 'Once a day, keeping the last '
                         '${BackupService.keepAutoBackups}'
+                        '${_lastBackup(settings.lastAutoBackupAt)}'
                     : 'Off',
                 value: settings.autoBackupEnabled,
                 onChanged: (bool v) =>
@@ -113,6 +115,9 @@ class DataSection extends ConsumerWidget {
     );
   }
 
+  static String _lastBackup(DateTime? at) =>
+      at == null ? '' : ' · last on ${Dates.formatDayMonth(at)}';
+
   /// The unavailable case is not silent: a backup still happens, and this row
   /// is where the user finds out where it went.
   static String _backupFolderLine(AppSettings settings, bool usable) {
@@ -123,6 +128,12 @@ class DataSection extends ConsumerWidget {
         ? settings.backupFolderName!
         : 'Chosen folder';
     if (!usable) return "$name is unavailable — using the app's own folder";
+    // The folder answers now, but the last backup did not reach it, so that
+    // one sits where uninstalling would take it.
+    if (settings.lastAutoBackupFellBack) {
+      return "$name could not be reached — the last backup went to the app's "
+          'own folder';
+    }
     return name == BackupFolder.folderName
         ? name
         : '$name/${BackupFolder.folderName}';
@@ -139,7 +150,7 @@ class DataSection extends ConsumerWidget {
     } catch (error, stack) {
       reportError(error, stack, where: 'choosing a backup folder');
       messenger.showSnackBar(
-        const SnackBar(content: Text('Could not use that folder.')),
+        const SnackBar(content: Text('Could not use that folder')),
       );
     }
   }
@@ -165,7 +176,7 @@ class DataSection extends ConsumerWidget {
     } catch (error, stack) {
       reportError(error, stack, where: 'backup export');
       messenger.showSnackBar(
-        const SnackBar(content: Text('Could not create the backup.')),
+        const SnackBar(content: Text('Could not create the backup')),
       );
       return;
     }
@@ -224,13 +235,13 @@ class DataSection extends ConsumerWidget {
 
   static String _restoreMessage(ImportOutcome outcome) => switch (outcome) {
         ImportOutcome.restored => 'Backup restored',
-        ImportOutcome.notABackup => 'That does not look like a Zeolite backup.',
-        ImportOutcome.notJson => 'Could not read that as JSON.',
-        ImportOutcome.notZeolite => 'This file was not created by Zeolite.',
+        ImportOutcome.notABackup => 'That does not look like a Zeolite backup',
+        ImportOutcome.notJson => 'Could not read that as JSON',
+        ImportOutcome.notZeolite => 'This file was not created by Zeolite',
         ImportOutcome.tooNew =>
-          'This backup came from a newer version of Zeolite.',
-        ImportOutcome.unreadable => 'Could not read that file.',
-        ImportOutcome.failed => 'Could not restore this backup.',
+          'This backup came from a newer version of Zeolite',
+        ImportOutcome.unreadable => 'Could not read that file',
+        ImportOutcome.failed => 'Could not restore this backup',
       };
 
   Future<void> _reset(BuildContext context, WidgetRef ref) async {

@@ -12,6 +12,7 @@ import '../../widgets/common.dart';
 import '../../widgets/undo_snack.dart';
 import '../subjects/attendance_log_screen.dart';
 import '../subjects/class_editor_sheets.dart';
+import '../subjects/subject_delete_dialog.dart';
 import 'simulate_sheet.dart';
 
 /// The sheet a subject card opens: its figures, its verdict and what can
@@ -256,31 +257,13 @@ class _SubjectDetail extends ConsumerWidget {
     Subject subject,
   ) async {
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
-    final bool? confirmed = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) => AlertDialog(
-        title: Text('Delete ${subject.name}?'),
-        content: const Text(
-          'This also removes its classes and all attendance history.',
-          style: TextStyle(height: 1.4),
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(
-              foregroundColor: context.palette.absent,
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    final bool confirmed = await confirmSubjectDelete(
+      context,
+      subject,
+      ref.read(timetableProvider).value,
     );
 
-    if (confirmed != true) return;
+    if (!confirmed) return;
     final int? id = subject.id;
     if (id != null) {
       final ActionCore core = ref.read(actionCoreProvider);

@@ -79,8 +79,10 @@ class TodayDayPage extends ConsumerWidget {
     List<ClassSession> sessions,
   ) {
     final AppPalette p = context.palette;
-    final int unmarkedHere =
-        sessions.where((ClassSession s) => s.needsMarking).length;
+    // Only classes that have already happened: the rest of today is not
+    // attended yet, whatever the button says.
+    final List<ClassSession> unmarkedHere =
+        sessions.where((ClassSession s) => s.needsMarking).toList();
     return Row(
       children: <Widget>[
         Expanded(
@@ -95,9 +97,9 @@ class TodayDayPage extends ConsumerWidget {
             ),
           ),
         ),
-        if (unmarkedHere > 1)
+        if (unmarkedHere.length > 1)
           InkWell(
-            onTap: () => _markAllPresent(context, ref, sessions),
+            onTap: () => _markAllPresent(context, ref, unmarkedHere),
             borderRadius: BorderRadius.circular(8),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
@@ -147,7 +149,20 @@ class TodayDayPage extends ConsumerWidget {
   }
 
   Widget _empty(BuildContext context, WidgetRef ref) {
-    final TimetableData? timetable = ref.watch(timetableProvider).value;
+    final AsyncValue<TimetableData> loaded = ref.watch(timetableProvider);
+    // Blank while the first read runs, and the failure rather than a
+    // first-run offer if it could not be done.
+    if (!loaded.hasValue) {
+      return loaded.hasError
+          ? Padding(
+              padding: const EdgeInsets.symmetric(vertical: 36),
+              child: LoadFailed(
+                onRetry: () => ref.invalidate(timetableProvider),
+              ),
+            )
+          : const SizedBox.shrink();
+    }
+    final TimetableData? timetable = loaded.value;
     final bool nothingScheduled = (timetable?.slots.isEmpty ?? true) &&
         (timetable?.extras.isEmpty ?? true);
     return Padding(

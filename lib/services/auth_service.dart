@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
+import '../core/report_error.dart';
 import 'firebase/firestore_sync_target.dart';
 
 /// Why a sign-in did not go through, in terms the screen can phrase.
@@ -86,9 +87,15 @@ class AuthService {
     });
   }
 
+  /// Firebase first: that is the sign-out that matters, and a Google SDK that
+  /// throws must not leave the account signed in behind it.
   Future<void> signOut() async {
-    await GoogleSignIn.instance.signOut();
     await _auth.signOut();
+    try {
+      await GoogleSignIn.instance.signOut();
+    } catch (error, stack) {
+      reportError(error, stack, where: 'Google sign-out');
+    }
   }
 
   /// Play requires an in-app way to delete the account *and* the data with it.
@@ -124,7 +131,8 @@ class AuthService {
             ? AuthFailure.cancelled
             : AuthFailure.unknown,
       );
-    } catch (error) {
+    } catch (error, stack) {
+      reportError(error, stack, where: 'account');
       return AuthResult.failed(AuthFailure.unknown, message: '$error');
     }
   }

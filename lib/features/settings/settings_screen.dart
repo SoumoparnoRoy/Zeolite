@@ -40,7 +40,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       headerGap: 22,
       header: _TargetHeader(
         target: settings.targetPercent,
-        onChanged: controller.setTarget,
+        onSettled: controller.setTarget,
       ),
       slivers: <Widget>[
         SliverPadding(
@@ -58,14 +58,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             query: value.text,
                             onTarget: () {
                               _search.clear();
-                              FocusScope.of(context).unfocus();
+                              dropFocus();
                             },
                           ),
               ),
               const SizedBox(height: AppSpacing.xl),
               Center(
                 child: Text(
-                  'Zeolite · 1.0.0\n'
+                  'Zeolite · ${ref.watch(appVersionProvider).value ?? ''}\n'
                   'Your timetable and attendance stay on this device unless '
                   'you sign in, connect Notion, or check a sheet with AI. '
                   'Zeolite counts how the app is used either way.',
@@ -136,7 +136,7 @@ class _Results extends ConsumerWidget {
               final SettingsItem item => item.title,
             },
             onTap: () {
-              FocusScope.of(context).unfocus();
+              dropFocus();
               topic.item == null ? onTarget() : topic.item!.open(context, ref);
             },
           ),
@@ -148,13 +148,29 @@ class _Results extends ConsumerWidget {
 /// The target lives in the header because everything below is computed
 /// against it.
 class _TargetHeader extends StatelessWidget {
-  const _TargetHeader({required this.target, required this.onChanged});
+  const _TargetHeader({required this.target, required this.onSettled});
 
   final double target;
-  final ValueChanged<double> onChanged;
+  final ValueChanged<double> onSettled;
 
   @override
   Widget build(BuildContext context) {
+    return SettledSlider(
+      value: target,
+      onSettled: onSettled,
+      builder: (BuildContext context,
+              double shown,
+              ValueChanged<double> onChanged,
+              ValueChanged<double> onChangeEnd) =>
+          _build(shown, onChanged, onChangeEnd),
+    );
+  }
+
+  Widget _build(
+    double target,
+    ValueChanged<double> onChanged,
+    ValueChanged<double> onChangeEnd,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
@@ -207,6 +223,7 @@ class _TargetHeader extends StatelessWidget {
               divisions: 60,
               label: Words.percent(target),
               onChanged: onChanged,
+              onChangeEnd: onChangeEnd,
             ),
           ),
         ),

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
+import '../../core/report_error.dart';
 import '../../core/words.dart';
 import '../../data/models/attendance_record.dart';
 import '../../data/models/attendance_status.dart';
@@ -55,9 +56,20 @@ class _NotionReviewScreenState extends ConsumerState<NotionReviewScreen> {
   Future<void> _apply() async {
     setState(() => _applying = true);
     final NavigatorState navigator = Navigator.of(context);
-    await ref
-        .read(notionSyncStatusProvider.notifier)
-        .applyReview(Map<String, SyncSide>.from(_choices));
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref
+          .read(notionSyncStatusProvider.notifier)
+          .applyReview(Map<String, SyncSide>.from(_choices));
+    } catch (error, stack) {
+      reportError(error, stack, where: 'Notion review');
+      if (!mounted) return;
+      setState(() => _applying = false);
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Could not apply that. Try again.')),
+      );
+      return;
+    }
     if (mounted) navigator.pop();
   }
 

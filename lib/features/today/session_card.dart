@@ -4,6 +4,7 @@ import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
 import '../../data/models/attendance_status.dart';
 import '../../data/models/class_session.dart';
+import '../../domain/term_outlook.dart';
 import '../../widgets/common.dart';
 
 /// One class on the Today screen, as a row on a timeline: times in a gutter, a
@@ -25,6 +26,8 @@ class SessionCard extends StatefulWidget {
     this.onTag,
     this.isNext = false,
     this.nextColor,
+    this.outlook,
+    this.now,
   });
 
   /// Also how far each spine paints past its own card, so the two cannot drift.
@@ -58,6 +61,16 @@ class SessionCard extends StatefulWidget {
 
   /// The next class still to happen, which earns the one badge on the screen.
   final bool isNext;
+
+  /// The subject's skip budget for the term, shown on a class still to start.
+  /// Null without term dates or a term total, where it cannot be worked out.
+  final TermOutlook? outlook;
+
+  /// The time the screen is drawn for, from the app's clock, so the badge and
+  /// the budget line move on with everything else. The real time without it.
+  final DateTime? now;
+
+  DateTime get _now => now ?? DateTime.now();
 
   @override
   State<SessionCard> createState() => _SessionCardState();
@@ -188,6 +201,7 @@ class _SessionCardState extends State<SessionCard> {
               color: p.textTertiary,
             ),
           ),
+          if (_outlookLine(context) case final Widget line) line,
           if (_showControls) _controls(context) else _verdict(context, status!),
         ],
       ),
@@ -211,12 +225,41 @@ class _SessionCardState extends State<SessionCard> {
     ].join(' · ');
   }
 
+  /// Only before the class starts and while it is unmarked: once it is held
+  /// or marked, the question it answers has already been decided.
+  Widget? _outlookLine(BuildContext context) {
+    final TermOutlook? outlook = widget.outlook;
+    final ClassSession session = widget.session;
+    if (outlook == null ||
+        session.isMarked ||
+        !session.startDateTime.isAfter(widget._now)) {
+      return null;
+    }
+    final AppPalette p = context.palette;
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Text(
+        outlook.line,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: AppType.captionMedium,
+          height: 1.3,
+          fontWeight: FontWeight.w600,
+          color: outlookColor(outlook, p),
+        ),
+      ),
+    );
+  }
+
   Widget _badge(BuildContext context) {
     final AppPalette p = context.palette;
     final ClassSession session = widget.session;
     final AttendanceStatus? status = session.status;
 
-    if (session.isOngoing) {
+    final DateTime now = widget._now;
+    if (now.isAfter(session.startDateTime) &&
+        now.isBefore(session.endDateTime)) {
       return Pill(label: 'Now', color: p.accent);
     }
     if (status != null) {

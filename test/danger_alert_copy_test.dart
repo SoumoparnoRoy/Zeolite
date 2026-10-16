@@ -37,15 +37,15 @@ void main() {
       final String below = NotificationService.dangerMessage(
         _stats(id: 2, name: 'Beta', present: 1, absent: 3),
       );
-      expect(above, startsWith('75% · '));
-      expect(below, startsWith('25% · '));
+      expect(above, startsWith('75.00% · '));
+      expect(below, startsWith('25.00% · '));
     });
 
-    test('rounds the way every other screen does', () {
+    test('cuts to two places the way every other screen does', () {
       final SubjectStats stats =
           _stats(id: 1, name: 'Alpha', present: 2, absent: 1);
       expect(stats.percent, closeTo(66.67, 0.01));
-      expect(NotificationService.dangerMessage(stats), startsWith('67% · '));
+      expect(NotificationService.dangerMessage(stats), startsWith('66.66% · '));
     });
 
     test('is the sentence the rest of the app already shows', () {

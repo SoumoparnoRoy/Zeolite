@@ -59,7 +59,7 @@ void main() {
     // 12 of 18 is 67%, and the card must not read "0 of 18" beside it.
     expect(find.text('12 of 18 attended'), findsOneWidget);
     // Once on the card, once as the headline — both off the same balance.
-    expect(find.text('67%'), findsWidgets);
+    expect(find.text('66.66%'), findsWidgets);
     expect(find.textContaining('0 of 18'), findsNothing);
 
     // The header legend counts the same classes as the percentage above it.
@@ -73,7 +73,7 @@ void main() {
 
     // 12 of 20 rather than 12 of 18, and 2 classes still to come.
     expect(
-      find.textContaining('Your portal will say 60%'),
+      find.textContaining('Your portal will say 60.00%'),
       findsOneWidget,
     );
     expect(find.textContaining('2 classes still to come'), findsOneWidget);

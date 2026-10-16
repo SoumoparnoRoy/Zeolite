@@ -82,11 +82,6 @@ class ClassSession {
 
   bool get isPast => DateTime.now().isAfter(endDateTime);
 
-  bool get isOngoing {
-    final DateTime now = DateTime.now();
-    return now.isAfter(startDateTime) && now.isBefore(endDateTime);
-  }
-
   bool get isToday => Dates.isSameDay(date, DateTime.now());
 
   /// A past session with no mark yet — the Today screen nudges you about these.

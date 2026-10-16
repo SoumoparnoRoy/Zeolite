@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- widget_stats_row at two columns: the name gets the full width and the
-     percentage moves to the end of the counts line. -->
+     percentage a line of its own under it. Beside the counts, two decimal
+     places squeezed "7 of 12 attended" into a column of fragments. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/stat_row"
     android:layout_width="match_parent"
@@ -31,27 +32,18 @@
             android:textSize="13.5sp"
             android:textStyle="bold" />
 
-        <LinearLayout
+        <TextView
+            android:id="@+id/stat_percent"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
+            android:textSize="16sp"
+            android:textStyle="bold" />
 
-            <TextView
-                android:id="@+id/stat_counts"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:textSize="10.5sp" />
-
-            <TextView
-                android:id="@+id/stat_percent"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:paddingStart="6dp"
-                android:textSize="16sp"
-                android:textStyle="bold" />
-        </LinearLayout>
+        <TextView
+            android:id="@+id/stat_counts"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="10.5sp" />
 
         <TextView
             android:id="@+id/stat_headline"

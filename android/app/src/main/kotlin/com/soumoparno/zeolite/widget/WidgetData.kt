@@ -24,6 +24,15 @@ object WidgetData {
         .getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
         .getString(key, null)
 
+    /**
+     * An attendance figure as the app formats it. A payload pushed before the
+     * app formatted it carries a whole number instead, and the launcher keeps
+     * redrawing from it until the app next opens.
+     */
+    fun percentText(entry: JSONObject?): String =
+        entry?.optString("percentText")?.takeIf { it.isNotEmpty() && it != "null" }
+            ?: "${entry?.optInt("percent")}%"
+
     /** Today as the yyyymmdd number Dart keys its days by. */
     fun todayKey(): Int {
         val now = Calendar.getInstance()

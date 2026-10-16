@@ -252,8 +252,10 @@
             </intent-filter>
         </receiver>
 
-        <!-- flutter_local_notifications: delivers scheduled notifications and
-             re-registers them after a reboot or app update. -->
+        <!-- flutter_local_notifications: delivers scheduled notifications.
+             After a reboot or app update NotificationRearmReceiver drops the
+             ones already missed, then hands over to the plugin's own boot
+             receiver to re-register the rest. -->
         <receiver
             android:exported="false"
             android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver" />
@@ -262,7 +264,7 @@
             android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
         <receiver
             android:exported="false"
-            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
+            android:name=".NotificationRearmReceiver">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />

@@ -95,7 +95,7 @@ fun statsRow(context: Context, theme: WidgetTheme, subject: JSONObject, layout: 
         setTextViewText(R.id.stat_counts, subject.optString("counts"))
         setTextViewText(
             R.id.stat_percent,
-            if (hasData) "${subject.optInt("percent")}%" else "—",
+            if (hasData) WidgetData.percentText(subject) else "—",
         )
 
         // Calm by default: the colour is spent only on the subjects that

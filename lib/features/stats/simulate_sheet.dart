@@ -67,7 +67,7 @@ class _SimulateSheetState extends State<SimulateSheet> {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: <Widget>[
             Text(
-              then.hasData ? Words.percent(then.percent) : '—',
+              then.hasData ? Words.attendance(then.percent) : '—',
               style: TextStyle(
                 fontSize: AppType.figureSmall,
                 height: 1,
@@ -85,7 +85,7 @@ class _SimulateSheetState extends State<SimulateSheet> {
                     // Until a class is added the big number already is "now".
                     : _attended == 0 && _missed == 0
                         ? 'Where you are now'
-                        : 'Now ${Words.percent(now.percent)}',
+                        : 'Now ${Words.attendance(now.percent)}',
                 style:
                     monoStyle(color: p.textTertiary, size: AppType.labelSmall),
               ),

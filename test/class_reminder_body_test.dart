@@ -143,7 +143,7 @@ void main() {
       expect(
         NotificationService.classEndTitle(
             _session(), _stats(present: 8, absent: 1)),
-        '89% Physics',
+        '88.88% Physics',
       );
     });
 

@@ -115,7 +115,7 @@ void main() {
         termEnd: Dates.addDays(monday, 14),
       );
       // Two Tuesdays fall in the window, each worth two.
-      expect(engine.remainingSessionsFor(1, from: monday), 4);
+      expect(engine.remainingSessionsBySubject(now: monday)[1], 4);
     });
   });
 

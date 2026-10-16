@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../core/app_theme.dart';
 import '../domain/attendance_stats.dart';
+import '../domain/term_outlook.dart';
 
 /// The colour a subject's attendance is drawn in, shared by every screen that
 /// shows a percentage so they never disagree.
@@ -33,6 +34,14 @@ Color healthFill(AttendanceHealth health, AppPalette palette) {
     palette.surfaceHigher,
   );
 }
+
+/// A skip-budget line's colour: grey while there is room, like the subject
+/// cards' headlines, so the colour is kept for the classes that cannot be
+/// spared.
+Color outlookColor(TermOutlook outlook, AppPalette palette) =>
+    outlook.health == AttendanceHealth.safe
+        ? palette.textTertiary
+        : healthColor(outlook.health, palette);
 
 /// Takes the keyboard down for good. `FocusScope.unfocus()` leaves the field
 /// in the scope's history, so the next sheet or page to close hands focus back

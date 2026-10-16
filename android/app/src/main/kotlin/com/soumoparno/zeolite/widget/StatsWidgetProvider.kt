@@ -125,7 +125,7 @@ class StatsWidgetProvider : ZeoliteWidgetProvider() {
 
             setTextViewText(
                 R.id.stats_percent,
-                if (hasData) "${standing?.optInt("percent")}%" else "—",
+                if (hasData) WidgetData.percentText(standing) else "—",
             )
             setTextViewText(R.id.stats_verdict, standing?.optString("verdict") ?: "")
             setViewVisibility(R.id.stats_next, if (next != null) View.VISIBLE else View.GONE)

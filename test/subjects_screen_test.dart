@@ -123,7 +123,7 @@ void main() {
     // Nothing scheduled is the one count still worth saying inline.
     expect(find.text('no classes'), findsOneWidget);
 
-    expect(find.text('75%'), findsOneWidget); // 3 present of 4 held
+    expect(find.text('75.00%'), findsOneWidget); // 3 present of 4 held
     expect(find.text('—'), findsOneWidget); // Mathematics, nothing marked
     expect(find.text('Add subject'), findsOneWidget);
   });
@@ -283,7 +283,7 @@ void main() {
         ProviderScope.containerOf(tester.element(find.byType(SubjectsScreen)));
 
     expect(find.text('3 of 4 attended'), findsOneWidget);
-    expect(find.text('75%'), findsOneWidget);
+    expect(find.text('75.00%'), findsOneWidget);
 
     await tester.tap(find.text('Count on the Stats page'));
     await tester.pumpAndSettle();

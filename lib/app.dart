@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:home_widget/home_widget.dart';
 
@@ -191,15 +192,22 @@ class _RootShellState extends ConsumerState<RootShell> with RouteAware {
 
   AppLifecycleListener? _lifecycle;
 
+  /// A time or zone set while the app is open, from `MainActivity`.
+  static const MethodChannel _clockChanges = MethodChannel('zeolite/clock');
+
   @override
   void initState() {
     super.initState();
     _lifecycle = AppLifecycleListener(
       onResume: () {
         ref.invalidate(trayAccessProvider);
+        ref.read(clockProvider.notifier).tick();
         _maybeBackUp();
       },
     );
+    _clockChanges.setMethodCallHandler((MethodCall _) async {
+      ref.read(clockProvider.notifier).tick();
+    });
     _tapped.addListener(_openTappedNotification);
     // Set by a link elsewhere too. A swipe sets it already on the page, which
     // the check leaves alone.
@@ -242,6 +250,7 @@ class _RootShellState extends ConsumerState<RootShell> with RouteAware {
     _tapped.removeListener(_openTappedNotification);
     unawaited(_linkSub?.cancel());
     _lifecycle?.dispose();
+    _clockChanges.setMethodCallHandler(null);
     _pages.dispose();
     super.dispose();
   }
@@ -309,9 +318,9 @@ class _RootShellState extends ConsumerState<RootShell> with RouteAware {
   void _report([int? index]) {
     final String tab = shellTabs[index ?? ref.read(selectedTabProvider)];
     // Stats reports its own view changes; arriving on it has to say which.
-    final bool counts =
-        tab == 'stats' && ref.read(statsViewProvider) == StatsView.counts;
-    unawaited(ref.read(analyticsProvider).screen(counts ? 'counts' : tab));
+    unawaited(ref.read(analyticsProvider).screen(
+          tab == 'stats' ? ref.read(statsViewProvider).screenName : tab,
+        ));
   }
 
   @override

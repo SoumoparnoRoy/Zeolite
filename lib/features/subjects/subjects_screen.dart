@@ -242,7 +242,7 @@ class _SubjectRow extends ConsumerWidget {
               const SizedBox(width: 8),
               Text(
                 stats != null && stats.hasData
-                    ? Words.percent(stats.percent)
+                    ? Words.attendance(stats.percent)
                     : '—',
                 style: TextStyle(
                   fontSize: AppType.titleMedium,

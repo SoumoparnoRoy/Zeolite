@@ -5,12 +5,17 @@ import '../../core/app_theme.dart';
 import '../../widgets/common.dart';
 
 enum StatsView {
-  overview('Overview'),
-  counts('Counts');
+  overview('Overview', 'stats'),
+  counts('Counts', 'counts'),
+  plan('Plan', 'plan');
 
-  const StatsView(this.label);
+  const StatsView(this.label, this.screenName);
 
   final String label;
+
+  /// What analytics calls the view. Overview keeps the tab's own name, which
+  /// it had before there was more than one view.
+  final String screenName;
 }
 
 /// The Stats view showing, which another screen sets to open Stats on Counts.
@@ -24,7 +29,7 @@ class StatsViewController extends Notifier<StatsView> {
 final statsViewProvider =
     NotifierProvider<StatsViewController, StatsView>(StatsViewController.new);
 
-/// The two Stats pages, as a pill above them both.
+/// The Stats pages, as a pill above them all.
 class StatsViewSwitch extends StatelessWidget {
   const StatsViewSwitch({
     super.key,

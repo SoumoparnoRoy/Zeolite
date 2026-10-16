@@ -167,7 +167,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // One present and one absent inside the term.
-    expect(find.text('50%', findRichText: true), findsOneWidget);
+    expect(find.text('50.00%', findRichText: true), findsOneWidget);
     expect(find.text('2 of 4 marked · 1 of 2 attended'), findsOneWidget);
   });
 
@@ -188,7 +188,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
-    expect(find.text('50%', findRichText: true), findsOneWidget);
+    expect(find.text('50.00%', findRichText: true), findsOneWidget);
     // The name may shorten; the counts under it must not.
     final RenderParagraph counts = tester.renderObject(
       find.text('2 of 4 marked · 1 of 2 attended'),

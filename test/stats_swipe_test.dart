@@ -67,6 +67,8 @@ Future<void> _pump(WidgetTester tester) async {
 final Finder _header = find.text('ATTENDANCE · THIS TERM');
 final Finder _overview = find.text('BY SUBJECT');
 final Finder _counts = find.text('Update from a portal photo');
+// The fixture has no term dates or term totals, so Plan shows its ask.
+final Finder _plan = find.text('Set term dates to plan');
 
 void main() {
   group('splitting one movement', () {
@@ -165,10 +167,10 @@ void main() {
   testWidgets('past the last view, the same swipe reaches the tab after',
       (WidgetTester tester) async {
     await _pump(tester);
-    await tester.tap(find.text('Counts'));
+    await tester.tap(find.text('Plan'));
     await tester.pumpAndSettle();
 
-    await tester.fling(_counts, const Offset(-120, 0), 2000);
+    await tester.fling(_plan, const Offset(-120, 0), 2000);
     await tester.pumpAndSettle();
 
     expect(find.text('Tab after'), findsOneWidget);

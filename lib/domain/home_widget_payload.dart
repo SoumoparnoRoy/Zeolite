@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 
 import '../core/app_theme.dart';
 import '../core/date_utils.dart';
+import '../core/words.dart';
 import '../data/models/attendance_status.dart';
 import '../data/models/class_session.dart';
 import '../data/models/holiday.dart';
@@ -98,6 +99,10 @@ class HomeWidgetPayload {
     return <String, Object?>{
       'verdict': stats.verdict,
       'hasData': stats.hasData,
+      // Formatted here so the widgets show what the app shows. The whole
+      // number stays for a build from before the text, which reads 0% without
+      // it when installed over this one.
+      'percentText': stats.hasData ? Words.attendance(stats.percent) : null,
       'percent': stats.hasData ? stats.percent.round() : null,
       'target': (stats.target * 100).round(),
       'meetsTarget': stats.meetsTarget,
@@ -175,6 +180,8 @@ class HomeWidgetPayload {
             'name': subject.subject.name,
             'colour': subject.subject.colorValue,
             'hasData': subject.hasData,
+            'percentText':
+                subject.hasData ? Words.attendance(subject.percent) : null,
             'percent': subject.hasData ? subject.percent.round() : null,
             'counts': subject.hasData
                 ? '${subject.attended} of ${subject.held} attended'

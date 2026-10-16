@@ -13,11 +13,12 @@ import '../../widgets/kept_alive.dart';
 import '../../widgets/pager_handoff.dart';
 import 'counts_page.dart';
 import 'overview_page.dart';
+import 'plan_page.dart';
 import 'stats_page_list.dart';
 import 'stats_view.dart';
 
-/// Attendance in two views under one header: where you stand, and the three
-/// counts behind it for anyone who keeps them by hand.
+/// Attendance in three views under one header: where you stand, the counts
+/// behind it, and what the rest of the term still allows.
 class StatsScreen extends ConsumerStatefulWidget {
   const StatsScreen({super.key});
 
@@ -52,9 +53,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
   void _onPageChanged(int page) {
     final StatsView view = StatsView.values[page];
     ref.read(statsViewProvider.notifier).show(view);
-    unawaited(ref
-        .read(analyticsProvider)
-        .screen(view == StatsView.counts ? 'counts' : 'stats'));
+    unawaited(ref.read(analyticsProvider).screen(view.screenName));
   }
 
   @override
@@ -87,6 +86,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
           children: const <Widget>[
             KeptAlive(child: OverviewPage()),
             KeptAlive(child: CountsPage()),
+            KeptAlive(child: PlanPage()),
           ],
         ),
       ),
@@ -130,13 +130,24 @@ class OverallStatsHeader extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: <Widget>[
-                HeaderNumber('${stats.percent.round()}',
-                    size: AppType.figureXl),
+                // Shrinks before it clips at a large font; 3:2 keeps the legend.
+                Flexible(
+                  flex: 3,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: HeaderNumber.attendance(
+                      stats.percent,
+                      size: AppType.figureXl,
+                    ),
+                  ),
+                ),
                 const SizedBox(width: 16),
                 // Capped, not just Expanded: on a wide column a label/value
                 // pair stretched to the full width leaves the count stranded
                 // half a screen from the word it belongs to.
                 Flexible(
+                  flex: 2,
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 190),
                     child: Column(
@@ -160,7 +171,6 @@ class OverallStatsHeader extends StatelessWidget {
                     ),
                   ),
                 ),
-                const Spacer(),
               ],
             ),
           ),
@@ -170,7 +180,7 @@ class OverallStatsHeader extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
             child: Text(
-              'Your portal will say ${Words.percent(stats.termPercent!)} — it counts '
+              'Your portal will say ${Words.attendance(stats.termPercent!)} — it counts '
               'the $toCome still to come as missed.',
               style: TextStyle(
                 fontSize: AppType.captionLarge,

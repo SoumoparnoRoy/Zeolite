@@ -79,4 +79,9 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+
+    testImplementation("junit:junit:4.13.2")
+    // Android's org.json is a stub on the JVM; the real one lets the prune be
+    // tested against a record the plugin actually wrote.
+    testImplementation("org.json:json:20250517")
 }

@@ -58,6 +58,12 @@ class HomeWidgetService {
   /// isolate; `open` goes to the activity.
   static const String scheme = 'zeolite';
 
+  /// What this process last handed the launcher. The clock rebuilds the stats
+  /// at every class start and end and on every resume, and most of those
+  /// change nothing the widgets show; each still wrote four keys and redrew
+  /// every widget.
+  static String? _lastPushed;
+
   Future<void> push({
     required Map<String, Object?> today,
     required Map<String, Object?> standing,
@@ -66,6 +72,16 @@ class HomeWidgetService {
     required List<DateTime> classStarts,
     PendingTap? settles,
   }) async {
+    final String pushed = jsonEncode(<Object?>[
+      today,
+      standing,
+      subjects,
+      theme,
+      <int>[for (final DateTime at in classStarts) at.millisecondsSinceEpoch],
+    ]);
+    // A tap to settle always goes through: the widget is showing it as
+    // pending until this redraw.
+    if (settles == null && pushed == _lastPushed) return;
     try {
       await HomeWidget.saveWidgetData<String>(todayKey, jsonEncode(today));
       await HomeWidget.saveWidgetData<String>(
@@ -82,6 +98,7 @@ class HomeWidgetService {
       if (settles != null) await _settle(settles);
       await _redraw();
       await _scheduleRedraws(classStarts);
+      _lastPushed = pushed;
     } catch (error, stack) {
       reportError(error, stack, where: 'home widget update');
     }

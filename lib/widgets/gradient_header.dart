@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../core/app_theme.dart';
+import '../core/words.dart';
 
 /// A gradient block bleeding from the top edge carrying the screen's headline,
 /// with content on a rounded sheet lifted over it.
@@ -267,6 +268,24 @@ class HeaderNumber extends StatelessWidget {
     this.size = AppType.figureMedium,
     this.unit = '%',
   });
+
+  /// A measured percentage, its two places set small with the sign so the
+  /// whole number keeps the size the header was drawn for: "76" large,
+  /// ".42%" beside it.
+  factory HeaderNumber.attendance(
+    num percent, {
+    Key? key,
+    double size = AppType.figureMedium,
+  }) {
+    final String figure = Words.attendanceFigure(percent);
+    final int point = figure.indexOf('.');
+    return HeaderNumber(
+      figure.substring(0, point),
+      key: key,
+      size: size,
+      unit: '${figure.substring(point)}%',
+    );
+  }
 
   final String value;
   final double size;

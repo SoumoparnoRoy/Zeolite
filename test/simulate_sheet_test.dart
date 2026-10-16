@@ -35,7 +35,7 @@ void main() {
         plannedFromSlots: 20,
       ),
     );
-    expect(find.text('50%'), findsOneWidget);
+    expect(find.text('50.00%'), findsOneWidget);
     expect(find.text('Where you are now'), findsOneWidget);
     expect(
       find.text('Attending the next 4 brings you back to target'),
@@ -44,8 +44,8 @@ void main() {
 
     await tester.tap(find.bySemanticsLabel('One more to Attend'));
     await tester.pump();
-    expect(find.text('60%'), findsOneWidget);
-    expect(find.text('Now 50%'), findsOneWidget);
+    expect(find.text('60.00%'), findsOneWidget);
+    expect(find.text('Now 50.00%'), findsOneWidget);
     expect(
       find.text('Attending the next 3 brings you back to target'),
       findsOneWidget,
@@ -53,7 +53,7 @@ void main() {
 
     await tester.tap(find.text('Reset'));
     await tester.pump();
-    expect(find.text('50%'), findsOneWidget);
+    expect(find.text('50.00%'), findsOneWidget);
   });
 
   testWidgets('stops at the classes the term still holds', (
@@ -79,6 +79,6 @@ void main() {
     await tester.tap(find.bySemanticsLabel('One more to Attend'));
     await tester.pump();
     // 4 of 6 held: the third tap was refused.
-    expect(find.text('67%'), findsOneWidget);
+    expect(find.text('66.66%'), findsOneWidget);
   });
 }

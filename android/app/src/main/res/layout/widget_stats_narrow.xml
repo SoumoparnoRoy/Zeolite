@@ -3,6 +3,7 @@
      it the verdict had less room than one word. Same ids, so the provider fills
      either layout the same way. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/stats_root"
     android:background="@drawable/widget_background"
     android:layout_width="match_parent"
@@ -17,12 +18,22 @@
         android:orientation="vertical"
         android:paddingBottom="14dp">
 
+        <!-- Shrinks to fit from Android 8: at two cells and a large system
+             font, "100.00%" is wider than the column. Below that it stays at
+             32sp, the size it had before the two decimal places. -->
         <TextView
             android:id="@+id/stats_percent"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:autoSizeMaxTextSize="32sp"
+            android:autoSizeMinTextSize="18sp"
+            android:autoSizeStepGranularity="1sp"
+            android:autoSizeTextType="uniform"
+            android:gravity="center_vertical"
+            android:maxLines="1"
             android:textSize="32sp"
-            android:textStyle="bold" />
+            android:textStyle="bold"
+            tools:targetApi="o" />
 
         <TextView
             android:id="@+id/stats_verdict"

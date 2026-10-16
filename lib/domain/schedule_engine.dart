@@ -180,58 +180,73 @@ class ScheduleEngine {
   ///
   /// Only looks back [lookbackDays] so the Today screen never guilt-trips you
   /// about a lecture from three months ago.
-  List<ClassSession> unmarkedSessions({int lookbackDays = 14}) {
-    final DateTime today = Dates.today();
+  List<ClassSession> unmarkedSessions({
+    int lookbackDays = 14,
+    DateTime? now,
+  }) {
+    final DateTime at = now ?? DateTime.now();
+    final DateTime today = Dates.dayOf(at);
     final DateTime from = Dates.addDays(today, -lookbackDays);
     final List<ClassSession> pending = sessionsBetween(from, today)
-        .where((ClassSession s) => s.needsMarking)
+        .where((ClassSession s) => !s.isMarked && at.isAfter(s.endDateTime))
         .toList();
     pending
         .sort((ClassSession a, ClassSession b) => ClassSession.compare(b, a));
     return pending;
   }
 
-  /// Sessions still to come for a subject before the term ends. Used to
-  /// work out whether a target is still mathematically reachable.
+  /// Sessions still to come for each subject before the term ends, counted
+  /// from [now]: today's classes not yet over, then every later day's. Used
+  /// to work out whether a target is still mathematically reachable.
   ///
   /// A session already marked is not one of them — a cancelled class will not
-  /// be attended, and one marked early is already in the held total.
+  /// be attended, and one marked early is already in the held total. One under
+  /// way stays until it ends or is marked: dropping it at its start took it out
+  /// of the term while the student sat in it, and the budget dipped until the
+  /// mark put it back.
   ///
   /// Counted in the same unit as [SubjectStats.held], so a class that counts
   /// twice contributes two. Mixing the units here would put a weighted class
   /// on both sides of `maxAchievableRatio` at different sizes.
-  int remainingSessionsFor(int subjectId, {DateTime? from}) {
-    if (termEnd == null) return 0;
-    final DateTime start = Dates.addDays(from ?? Dates.today(), 1);
-    if (Dates.keyOf(start) > Dates.keyOf(termEnd!)) return 0;
-    return sessionsBetween(start, termEnd!)
-        .where((ClassSession s) => s.subject.id == subjectId && !s.isMarked)
-        .fold<int>(0, (int sum, ClassSession s) => sum + s.weight);
-  }
-
-  /// Remaining sessions for every subject in one pass — much cheaper than
-  /// calling [remainingSessionsFor] per subject.
-  Map<int, int> remainingSessionsBySubject({DateTime? from}) {
+  Map<int, int> remainingSessionsBySubject({DateTime? now}) {
     final Map<int, int> counts = <int, int>{};
     if (termEnd == null) return counts;
-    final DateTime start = Dates.addDays(from ?? Dates.today(), 1);
-    if (Dates.keyOf(start) > Dates.keyOf(termEnd!)) return counts;
-    for (final ClassSession session in sessionsBetween(start, termEnd!)) {
+    final DateTime at = now ?? DateTime.now();
+    final DateTime today = Dates.dayOf(at);
+    if (Dates.keyOf(today) > Dates.keyOf(termEnd!)) return counts;
+    for (final ClassSession session in sessionsBetween(today, termEnd!)) {
       final int? id = session.subject.id;
       if (id == null || session.isMarked) continue;
+      // One that has ended is waiting to be marked, not still to attend.
+      if (!session.endDateTime.isAfter(at)) continue;
       counts[id] = (counts[id] ?? 0) + session.weight;
     }
     return counts;
   }
 
-  /// The next class from now, looking up to [withinDays] ahead.
-  ClassSession? nextSession({int withinDays = 14}) {
-    final DateTime now = DateTime.now();
-    final DateTime today = Dates.dayOf(now);
+  /// The next moment a screen of classes changes by itself: one of today's
+  /// classes starting or ending, or failing those, midnight.
+  DateTime nextChange(DateTime now) {
+    DateTime next = Dates.addDays(Dates.dayOf(now), 1);
+    for (final ClassSession session in sessionsOn(now)) {
+      for (final DateTime at in <DateTime>[
+        session.startDateTime,
+        session.endDateTime,
+      ]) {
+        if (at.isAfter(now) && at.isBefore(next)) next = at;
+      }
+    }
+    return next;
+  }
+
+  /// The next class from [now], looking up to [withinDays] ahead.
+  ClassSession? nextSession({int withinDays = 14, DateTime? now}) {
+    final DateTime at = now ?? DateTime.now();
+    final DateTime today = Dates.dayOf(at);
     for (int i = 0; i <= withinDays; i++) {
       final DateTime day = Dates.addDays(today, i);
       for (final ClassSession session in sessionsOn(day)) {
-        if (session.startDateTime.isAfter(now)) return session;
+        if (session.startDateTime.isAfter(at)) return session;
       }
     }
     return null;

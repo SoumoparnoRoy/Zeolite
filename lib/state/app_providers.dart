@@ -30,6 +30,7 @@ import '../domain/schedule_engine.dart';
 import '../domain/subject_counts.dart';
 import '../domain/sync/sync_target.dart';
 import '../domain/tag_stats.dart';
+import '../domain/term_outlook.dart';
 import '../domain/untimed_match.dart';
 import '../services/analytics_service.dart';
 import '../services/backup_folder.dart';
@@ -424,6 +425,49 @@ class SelectedDateController extends Notifier<DateTime> {
   void shiftDays(int days) => state = Dates.addDays(state, days);
 }
 
+/// The time the screens are drawn for. Moved on only when something on them
+/// can change by itself (a class starting or ending, midnight, a return to the
+/// app), so what watches it is rebuilt a few times a day rather than every
+/// minute; the term's remaining count alone costs tens of milliseconds. Watch
+/// this rather than reading `DateTime.now()` in anything a screen shows.
+final clockProvider =
+    NotifierProvider<ClockController, DateTime>(ClockController.new);
+
+class ClockController extends Notifier<DateTime> {
+  Timer? _next;
+
+  @override
+  DateTime build() {
+    ref.onDispose(() => _next?.cancel());
+    // An edit can bring a class closer than the moment already set.
+    ref.listen<ScheduleEngine?>(
+      scheduleEngineProvider,
+      (ScheduleEngine? _, ScheduleEngine? __) => _arm(DateTime.now()),
+    );
+    final DateTime now = DateTime.now();
+    _arm(now);
+    return now;
+  }
+
+  /// Also called on returning to the app: nothing moves the clock while the
+  /// process is frozen in the background.
+  void tick() {
+    final DateTime now = DateTime.now();
+    _arm(now);
+    state = now;
+  }
+
+  void _arm(DateTime now) {
+    _next?.cancel();
+    final DateTime at = ref.read(scheduleEngineProvider)?.nextChange(now) ??
+        Dates.addDays(Dates.dayOf(now), 1);
+    // A millisecond late rather than early: timers run on whole
+    // milliseconds, and a tick just short of the boundary changes nothing
+    // and has to be fired again.
+    _next = Timer(at.difference(now) + const Duration(milliseconds: 1), tick);
+  }
+}
+
 /// Classes on the currently selected day.
 final selectedDaySessionsProvider = Provider<List<ClassSession>>((ref) {
   final ScheduleEngine? engine = ref.watch(scheduleEngineProvider);
@@ -435,13 +479,15 @@ final selectedDaySessionsProvider = Provider<List<ClassSession>>((ref) {
 /// Past classes you have not marked yet.
 final unmarkedSessionsProvider = Provider<List<ClassSession>>((ref) {
   final ScheduleEngine? engine = ref.watch(scheduleEngineProvider);
+  // A class joins the list as it ends.
+  final DateTime now = ref.watch(clockProvider);
   if (engine == null) return const <ClassSession>[];
-  return engine.unmarkedSessions();
+  return engine.unmarkedSessions(now: now);
 });
 
 final nextSessionProvider = Provider<ClassSession?>((ref) {
   final ScheduleEngine? engine = ref.watch(scheduleEngineProvider);
-  return engine?.nextSession();
+  return engine?.nextSession(now: ref.watch(clockProvider));
 });
 
 /// The week shown on the timetable screen, keyed by its Monday.
@@ -514,7 +560,8 @@ final statsProvider = Provider<OverallStats>((ref) {
   }
 
   final Map<int, int> remaining =
-      engine?.remainingSessionsBySubject() ?? <int, int>{};
+      engine?.remainingSessionsBySubject(now: ref.watch(clockProvider)) ??
+          <int, int>{};
 
   final List<SubjectStats> subjectStats = <SubjectStats>[];
   for (final Subject subject in timetable.subjects) {
@@ -545,6 +592,36 @@ final statsProvider = Provider<OverallStats>((ref) {
   });
 
   return OverallStats(subjects: subjectStats, target: globalTarget);
+});
+
+/// Where each subject can still finish the term, for the Plan view and the
+/// line on Today's upcoming classes.
+final termPlanProvider = Provider<TermPlan>((ref) {
+  final AppSettings? settings = ref.watch(settingsProvider).value;
+  return TermPlan.of(
+    ref.watch(statsProvider),
+    termEndKnown: settings?.termEnd != null,
+  );
+});
+
+/// Classes not yet over before the term ends, unmarked, soonest first: the
+/// ones the remaining count holds, so the two agree. Empty without an end
+/// date: there is no honest place to stop the list.
+///
+/// Expanding a whole term costs tens of milliseconds, so it is autoDispose and
+/// watched only while Plan is the Stats view; a kept-alive page watching it
+/// would redo that on every mark made anywhere in the app.
+final classesAheadProvider = Provider.autoDispose<List<ClassSession>>((ref) {
+  final ScheduleEngine? engine = ref.watch(scheduleEngineProvider);
+  final DateTime? end = ref.watch(settingsProvider).value?.termEnd;
+  if (engine == null || end == null) return const <ClassSession>[];
+  final DateTime now = ref.watch(clockProvider);
+  final DateTime today = Dates.dayOf(now);
+  if (Dates.keyOf(today) > Dates.keyOf(end)) return const <ClassSession>[];
+  return engine
+      .sessionsBetween(today, end)
+      .where((ClassSession s) => !s.isMarked && s.endDateTime.isAfter(now))
+      .toList();
 });
 
 /// Stats for one subject, looked up from [statsProvider] by id.
@@ -634,7 +711,7 @@ final attendanceLogProvider =
   final TimetableData? timetable = ref.watch(timetableProvider).value;
   if (engine == null || timetable == null) return const <AttendanceLogEntry>[];
 
-  final DateTime today = Dates.today();
+  final DateTime today = Dates.dayOf(ref.watch(clockProvider));
   final DateTime earliest = Dates.addDays(today, -_maxLogDays);
 
   // Start at the term opening, but stretch back far enough to include any

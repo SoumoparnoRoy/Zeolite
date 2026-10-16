@@ -1,8 +1,11 @@
 package com.soumoparno.zeolite
 
 import android.content.ActivityNotFoundException
+import android.content.BroadcastReceiver
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -13,8 +16,20 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
 
+    private var clock: MethodChannel? = null
+
+    // The app's clock waits on a timer for the next class or midnight; a time
+    // or zone set while the app is open would otherwise leave it waiting for
+    // the wrong moment until the next resume.
+    private val clockChanged = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            clock?.invokeMethod("changed", null)
+        }
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        clock = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CLOCK_CHANNEL)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -44,6 +59,26 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_TIME_CHANGED)
+            addAction(Intent.ACTION_TIMEZONE_CHANGED)
+        }
+        // Both are system broadcasts, which reach a receiver that is not
+        // exported; nothing else needs to.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(clockChanged, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(clockChanged, filter)
+        }
+    }
+
+    override fun onStop() {
+        unregisterReceiver(clockChanged)
+        super.onStop()
     }
 
     // Below Android 8 there are no channels and no notification screen of the
@@ -109,6 +144,7 @@ class MainActivity : FlutterActivity() {
     private companion object {
         const val CHANNEL = "zeolite/launcher_icon"
         const val SETTINGS_CHANNEL = "zeolite/notification_settings"
+        const val CLOCK_CHANNEL = "zeolite/clock"
         const val DEFAULT = "default"
 
         val ICONS = listOf(

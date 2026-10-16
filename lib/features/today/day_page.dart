@@ -10,6 +10,7 @@ import '../../data/models/holiday.dart';
 import '../../data/models/tag.dart';
 import '../../data/settings/app_settings.dart';
 import '../../domain/schedule_engine.dart';
+import '../../domain/term_outlook.dart';
 import '../../state/providers.dart';
 import '../../widgets/common.dart';
 import '../../widgets/tag_picker.dart';
@@ -34,6 +35,9 @@ class TodayDayPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // "Today", "Now" and the budget lines are read from the time; a class
+    // ending changes no count, so nothing else would redraw them.
+    ref.watch(clockProvider);
     final ScheduleEngine? engine = ref.watch(scheduleEngineProvider);
     final List<ClassSession> sessions =
         engine?.sessionsOn(date) ?? const <ClassSession>[];
@@ -201,6 +205,8 @@ class TodayDayPage extends ConsumerWidget {
     final AppSettings settings =
         ref.watch(settingsProvider).value ?? const AppSettings();
     final ClassSession? next = ref.watch(nextSessionProvider);
+    final TermPlan plan = ref.watch(termPlanProvider);
+    final DateTime now = ref.watch(clockProvider);
     final List<Tag> tags = timetable?.tags ?? const <Tag>[];
     return SliverPadding(
       padding: const EdgeInsets.fromLTRB(_pad, 0, _pad, 96),
@@ -221,6 +227,8 @@ class TodayDayPage extends ConsumerWidget {
             categoryName:
                 timetable?.categoryById(session.effectiveCategoryId)?.name,
             tagName: timetable?.tagById(session.record?.tagId)?.name,
+            outlook: plan.forSubject(session.subject.id),
+            now: now,
             isNext: next != null &&
                 next.date == session.date &&
                 next.startMinutes == session.startMinutes &&

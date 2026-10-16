@@ -173,7 +173,7 @@ class _SubjectStatsCard extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                stats.hasData ? Words.percent(stats.percent) : '—',
+                stats.hasData ? Words.attendance(stats.percent) : '—',
                 style: TextStyle(
                   fontSize: AppType.headingLarge,
                   height: 1,

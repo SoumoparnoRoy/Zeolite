@@ -13,6 +13,9 @@ import 'package:zeolite/domain/schedule_engine.dart';
 /// A Monday, used as the anchor for every fixture below.
 final DateTime monday = DateTime(2026, 8, 3);
 
+/// The fixture's Monday, once its 09:00 class is over.
+final DateTime afterClass = DateTime(2026, 8, 3, 10, 30);
+
 Subject subjectFixture({int id = 1, String name = 'Physics'}) => Subject(
       id: id,
       name: name,
@@ -285,9 +288,20 @@ void main() {
         slots: <ClassSlot>[slotFixture(startDate: Dates.addDays(monday, -70))],
         termEnd: Dates.addDays(monday, 21),
       );
-      // Counting forward from the Monday: +7, +14 and +21 remain.
-      expect(engine.remainingSessionsFor(1, from: monday), 3);
-      expect(engine.remainingSessionsBySubject(from: monday)[1], 3);
+      // Counting forward from the Monday, after its class: +7, +14 and +21.
+      expect(engine.remainingSessionsBySubject(now: afterClass)[1], 3);
+    });
+
+    test("today's class counts until it ends", () {
+      final ScheduleEngine engine = buildEngine(
+        slots: <ClassSlot>[slotFixture(startDate: Dates.addDays(monday, -70))],
+        termEnd: Dates.addDays(monday, 21),
+      );
+      final DateTime beforeClass = DateTime(2026, 8, 3, 8, 30);
+      final DateTime duringClass = DateTime(2026, 8, 3, 9, 30);
+      expect(engine.remainingSessionsBySubject(now: beforeClass)[1], 4);
+      expect(engine.remainingSessionsBySubject(now: duringClass)[1], 4);
+      expect(engine.remainingSessionsBySubject(now: afterClass)[1], 3);
     });
 
     test('a future class already cancelled is not one still to attend', () {
@@ -303,8 +317,7 @@ void main() {
         ],
         termEnd: Dates.addDays(monday, 21),
       );
-      expect(engine.remainingSessionsFor(1, from: monday), 2);
-      expect(engine.remainingSessionsBySubject(from: monday)[1], 2);
+      expect(engine.remainingSessionsBySubject(now: afterClass)[1], 2);
     });
 
     test('one marked ahead of its date is counted as held, not as remaining',
@@ -321,7 +334,7 @@ void main() {
         ],
         termEnd: Dates.addDays(monday, 21),
       );
-      expect(engine.remainingSessionsFor(1, from: monday), 2);
+      expect(engine.remainingSessionsBySubject(now: afterClass)[1], 2);
     });
   });
 

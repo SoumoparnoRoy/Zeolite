@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
+import '../../core/words.dart';
 import '../../data/models/attendance_record.dart';
 import '../../data/models/attendance_status.dart';
 import '../../data/models/class_session.dart';
@@ -161,13 +162,11 @@ class _LogFigure extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(left: 12),
       child: Semantics(
-        label: known ? '${s.percent.round()} percent attended' : null,
+        label: known ? '${Words.attendance(s.percent)} attended' : null,
         excludeSemantics: known,
-        child: HeaderNumber(
-          known ? '${s.percent.round()}' : '—',
-          size: AppType.heroLarge,
-          unit: known ? '%' : '',
-        ),
+        child: known
+            ? HeaderNumber.attendance(s.percent, size: AppType.heroLarge)
+            : const HeaderNumber('—', size: AppType.heroLarge, unit: ''),
       ),
     );
   }

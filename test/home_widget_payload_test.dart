@@ -217,11 +217,11 @@ void main() {
     // A subject with nothing marked is untouched, not in trouble, so it sorts
     // last and shows no figure at all.
     final Map<String, Object?> untouched = rows.last as Map<String, Object?>;
-    expect(untouched['percent'], isNull);
+    expect(untouched['percentText'], isNull);
     expect(untouched['counts'], 'Nothing marked yet');
 
     final Map<String, Object?> worst = rows.first as Map<String, Object?>;
-    expect(worst['percent'], 25);
+    expect(worst['percentText'], '25.00%');
     expect(worst['counts'], '1 of 4 attended');
     expect(worst['meetsTarget'], isFalse);
   });
@@ -248,7 +248,7 @@ void main() {
     );
 
     expect(standing['verdict'], stats.verdict);
-    expect(standing['percent'], 75);
+    expect(standing['percentText'], '75.00%');
     expect(standing['meetsTarget'], isTrue);
   });
 

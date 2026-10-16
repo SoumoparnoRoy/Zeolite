@@ -527,7 +527,7 @@ class NotificationService {
   ) {
     final String name = session.subject.name;
     if (subjectStats == null || !subjectStats.hasData) return name;
-    return '${Words.percent(subjectStats.percent)} $name';
+    return '${Words.attendance(subjectStats.percent)} $name';
   }
 
   Future<void> _scheduleClassReminders(
@@ -803,7 +803,7 @@ class NotificationService {
   /// One shape either side of the target — the on-target case used to get a
   /// sentence of its own — and rounded like every percentage elsewhere.
   static String dangerMessage(SubjectStats subjectStats) =>
-      '${Words.percent(subjectStats.percent)} · ${subjectStats.headline}';
+      '${Words.attendance(subjectStats.percent)} · ${subjectStats.headline}';
 
   /// Shared with the in-app dialog, so the two cannot word it differently.
   static String dangerTitle(int count) =>

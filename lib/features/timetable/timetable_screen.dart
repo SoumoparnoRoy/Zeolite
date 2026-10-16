@@ -32,8 +32,10 @@ class TimetableScreen extends ConsumerWidget {
     final Map<int, List<ClassSession>> byDay =
         engine?.sessionsForWeekOf(weekStart) ?? <int, List<ClassSession>>{};
     final DateTime weekEnd = Dates.addDays(weekStart, 6);
-    final bool isCurrentWeek =
-        Dates.isSameDay(weekStart, Dates.startOfWeek(Dates.today()));
+    final bool isCurrentWeek = Dates.isSameDay(
+      weekStart,
+      Dates.startOfWeek(ref.watch(clockProvider)),
+    );
     final int weekTotal = byDay.values
         .fold<int>(0, (int sum, List<ClassSession> v) => sum + v.length);
 

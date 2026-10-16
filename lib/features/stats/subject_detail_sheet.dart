@@ -177,7 +177,7 @@ class _SubjectDetail extends ConsumerWidget {
         const SizedBox(height: AppSpacing.md),
         Text(
           'Attending every remaining class would put you at '
-          '${Words.percent(stats.maxAchievableRatio * 100)}.',
+          '${Words.attendance(stats.maxAchievableRatio * 100)}.',
           style: TextStyle(
               fontSize: AppType.labelLarge, height: 1.4, color: p.textTertiary),
         ),

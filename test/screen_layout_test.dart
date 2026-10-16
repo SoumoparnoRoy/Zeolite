@@ -47,7 +47,8 @@ class _StaticSettings extends SettingsController {
   Future<AppSettings> build() async => _settings;
 }
 
-TimetableData _fixture() {
+/// [perfect] marks every held class attended: 100.00%, the widest figure.
+TimetableData _fixture({bool perfect = false}) {
   final DateTime today = Dates.today();
   final DateTime monday = Dates.startOfWeek(today);
   return TimetableData(
@@ -99,7 +100,7 @@ TimetableData _fixture() {
         subjectId: 2,
         date: Dates.addDays(today, -6),
         startMinutes: 9 * 60 + 50,
-        status: AttendanceStatus.absent,
+        status: perfect ? AttendanceStatus.present : AttendanceStatus.absent,
       ),
       AttendanceRecord(
         subjectId: 2,
@@ -111,10 +112,16 @@ TimetableData _fixture() {
   );
 }
 
-Widget _host(Widget screen, ThemeData theme, {double textScale = 1}) {
+Widget _host(
+  Widget screen,
+  ThemeData theme, {
+  double textScale = 1,
+  bool perfect = false,
+}) {
   return ProviderScope(
     overrides: [
-      timetableProvider.overrideWith((Ref ref) async => _fixture()),
+      timetableProvider
+          .overrideWith((Ref ref) async => _fixture(perfect: perfect)),
       settingsProvider.overrideWith(_StaticSettings.new),
     ],
     child: MaterialApp(
@@ -168,6 +175,22 @@ void main() {
 
       await tester.pumpWidget(
         _host(entry.value(), AppTheme.light(), textScale: 1.3),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final MapEntry<String, Widget Function()> entry in screens.entries) {
+    testWidgets('${entry.key} fits 100.00% on a small phone at a larger font',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = _smallPhone;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        _host(entry.value(), AppTheme.light(), textScale: 1.3, perfect: true),
       );
       await tester.pumpAndSettle();
 

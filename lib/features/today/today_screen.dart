@@ -27,10 +27,13 @@ import 'week_strip.dart';
 /// Computed once per data change rather than on every scroll frame.
 final dayMarkersProvider = Provider<Map<int, DayMarker>>((ref) {
   final ScheduleEngine? engine = ref.watch(scheduleEngineProvider);
+  // A class ending puts a dot under today without any data changing.
+  final DateTime now = ref.watch(clockProvider);
   if (engine == null) return const <int, DayMarker>{};
 
-  final DateTime from = Dates.addDays(Dates.today(), -60);
-  final DateTime to = Dates.addDays(Dates.today(), 120);
+  final DateTime today = Dates.dayOf(now);
+  final DateTime from = Dates.addDays(today, -60);
+  final DateTime to = Dates.addDays(today, 120);
   final Map<int, List<ClassSession>> byDay =
       engine.sessionsByDayBetween(from, to);
 
@@ -38,7 +41,8 @@ final dayMarkersProvider = Provider<Map<int, DayMarker>>((ref) {
     for (final MapEntry<int, List<ClassSession>> entry in byDay.entries)
       entry.key: DayMarker(
         count: entry.value.length,
-        hasUnmarked: entry.value.any((ClassSession s) => s.needsMarking),
+        hasUnmarked: entry.value
+            .any((ClassSession s) => !s.isMarked && now.isAfter(s.endDateTime)),
         color: entry.value.first.subject.color,
       ),
   };
@@ -401,9 +405,19 @@ class _DayHeader extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: <Widget>[
-                HeaderNumber('${stats.percent.round()}'),
+                // 100.00% at a large font pushed the caption onto more lines
+                // than the header has; the figure shrinks first instead.
+                Flexible(
+                  flex: 2,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: HeaderNumber.attendance(stats.percent),
+                  ),
+                ),
                 const SizedBox(width: 14),
                 Expanded(
+                  flex: 3,
                   child: HeaderCaption(
                     '${stats.attended} attended of ${stats.held} held\n'
                     'target ${Words.percent(settings.targetPercent)}'

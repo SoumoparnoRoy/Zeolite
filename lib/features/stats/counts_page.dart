@@ -168,7 +168,7 @@ class _CountsCard extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(right: 4),
                 child: Text(
-                  stats.hasData ? Words.percent(stats.percent) : '—',
+                  stats.hasData ? Words.attendance(stats.percent) : '—',
                   style: TextStyle(
                     fontSize: AppType.headingLarge,
                     height: 1,

@@ -32,9 +32,19 @@ class Words {
   static String plural(int value, String singular, [String? plural]) =>
       '$value ${noun(value, singular, plural)}';
 
-  /// `76%`. Rounded half away from zero, the same as every other figure, so
-  /// a subject's line and its header never disagree by one.
+  /// `75%`, for what is set rather than measured: targets and how far the
+  /// term has run. Rounded half away from zero.
   static String percent(num value) => '${value.round()}%';
+
+  /// Attendance as measured, to two places: `76.42%`. Cut rather than
+  /// rounded, so a figure short of its target never reads as reaching it
+  /// (74.996% is 74.99%, not 75.00%).
+  static String attendance(num percent) => '${attendanceFigure(percent)}%';
+
+  /// [attendance] without the sign, for a header that sets it apart. The
+  /// nudge absorbs binary error: 29% is stored as 28.999999999999996.
+  static String attendanceFigure(num percent) =>
+      ((percent * 100 + 1e-6).floor() / 100).toStringAsFixed(2);
 
   /// The word alone, where the figure is written some other way or sits
   /// apart from it.

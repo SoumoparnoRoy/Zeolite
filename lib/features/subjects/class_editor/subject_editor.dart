@@ -147,6 +147,7 @@ class _SubjectFormState extends ConsumerState<_SubjectForm> {
           controller: _name,
           autofocus: widget.subject == null,
           textCapitalization: TextCapitalization.words,
+          inputFormatters: shortTextFormatters,
           decoration: const InputDecoration(
             labelText: 'Subject name',
             hintText: 'e.g. Thermodynamics',
@@ -159,6 +160,7 @@ class _SubjectFormState extends ConsumerState<_SubjectForm> {
               child: TextField(
                 controller: _code,
                 textCapitalization: TextCapitalization.characters,
+                inputFormatters: shortTextFormatters,
                 decoration: const InputDecoration(
                   labelText: 'Code',
                   hintText: 'e.g. CS201',
@@ -170,6 +172,7 @@ class _SubjectFormState extends ConsumerState<_SubjectForm> {
               child: TextField(
                 controller: _teacher,
                 textCapitalization: TextCapitalization.words,
+                inputFormatters: shortTextFormatters,
                 decoration: const InputDecoration(
                   labelText: 'Professor',
                   hintText: 'Optional',

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -24,6 +26,9 @@ enum AuthFailure {
   /// Deleting an account needs a recent sign-in, and Firebase decides what
   /// recent means. The screen asks them to sign in again and retry.
   needsRecentLogin,
+
+  /// Confirming with Google picked a different account from the one signed in.
+  wrongAccount,
 
   cancelled,
   unknown,
@@ -54,11 +59,57 @@ class AuthService {
   Stream<User?> get changes => _auth.authStateChanges();
   User? get user => _auth.currentUser;
 
-  Future<AuthResult> signUp(String email, String password) =>
-      _guard(() => _auth.createUserWithEmailAndPassword(
-            email: email.trim(),
-            password: password,
-          ));
+  /// The link is what proves the address belongs to whoever typed it. Without
+  /// it, anyone could sign up with someone else's Gmail address, fill the
+  /// account, and have Google hand it to the owner on their first sign-in.
+  Future<AuthResult> signUp(String email, String password) => _guard(() async {
+        final UserCredential credential =
+            await _auth.createUserWithEmailAndPassword(
+          email: email.trim(),
+          password: password,
+        );
+        // Not waited on: the account exists either way, and the Account
+        // screen offers to send the link again.
+        final User? user = credential.user;
+        if (user != null) {
+          unawaited(user.sendEmailVerification().catchError(
+                (Object error, StackTrace stack) =>
+                    reportError(error, stack, where: 'verification email'),
+              ));
+        }
+      });
+
+  Future<AuthResult> sendVerification() =>
+      _guard(() async => _auth.currentUser?.sendEmailVerification());
+
+  /// Firebase answers the same whether or not the address has an account, so
+  /// the screen can't say which, and shouldn't.
+  Future<AuthResult> sendPasswordReset(String email) =>
+      _guard(() => _auth.sendPasswordResetEmail(email: email.trim()));
+
+  /// A password account that has not opened its link. Google vouches for its
+  /// own addresses, so only the password provider is ever unverified here.
+  static bool needsVerification(User user) =>
+      !user.emailVerified &&
+      user.providerData.any((UserInfo info) => info.providerId == 'password');
+
+  /// Asks Firebase again after the link was opened in the mail app. The ID
+  /// token is refreshed too: the rules read `email_verified` from the token,
+  /// and the one this device holds was minted before the click.
+  Future<bool> confirmVerified() async {
+    try {
+      await _auth.currentUser?.reload();
+      final User? user = _auth.currentUser;
+      if (user == null || !user.emailVerified) return false;
+      await user.getIdToken(true);
+      return true;
+    } on FirebaseAuthException {
+      return false;
+    } catch (error, stack) {
+      reportError(error, stack, where: 'verification check');
+      return false;
+    }
+  }
 
   Future<AuthResult> signIn(String email, String password) =>
       _guard(() => _auth.signInWithEmailAndPassword(
@@ -98,6 +149,43 @@ class AuthService {
     }
   }
 
+  /// Which way [user] proves it is them before a delete.
+  static bool confirmsWithGoogle(User user) =>
+      user.providerData.any((UserInfo info) => info.providerId == 'google.com');
+
+  /// Firebase refuses to delete an account whose sign-in is more than a few
+  /// minutes old, and checks only at the last step, after the data has gone.
+  /// Confirming first makes the delete one step instead of two.
+  Future<AuthResult> confirmWithPassword(String password) async {
+    final User? current = _auth.currentUser;
+    final String? email = current?.email;
+    if (current == null || email == null) {
+      return const AuthResult.failed(AuthFailure.noSuchUser);
+    }
+    return _guard(() => current.reauthenticateWithCredential(
+          EmailAuthProvider.credential(email: email, password: password),
+        ));
+  }
+
+  Future<AuthResult> confirmWithGoogle() async {
+    final User? current = _auth.currentUser;
+    if (current == null) return const AuthResult.failed(AuthFailure.noSuchUser);
+    return _guard(() async {
+      await GoogleSignIn.instance.initialize();
+      final GoogleSignInAccount account =
+          await GoogleSignIn.instance.authenticate();
+      final GoogleSignInClientAuthorization authorization = await account
+          .authorizationClient
+          .authorizeScopes(<String>['email', 'profile']);
+      await current.reauthenticateWithCredential(
+        GoogleAuthProvider.credential(
+          idToken: account.authentication.idToken,
+          accessToken: authorization.accessToken,
+        ),
+      );
+    });
+  }
+
   /// Play requires an in-app way to delete the account *and* the data with it.
   ///
   /// The documents go first and the account last: an interrupted run then
@@ -117,6 +205,28 @@ class AuthService {
       await current.delete();
       await GoogleSignIn.instance.signOut();
     });
+  }
+
+  /// Whether Firebase says [user]'s account no longer exists. A device that
+  /// was signed in when another one deleted the account keeps a working ID
+  /// token for up to an hour, and the rules accept it, so its next sync would
+  /// quietly fill the deleted account up again. Anything short of a definite
+  /// answer — offline, a slow server — reads as still there, and the run then
+  /// fails or succeeds on its own terms.
+  static Future<bool> isDeleted(User user) async {
+    try {
+      await user.reload();
+      return false;
+    } on FirebaseAuthException catch (error) {
+      return const <String>{
+        'user-not-found',
+        'user-disabled',
+        'user-token-expired',
+      }.contains(error.code);
+    } catch (error, stack) {
+      reportError(error, stack, where: 'account check');
+      return false;
+    }
   }
 
   Future<AuthResult> _guard(Future<void> Function() run) async {
@@ -159,6 +269,8 @@ class AuthService {
         return AuthFailure.differentSignInMethod;
       case 'requires-recent-login':
         return AuthFailure.needsRecentLogin;
+      case 'user-mismatch':
+        return AuthFailure.wrongAccount;
       default:
         return AuthFailure.unknown;
     }

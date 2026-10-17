@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -12,6 +13,7 @@ import 'package:zeolite/data/models/subject.dart';
 import 'package:zeolite/data/settings/app_settings.dart';
 import 'package:zeolite/domain/sync/sync_merge.dart';
 import 'package:zeolite/domain/sync/sync_target.dart';
+import 'package:zeolite/services/auth_service.dart';
 import 'package:zeolite/services/sync/sync_coordinator.dart';
 import 'package:zeolite/state/auth_providers.dart';
 import 'package:zeolite/state/providers.dart';
@@ -26,7 +28,38 @@ class _SignedInAs implements User {
   final String uid;
 
   @override
+  Future<void> reload() async {}
+
+  @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+/// Signed in when another device deleted the account: the token still works,
+/// but Firebase no longer knows the user.
+class _DeletedElsewhere implements User {
+  @override
+  String get uid => 'uid-deleted';
+
+  @override
+  Future<void> reload() async =>
+      throw FirebaseAuthException(code: 'user-not-found');
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _Unused implements FirebaseAuth, FirebaseFirestore {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _CountingSignOut extends AuthService {
+  _CountingSignOut() : super(auth: _Unused(), firestore: _Unused());
+
+  int signOuts = 0;
+
+  @override
+  Future<void> signOut() async => signOuts++;
 }
 
 /// Two ways a ledger stops describing the far side, both reported from a real
@@ -247,5 +280,37 @@ void main() {
       second.read(settingsProvider).value?.syncedAccountId,
       'uid-second',
     );
+  });
+
+  test('an account deleted from another device is signed out, not refilled',
+      () async {
+    final _CountingSignOut auth = _CountingSignOut();
+    final ProviderContainer container = ProviderContainer(
+      overrides: [
+        repositoryProvider.overrideWithValue(repo),
+        syncTargetProvider.overrideWithValue(target),
+        authServiceProvider.overrideWithValue(auth),
+        signedInUserProvider.overrideWith(
+          (Ref ref) => Stream<User?>.value(_DeletedElsewhere()),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    container.listen(signedInUserProvider, (_, __) {});
+    await container.read(signedInUserProvider.future);
+    await container.read(settingsProvider.future);
+
+    final SyncRunResult? result =
+        await container.read(syncStatusProvider.notifier).run(force: true);
+
+    expect(result, isNull);
+    expect(auth.signOuts, 1);
+    expect(await repo.getRemoteLinks('fake', SyncKind.subject), isEmpty,
+        reason: 'nothing was pushed to the deleted account');
+  });
+
+  test('only a definite answer counts as deleted', () async {
+    expect(await AuthService.isDeleted(_DeletedElsewhere()), isTrue);
+    expect(await AuthService.isDeleted(_SignedInAs('uid-live')), isFalse);
   });
 }

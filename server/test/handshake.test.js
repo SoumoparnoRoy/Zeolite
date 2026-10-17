@@ -53,16 +53,29 @@ async function startSession(value = challenge) {
     redirect: "manual",
   });
   const location = new URL(response.headers.get("location"));
-  return { response, location, state: location.searchParams.get("state") };
+  const cookie = response.headers.getSetCookie()[0];
+  return {
+    response,
+    location,
+    state: location.searchParams.get("state"),
+    cookie,
+    browser: cookie?.split(";")[0],
+  };
+}
+
+// Comes back from Notion in the browser that started, unless told otherwise.
+function returnFrom(started, browser = started.browser) {
+  return fetch(
+    `${baseUrl}/notion/callback?code=generic-code&state=${encodeURIComponent(started.state)}`,
+    { headers: browser ? { cookie: browser } : {} },
+  );
 }
 
 async function readySession(sessionVerifier = verifier) {
   const started = await startSession(
     createHash("sha256").update(sessionVerifier).digest("base64url"),
   );
-  const callback = await fetch(
-    `${baseUrl}/notion/callback?code=generic-code&state=${encodeURIComponent(started.state)}`,
-  );
+  const callback = await returnFrom(started);
   const html = await callback.text();
   const session = html.match(/zeolite:\/\/notion\?session=([A-Za-z0-9_-]+)/)?.[1];
   const code = html.match(/<div class="code">([A-Z0-9]+)<\/div>/)?.[1];
@@ -121,9 +134,7 @@ test("callback returns the pairing code and app deep link", async () => {
 test("callback hides an upstream failure", async () => {
   upstreamMode = "failure";
   const started = await startSession();
-  const response = await fetch(
-    `${baseUrl}/notion/callback?code=generic-code&state=${encodeURIComponent(started.state)}`,
-  );
+  const response = await returnFrom(started);
   const body = await response.text();
   assert.equal(response.status, 502);
   assert.doesNotMatch(body, /provider-private-error/);
@@ -141,9 +152,7 @@ test("pressing Cancel on Notion says so, and the pages carry a policy", async ()
 test("a reply from Notion without a token is not a connection", async () => {
   upstreamMode = "tokenless";
   const started = await startSession();
-  const response = await fetch(
-    `${baseUrl}/notion/callback?code=generic-code&state=${encodeURIComponent(started.state)}`,
-  );
+  const response = await returnFrom(started);
   upstreamMode = "success";
   assert.equal(response.status, 502);
   assert.doesNotMatch(await response.text(), /Connection ready/);
@@ -152,9 +161,7 @@ test("a reply from Notion without a token is not a connection", async () => {
 test("a stalled Notion gives up instead of holding the request open", async () => {
   upstreamMode = "stalled";
   const started = await startSession();
-  const callback = await fetch(
-    `${baseUrl}/notion/callback?code=generic-code&state=${encodeURIComponent(started.state)}`,
-  );
+  const callback = await returnFrom(started);
   assert.equal(callback.status, 502);
 
   const refresh = await fetch(`${baseUrl}/notion/refresh`, {
@@ -173,12 +180,11 @@ test("a stalled Notion gives up instead of holding the request open", async () =
 test("reloading the ready page shows it again, and the session stays claimable", async () => {
   upstreamMode = "success";
   const started = await startSession();
-  const callbackUrl = `${baseUrl}/notion/callback?code=generic-code&state=${encodeURIComponent(started.state)}`;
-  const first = await (await fetch(callbackUrl)).text();
+  const first = await (await returnFrom(started)).text();
 
   // Notion refuses a code it has already exchanged.
   upstreamMode = "failure";
-  const reload = await fetch(callbackUrl);
+  const reload = await returnFrom(started);
   upstreamMode = "success";
   assert.equal(reload.status, 200);
   assert.equal(await reload.text(), first);
@@ -192,12 +198,41 @@ test("reloading the ready page shows it again, and the session stays claimable",
   assert.deepEqual(await claim.json(), tokenPayload);
 });
 
+test("only the browser that started the session is shown it", async () => {
+  currentTime += 61_000;
+  upstreamMode = "success";
+  const started = await startSession();
+  assert.match(started.cookie, /HttpOnly/);
+  assert.match(started.cookie, /Secure/);
+  assert.match(started.cookie, /SameSite=Lax/);
+  assert.match(started.cookie, /Path=\/notion/);
+
+  // Someone else's link: the session is never exchanged, and stays pending.
+  const other = await startSession();
+  const crossed = await returnFrom(started, other.browser);
+  assert.equal(crossed.status, 400);
+  assert.match(await crossed.text(), /This link expired/);
+
+  const ready = await (await returnFrom(started)).text();
+  const session = ready.match(/session=([A-Za-z0-9_-]+)/)[1];
+  const code = ready.match(/<div class="code">([A-Z0-9]+)<\/div>/)[1];
+
+  for (const browser of [null, other.browser, `${started.browser}x`]) {
+    upstreamMode = "failure";
+    const reload = await returnFrom(started, browser);
+    upstreamMode = "success";
+    const body = await reload.text();
+    assert.equal(reload.status, 400);
+    assert.match(body, /This link expired/);
+    assert.ok(!body.includes(session) && !body.includes(code));
+  }
+  currentTime += 61_000;
+});
+
 test("a session that runs out during the exchange is not shown as ready", async () => {
   upstreamMode = "outlived";
   const started = await startSession();
-  const response = await fetch(
-    `${baseUrl}/notion/callback?code=generic-code&state=${encodeURIComponent(started.state)}`,
-  );
+  const response = await returnFrom(started);
   upstreamMode = "success";
   assert.equal(response.status, 400);
   assert.match(await response.text(), /This link expired/);

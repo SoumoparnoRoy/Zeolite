@@ -25,14 +25,23 @@ class WidgetMarkReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         val uri = intent.data ?: return
+        // The list's template is mutable, so the widget host fills this URI in
+        // and could name any class on any date. Only a class the widget is
+        // showing right now, with a status the app knows, goes on to Dart.
+        val tap = runCatching { tapOn(context, uri) }.getOrNull() ?: return
         // A head start only: nothing that goes wrong drawing it may stop the
         // tap reaching Dart.
-        val drawnAt = runCatching { drawAtOnce(context, uri) }.getOrNull()
-        val forwarded = if (drawnAt == null) {
-            uri
-        } else {
-            uri.buildUpon().appendQueryParameter("drawn", drawnAt.toString()).build()
-        }
+        val drawnAt = runCatching { drawAtOnce(context, tap) }.getOrNull()
+        // Rebuilt from what was checked, never passed on as it came: Android
+        // reads the first of a repeated parameter and Dart the last, so a
+        // second subject= would otherwise reach Dart unchecked.
+        val checked = uri.buildUpon().clearQuery()
+            .appendQueryParameter("subject", tap.subject.toString())
+            .appendQueryParameter("date", tap.date.toString())
+            .appendQueryParameter("start", tap.start.toString())
+            .appendQueryParameter("status", tap.status)
+        if (drawnAt != null) checked.appendQueryParameter("drawn", drawnAt.toString())
+        val forwarded = checked.build()
         context.sendBroadcast(
             Intent(context, HomeWidgetBackgroundReceiver::class.java)
                 .setAction(BACKGROUND_ACTION)
@@ -40,21 +49,33 @@ class WidgetMarkReceiver : BroadcastReceiver() {
         )
     }
 
-    /** When the tap was drawn, or null when it could not be. */
-    private fun drawAtOnce(context: Context, uri: Uri): Long? {
+    private class Tap(
+        val subject: Int,
+        val date: Int,
+        val start: Int,
+        val status: String,
+        val session: JSONObject,
+    )
+
+    /** The tap, or null when it names something the widget is not showing. */
+    private fun tapOn(context: Context, uri: Uri): Tap? {
         val subject = uri.getQueryParameter("subject")?.toIntOrNull() ?: return null
         val date = uri.getQueryParameter("date")?.toIntOrNull() ?: return null
         val start = uri.getQueryParameter("start")?.toIntOrNull() ?: return null
-        val status = uri.getQueryParameter("status")?.takeIf { it.isNotBlank() } ?: return null
+        val status = uri.getQueryParameter("status")?.takeIf { it in STATUSES } ?: return null
         val session = sessionFor(context, subject, date, start) ?: return null
+        return Tap(subject, date, start, status, session)
+    }
 
-        val key = WidgetData.markKey(subject, date, start)
+    /** When the tap was drawn, or null when it could not be. */
+    private fun drawAtOnce(context: Context, tap: Tap): Long? {
+        val key = WidgetData.markKey(tap.subject, tap.date, tap.start)
         val shown = WidgetData.pendingMarks(context)[key]
-            ?: session.optString("status").takeIf { it.isNotBlank() && it != "null" }
+            ?: tap.session.optString("status").takeIf { it.isNotBlank() && it != "null" }
             ?: ""
         // The Today screen's rule, which Dart applies to the same tap: tapping
         // the status a class already has clears it.
-        val at = WidgetData.putPendingMark(context, key, if (shown == status) "" else status)
+        val at = WidgetData.putPendingMark(context, key, if (shown == tap.status) "" else tap.status)
 
         val manager = AppWidgetManager.getInstance(context)
         val ids = manager.getAppWidgetIds(ComponentName(context, TodayWidgetProvider::class.java))
@@ -82,27 +103,33 @@ class WidgetMarkReceiver : BroadcastReceiver() {
         alarms.set(AlarmManager.RTC, at + WidgetData.PENDING_FOR_MS + 1000, redraw)
     }
 
-    /** The class as the widget drew it, or null when the payload has moved on. */
-    private fun sessionFor(context: Context, subject: Int, date: Int, start: Int): JSONObject? {
-        val days = WidgetData.read(context, "today")?.optJSONArray("days") ?: return null
-        for (index in 0 until days.length()) {
-            val day = days.optJSONObject(index) ?: continue
-            if (day.optInt("date") != date) continue
-            val classes = day.optJSONArray("classes") ?: return null
-            for (row in 0 until classes.length()) {
-                val session = classes.optJSONObject(row) ?: continue
-                if (session.optInt("subjectId") == subject && session.optInt("startMinutes") == start) {
-                    return session
-                }
-            }
-        }
-        return null
-    }
+    private fun sessionFor(context: Context, subject: Int, date: Int, start: Int): JSONObject? =
+        shownSession(WidgetData.read(context, "today"), subject, date, start)
 
-    private companion object {
-        const val BACKGROUND_ACTION = "es.antonborri.home_widget.action.BACKGROUND"
+    internal companion object {
+        private const val BACKGROUND_ACTION = "es.antonborri.home_widget.action.BACKGROUND"
+
+        /** `AttendanceStatus` in Dart, by name. */
+        val STATUSES = setOf("present", "absent", "cancelled")
 
         /** One alarm, moved on by each tap: the last tap's lapse is the one that matters. */
-        const val LAPSE_CODE = 7
+        private const val LAPSE_CODE = 7
+
+        /** The class as the widget drew it, or null when the payload has moved on. */
+        fun shownSession(today: JSONObject?, subject: Int, date: Int, start: Int): JSONObject? {
+            val days = today?.optJSONArray("days") ?: return null
+            for (index in 0 until days.length()) {
+                val day = days.optJSONObject(index) ?: continue
+                if (day.optInt("date") != date) continue
+                val classes = day.optJSONArray("classes") ?: return null
+                for (row in 0 until classes.length()) {
+                    val session = classes.optJSONObject(row) ?: continue
+                    if (session.optInt("subjectId") == subject && session.optInt("startMinutes") == start) {
+                        return session
+                    }
+                }
+            }
+            return null
+        }
     }
 }

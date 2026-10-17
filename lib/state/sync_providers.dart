@@ -7,6 +7,7 @@ import '../data/settings/app_settings.dart';
 import '../domain/sync/sync_merge.dart';
 import '../domain/sync/sync_status.dart';
 import '../domain/sync/sync_target.dart';
+import '../services/auth_service.dart';
 import '../services/firebase/firestore_sync_target.dart';
 import '../services/sync/sync_coordinator.dart';
 import '../services/sync/sync_scheduler.dart';
@@ -25,12 +26,13 @@ final minuteTickProvider = StreamProvider.autoDispose<DateTime>((ref) async* {
   );
 });
 
-/// The account as somewhere to mirror to, or null while signed out. Rebuilt
+/// The account as somewhere to mirror to, or null while signed out or not
+/// yet verified. Rebuilt
 /// when the user changes, so signing into a second account cannot go on
 /// writing to the first one's collections.
 final syncTargetProvider = Provider<SyncTarget?>((ref) {
   final User? user = ref.watch(signedInUserProvider).value;
-  if (user == null) return null;
+  if (user == null || ref.watch(verificationPendingProvider)) return null;
   return FirestoreSyncTarget(uid: user.uid);
 });
 
@@ -92,8 +94,11 @@ class SyncController extends Notifier<SyncStatus> {
   @override
   SyncStatus build() {
     // Signing out has to clear this: a stale "synced 2 minutes ago" against an
-    // account nobody is in reads as a promise the app is not keeping.
+    // account nobody is in reads as a promise the app is not keeping. The last
+    // result too, which otherwise outlives the rebuild and shows the previous
+    // account's counts under the new one.
     ref.watch(syncTargetProvider);
+    _last = null;
     return const SyncStatus();
   }
 
@@ -106,6 +111,10 @@ class SyncController extends Notifier<SyncStatus> {
     if (coordinator == null) return null;
 
     state = coordinator.status.running();
+    if (await _accountGone()) {
+      state = coordinator.status;
+      return null;
+    }
     final SyncRunResult result;
     try {
       result = await ref
@@ -136,7 +145,13 @@ class SyncController extends Notifier<SyncStatus> {
 
     await _forgetLedgerIfAccountChanged(coordinator.target.id);
 
+    // Running before the account check, which is a round trip: a second call
+    // in that gap has to be turned away like any other overlapping one.
     state = coordinator.status.running();
+    if (await _accountGone()) {
+      state = coordinator.status;
+      return null;
+    }
     final SyncRunResult result = await coordinator.run(force: force);
     _last = result;
     state = coordinator.status;
@@ -157,6 +172,16 @@ class SyncController extends Notifier<SyncStatus> {
     }
     if (result.ok) await _stampLastSync(coordinator.status.lastRunAt);
     return result;
+  }
+
+  /// Deleted from another device: signs this one out instead of syncing, so
+  /// the deleted account is not filled again from here. What is on the device
+  /// stays, as it does for any sign-out.
+  Future<bool> _accountGone() async {
+    final User? user = ref.read(signedInUserProvider).value;
+    if (user == null || !await AuthService.isDeleted(user)) return false;
+    await ref.read(authServiceProvider).signOut();
+    return true;
   }
 
   /// The ledger keys on the target, and the target's id is the same string for

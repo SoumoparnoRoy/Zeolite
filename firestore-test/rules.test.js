@@ -50,6 +50,21 @@ test('nobody else can read or write it', async () => {
   await assertFails(getDoc(doc(nobody, 'users/me/attendance/x')));
 });
 
+test('a password account writes only once its email is confirmed', async () => {
+  const signedUp = (emailVerified) =>
+    env
+      .authenticatedContext('pw', {
+        firebase: { sign_in_provider: 'password' },
+        email_verified: emailVerified,
+      })
+      .firestore();
+  const ref = (db) => doc(db, 'users/pw/attendance/x');
+  await assertFails(setDoc(ref(signedUp(false)), mark));
+  await assertSucceeds(setDoc(ref(signedUp(true)), mark));
+  await assertSucceeds(getDoc(ref(signedUp(false))));
+  await assertSucceeds(deleteDoc(ref(signedUp(false))));
+});
+
 test('a collection the app never files is refused', async () => {
   await assertFails(setDoc(doc(me(), 'users/me/anything/x'), mark));
 });

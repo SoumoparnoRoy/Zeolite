@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/app_theme.dart';
 import '../../data/settings/app_settings.dart';
 import '../../domain/sync/sync_status.dart';
+import '../../state/auth_providers.dart';
 import '../../state/providers.dart';
 import '../../state/sync_providers.dart';
 import 'launch_painter.dart';
@@ -86,7 +87,11 @@ class _JoiningScreenState extends ConsumerState<JoiningScreen> {
     ));
     final bool ended = status.state != SyncState.running &&
         (_sawRun || status.lastRunAt != null || status.failure != null);
-    if (onboarded || ended) {
+    // A new password account syncs only once its email is confirmed, so there
+    // is no run to wait on. Watched, since the new user can reach the auth
+    // stream a frame after this screen is built.
+    final bool unconfirmed = ref.watch(verificationPendingProvider);
+    if (onboarded || ended || unconfirmed) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _finish();
       });

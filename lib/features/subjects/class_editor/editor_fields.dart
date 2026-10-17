@@ -321,6 +321,7 @@ class RoomField extends ConsumerWidget {
         TextField(
           controller: controller,
           textCapitalization: TextCapitalization.characters,
+          inputFormatters: shortTextFormatters,
           style: const TextStyle(fontSize: AppType.titleMedium),
           decoration: InputDecoration(
             isDense: true,

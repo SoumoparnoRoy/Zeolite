@@ -49,6 +49,14 @@ Color outlookColor(TermOutlook outlook, AppPalette palette) =>
 void dropFocus() => FocusManager.instance.primaryFocus
     ?.unfocus(disposition: UnfocusDisposition.previouslyFocusedChild);
 
+/// `shortText` in `firestore.rules`: a longer name is refused as
+/// `permission-denied`, which fails the whole sync as a sign-in problem.
+const int shortTextLimit = 500;
+
+final List<TextInputFormatter> shortTextFormatters = <TextInputFormatter>[
+  LengthLimitingTextInputFormatter(shortTextLimit),
+];
+
 /// Times, dates, room codes and counts.
 ///
 /// Anything the eye scans down a column rather than reads as a sentence goes
@@ -772,7 +780,7 @@ class _SheetTextFormState extends State<SheetTextForm> {
           maxLines: widget.maxLines,
           textCapitalization: widget.textCapitalization,
           keyboardType: widget.keyboardType,
-          inputFormatters: widget.inputFormatters,
+          inputFormatters: widget.inputFormatters ?? shortTextFormatters,
           decoration: InputDecoration(
             labelText: widget.labelText,
             hintText: widget.hintText,

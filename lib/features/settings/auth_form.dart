@@ -64,6 +64,30 @@ class _AuthFormState extends ConsumerState<AuthForm> {
     }
   }
 
+  Future<void> _resetPassword() async {
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    if (_email.text.trim().isEmpty) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Type your email above first.')),
+      );
+      return;
+    }
+    setState(() => _busy = true);
+    final AuthResult result =
+        await ref.read(authServiceProvider).sendPasswordReset(_email.text);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          result.ok
+              ? 'If that email has an account, a reset link is on its way.'
+              : authFailureMessage(result.failure!),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final AuthService auth = ref.read(authServiceProvider);
@@ -103,6 +127,11 @@ class _AuthFormState extends ConsumerState<AuthForm> {
                   : auth.signIn(_email.text, _password.text)),
           child: Text(_creating ? 'Create account' : 'Sign in'),
         ),
+        if (!_creating)
+          TextButton(
+            onPressed: _busy ? null : _resetPassword,
+            child: const Text('Forgot password?'),
+          ),
         if (widget.allowToggle)
           TextButton(
             onPressed:
@@ -143,6 +172,9 @@ String authFailureMessage(AuthFailure failure) {
           'Google.';
     case AuthFailure.needsRecentLogin:
       return 'Sign out and back in first, then delete the account.';
+    case AuthFailure.wrongAccount:
+      return 'That is a different Google account. Pick the one you are '
+          'signed in with.';
     case AuthFailure.cancelled:
     case AuthFailure.unknown:
       return 'That did not work. Try again.';

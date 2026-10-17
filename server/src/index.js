@@ -91,7 +91,11 @@ export function createApp({
   const limit = createRateLimiter({ now });
   const budget = createDailyBudget({ maximum: config.dailyCalls, now });
   const verifyAppCheck = config.vision
-    ? createAppCheckVerifier({ projectNumber: config.vision.projectNumber, keys: appCheckKeys })
+    ? createAppCheckVerifier({
+        projectNumber: config.vision.projectNumber,
+        keys: appCheckKeys,
+        now,
+      })
     : null;
 
   app.set("trust proxy", config.trustProxy);

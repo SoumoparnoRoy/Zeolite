@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { after, before, test } from "node:test";
 import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair } from "jose";
 import { createApp } from "../src/index.js";
@@ -19,12 +20,12 @@ const projectNumber = "123456789";
 
 let signingKey;
 let appCheckKeys;
-let token;
 
 // Shaped like a Firebase App Check token: the issuer and audience both name
-// the project, and it is signed by whichever key is passed.
+// the project, and it is signed by whichever key is passed. Each is distinct,
+// as each limited-use token is.
 function attestation(key, { project = projectNumber, expiresIn = "1h" } = {}) {
-  return new SignJWT({})
+  return new SignJWT({ jti: randomUUID() })
     .setProtectedHeader({ alg: "RS256", typ: "JWT", kid: "test-key" })
     .setIssuer(`https://firebaseappcheck.googleapis.com/${project}`)
     .setAudience([`projects/${project}`])
@@ -78,8 +79,11 @@ async function listen(app) {
 
 // Each call moves past the per-caller window, so the limiter does not decide
 // the outcome of a test that is about something else.
-function read(baseUrl, body, attested = token) {
+async function read(baseUrl, body, attested) {
   currentTime += 61_000;
+  if (attested === undefined) {
+    attested = await attestation(signingKey);
+  }
   const headers = { "Content-Type": "application/json" };
   if (attested !== null) {
     headers["X-Firebase-AppCheck"] = attested;
@@ -101,7 +105,6 @@ before(async () => {
   signingKey = pair.privateKey;
   const publicJwk = { ...(await exportJWK(pair.publicKey)), kid: "test-key", alg: "RS256" };
   appCheckKeys = createLocalJWKSet({ keys: [publicJwk] });
-  token = await attestation(signingKey);
 
   const options = {
     fetchImpl: fetchStub,
@@ -371,6 +374,32 @@ test("only a read attested for this project reaches the upstream", async () => {
   assert.equal(logged.length, 1);
   assert.match(logged[0], /ERR_JWT_CLAIM_VALIDATION_FAILED|claim/);
   assert.ok(!stderr.includes(otherProject));
+});
+
+test("a token reads once, and a replay spends nothing", async () => {
+  upstreamOk = true;
+  upstreamReply = "**Monday**\n*   09:10-10:00: ABC1234";
+  const once = await attestation(signingKey);
+  assert.equal((await read(configured, { image }, once)).status, 200);
+
+  lastRequest = undefined;
+  let stderr = "";
+  const originalWrite = process.stderr.write;
+  process.stderr.write = (chunk) => {
+    stderr += String(chunk);
+    return true;
+  };
+  let replay;
+  try {
+    replay = await read(configured, { image }, once);
+  } finally {
+    process.stderr.write = originalWrite;
+  }
+  assert.equal(replay.status, 401);
+  assert.equal(lastRequest, undefined);
+  assert.match(stderr, /App Check token used twice/);
+  assert.ok(!stderr.includes(once));
+  assert.equal((await read(configured, { image })).status, 200);
 });
 
 test("an unattested body is turned away before it is read", async () => {

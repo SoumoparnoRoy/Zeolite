@@ -57,11 +57,6 @@ linux/flutter/ephemeral/
 macos/Flutter/ephemeral/
 ios/Flutter/ephemeral/
 
-# Editor and tool leftovers
-# Leftover hooks from a VS Code Java-modernization extension, unrelated to this
-# Flutter project.
-.github/modernize/
-
 # Firebase CLI deploy cache — regenerated on every `firebase deploy`.
 .firebase/
 

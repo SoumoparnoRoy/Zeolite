@@ -148,7 +148,17 @@ class FirestoreSyncTarget implements SyncTarget {
   }
 
   @override
-  Future<SyncOutcome> create(SyncItem item) => _write(item, item.localKey);
+  Future<SyncOutcome> create(SyncItem item) =>
+      _write(item, _documentIdFor(item.localKey));
+
+  /// Rooms, tags and categories are keyed by name, and a `/` in a document id
+  /// is a path the rules refuse, which failed every later sync as a sign-in
+  /// problem. Only `/` is escaped, so every id written before stays the same.
+  static String _documentIdFor(String localKey) =>
+      localKey.replaceAll('/', '%2F');
+
+  static String _localKeyOf(String documentId) =>
+      documentId.replaceAll('%2F', '/');
 
   /// The document id is the sync key, so an update is the same call as a
   /// create and re-running a half-finished push cannot double anything.
@@ -208,13 +218,14 @@ class FirestoreSyncTarget implements SyncTarget {
       ..remove('changedAt')
       ..remove('deletedAt');
 
+    final String localKey = _localKeyOf(id);
     return RemoteState(
       kind: kind,
-      localKey: id,
+      localKey: localKey,
       remoteId: id,
       hash: deleted
           ? _deletedHash
-          : SyncItem(kind: kind, localKey: id, fields: fields).hash,
+          : SyncItem(kind: kind, localKey: localKey, fields: fields).hash,
       fields: deleted ? const <String, Object?>{} : fields,
       // A tombstone is timed by when it was written, not by the last edit
       // before it: the coordinator needs to know whether a local row of the

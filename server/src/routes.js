@@ -2,8 +2,10 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import express, { Router } from "express";
 import { failureOf } from "./failure.js";
 import { exchangeCode, refreshToken } from "./oauth.js";
+import { SESSION_TTL_MS } from "./sessions.js";
 
 const CHALLENGE_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+const BROWSER_COOKIE = "zeolite_notion";
 const INVALID_CLAIM = { error: "Unable to claim this connection." };
 const PAGE_POLICY = "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'";
 
@@ -19,9 +21,25 @@ function verifierMatches(verifier, expectedChallenge) {
   if (typeof verifier !== "string") {
     return false;
   }
-  const actual = Buffer.from(challengeFor(verifier));
-  const expected = Buffer.from(expectedChallenge);
+  return sameValue(challengeFor(verifier), expectedChallenge);
+}
+
+function sameValue(left, right) {
+  const actual = Buffer.from(left);
+  const expected = Buffer.from(right);
   return actual.length === expected.length && timingSafeEqual(actual, expected);
+}
+
+// PKCE proves who started the handshake, not who approved it, so the ready
+// page and the session id and code on it belong to the starting browser only.
+function fromStartingBrowser(request, session) {
+  for (const part of (request.headers.cookie ?? "").split(";")) {
+    const [name, ...value] = part.trim().split("=");
+    if (name === BROWSER_COOKIE) {
+      return sameValue(value.join("="), session.browser);
+    }
+  }
+  return false;
 }
 
 function callbackFailure(message) {
@@ -36,6 +54,8 @@ function callbackSuccess(session, appScheme) {
 export function createNotionRouter({ config, sessions, limit, fetchImpl }) {
   const router = Router();
   const parseBody = express.json();
+  // A browser drops a Secure cookie set over plain http, which a local server is.
+  const secureCookie = new URL(config.redirectUri).protocol === "https:";
 
   router.get("/start", limit("/notion/start", 10), (request, response) => {
     const { challenge } = request.query;
@@ -55,6 +75,14 @@ export function createNotionRouter({ config, sessions, limit, fetchImpl }) {
     authorizationUrl.searchParams.set("owner", "user");
     authorizationUrl.searchParams.set("redirect_uri", config.redirectUri);
     authorizationUrl.searchParams.set("state", session.state);
+    // Lax still rides along on Notion's top-level redirect back to the callback.
+    response.cookie(BROWSER_COOKIE, session.browser, {
+      httpOnly: true,
+      secure: secureCookie,
+      sameSite: "lax",
+      path: "/notion",
+      maxAge: SESSION_TTL_MS,
+    });
     response.redirect(302, authorizationUrl.toString());
   });
 
@@ -79,7 +107,7 @@ export function createNotionRouter({ config, sessions, limit, fetchImpl }) {
         .status(400)
         .type("html")
         .send(callbackFailure("This link expired. Try connecting again."));
-    if (typeof code !== "string" || !session) {
+    if (typeof code !== "string" || !session || !fromStartingBrowser(request, session)) {
       expired();
       return;
     }

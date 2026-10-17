@@ -155,6 +155,7 @@ class _CategoryFormState extends ConsumerState<_CategoryForm> {
           controller: _name,
           autofocus: widget.category == null,
           textCapitalization: TextCapitalization.words,
+          inputFormatters: shortTextFormatters,
           decoration: const InputDecoration(
             labelText: 'Category name',
             hintText: 'e.g. Lecture, Practical, Tutorial',

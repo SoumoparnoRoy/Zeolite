@@ -81,7 +81,8 @@ class _SignedInState extends ConsumerState<_SignedIn> {
             title: const Text('Delete this account?'),
             content: const Text(
               'Your account and everything backed up to it are deleted for '
-              'good. Attendance already on this device stays where it is.',
+              'good, and every device signed in to it is signed out. '
+              'Attendance already on each device stays where it is.',
             ),
             actions: <Widget>[
               TextButton(
@@ -102,9 +103,32 @@ class _SignedInState extends ConsumerState<_SignedIn> {
     if (!confirmed || !mounted) return;
 
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    final AuthService auth = ref.read(authServiceProvider);
+    final AuthResult? confirmedIdentity;
+    if (AuthService.confirmsWithGoogle(widget.user)) {
+      confirmedIdentity = await auth.confirmWithGoogle();
+    } else {
+      final String? password = await showDialog<String>(
+        context: context,
+        builder: (BuildContext context) =>
+            _PasswordCheck(email: widget.user.email),
+      );
+      confirmedIdentity =
+          password == null ? null : await auth.confirmWithPassword(password);
+    }
+    if (confirmedIdentity == null ||
+        confirmedIdentity.failure == AuthFailure.cancelled) {
+      return;
+    }
+    if (!confirmedIdentity.ok) {
+      messenger.showSnackBar(SnackBar(
+          content: Text(authFailureMessage(confirmedIdentity.failure!))));
+      return;
+    }
+    if (!mounted) return;
+
     setState(() => _deleting = true);
-    final AuthResult result =
-        await ref.read(authServiceProvider).deleteAccount();
+    final AuthResult result = await auth.deleteAccount();
     if (mounted) setState(() => _deleting = false);
     if (!result.ok) {
       messenger.showSnackBar(
@@ -114,6 +138,10 @@ class _SignedInState extends ConsumerState<_SignedIn> {
 
   @override
   Widget build(BuildContext context) {
+    // A run already under way would write back what the delete just removed.
+    final bool syncing =
+        ref.watch(syncStatusProvider).state == SyncState.running;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
@@ -135,7 +163,10 @@ class _SignedInState extends ConsumerState<_SignedIn> {
         ),
         const SizedBox(height: AppSpacing.xl),
         const SectionHeader('Sync'),
-        const _SyncSection(),
+        if (ref.watch(verificationPendingProvider))
+          _ConfirmEmail(email: widget.user.email)
+        else
+          const _SyncSection(),
         const SizedBox(height: AppSpacing.xl),
         const SectionHeader('Deleting your account'),
         SettingsNoted(
@@ -146,13 +177,145 @@ class _SignedInState extends ConsumerState<_SignedIn> {
             child: SettingsRow(
               icon: Icons.delete_forever_outlined,
               title: _deleting ? 'Deleting…' : 'Delete my account',
-              value: 'Removes the account and everything backed up to it',
+              value: syncing
+                  ? 'Available once the sync finishes'
+                  : 'Removes the account and everything backed up to it',
               danger: true,
-              onTap: _deleting ? null : _delete,
+              onTap: _deleting || syncing ? null : _delete,
             ),
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Pops the password, or null when cancelled.
+class _PasswordCheck extends StatefulWidget {
+  const _PasswordCheck({required this.email});
+
+  final String? email;
+
+  @override
+  State<_PasswordCheck> createState() => _PasswordCheckState();
+}
+
+class _PasswordCheckState extends State<_PasswordCheck> {
+  final TextEditingController _password = TextEditingController();
+
+  @override
+  void dispose() {
+    _password.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (_password.text.isEmpty) return;
+    Navigator.of(context).pop(_password.text);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Confirm it is you'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Text('Type the password for ${widget.email ?? 'this account'}.'),
+          const SizedBox(height: AppSpacing.md),
+          TextField(
+            controller: _password,
+            autofocus: true,
+            obscureText: true,
+            decoration: const InputDecoration(labelText: 'Password'),
+            onSubmitted: (_) => _submit(),
+          ),
+        ],
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: _submit,
+          style: TextButton.styleFrom(foregroundColor: context.palette.absent),
+          child: const Text('Delete'),
+        ),
+      ],
+    );
+  }
+}
+
+/// Shown in place of the sync controls until the link in the sign-up email is
+/// opened. The mail app opens it, not this app, so the user has to say so.
+class _ConfirmEmail extends ConsumerStatefulWidget {
+  const _ConfirmEmail({required this.email});
+
+  final String? email;
+
+  @override
+  ConsumerState<_ConfirmEmail> createState() => _ConfirmEmailState();
+}
+
+class _ConfirmEmailState extends ConsumerState<_ConfirmEmail> {
+  bool _busy = false;
+
+  Future<void> _check() async {
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    setState(() => _busy = true);
+    final bool verified =
+        await ref.read(verificationPendingProvider.notifier).recheck();
+    if (mounted) setState(() => _busy = false);
+    if (!verified) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Not confirmed yet. Open the link in the email first.'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _resend() async {
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    setState(() => _busy = true);
+    final AuthResult result =
+        await ref.read(authServiceProvider).sendVerification();
+    if (mounted) setState(() => _busy = false);
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          result.ok
+              ? 'Sent. It can take a minute, and may land in spam.'
+              : authFailureMessage(result.failure!),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SettingsNoted(
+      note: 'Sync starts once you open the link we sent to '
+          '${widget.email ?? 'your email'}. Attendance on this device is '
+          'saved meanwhile.',
+      child: GroupedRows(
+        children: <Widget>[
+          SettingsRow(
+            icon: Icons.mark_email_read_outlined,
+            title: "I've opened the link",
+            value: 'Check again and start syncing',
+            onTap: _busy ? null : _check,
+          ),
+          SettingsRow(
+            icon: Icons.forward_to_inbox_outlined,
+            title: 'Send the link again',
+            value: widget.email ?? 'To the address you signed up with',
+            onTap: _busy ? null : _resend,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -182,8 +345,14 @@ class _SyncSection extends ConsumerWidget {
               : syncStatusLine(
                   status,
                   last,
-                  storedLastSyncAt:
-                      ref.watch(settingsProvider).value?.lastSyncAt,
+                  // The stamp is the device's, so after switching accounts
+                  // it is the previous account's last sync, not this one's.
+                  // A device from before the account was recorded keeps it.
+                  storedLastSyncAt: settings.syncedAccountId == null ||
+                          settings.syncedAccountId ==
+                              ref.watch(signedInUserProvider).value?.uid
+                      ? settings.lastSyncAt
+                      : null,
                   now: ref.watch(minuteTickProvider).value,
                 ),
           value: '',

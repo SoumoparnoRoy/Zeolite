@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 
-const SESSION_TTL_MS = 5 * 60 * 1000;
+export const SESSION_TTL_MS = 5 * 60 * 1000;
 const SWEEP_INTERVAL_MS = 60 * 1000;
 const PAIRING_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
 
@@ -65,6 +65,7 @@ export function createSessionStore({ now = Date.now } = {}) {
     const session = {
       id: randomBytes(32).toString("base64url"),
       state: randomBytes(32).toString("base64url"),
+      browser: randomBytes(32).toString("base64url"),
       challenge,
       pairingCode,
       createdAt: now(),

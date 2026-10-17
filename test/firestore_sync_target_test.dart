@@ -78,6 +78,27 @@ void main() {
     expect(state.hash, item.hash);
   });
 
+  // A slash was a path the rules refused, and every later sync then failed.
+  test('a name with a slash goes up as one document and comes back whole',
+      () async {
+    final SyncItem room = SyncItem(
+      kind: SyncKind.room,
+      localKey: 'LT/3',
+      fields: <String, Object?>{'position': 0},
+    );
+    final SyncOutcome outcome = await target.create(room);
+    expect(outcome.remoteId, 'LT%2F3');
+
+    final QuerySnapshot<Map<String, Object?>> stored =
+        await firestore.collection('users').doc(_uid).collection('rooms').get();
+    expect(stored.docs.map((doc) => doc.id), <String>['LT%2F3']);
+
+    final RemoteState state = (await target.fetch(SyncKind.room))!.single;
+    expect(state.localKey, 'LT/3');
+    expect(state.remoteId, 'LT%2F3');
+    expect(state.hash, room.hash);
+  });
+
   test('subjects and attendance do not share a collection', () async {
     await target.create(_mark());
     await target.create(SyncItem(

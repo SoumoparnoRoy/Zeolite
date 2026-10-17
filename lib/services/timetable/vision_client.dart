@@ -21,8 +21,11 @@ class VisionClient {
     Future<String?> Function()? appCheckToken,
   })  : _http = httpClient ?? http.Client(),
         _base = baseUri ?? Uri.parse(defaultBaseUrl),
-        _appCheckToken =
-            appCheckToken ?? (() => FirebaseAppCheck.instance.getToken());
+        // Limited-use, one per read: the ordinary token is good for an hour,
+        // and replayed from one address for that hour it is exactly the day's
+        // shared budget. The service can then refuse a token it has seen.
+        _appCheckToken = appCheckToken ??
+            (() => FirebaseAppCheck.instance.getLimitedUseToken());
 
   static const String defaultBaseUrl = Endpoints.server;
 

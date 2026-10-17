@@ -77,6 +77,19 @@ flutter {
     source = "../.."
 }
 
+// The lockfile is what lets a dependency scan see the APK's native side;
+// rerun `./gradlew :app:dependencies --write-locks` after a plugin upgrade.
+// The engine stays out because `flutter run` resolves only one ABI's build.
+dependencyLocking {
+    lockAllConfigurations()
+    ignoredDependencies.add("io.flutter:*")
+}
+
+// AGP's test-platform tooling never runs here (no managed-device tests), and
+// locking it fills every scan with advisories for code that never ships.
+configurations.matching { it.name.startsWith("_internal-unified-test-platform") }
+    .configureEach { resolutionStrategy.deactivateDependencyLocking() }
+
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 

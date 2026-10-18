@@ -91,12 +91,17 @@ class _PickerChip extends StatelessWidget {
                 color: selected ? accent : context.palette.textTertiary,
               ),
               const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: AppType.titleSmall,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                  color: selected ? accent : context.palette.textSecondary,
+              Flexible(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: AppType.titleSmall,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                    color: selected ? accent : context.palette.textSecondary,
+                  ),
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],

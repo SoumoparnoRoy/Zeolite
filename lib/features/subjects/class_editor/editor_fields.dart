@@ -77,6 +77,9 @@ class OptionChip extends StatelessWidget {
                   ? context.palette.textPrimary
                   : context.palette.textSecondary,
             ),
+            maxLines: 1,
+            softWrap: false,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ),
@@ -406,6 +409,9 @@ class _RoomPickChip extends StatelessWidget {
                   ? context.palette.textPrimary
                   : context.palette.textSecondary,
             ),
+            maxLines: 1,
+            softWrap: false,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ),

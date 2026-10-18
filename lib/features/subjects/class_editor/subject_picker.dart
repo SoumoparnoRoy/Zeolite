@@ -115,14 +115,19 @@ class _SubjectChip extends StatelessWidget {
                 decoration: BoxDecoration(color: color, shape: BoxShape.circle),
               ),
               const SizedBox(width: 8),
-              Text(
-                subject.name,
-                style: TextStyle(
-                  fontSize: AppType.titleSmall,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  color: selected
-                      ? context.palette.textPrimary
-                      : context.palette.textSecondary,
+              Flexible(
+                child: Text(
+                  subject.name,
+                  style: TextStyle(
+                    fontSize: AppType.titleSmall,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    color: selected
+                        ? context.palette.textPrimary
+                        : context.palette.textSecondary,
+                  ),
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],

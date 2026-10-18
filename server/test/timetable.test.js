@@ -402,6 +402,33 @@ test("a token reads once, and a replay spends nothing", async () => {
   assert.equal((await read(configured, { image })).status, 200);
 });
 
+// The signature's last character carries spare bits and a space inside it is
+// skipped when decoding, so the same token can be spelled many ways.
+test("a token spelled differently is still a replay", async () => {
+  upstreamOk = true;
+  upstreamReply = "**Monday**\n*   09:10-10:00: ABC1234";
+  const once = await attestation(signingKey);
+  assert.equal((await read(configured, { image }, once)).status, 200);
+
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+  const last = alphabet.indexOf(once.at(-1));
+  const spareBits = once.slice(0, -1) + alphabet[last ^ 1];
+  const dot = once.lastIndexOf(".");
+  const spaced = `${once.slice(0, dot + 5)} ${once.slice(dot + 5)}`;
+
+  const originalWrite = process.stderr.write;
+  process.stderr.write = () => true;
+  try {
+    for (const respelled of [spareBits, spaced]) {
+      lastRequest = undefined;
+      assert.equal((await read(configured, { image }, respelled)).status, 401);
+      assert.equal(lastRequest, undefined);
+    }
+  } finally {
+    process.stderr.write = originalWrite;
+  }
+});
+
 test("an unattested body is turned away before it is read", async () => {
   currentTime += 61_000;
   const response = await fetch(`${configured}/timetable/read`, {

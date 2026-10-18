@@ -279,8 +279,10 @@ class _SessionCardState extends State<SessionCard> {
     return Padding(
       padding: const EdgeInsets.only(top: 8),
       child: Row(
+        // A long tag gets at most half the line; a short one still ends it.
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: <Widget>[
-          Expanded(
+          Flexible(
             child: Text(
               'Marked ${status.label.toLowerCase()}',
               style: TextStyle(
@@ -291,7 +293,8 @@ class _SessionCardState extends State<SessionCard> {
               ),
             ),
           ),
-          if (tag != null && tag.isNotEmpty) Pill(label: tag, color: p.cyan),
+          if (tag != null && tag.isNotEmpty)
+            Flexible(child: Pill(label: tag, color: p.cyan)),
         ],
       ),
     );

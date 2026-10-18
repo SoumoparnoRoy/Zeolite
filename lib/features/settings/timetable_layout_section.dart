@@ -528,11 +528,16 @@ class _RoomChip extends StatelessWidget {
                 color: context.palette.textTertiary,
               ),
               const SizedBox(width: 6),
-              Text(
-                room.name,
-                style: const TextStyle(
-                  fontSize: AppType.titleSmall,
-                  fontWeight: FontWeight.w600,
+              Flexible(
+                child: Text(
+                  room.name,
+                  style: const TextStyle(
+                    fontSize: AppType.titleSmall,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               IconButton(
@@ -725,11 +730,16 @@ class _TagChip extends StatelessWidget {
                 color: context.palette.textTertiary,
               ),
               const SizedBox(width: 6),
-              Text(
-                tag.name,
-                style: const TextStyle(
-                  fontSize: AppType.titleSmall,
-                  fontWeight: FontWeight.w600,
+              Flexible(
+                child: Text(
+                  tag.name,
+                  style: const TextStyle(
+                    fontSize: AppType.titleSmall,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               IconButton(

@@ -10,6 +10,7 @@ import 'package:zeolite/data/models/subject.dart';
 import 'package:zeolite/data/models/tag.dart';
 import 'package:zeolite/features/today/session_card.dart';
 import 'package:zeolite/state/providers.dart';
+import 'package:zeolite/widgets/common.dart';
 import 'package:zeolite/widgets/tag_picker.dart';
 
 const Subject _physics = Subject(
@@ -88,6 +89,55 @@ void main() {
       );
 
       expect(find.text('PROXY'), findsOneWidget);
+    });
+
+    testWidgets('a long tag shrinks to fit beside the marked line',
+        (tester) async {
+      tester.view.physicalSize = const Size(400, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        _host(
+          SessionCard(
+            session: _session(status: AttendanceStatus.present, tagId: 1),
+            use24Hour: true,
+            tagName: 'Online ' * 40,
+            onMark: (_) {},
+            onTag: () {},
+          ),
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Marked present'), findsOneWidget);
+    });
+
+    testWidgets('a short tag stays at the end of the marked line',
+        (tester) async {
+      tester.view.physicalSize = const Size(400, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        _host(
+          SessionCard(
+            session: _session(status: AttendanceStatus.present, tagId: 1),
+            use24Hour: true,
+            tagName: 'Proxy',
+            onMark: (_) {},
+            onTag: () {},
+          ),
+        ),
+      );
+
+      final Rect line = tester.getRect(
+        find
+            .ancestor(
+              of: find.text('Marked present'),
+              matching: find.byType(Row),
+            )
+            .first,
+      );
+      expect(tester.getTopRight(find.byType(Pill)).dx, line.right);
     });
 
     testWidgets('is absent from an untagged class', (tester) async {

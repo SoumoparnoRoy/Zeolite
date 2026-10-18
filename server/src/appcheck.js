@@ -14,9 +14,11 @@ export function createAppCheckVerifier({ projectNumber, keys = firebaseKeys, now
   // A token is good for one read. An ordinary one lives an hour, and replayed
   // from one address at the rate limit that was exactly the day's shared
   // budget; the app asks for a limited-use token per read instead. Keyed by a
-  // hash of the whole token, so nothing here depends on which claims Firebase
-  // puts in it and the map holds no credentials, and kept only until the token
-  // would have expired anyway.
+  // hash of the signed part, header and payload: the signature pins those
+  // byte for byte, while the signature segment itself decodes the same under
+  // other spellings. Nothing here depends on which claims Firebase puts in the
+  // token, the map holds no credentials, and an entry is kept only until the
+  // token would have expired anyway.
   const spent = new Map();
   const sweepTimer = setInterval(() => {
     const currentTime = now();
@@ -48,7 +50,8 @@ export function createAppCheckVerifier({ projectNumber, keys = firebaseKeys, now
     }
     // Checked and recorded with no await between, so two requests carrying
     // the same token cannot both get through.
-    const key = createHash("sha256").update(token).digest("base64url");
+    const signed = token.slice(0, token.lastIndexOf("."));
+    const key = createHash("sha256").update(signed).digest("base64url");
     if (spent.has(key)) {
       // An app build from before limited-use tokens, or someone replaying one.
       process.stderr.write("App Check token used twice\n");

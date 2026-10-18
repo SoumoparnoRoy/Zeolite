@@ -54,8 +54,41 @@ void dropFocus() => FocusManager.instance.primaryFocus
 const int shortTextLimit = 500;
 
 final List<TextInputFormatter> shortTextFormatters = <TextInputFormatter>[
-  LengthLimitingTextInputFormatter(shortTextLimit),
+  const _Utf16Limit(shortTextLimit),
 ];
+
+/// Flutter's own limit counts what reads as one character, which can be
+/// several of the UTF-16 units the rules count: an emoji is two. This cuts at
+/// the last whole character that fits, so nothing is left half drawn.
+class _Utf16Limit extends TextInputFormatter {
+  const _Utf16Limit(this.most);
+
+  final int most;
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final int length = newValue.text.length;
+    final int before = oldValue.text.length;
+    // Never refused: a name imported over the cap has to be shortenable.
+    if (length <= most || length <= before) return newValue;
+    if (before == most) return oldValue;
+    final StringBuffer kept = StringBuffer();
+    int used = 0;
+    for (final String character in newValue.text.characters) {
+      used += character.length;
+      if (used > most) break;
+      kept.write(character);
+    }
+    final String text = kept.toString();
+    return TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+  }
+}
 
 /// Times, dates, room codes and counts.
 ///
@@ -521,14 +554,19 @@ class Pill extends StatelessWidget {
             Icon(icon, size: 11, color: fg),
             const SizedBox(width: 3),
           ],
-          Text(
-            label.toUpperCase(),
-            style: TextStyle(
-              color: fg,
-              fontSize: AppType.microMedium,
-              height: 1,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.45,
+          Flexible(
+            child: Text(
+              label.toUpperCase(),
+              style: TextStyle(
+                color: fg,
+                fontSize: AppType.microMedium,
+                height: 1,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.45,
+              ),
+              maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],

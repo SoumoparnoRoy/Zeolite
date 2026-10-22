@@ -1,0 +1,9 @@
+appId: com.soumoparno.zeolite
+---
+- launchApp
+- extendedWaitUntil:
+    visible: ".*Tab 1 of 4|Got it"
+    timeout: 30000
+- tapOn:
+    text: "Got it"
+    optional: true

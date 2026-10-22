@@ -1,0 +1,20 @@
+appId: com.soumoparno.zeolite
+name: Double tap on Sync now after signing in
+env:
+  PROJECT: ${MAESTRO_FIREBASE_PROJECT || 'zeolite-app'}
+---
+- runScript:
+    file: scripts/seed_account.js
+    env:
+      EMAIL: ${MAESTRO_TEST_EMAIL}
+      PASSWORD: ${MAESTRO_TEST_PASSWORD}
+- runFlow: subflows/launch.yaml
+- runFlow: subflows/sign_out_if_needed.yaml
+- runFlow: subflows/sign_in.yaml
+- scrollUntilVisible:
+    element: "Sync now\n.*"
+- doubleTapOn: "Sync now\n.*"
+- extendedWaitUntil:
+    visible: ".*Synced .* sent.*"
+    timeout: 60000
+- assertVisible: { id: "delete-account", text: "Delete my account\nRemoves the account and everything backed up to it" }

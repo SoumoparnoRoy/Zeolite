@@ -1,0 +1,49 @@
+appId: com.soumoparno.zeolite
+name: Delete a subject, undo, delete again
+tags:
+  - tablet
+---
+- runFlow: subflows/launch.yaml
+- runFlow: subflows/remove_leftover_fixture.yaml
+- runFlow: subflows/add_fixture_class.yaml
+- tapOn:
+    text: "Present"
+    below: ".*Regression Subject\nOne-off.*"
+
+- tapOn: "Settings\nTab 4 of 4"
+- tapOn: "Subjects\n.*"
+- scrollUntilVisible:
+    element: ".*Regression Subject.*"
+- tapOn:
+    text: "Show menu"
+    childOf: ".*Regression Subject.*"
+- tapOn: "Delete"
+- assertVisible: "Delete Regression Subject\\?"
+- assertVisible: "Regression Subject has 1 one-off class and 1 attendance mark.*"
+- tapOn: "Cancel"
+- assertVisible: ".*Regression Subject\nRG101.*"
+
+- tapOn:
+    text: "Show menu"
+    childOf: ".*Regression Subject.*"
+- tapOn: "Delete"
+- tapOn:
+    text: "Delete"
+    below: "Delete Regression Subject\\?"
+- assertNotVisible: ".*Regression Subject\nRG101.*"
+- tapOn: "Undo"
+- assertVisible: ".*Regression Subject\nRG101.*"
+- back
+
+# Undo brought the class and its mark back with the subject.
+- tapOn: "Today\nTab 1 of 4"
+- assertVisible: ".*Regression Subject\nOne-off.*Marked present.*"
+
+- runFlow: subflows/delete_fixture.yaml
+- stopApp
+- runFlow: subflows/launch.yaml
+- assertNotVisible: ".*Regression Subject.*"
+- tapOn: "Settings\nTab 4 of 4"
+- tapOn: "Subjects\n.*"
+- assertNotVisible: ".*Regression Subject.*"
+- back

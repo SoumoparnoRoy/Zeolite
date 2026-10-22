@@ -143,27 +143,33 @@ class _SubjectFormState extends ConsumerState<_SubjectForm> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        TextField(
-          controller: _name,
-          autofocus: widget.subject == null,
-          textCapitalization: TextCapitalization.words,
-          inputFormatters: shortTextFormatters,
-          decoration: const InputDecoration(
-            labelText: 'Subject name',
-            hintText: 'e.g. Thermodynamics',
+        Semantics(
+          identifier: 'subject-name',
+          child: TextField(
+            controller: _name,
+            autofocus: widget.subject == null,
+            textCapitalization: TextCapitalization.words,
+            inputFormatters: shortTextFormatters,
+            decoration: const InputDecoration(
+              labelText: 'Subject name',
+              hintText: 'e.g. Thermodynamics',
+            ),
           ),
         ),
         const SizedBox(height: AppSpacing.md),
         Row(
           children: <Widget>[
             Expanded(
-              child: TextField(
-                controller: _code,
-                textCapitalization: TextCapitalization.characters,
-                inputFormatters: shortTextFormatters,
-                decoration: const InputDecoration(
-                  labelText: 'Code',
-                  hintText: 'e.g. CS201',
+              child: Semantics(
+                identifier: 'subject-code',
+                child: TextField(
+                  controller: _code,
+                  textCapitalization: TextCapitalization.characters,
+                  inputFormatters: shortTextFormatters,
+                  decoration: const InputDecoration(
+                    labelText: 'Code',
+                    hintText: 'e.g. CS201',
+                  ),
                 ),
               ),
             ),

@@ -153,11 +153,15 @@ class _SignedInState extends ConsumerState<_SignedIn> {
               title: widget.user.email ?? 'This device',
               value: 'Backups go to this account',
             ),
-            SettingsRow(
-              icon: Icons.logout_rounded,
-              title: 'Sign out',
-              value: 'Attendance on this device stays here',
-              onTap: () => ref.read(authServiceProvider).signOut(),
+            Semantics(
+              container: true,
+              identifier: 'sign-out',
+              child: SettingsRow(
+                icon: Icons.logout_rounded,
+                title: 'Sign out',
+                value: 'Attendance on this device stays here',
+                onTap: () => ref.read(authServiceProvider).signOut(),
+              ),
             ),
           ],
         ),
@@ -174,14 +178,18 @@ class _SignedInState extends ConsumerState<_SignedIn> {
               'the address is in the Privacy Policy.',
           child: SurfaceCard(
             padding: EdgeInsets.zero,
-            child: SettingsRow(
-              icon: Icons.delete_forever_outlined,
-              title: _deleting ? 'Deleting…' : 'Delete my account',
-              value: syncing
-                  ? 'Available once the sync finishes'
-                  : 'Removes the account and everything backed up to it',
-              danger: true,
-              onTap: _deleting || syncing ? null : _delete,
+            child: Semantics(
+              container: true,
+              identifier: 'delete-account',
+              child: SettingsRow(
+                icon: Icons.delete_forever_outlined,
+                title: _deleting ? 'Deleting…' : 'Delete my account',
+                value: syncing
+                    ? 'Available once the sync finishes'
+                    : 'Removes the account and everything backed up to it',
+                danger: true,
+                onTap: _deleting || syncing ? null : _delete,
+              ),
             ),
           ),
         ),

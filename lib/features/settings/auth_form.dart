@@ -103,17 +103,23 @@ class _AuthFormState extends ConsumerState<AuthForm> {
         SurfaceCard(
           child: Column(
             children: <Widget>[
-              TextField(
-                controller: _email,
-                keyboardType: TextInputType.emailAddress,
-                autocorrect: false,
-                decoration: const InputDecoration(labelText: 'Email'),
+              Semantics(
+                identifier: 'auth-email',
+                child: TextField(
+                  controller: _email,
+                  keyboardType: TextInputType.emailAddress,
+                  autocorrect: false,
+                  decoration: const InputDecoration(labelText: 'Email'),
+                ),
               ),
               const SizedBox(height: AppSpacing.sm),
-              TextField(
-                controller: _password,
-                obscureText: true,
-                decoration: const InputDecoration(labelText: 'Password'),
+              Semantics(
+                identifier: 'auth-password',
+                child: TextField(
+                  controller: _password,
+                  obscureText: true,
+                  decoration: const InputDecoration(labelText: 'Password'),
+                ),
               ),
             ],
           ),

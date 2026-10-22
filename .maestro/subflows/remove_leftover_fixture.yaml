@@ -1,0 +1,23 @@
+appId: com.soumoparno.zeolite
+---
+# A run that stopped partway leaves its subject behind, and the next flow
+# would find two.
+- tapOn: "Settings\nTab 4 of 4"
+- tapOn: "Subjects\n.*"
+- scrollUntilVisible:
+    element: ".*Regression Subject\nRG101.*"
+    timeout: 5000
+    optional: true
+- repeat:
+    while:
+      visible: ".*Regression Subject\nRG101.*"
+    commands:
+      - tapOn:
+          text: "Show menu"
+          childOf: ".*Regression Subject.*"
+      - tapOn: "Delete"
+      - tapOn:
+          text: "Delete"
+          below: "Delete Regression Subject\\?"
+      - waitForAnimationToEnd
+- back

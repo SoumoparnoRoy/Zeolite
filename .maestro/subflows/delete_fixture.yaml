@@ -1,0 +1,16 @@
+appId: com.soumoparno.zeolite
+---
+- tapOn: "Settings\nTab 4 of 4"
+- tapOn: "Subjects\n.*"
+- scrollUntilVisible:
+    element: ".*Regression Subject.*"
+- tapOn:
+    text: "Show menu"
+    childOf: ".*Regression Subject.*"
+- tapOn: "Delete"
+- assertVisible: "Delete Regression Subject\\?"
+- tapOn: "Delete"
+- extendedWaitUntil:
+    notVisible: ".*Regression Subject\nRG101.*"
+    timeout: 5000
+- back

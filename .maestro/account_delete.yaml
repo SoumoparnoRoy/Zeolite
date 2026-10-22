@@ -1,0 +1,84 @@
+appId: com.soumoparno.zeolite
+name: Delete the account and everything backed up to it
+env:
+  PROJECT: ${MAESTRO_FIREBASE_PROJECT || 'zeolite-app'}
+---
+- runScript:
+    file: scripts/seed_account.js
+    env:
+      EMAIL: ${MAESTRO_TEST_EMAIL}
+      PASSWORD: ${MAESTRO_TEST_PASSWORD}
+- runFlow: subflows/launch.yaml
+- runFlow: subflows/sign_out_if_needed.yaml
+- runFlow: subflows/sign_in.yaml
+- scrollUntilVisible:
+    element: "Sync now\n.*"
+- tapOn: "Sync now\n.*"
+- extendedWaitUntil:
+    visible: ".*Synced .* sent.*"
+    timeout: 60000
+
+# Backing out at either question leaves the account alone.
+- tapOn:
+    id: "delete-account"
+- assertVisible: "Delete this account\\?"
+- tapOn: "Cancel"
+- tapOn:
+    id: "delete-account"
+- tapOn: "Delete"
+- assertVisible: "Confirm it is you"
+- tapOn: "Cancel"
+- assertVisible: "SIGNED IN AS.*"
+
+- tapOn:
+    id: "delete-account"
+- tapOn: "Delete"
+- inputText: "wrong-password"
+- pressKey: Enter
+- extendedWaitUntil:
+    visible: "That email and password do not match."
+    timeout: 12000
+- assertVisible: "SIGNED IN AS.*"
+- runScript:
+    file: scripts/account_rows.js
+    env:
+      UID: ${output.uid}
+- assertTrue: ${output.subjects > 0}
+- assertTrue: ${output.accounts == 1}
+
+- tapOn:
+    id: "delete-account"
+- tapOn: "Delete"
+- inputText: ${MAESTRO_TEST_PASSWORD}
+# Submitted twice: the keyboard's done key, then the button straight after.
+- pressKey: Enter
+- tapOn:
+    text: "Delete"
+    optional: true
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    visible: "Sign in"
+    timeout: 30000
+- runScript:
+    file: scripts/account_rows.js
+    env:
+      UID: ${output.uid}
+- assertTrue: ${output.subjects == 0}
+- assertTrue: ${output.accounts == 0}
+
+# The attendance on the device stays, and the old sign-in no longer works.
+- stopApp
+- runFlow: subflows/launch.yaml
+- assertVisible: ".*Tab 1 of 4"
+- runFlow: subflows/open_account.yaml
+- tapOn:
+    id: "auth-email"
+- inputText: ${MAESTRO_TEST_EMAIL}
+- tapOn:
+    id: "auth-password"
+- inputText: ${MAESTRO_TEST_PASSWORD}
+- hideKeyboard
+- tapOn: "Sign in"
+- extendedWaitUntil:
+    visible: "No account with that email.|That email and password do not match."
+    timeout: 12000

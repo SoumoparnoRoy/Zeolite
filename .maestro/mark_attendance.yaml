@@ -1,0 +1,35 @@
+appId: com.soumoparno.zeolite
+name: Mark attendance on Today
+tags:
+  - tablet
+---
+- runFlow: subflows/launch.yaml
+- runFlow: subflows/remove_leftover_fixture.yaml
+- runFlow: subflows/add_fixture_class.yaml
+
+- assertVisible:
+    text: "Present"
+    below: ".*Regression Subject\nOne-off.*"
+
+# Tapping the current status clears it, so a double tap that counted twice
+# would leave the class unmarked.
+- doubleTapOn:
+    text: "Present"
+    below: ".*Regression Subject\nOne-off.*"
+- stopApp
+- runFlow: subflows/launch.yaml
+- assertVisible: ".*Regression Subject\nOne-off.*Marked present.*"
+
+- tapOn: ".*Regression Subject\nOne-off.*Marked present.*"
+- tapOn:
+    text: "Present"
+    below: ".*Regression Subject\nOne-off.*"
+- assertNotVisible: ".*Regression Subject\nOne-off.*Marked present.*"
+- tapOn:
+    text: "Absent"
+    below: ".*Regression Subject\nOne-off.*"
+- stopApp
+- runFlow: subflows/launch.yaml
+- assertVisible: ".*Regression Subject\nOne-off.*Marked absent.*"
+
+- runFlow: subflows/delete_fixture.yaml

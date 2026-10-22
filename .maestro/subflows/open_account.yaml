@@ -1,0 +1,11 @@
+appId: com.soumoparno.zeolite
+---
+- tapOn: "Settings\nTab 4 of 4"
+- scrollUntilVisible:
+    element: "Account\n.*"
+    centerElement: true
+- waitForAnimationToEnd
+- tapOn: "Account\n.*"
+- extendedWaitUntil:
+    visible: "Sign in|SIGNED IN AS.*"
+    timeout: 10000

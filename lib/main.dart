@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app.dart';
 import 'core/app_theme.dart';
 import 'core/report_error.dart';
+import 'services/firebase/firebase_emulator.dart';
 import 'services/notification_service.dart';
 import 'state/home_widget_providers.dart';
 
@@ -39,6 +40,7 @@ Future<void> main() async {
     await FirebaseCrashlytics.instance
         .setCrashlyticsCollectionEnabled(kReleaseMode);
     if (kReleaseMode) errorSink = _toCrashlytics;
+    await useFirebaseEmulatorIfAsked();
   } catch (error, stack) {
     reportError(error, stack, where: 'Firebase start-up');
   }

@@ -1,0 +1,14 @@
+appId: com.soumoparno.zeolite
+---
+- runFlow: open_account.yaml
+- tapOn:
+    id: "auth-email"
+- inputText: ${MAESTRO_TEST_EMAIL}
+- tapOn:
+    id: "auth-password"
+- inputText: ${MAESTRO_TEST_PASSWORD}
+- hideKeyboard
+- tapOn: "Sign in"
+- extendedWaitUntil:
+    visible: "SIGNED IN AS.*"
+    timeout: 15000

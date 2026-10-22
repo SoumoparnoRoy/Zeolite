@@ -1,0 +1,14 @@
+appId: com.soumoparno.zeolite
+---
+- runFlow: open_account.yaml
+- runFlow:
+    when:
+      visible: "SIGNED IN AS.*"
+    commands:
+      - tapOn:
+          id: "sign-out"
+      - extendedWaitUntil:
+          visible: "Sign in"
+          timeout: 10000
+- stopApp
+- runFlow: launch.yaml

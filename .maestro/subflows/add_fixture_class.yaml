@@ -1,0 +1,18 @@
+appId: com.soumoparno.zeolite
+---
+- tapOn: "Today\nTab 1 of 4"
+- tapOn: "Add class"
+- tapOn: "One-off class.*"
+- tapOn: "New"
+- inputText: "Regression Subject"
+- tapOn:
+    id: "subject-code"
+- inputText: "RG101"
+- hideKeyboard
+- tapOn: "Create subject"
+- scrollUntilVisible:
+    element: "Add one-off class"
+- tapOn: "Add one-off class"
+- extendedWaitUntil:
+    visible: ".*Regression Subject.*"
+    timeout: 5000

@@ -1,0 +1,74 @@
+appId: com.soumoparno.zeolite
+name: Create a subject and a one-off class
+tags:
+  - tablet
+---
+- runFlow: subflows/launch.yaml
+- runFlow: subflows/remove_leftover_fixture.yaml
+- tapOn: "Today\nTab 1 of 4"
+- tapOn: "Add class"
+- tapOn: "One-off class.*"
+- tapOn: "New"
+
+# A subject needs a name; blank and space-only names go nowhere.
+- scrollUntilVisible:
+    element: "Create subject"
+- tapOn: "Create subject"
+- assertVisible: "Give the subject a name."
+- scrollUntilVisible:
+    element:
+      id: "subject-name"
+    direction: UP
+- tapOn:
+    id: "subject-name"
+- inputText: "   "
+- hideKeyboard
+- scrollUntilVisible:
+    element: "Create subject"
+- tapOn: "Create subject"
+- assertVisible: "Give the subject a name."
+
+- scrollUntilVisible:
+    element:
+      id: "subject-name"
+    direction: UP
+- tapOn:
+    id: "subject-name"
+- eraseText
+- inputText: "Regression Subject"
+- tapOn:
+    id: "subject-code"
+- inputText: "RG101"
+- hideKeyboard
+- scrollUntilVisible:
+    element: "Create subject"
+- doubleTapOn: "Create subject"
+- assertVisible: "One-off class"
+- assertVisible: "Regression Subject"
+- assertNotVisible:
+    text: "Regression Subject"
+    index: 1
+
+- scrollUntilVisible:
+    element: "Add one-off class"
+- doubleTapOn: "Add one-off class"
+- extendedWaitUntil:
+    visible: ".*Regression Subject\nOne-off.*"
+    timeout: 5000
+- assertNotVisible:
+    text: ".*Regression Subject\nOne-off.*"
+    index: 1
+
+- stopApp
+- runFlow: subflows/launch.yaml
+- assertVisible: ".*Regression Subject\nOne-off.*"
+- tapOn: "Settings\nTab 4 of 4"
+- tapOn: "Subjects\n.*"
+- scrollUntilVisible:
+    element: ".*Regression Subject\nRG101.*"
+- assertNotVisible:
+    text: ".*Regression Subject\nRG101.*"
+    index: 1
+- back
+
+- runFlow: subflows/delete_fixture.yaml

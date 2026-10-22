@@ -1,0 +1,22 @@
+appId: com.soumoparno.zeolite
+name: Double tap on a subject's delete confirmation
+tags:
+  - tablet
+---
+- runFlow: subflows/launch.yaml
+- runFlow: subflows/remove_leftover_fixture.yaml
+- runFlow: subflows/add_fixture_class.yaml
+- tapOn: "Settings\nTab 4 of 4"
+- tapOn: "Subjects\n.*"
+- scrollUntilVisible:
+    element: ".*Regression Subject.*"
+- tapOn:
+    text: "Show menu"
+    childOf: ".*Regression Subject.*"
+- tapOn: "Delete"
+- doubleTapOn:
+    text: "Delete"
+    below: "Delete Regression Subject\\?"
+- assertNotVisible: ".*Regression Subject\nRG101.*"
+- assertNotVisible: "Edit subject"
+- back

@@ -51,6 +51,22 @@ test('nobody else can read or write it', async () => {
   await assertFails(getDoc(doc(nobody, 'users/me/attendance/x')));
 });
 
+test('a confirmed account cannot touch another account rows', async () => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'users/me/attendance/x'), mark);
+  });
+  const other = env
+    .authenticatedContext('someone', { email_verified: true })
+    .firestore();
+  const ref = doc(other, 'users/me/attendance/x');
+  await assertFails(getDoc(ref));
+  await assertFails(setDoc(ref, { ...mark, status: 'absent' }));
+  await assertFails(setDoc(ref, { deletedAt: 1 }, { merge: true }));
+  await assertFails(deleteDoc(ref));
+  await assertFails(setDoc(doc(other, 'users/me/attendance/y'), mark));
+  await assertFails(deleteDoc(doc(other, 'users/me')));
+});
+
 test('a password account writes only once its email is confirmed', async () => {
   const signedUp = (emailVerified) =>
     env
@@ -100,6 +116,13 @@ test('text longer than anyone types is refused', async () => {
   await assertFails(
     setDoc(doc(me(), 'users/me/subjects/x'), { name: 's'.repeat(501) }),
   );
+});
+
+test('names are capped at 500 UTF-16 units, the way the app counts', async () => {
+  const ref = doc(me(), 'users/me/subjects/x');
+  await assertSucceeds(setDoc(ref, { name: 's'.repeat(500) }));
+  await assertSucceeds(setDoc(ref, { name: '\u{1F600}'.repeat(250) }));
+  await assertFails(setDoc(ref, { name: `${'s'.repeat(499)}\u{1F600}` }));
 });
 
 test('a tombstone can be merged onto an existing row', async () => {

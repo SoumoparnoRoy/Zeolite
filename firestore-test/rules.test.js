@@ -24,7 +24,8 @@ before(async () => {
 beforeEach(() => env.clearFirestore());
 after(() => env.cleanup());
 
-const me = () => env.authenticatedContext('me').firestore();
+const me = () =>
+  env.authenticatedContext('me', { email_verified: true }).firestore();
 
 // The shape the app writes for a mark, which every other kind resembles.
 const mark = {
@@ -63,6 +64,16 @@ test('a password account writes only once its email is confirmed', async () => {
   await assertSucceeds(setDoc(ref(signedUp(true)), mark));
   await assertSucceeds(getDoc(ref(signedUp(false))));
   await assertSucceeds(deleteDoc(ref(signedUp(false))));
+});
+
+test('any sign-in with an unproven address cannot write', async () => {
+  const linked = env
+    .authenticatedContext('pw', {
+      firebase: { sign_in_provider: 'google.com' },
+      email_verified: false,
+    })
+    .firestore();
+  await assertFails(setDoc(doc(linked, 'users/pw/attendance/x'), mark));
 });
 
 test('a collection the app never files is refused', async () => {

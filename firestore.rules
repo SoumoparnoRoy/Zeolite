@@ -18,14 +18,16 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == uid;
     }
 
-    // A password account proves its address only by opening the link sent at
-    // sign-up. Until then it may not write: anyone could sign up with someone
-    // else's Gmail address, fill the account, and Google would hand it to the
-    // owner at their first sign-in. Deleting stays open, so an unconfirmed
-    // account can still be removed.
+    // An account may write only once its address is proven. Anyone could sign
+    // up with someone else's Gmail address, fill the account, and Google would
+    // hand it to the owner at their first sign-in. A password account proves
+    // it with the link sent at sign-up; a Google sign-in carries the flag for
+    // its own address. The flag is checked rather than the provider: a Google
+    // identity linked onto an unconfirmed account from outside the app signs
+    // in as google.com with the address still unproven. Deleting stays open,
+    // so an unconfirmed account can still be removed.
     function isConfirmed() {
-      return request.auth.token.get('firebase', {}).get('sign_in_provider', '') != 'password'
-        || request.auth.token.get('email_verified', false) == true;
+      return request.auth.token.get('email_verified', false) == true;
     }
 
     function isAppCollection(name) {

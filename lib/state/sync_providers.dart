@@ -143,14 +143,19 @@ class SyncController extends Notifier<SyncStatus> {
     // how the user reaches the screen that answers it.
     if (!force && _last?.outcome == SyncRunOutcome.reviewNeeded) return null;
 
-    await _forgetLedgerIfAccountChanged(coordinator.target.id);
-
-    // Running before the account check, which is a round trip: a second call
-    // in that gap has to be turned away like any other overlapping one.
+    // Running before the first await. A second call that got past the check
+    // above reaches the coordinator, which queues a rerun this status never
+    // hears the end of, and Settings says "Syncing…" until a restart.
     state = coordinator.status.running();
-    if (await _accountGone()) {
+    try {
+      await _forgetLedgerIfAccountChanged(coordinator.target.id);
+      if (await _accountGone()) {
+        state = coordinator.status;
+        return null;
+      }
+    } catch (_) {
       state = coordinator.status;
-      return null;
+      rethrow;
     }
     final SyncRunResult result = await coordinator.run(force: force);
     _last = result;

@@ -12,6 +12,7 @@ import 'package:zeolite/data/db/zeolite_repository.dart';
 import 'package:zeolite/data/models/subject.dart';
 import 'package:zeolite/data/settings/app_settings.dart';
 import 'package:zeolite/domain/sync/sync_merge.dart';
+import 'package:zeolite/domain/sync/sync_status.dart';
 import 'package:zeolite/domain/sync/sync_target.dart';
 import 'package:zeolite/services/auth_service.dart';
 import 'package:zeolite/services/sync/sync_coordinator.dart';
@@ -51,6 +52,14 @@ class _DeletedElsewhere implements User {
 class _Unused implements FirebaseAuth, FirebaseFirestore {
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _LedgerWontClear extends ZeoliteRepository {
+  _LedgerWontClear({required super.db});
+
+  @override
+  Future<void> deleteRemoteLinksFor(String target) async =>
+      throw StateError('disk full');
 }
 
 class _CountingSignOut extends AuthService {
@@ -105,6 +114,21 @@ void main() {
         settings: SettingsService(),
         target: target,
       );
+
+  ProviderContainer signedIn(String uid, {ZeoliteRepository? repository}) {
+    final ProviderContainer container = ProviderContainer(
+      overrides: [
+        repositoryProvider.overrideWithValue(repository ?? repo),
+        syncTargetProvider.overrideWithValue(target),
+        signedInUserProvider.overrideWith(
+          (Ref ref) => Stream<User?>.value(_SignedInAs(uid)),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    container.listen(signedInUserProvider, (_, __) {});
+    return container;
+  }
 
   /// The fake keeps what it was told to hold apart from what it hands back, so
   /// a far side holding the last run's work has to be rebuilt from the ledger.
@@ -243,22 +267,7 @@ void main() {
     // Off, so only the ledger being forgotten can explain a push.
     target.recreatesMissingRows = false;
 
-    ProviderContainer as(String uid) {
-      final ProviderContainer container = ProviderContainer(
-        overrides: [
-          repositoryProvider.overrideWithValue(repo),
-          syncTargetProvider.overrideWithValue(target),
-          signedInUserProvider.overrideWith(
-            (Ref ref) => Stream<User?>.value(_SignedInAs(uid)),
-          ),
-        ],
-      );
-      addTearDown(container.dispose);
-      container.listen(signedInUserProvider, (_, __) {});
-      return container;
-    }
-
-    final ProviderContainer first = as('uid-first');
+    final ProviderContainer first = signedIn('uid-first');
     await first.read(signedInUserProvider.future);
     await first.read(settingsProvider.future);
     expect(
@@ -269,7 +278,7 @@ void main() {
 
     // That account is deleted and another connected.
     target.remote = <RemoteState>[];
-    final ProviderContainer second = as('uid-second');
+    final ProviderContainer second = signedIn('uid-second');
     await second.read(signedInUserProvider.future);
     await second.read(settingsProvider.future);
     final SyncRunResult? result =
@@ -280,6 +289,49 @@ void main() {
       second.read(settingsProvider).value?.syncedAccountId,
       'uid-second',
     );
+  });
+
+  // The second tap used to slip past the running check while the first was
+  // still writing which account the ledger belongs to.
+  test('a double tap on the first sync with an account runs once', () async {
+    final ProviderContainer container = signedIn('uid-new');
+    await container.read(signedInUserProvider.future);
+    await container.read(settingsProvider.future);
+    final SyncController sync = container.read(syncStatusProvider.notifier);
+
+    final List<SyncRunResult?> results = await Future.wait(
+      <Future<SyncRunResult?>>[sync.run(force: true), sync.run(force: true)],
+    );
+    // A rerun queued by the coordinator is nobody's future, so give one the
+    // time to show up before counting.
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+
+    expect(results.whereType<SyncRunResult>(), hasLength(1));
+    expect(target.calls.where((String c) => c == 'fetch'),
+        hasLength(target.kinds.length),
+        reason: 'the coordinator ran once');
+    expect(container.read(syncStatusProvider).state, isNot(SyncState.running));
+  });
+
+  test('a ledger that cannot be cleared does not leave the sync running',
+      () async {
+    final ProviderContainer before = signedIn('uid-first');
+    await before.read(signedInUserProvider.future);
+    await before.read(settingsProvider.future);
+    await before.read(syncStatusProvider.notifier).run(force: true);
+
+    final ProviderContainer after = signedIn(
+      'uid-second',
+      repository: _LedgerWontClear(db: appDb!),
+    );
+    await after.read(signedInUserProvider.future);
+    await after.read(settingsProvider.future);
+
+    await expectLater(
+      after.read(syncStatusProvider.notifier).run(force: true),
+      throwsStateError,
+    );
+    expect(after.read(syncStatusProvider).state, isNot(SyncState.running));
   });
 
   test('an account deleted from another device is signed out, not refilled',

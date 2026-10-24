@@ -135,9 +135,15 @@ class NotionSyncController extends Notifier<SyncStatus> {
     if (coordinator == null) return null;
     if (state.state == SyncState.running) return null;
 
-    await _forgetLedgerIfDatabaseChanged();
-
+    // Set before the ledger check, which writes when the database is new, for
+    // the reason given in [SyncController.run].
     state = coordinator.status.running();
+    try {
+      await _forgetLedgerIfDatabaseChanged();
+    } catch (_) {
+      state = coordinator.status;
+      rethrow;
+    }
     final SyncRunResult result =
         await coordinator.run(force: force, rewrite: rewrite);
     _last = result;

@@ -177,7 +177,7 @@ export function createNotionRouter({ config, sessions, limit, fetchImpl }) {
 
   router.post("/refresh", limit("/notion/refresh", 10), parseBody, async (request, response) => {
     const value = request.body?.refresh_token;
-    if (typeof value !== "string" || value.length === 0) {
+    if (typeof value !== "string" || value.trim().length === 0) {
       response.status(400).json({ error: "Invalid request." });
       return;
     }

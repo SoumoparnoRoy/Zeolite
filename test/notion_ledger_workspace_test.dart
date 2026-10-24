@@ -10,6 +10,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:zeolite/data/db/app_database.dart';
 import 'package:zeolite/data/db/zeolite_repository.dart';
 import 'package:zeolite/domain/notion/notion_mapping.dart';
+import 'package:zeolite/domain/sync/sync_status.dart';
 import 'package:zeolite/domain/sync/sync_target.dart';
 import 'package:zeolite/services/notion/notion_sync_target.dart';
 import 'package:zeolite/services/sync/sync_coordinator.dart';
@@ -31,6 +32,14 @@ class _MappingOf extends NotionMappingController {
 
   @override
   Future<void> refreshTitle() async {}
+}
+
+class _LedgerWontClear extends ZeoliteRepository {
+  _LedgerWontClear({required super.db});
+
+  @override
+  Future<void> deleteRemoteLinksFor(String target) async =>
+      throw StateError('disk full');
 }
 
 NotionMapping _mappingOn(String databaseId) => NotionMapping(
@@ -87,10 +96,13 @@ void main() {
         ],
       );
 
-  ProviderContainer connectedTo(String databaseId) {
+  ProviderContainer connectedTo(
+    String databaseId, {
+    ZeoliteRepository? repository,
+  }) {
     final ProviderContainer container = ProviderContainer(
       overrides: [
-        repositoryProvider.overrideWithValue(repo),
+        repositoryProvider.overrideWithValue(repository ?? repo),
         notionMappingProvider.overrideWith(
           () => _MappingOf(_mappingOn(databaseId)),
         ),
@@ -132,6 +144,47 @@ void main() {
     expect(
       second.read(settingsProvider).value?.syncedNotionDatabaseId,
       'db-second',
+    );
+  });
+
+  test('a double tap on the first run against a database runs once', () async {
+    final ProviderContainer container = connectedTo('db-first');
+    await container.read(settingsProvider.future);
+    await container.read(notionMappingProvider.future);
+    final NotionSyncController sync =
+        container.read(notionSyncStatusProvider.notifier);
+
+    final List<SyncRunResult?> results = await Future.wait(
+      <Future<SyncRunResult?>>[sync.run(force: true), sync.run(force: true)],
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+
+    expect(results.whereType<SyncRunResult>(), hasLength(1));
+    expect(target.calls.where((String c) => c == 'fetch'),
+        hasLength(target.kinds.length),
+        reason: 'the coordinator ran once');
+    expect(
+      container.read(notionSyncStatusProvider).state,
+      isNot(SyncState.running),
+    );
+  });
+
+  test('a ledger that cannot be cleared does not leave the run going',
+      () async {
+    final ProviderContainer container = connectedTo(
+      'db-first',
+      repository: _LedgerWontClear(db: appDb!),
+    );
+    await container.read(settingsProvider.future);
+    await container.read(notionMappingProvider.future);
+
+    await expectLater(
+      container.read(notionSyncStatusProvider.notifier).run(force: true),
+      throwsStateError,
+    );
+    expect(
+      container.read(notionSyncStatusProvider).state,
+      isNot(SyncState.running),
     );
   });
 

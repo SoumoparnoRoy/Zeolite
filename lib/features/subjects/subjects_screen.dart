@@ -81,8 +81,10 @@ class SubjectsScreen extends ConsumerWidget {
             sliver: SliverList.separated(
               itemCount: subjects.length,
               separatorBuilder: (_, __) => const SizedBox(height: 10),
-              itemBuilder: (BuildContext context, int index) =>
-                  _SubjectRow(subject: subjects[index]),
+              itemBuilder: (BuildContext context, int index) => _SubjectRow(
+                key: ValueKey<int?>(subjects[index].id),
+                subject: subjects[index],
+              ),
             ),
           ),
       ],
@@ -158,13 +160,25 @@ class _MenuRow extends StatelessWidget {
   }
 }
 
-class _SubjectRow extends ConsumerWidget {
-  const _SubjectRow({required this.subject});
+class _SubjectRow extends ConsumerStatefulWidget {
+  const _SubjectRow({super.key, required this.subject});
 
   final Subject subject;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_SubjectRow> createState() => _SubjectRowState();
+}
+
+class _SubjectRowState extends ConsumerState<_SubjectRow> {
+  // The dialog lets taps through while it fades, and the row stays drawn
+  // until the delete lands, so the second tap of a double tap on *Delete*
+  // would otherwise open the editor for a subject that is going away.
+  bool _deleting = false;
+
+  Subject get subject => widget.subject;
+
+  @override
+  Widget build(BuildContext context) {
     final AppPalette p = context.palette;
     final TimetableData? timetable = ref.watch(timetableProvider).value;
     final int? id = subject.id;
@@ -198,7 +212,10 @@ class _SubjectRow extends ConsumerWidget {
 
     return SurfaceCard(
       padding: const EdgeInsets.fromLTRB(13, 12, 4, 12),
-      onTap: () => showSubjectEditor(context, subject: subject),
+      onTap: () {
+        if (_deleting) return;
+        showSubjectEditor(context, subject: subject);
+      },
       onLongPress: () => showSubjectColorPicker(context, ref, subject),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -270,7 +287,7 @@ class _SubjectRow extends ConsumerWidget {
                     case _SubjectAction.colour:
                       await showSubjectColorPicker(context, ref, subject);
                     case _SubjectAction.delete:
-                      await _confirmDelete(context, ref, timetable);
+                      await _confirmDelete(timetable);
                   }
                 },
                 itemBuilder: (BuildContext context) =>
@@ -322,11 +339,7 @@ class _SubjectRow extends ConsumerWidget {
 
   /// Deleting cascades to classes and history, so the dialog says exactly what
   /// is about to go rather than a vague warning.
-  Future<void> _confirmDelete(
-    BuildContext context,
-    WidgetRef ref,
-    TimetableData? data,
-  ) async {
+  Future<void> _confirmDelete(TimetableData? data) async {
     final int? id = subject.id;
     if (id == null) return;
 
@@ -336,9 +349,16 @@ class _SubjectRow extends ConsumerWidget {
     final bool confirmed = await confirmSubjectDelete(context, subject, data);
 
     if (!confirmed) return;
+    _deleting = true;
     final ActionCore core = ref.read(actionCoreProvider);
     final SubjectActions subjects = ref.read(subjectActionsProvider);
-    await subjects.deleteSubject(id);
+    try {
+      await subjects.deleteSubject(id);
+    } catch (_) {
+      // The subject is still there, so its row has to open again.
+      _deleting = false;
+      rethrow;
+    }
     showUndoSnack(messenger, core, '${subject.name} deleted');
   }
 }

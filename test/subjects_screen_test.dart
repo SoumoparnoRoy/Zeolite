@@ -92,11 +92,23 @@ TimetableData _fixture() {
   );
 }
 
-Widget _app(TimetableData data) {
+/// Holds a delete open until the test lets it finish, the way a slow write
+/// does on a device.
+class _HeldDelete extends SubjectActions {
+  _HeldDelete(super.core, this.gate);
+
+  final Completer<void> gate;
+
+  @override
+  Future<void> deleteSubject(int id) => gate.future;
+}
+
+Widget _app(TimetableData data, {SubjectActions Function(Ref)? subjects}) {
   return ProviderScope(
     overrides: [
       timetableProvider.overrideWith((Ref ref) async => data),
       settingsProvider.overrideWith(_StaticSettings.new),
+      if (subjects != null) subjectActionsProvider.overrideWith(subjects),
     ],
     child: MaterialApp(
       theme: AppTheme.dark(),
@@ -241,6 +253,33 @@ void main() {
       findsOneWidget,
     );
     expect(find.textContaining('nothing else is lost'), findsNothing);
+  });
+
+  testWidgets('a subject being deleted does not open its editor',
+      (WidgetTester tester) async {
+    final Completer<void> gate = Completer<void>();
+    await tester.pumpWidget(
+      _app(
+        _fixture(),
+        subjects: (Ref ref) => _HeldDelete(ref.read(actionCoreProvider), gate),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.more_vert_rounded).last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Physics'), findsOneWidget);
+    await tester.tap(find.text('Physics'));
+    await tester.pumpAndSettle();
+    expect(find.text('Edit subject'), findsNothing);
+
+    gate.complete();
+    await tester.pump(const Duration(seconds: 10));
   });
 
   testWidgets('a subject with no classes is sent to the Counts page',

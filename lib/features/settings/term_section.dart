@@ -139,6 +139,7 @@ class CountingSection extends ConsumerWidget {
                   settings.copyWith(cancelledCountsAsAttended: on),
                 ),
               ),
+              mergeTrailing: true,
             ),
           ),
         ),

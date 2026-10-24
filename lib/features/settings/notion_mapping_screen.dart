@@ -153,7 +153,8 @@ class _MappingBody {
           icon: Icons.table_chart_outlined,
           title: form.coursesTitle ??
               (form.courses == null ? 'Not linked' : 'Linked'),
-          onTap: _busy ? null : () => _pickCourses(context),
+          onTap: () => _pickCourses(context),
+          enabled: !_busy,
         ),
       ),
       if (form.courses == null && form.suggestedCourses != null)
@@ -258,7 +259,8 @@ class _MappingBody {
             icon: Icons.table_chart_outlined,
             title: choice.title,
             value: form.placeOf(choice),
-            onTap: _busy ? null : () => controller.chooseSource(choice),
+            onTap: () => controller.chooseSource(choice),
+            enabled: !_busy,
           ),
         ),
         const SizedBox(height: AppSpacing.sm),

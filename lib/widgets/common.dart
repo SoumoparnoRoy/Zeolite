@@ -171,14 +171,20 @@ class SectionHeader extends StatelessWidget {
       child: Row(
         children: <Widget>[
           Expanded(
-            child: Text(
-              title.toUpperCase(),
-              style: TextStyle(
-                color: context.palette.textTertiary,
-                fontSize: AppType.captionLarge,
-                height: 1,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.05,
+            // Otherwise every header on a page folds into one stop that reads
+            // them all in a row.
+            child: Semantics(
+              container: true,
+              header: true,
+              child: Text(
+                title.toUpperCase(),
+                style: TextStyle(
+                  color: context.palette.textTertiary,
+                  fontSize: AppType.captionLarge,
+                  height: 1,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.05,
+                ),
               ),
             ),
           ),
@@ -586,6 +592,9 @@ class AppRow extends StatelessWidget {
     this.tint,
     this.onTap,
     this.trailing,
+    this.mergeTrailing = false,
+    this.semanticsIdentifier,
+    this.enabled = true,
   });
 
   final IconData icon;
@@ -602,14 +611,46 @@ class AppRow extends StatelessWidget {
   /// Replaces the chevron — a switch, a value, nothing.
   final Widget? trailing;
 
+  /// Reads [trailing] as part of the row: one stop that says the switch's
+  /// state. Off for a trailing button, which needs its own stop.
+  final bool mergeTrailing;
+
+  /// For UI tests to find the row by.
+  final String? semanticsIdentifier;
+
+  /// False while [onTap] is unavailable for now; it reads as a disabled button.
+  final bool enabled;
+
   @override
   Widget build(BuildContext context) {
+    // Each row is its own node. Without the boundary, a row's texts and tap
+    // fold into the nearest ancestor, and after a sync the whole Account page
+    // read as one node.
+    if (mergeTrailing) {
+      return MergeSemantics(
+        child: Semantics(
+          identifier: semanticsIdentifier,
+          child: _row(context),
+        ),
+      );
+    }
+    return Semantics(
+      container: true,
+      button: onTap != null,
+      enabled: onTap == null ? null : enabled,
+      identifier: semanticsIdentifier,
+      child: _row(context),
+    );
+  }
+
+  Widget _row(BuildContext context) {
     final AppPalette p = context.palette;
     final Color tone = tint ?? p.accent;
     final String? sub = value;
+    final VoidCallback? tap = enabled ? onTap : null;
 
     return InkWell(
-      onTap: onTap,
+      onTap: tap,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
         child: Row(
@@ -659,7 +700,7 @@ class AppRow extends StatelessWidget {
             ),
             if (trailing != null)
               trailing!
-            else if (onTap != null)
+            else if (tap != null)
               Icon(Icons.chevron_right_rounded, size: 18, color: p.textFaint),
           ],
         ),
@@ -714,13 +755,16 @@ class GroupNote extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(2, 9, 2, 0),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: AppType.captionLarge,
-          height: 1.4,
-          fontWeight: FontWeight.w400,
-          color: context.palette.textTertiary,
+      child: Semantics(
+        container: true,
+        child: Text(
+          text,
+          style: TextStyle(
+            fontSize: AppType.captionLarge,
+            height: 1.4,
+            fontWeight: FontWeight.w400,
+            color: context.palette.textTertiary,
+          ),
         ),
       ),
     );

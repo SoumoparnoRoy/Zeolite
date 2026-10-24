@@ -103,6 +103,7 @@ class NotionSection extends ConsumerWidget {
                       .read(settingsProvider.notifier)
                       .save(settings.copyWith(notionAutoSync: on)),
                 ),
+                mergeTrailing: true,
               ),
           ],
         ),
@@ -143,11 +144,10 @@ class NotionSection extends ConsumerWidget {
                   icon: Icons.restart_alt_rounded,
                   title: 'Rewrite every row',
                   value: 'Send every class to Notion again',
-                  onTap: running
-                      ? null
-                      : () => ref
-                          .read(notionSyncStatusProvider.notifier)
-                          .resyncEverything(),
+                  onTap: () => ref
+                      .read(notionSyncStatusProvider.notifier)
+                      .resyncEverything(),
+                  enabled: !running,
                 ),
             ],
           ),

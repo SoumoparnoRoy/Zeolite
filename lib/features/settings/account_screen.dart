@@ -153,15 +153,12 @@ class _SignedInState extends ConsumerState<_SignedIn> {
               title: widget.user.email ?? 'This device',
               value: 'Backups go to this account',
             ),
-            Semantics(
-              container: true,
-              identifier: 'sign-out',
-              child: SettingsRow(
-                icon: Icons.logout_rounded,
-                title: 'Sign out',
-                value: 'Attendance on this device stays here',
-                onTap: () => ref.read(authServiceProvider).signOut(),
-              ),
+            SettingsRow(
+              icon: Icons.logout_rounded,
+              title: 'Sign out',
+              value: 'Attendance on this device stays here',
+              onTap: () => ref.read(authServiceProvider).signOut(),
+              semanticsIdentifier: 'sign-out',
             ),
           ],
         ),
@@ -178,18 +175,16 @@ class _SignedInState extends ConsumerState<_SignedIn> {
               'the address is in the Privacy Policy.',
           child: SurfaceCard(
             padding: EdgeInsets.zero,
-            child: Semantics(
-              container: true,
-              identifier: 'delete-account',
-              child: SettingsRow(
-                icon: Icons.delete_forever_outlined,
-                title: _deleting ? 'Deleting…' : 'Delete my account',
-                value: syncing
-                    ? 'Available once the sync finishes'
-                    : 'Removes the account and everything backed up to it',
-                danger: true,
-                onTap: _deleting || syncing ? null : _delete,
-              ),
+            child: SettingsRow(
+              icon: Icons.delete_forever_outlined,
+              title: _deleting ? 'Deleting…' : 'Delete my account',
+              value: syncing
+                  ? 'Available once the sync finishes'
+                  : 'Removes the account and everything backed up to it',
+              danger: true,
+              onTap: _delete,
+              enabled: !_deleting && !syncing,
+              semanticsIdentifier: 'delete-account',
             ),
           ),
         ),
@@ -314,13 +309,15 @@ class _ConfirmEmailState extends ConsumerState<_ConfirmEmail> {
             icon: Icons.mark_email_read_outlined,
             title: "I've opened the link",
             value: 'Check again and start syncing',
-            onTap: _busy ? null : _check,
+            onTap: _check,
+            enabled: !_busy,
           ),
           SettingsRow(
             icon: Icons.forward_to_inbox_outlined,
             title: 'Send the link again',
             value: widget.email ?? 'To the address you signed up with',
-            onTap: _busy ? null : _resend,
+            onTap: _resend,
+            enabled: !_busy,
           ),
         ],
       ),
@@ -381,23 +378,24 @@ class _SyncSection extends ConsumerWidget {
                 .read(settingsProvider.notifier)
                 .save(settings.copyWith(accountAutoSync: on)),
           ),
+          mergeTrailing: true,
         ),
         if (review)
           SettingsRow(
             icon: Icons.merge_rounded,
             title: 'Review and merge',
             value: 'This account already holds data — choose what to keep',
-            onTap: running ? null : () => _review(context, ref),
+            onTap: () => _review(context, ref),
+            enabled: !running,
           )
         else
           SettingsRow(
             icon: Icons.cloud_sync_outlined,
             title: status.failures > 0 ? 'Try again' : 'Sync now',
             value: 'Back up and bring in changes straight away',
-            onTap: running
-                ? null
-                // Forced: a Retry that honours the backoff is not a Retry.
-                : () => ref.read(syncStatusProvider.notifier).run(force: true),
+            // Forced: a Retry that honours the backoff is not a Retry.
+            onTap: () => ref.read(syncStatusProvider.notifier).run(force: true),
+            enabled: !running,
           ),
       ],
     );

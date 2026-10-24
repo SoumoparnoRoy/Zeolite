@@ -12,6 +12,9 @@ class SettingsRow extends StatelessWidget {
     this.onTap,
     this.trailing,
     this.danger = false,
+    this.mergeTrailing = false,
+    this.semanticsIdentifier,
+    this.enabled = true,
   });
 
   final IconData icon;
@@ -20,6 +23,9 @@ class SettingsRow extends StatelessWidget {
   final VoidCallback? onTap;
   final Widget? trailing;
   final bool danger;
+  final bool mergeTrailing;
+  final String? semanticsIdentifier;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -31,6 +37,9 @@ class SettingsRow extends StatelessWidget {
       tint: danger ? p.absent : p.accent,
       onTap: onTap,
       trailing: trailing,
+      mergeTrailing: mergeTrailing,
+      semanticsIdentifier: semanticsIdentifier,
+      enabled: enabled,
     );
   }
 }
@@ -61,6 +70,19 @@ class SettingsSwitchRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final Color link =
         warning ? context.palette.absent : context.palette.accent;
+    final Widget toggle = Switch.adaptive(value: value, onChanged: onChanged);
+    // One stop, unless the text opens something else and the switch needs a name.
+    final Widget row = _row(
+      context,
+      link,
+      onTapSubtitle == null
+          ? toggle
+          : Semantics(container: true, label: title, child: toggle),
+    );
+    return onTapSubtitle == null ? MergeSemantics(child: row) : row;
+  }
+
+  Widget _row(BuildContext context, Color link, Widget toggle) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 6, 14, 6),
       child: Row(
@@ -129,7 +151,7 @@ class SettingsSwitchRow extends StatelessWidget {
               ),
             ),
           ),
-          Switch.adaptive(value: value, onChanged: onChanged),
+          toggle,
         ],
       ),
     );

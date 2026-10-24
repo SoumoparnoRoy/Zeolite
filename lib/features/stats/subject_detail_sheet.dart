@@ -28,13 +28,23 @@ Future<void> showSubjectDetail(
   );
 }
 
-class _SubjectDetail extends ConsumerWidget {
+class _SubjectDetail extends ConsumerStatefulWidget {
   const _SubjectDetail({required this.stats});
 
   final SubjectStats stats;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_SubjectDetail> createState() => _SubjectDetailState();
+}
+
+class _SubjectDetailState extends ConsumerState<_SubjectDetail> {
+  // Set once a delete is confirmed, while the sheet waits for the write.
+  bool _deleting = false;
+
+  SubjectStats get stats => widget.stats;
+
+  @override
+  Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
@@ -190,7 +200,10 @@ class _SubjectDetail extends ConsumerWidget {
     final Subject subject = stats.subject;
     return <Widget>[
       OutlinedButton.icon(
-        onPressed: () => showSimulateSheet(context, stats),
+        onPressed: () {
+          if (_deleting) return;
+          showSimulateSheet(context, stats);
+        },
         icon: const Icon(Icons.tune_rounded, size: 18),
         label: const Text('Simulate'),
       ),
@@ -205,6 +218,7 @@ class _SubjectDetail extends ConsumerWidget {
       const SizedBox(height: AppSpacing.lg),
       OutlinedButton.icon(
         onPressed: () async {
+          if (_deleting) return;
           // Same ordering as Edit below: push on top first, because popping
           // this sheet would unmount the context being navigated from.
           await Navigator.of(context).push(
@@ -225,6 +239,7 @@ class _SubjectDetail extends ConsumerWidget {
           Expanded(
             child: OutlinedButton.icon(
               onPressed: () async {
+                if (_deleting) return;
                 // Open the editor on top first — popping this sheet before
                 // awaiting would unmount the context we need.
                 await showSubjectEditor(context, subject: subject);
@@ -237,7 +252,10 @@ class _SubjectDetail extends ConsumerWidget {
           const SizedBox(width: AppSpacing.md),
           Expanded(
             child: OutlinedButton.icon(
-              onPressed: () => _confirmDelete(context, ref, subject),
+              onPressed: () {
+                if (_deleting) return;
+                _confirmDelete(context, ref, subject);
+              },
               style: OutlinedButton.styleFrom(
                 foregroundColor: p.absent,
                 backgroundColor: p.absent.withValues(alpha: 0.1),
@@ -268,7 +286,13 @@ class _SubjectDetail extends ConsumerWidget {
     if (id != null) {
       final ActionCore core = ref.read(actionCoreProvider);
       final SubjectActions subjects = ref.read(subjectActionsProvider);
-      await subjects.deleteSubject(id);
+      _deleting = true;
+      try {
+        await subjects.deleteSubject(id);
+      } catch (_) {
+        _deleting = false;
+        rethrow;
+      }
       showUndoSnack(messenger, core, '${subject.name} deleted');
     }
     if (context.mounted) Navigator.of(context).pop();

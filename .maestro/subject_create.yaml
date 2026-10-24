@@ -53,15 +53,15 @@ tags:
     element: "Add one-off class"
 - doubleTapOn: "Add one-off class"
 - extendedWaitUntil:
-    visible: ".*Regression Subject\nOne-off.*"
+    visible: ".*Regression Subject\n(NEXT\n|NOW\n)?One-off.*"
     timeout: 5000
 - assertNotVisible:
-    text: ".*Regression Subject\nOne-off.*"
+    text: ".*Regression Subject\n(NEXT\n|NOW\n)?One-off.*"
     index: 1
 
 - stopApp
 - runFlow: subflows/launch.yaml
-- assertVisible: ".*Regression Subject\nOne-off.*"
+- assertVisible: ".*Regression Subject\n(NEXT\n|NOW\n)?One-off.*"
 - tapOn: "Settings\nTab 4 of 4"
 - tapOn: "Subjects\n.*"
 - scrollUntilVisible:

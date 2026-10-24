@@ -8,7 +8,7 @@ tags:
 - runFlow: subflows/add_fixture_class.yaml
 - tapOn:
     text: "Present"
-    below: ".*Regression Subject\nOne-off.*"
+    below: ".*Regression Subject\n(NEXT\n|NOW\n)?One-off.*"
 
 - tapOn: "Settings\nTab 4 of 4"
 - tapOn: "Subjects\n.*"
@@ -37,7 +37,7 @@ tags:
 
 # Undo brought the class and its mark back with the subject.
 - tapOn: "Today\nTab 1 of 4"
-- assertVisible: ".*Regression Subject\nOne-off.*Marked present.*"
+- assertVisible: ".*Regression Subject\n(NEXT\n|NOW\n)?One-off.*Marked present.*"
 
 - runFlow: subflows/delete_fixture.yaml
 - stopApp

@@ -9,27 +9,27 @@ tags:
 
 - assertVisible:
     text: "Present"
-    below: ".*Regression Subject\nOne-off.*"
+    below: ".*Regression Subject\n(NEXT\n|NOW\n)?One-off.*"
 
 # Tapping the current status clears it, so a double tap that counted twice
 # would leave the class unmarked.
 - doubleTapOn:
     text: "Present"
-    below: ".*Regression Subject\nOne-off.*"
+    below: ".*Regression Subject\n(NEXT\n|NOW\n)?One-off.*"
 - stopApp
 - runFlow: subflows/launch.yaml
-- assertVisible: ".*Regression Subject\nOne-off.*Marked present.*"
+- assertVisible: ".*Regression Subject\n(NEXT\n|NOW\n)?One-off.*Marked present.*"
 
-- tapOn: ".*Regression Subject\nOne-off.*Marked present.*"
+- tapOn: ".*Regression Subject\n(NEXT\n|NOW\n)?One-off.*Marked present.*"
 - tapOn:
     text: "Present"
-    below: ".*Regression Subject\nOne-off.*"
-- assertNotVisible: ".*Regression Subject\nOne-off.*Marked present.*"
+    below: ".*Regression Subject\n(NEXT\n|NOW\n)?One-off.*"
+- assertNotVisible: ".*Regression Subject\n(NEXT\n|NOW\n)?One-off.*Marked present.*"
 - tapOn:
     text: "Absent"
-    below: ".*Regression Subject\nOne-off.*"
+    below: ".*Regression Subject\n(NEXT\n|NOW\n)?One-off.*"
 - stopApp
 - runFlow: subflows/launch.yaml
-- assertVisible: ".*Regression Subject\nOne-off.*Marked absent.*"
+- assertVisible: ".*Regression Subject\n(NEXT\n|NOW\n)?One-off.*Marked absent.*"
 
 - runFlow: subflows/delete_fixture.yaml

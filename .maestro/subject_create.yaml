@@ -51,6 +51,7 @@ tags:
 
 - scrollUntilVisible:
     element: "Add one-off class"
+    centerElement: true
 - doubleTapOn: "Add one-off class"
 - extendedWaitUntil:
     visible: ".*Regression Subject\n(NEXT\n|NOW\n)?One-off.*"

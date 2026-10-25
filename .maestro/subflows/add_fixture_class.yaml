@@ -12,6 +12,7 @@ appId: com.soumoparno.zeolite
 - tapOn: "Create subject"
 - scrollUntilVisible:
     element: "Add one-off class"
+    centerElement: true
 - tapOn: "Add one-off class"
 - extendedWaitUntil:
     visible: ".*Regression Subject.*"

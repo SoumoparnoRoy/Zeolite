@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
@@ -50,25 +52,62 @@ Future<bool> confirmSubjectDelete(
       : '${subject.name} has ${_joinNaturally(losses)}. Deleting the subject '
           'removes all of it.';
 
+  final OverlayState? overlay =
+      Navigator.of(context, rootNavigator: true).overlay;
+  ModalRoute<Object?>? dialog;
   final bool? confirmed = await showDialog<bool>(
     context: context,
-    builder: (BuildContext context) => AlertDialog(
-      title: Text('Delete ${subject.name}?'),
-      content: Text(message, style: const TextStyle(height: 1.4)),
-      actions: <Widget>[
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('Cancel'),
-        ),
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(true),
-          style: TextButton.styleFrom(foregroundColor: context.palette.absent),
-          child: const Text('Delete'),
-        ),
-      ],
-    ),
+    builder: (BuildContext context) {
+      dialog ??= ModalRoute.of(context);
+      return AlertDialog(
+        title: Text('Delete ${subject.name}?'),
+        content: Text(message, style: const TextStyle(height: 1.4)),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style:
+                TextButton.styleFrom(foregroundColor: context.palette.absent),
+            child: const Text('Delete'),
+          ),
+        ],
+      );
+    },
   );
+  if (overlay != null && dialog != null) _coverWhileClosing(overlay, dialog!);
   return confirmed ?? false;
+}
+
+/// A closing dialog's barrier stops taking taps as soon as it starts to fade,
+/// so the second tap of a double tap on *Delete* or *Cancel* would land on
+/// whatever is underneath: another subject's row, or a button in the sheet the
+/// dialog came from. This covers the screen until the dialog has gone, however
+/// it was closed.
+///
+/// [TransitionRoute.completed] fires when the route is disposed, including
+/// when it is removed before its animation finishes. The timer is a backstop so
+/// the cover can never outlast a dialog that somehow never completes.
+void _coverWhileClosing(OverlayState overlay, ModalRoute<Object?> dialog) {
+  if (!overlay.mounted) return;
+  final OverlayEntry cover = OverlayEntry(
+    builder: (BuildContext context) => const ModalBarrier(dismissible: false),
+  );
+  overlay.insert(cover);
+  bool removed = false;
+  late final Timer backstop;
+  void remove() {
+    if (removed) return;
+    removed = true;
+    backstop.cancel();
+    cover.remove();
+    cover.dispose();
+  }
+
+  backstop = Timer(const Duration(seconds: 1), remove);
+  dialog.completed.whenComplete(remove);
 }
 
 /// "a, b and c" — reads like a sentence rather than a list of counts.

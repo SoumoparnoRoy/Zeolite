@@ -17,6 +17,7 @@ import 'package:zeolite/data/settings/app_settings.dart';
 import 'package:zeolite/features/stats/stats_view.dart';
 import 'package:zeolite/features/subjects/subjects_screen.dart';
 import 'package:zeolite/state/providers.dart';
+import 'package:zeolite/widgets/common.dart';
 
 /// Serves fixed settings so the screen never reaches SharedPreferences.
 class _StaticSettings extends SettingsController {
@@ -101,6 +102,74 @@ class _HeldDelete extends SubjectActions {
 
   @override
   Future<void> deleteSubject(int id) => gate.future;
+}
+
+/// [_fixture] plus enough subjects after Physics that rows sit under the
+/// delete dialog's buttons.
+TimetableData _crowded() {
+  final TimetableData base = _fixture();
+  return TimetableData(
+    categories: base.categories,
+    subjects: <Subject>[
+      ...base.subjects,
+      for (int id = 3; id < 15; id++)
+        Subject(
+          id: id,
+          name: 'Topic $id',
+          colorValue: AppColors.defaultSubjectColor,
+        ),
+    ],
+    slots: base.slots,
+    extras: base.extras,
+    holidays: base.holidays,
+    records: base.records,
+  );
+}
+
+/// Phone width: on the default surface the list is capped narrower than the
+/// dialog, so its buttons sit beside the rows rather than over them.
+void _phoneSized(WidgetTester tester) {
+  tester.view.physicalSize = const Size(1080, 2400);
+  tester.view.devicePixelRatio = 2.5;
+  addTearDown(tester.view.reset);
+}
+
+Future<void> _openDeleteDialog(WidgetTester tester, String name) async {
+  final Finder card =
+      find.ancestor(of: find.text(name), matching: find.byType(SurfaceCard));
+  await tester.tap(
+    find.descendant(of: card, matching: find.byIcon(Icons.more_vert_rounded)),
+  );
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Delete'));
+  await tester.pumpAndSettle();
+}
+
+/// Two taps on [button]'s spot, the second while the dialog fades out, after
+/// checking another subject's row really is underneath. The row being
+/// deleted doesn't count: its own guard would pass the test without the
+/// dialog's.
+Future<void> _doubleTapOverARow(
+  WidgetTester tester,
+  Finder button, {
+  required String deleting,
+}) async {
+  final Offset at = tester.getCenter(button);
+  final Finder own = find.ancestor(
+      of: find.text(deleting), matching: find.byType(SurfaceCard));
+  final Set<Element> skip = own.evaluate().toSet();
+  final bool overARow = find
+      .byType(SurfaceCard)
+      .evaluate()
+      .where((Element e) => !skip.contains(e))
+      .map((Element e) => e.renderObject! as RenderBox)
+      .any((RenderBox box) =>
+          (box.localToGlobal(Offset.zero) & box.size).contains(at));
+  expect(overARow, isTrue, reason: 'no other row under the dialog button');
+  await tester.tapAt(at);
+  await tester.pump(const Duration(milliseconds: 40));
+  await tester.tapAt(at);
+  await tester.pumpAndSettle();
 }
 
 Widget _app(TimetableData data, {SubjectActions Function(Ref)? subjects}) {
@@ -280,6 +349,116 @@ void main() {
 
     gate.complete();
     await tester.pump(const Duration(seconds: 10));
+  });
+
+  testWidgets('a double tap on Delete opens no other subject',
+      (WidgetTester tester) async {
+    _phoneSized(tester);
+    final Completer<void> gate = Completer<void>();
+    await tester.pumpWidget(
+      _app(
+        _crowded(),
+        subjects: (Ref ref) => _HeldDelete(ref.read(actionCoreProvider), gate),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _openDeleteDialog(tester, 'Physics');
+    await _doubleTapOverARow(tester, find.text('Delete').last,
+        deleting: 'Physics');
+    expect(find.text('Edit subject'), findsNothing);
+
+    gate.complete();
+    await tester.pump(const Duration(seconds: 10));
+  });
+
+  testWidgets('a double tap on Cancel opens no subject',
+      (WidgetTester tester) async {
+    _phoneSized(tester);
+    await tester.pumpWidget(_app(_crowded()));
+    await tester.pumpAndSettle();
+
+    await _openDeleteDialog(tester, 'Physics');
+    await _doubleTapOverARow(tester, find.text('Cancel'), deleting: 'Physics');
+    expect(find.text('Edit subject'), findsNothing);
+    expect(find.text('Physics'), findsOneWidget);
+  });
+
+  testWidgets('rows take taps again however the dialog closes',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(_app(_crowded()));
+    await tester.pumpAndSettle();
+
+    Future<void> rowOpensItsEditor() async {
+      await tester.tap(find.text('Mathematics'));
+      await tester.pumpAndSettle();
+      expect(find.text('Edit subject'), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text('Edit subject'), findsNothing);
+    }
+
+    await _openDeleteDialog(tester, 'Physics');
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    await rowOpensItsEditor();
+
+    await _openDeleteDialog(tester, 'Physics');
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await rowOpensItsEditor();
+
+    await _openDeleteDialog(tester, 'Physics');
+    await tester.tapAt(const Offset(4, 4));
+    await tester.pumpAndSettle();
+    await rowOpensItsEditor();
+  });
+
+  testWidgets('the page behind takes taps when the screen closes mid-fade',
+      (WidgetTester tester) async {
+    int homeTaps = 0;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          timetableProvider.overrideWith((Ref ref) async => _crowded()),
+          settingsProvider.overrideWith(_StaticSettings.new),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.dark(),
+          home: Builder(
+            builder: (BuildContext context) => Scaffold(
+              body: SizedBox.expand(
+                child: TextButton(
+                  onPressed: () {
+                    homeTaps++;
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const SubjectsScreen(),
+                      ),
+                    );
+                  },
+                  child: const Text('home'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('home'));
+    await tester.pumpAndSettle();
+
+    await _openDeleteDialog(tester, 'Physics');
+    await tester.tap(find.text('Cancel'));
+    await tester.pump(const Duration(milliseconds: 20));
+    // A second back while the dialog fades takes the whole screen with it.
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byType(SubjectsScreen), findsNothing);
+
+    await tester.tap(find.text('home'));
+    expect(homeTaps, 2);
+    await tester.pumpAndSettle();
   });
 
   testWidgets('a subject with no classes is sent to the Counts page',

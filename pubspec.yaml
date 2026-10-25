@@ -3,11 +3,12 @@ description: "Zeolite - track your university classes and attendance."
 publish_to: 'none'
 version: 1.0.0+1
 
-# Verified against pub.dev on 11 Aug 2026. flutter_local_notifications 22.x
-# requires Flutter 3.38.1+, which sets the floor for the whole project.
+# flutter_local_notifications 22.x needs Flutter 3.38.1+ (pub.dev, 11 Aug
+# 2026), but the floor is 3.47.8: older stables still trust the compromised
+# eMudhra CA keys on Android (GHSA-frr6-h895-5pxp).
 environment:
   sdk: '>=3.5.0 <4.0.0'
-  flutter: '>=3.38.1'
+  flutter: '>=3.47.8'
 
 dependencies:
   flutter:

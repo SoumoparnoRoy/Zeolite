@@ -10,7 +10,7 @@ A Flutter app for tracking university timetables and attendance. Add your
 weekly schedule once, mark each class with one tap, and get a straight answer
 before you skip a lecture.
 
-[![Flutter](https://img.shields.io/badge/Flutter-3.38.1+-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
+[![Flutter](https://img.shields.io/badge/Flutter-3.47.8+-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-3.5+-0175C2?logo=dart&logoColor=white)](https://dart.dev)
 [![Riverpod](https://img.shields.io/badge/State-Riverpod%203-4B32C3)](https://riverpod.dev)
 [![SQLite](https://img.shields.io/badge/DB-sqflite-003B57?logo=sqlite&logoColor=white)](https://pub.dev/packages/sqflite)
@@ -74,7 +74,7 @@ is the full text.
 
 ## Getting started
 
-You need [Flutter](https://docs.flutter.dev/install) 3.38.1 or newer and an
+You need [Flutter](https://docs.flutter.dev/install) 3.47.8 or newer and an
 Android device or emulator.
 
 ```bash

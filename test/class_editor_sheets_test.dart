@@ -307,6 +307,51 @@ void main() {
     });
   });
 
+  testWidgets('a clash warning goes once the class it names is changed',
+      (WidgetTester tester) async {
+    final List<ExtraClass> extras = <ExtraClass>[];
+    await tester.pumpWidget(
+      _host(
+        (c, _) => showExtraClassEditor(c),
+        slots: <ClassSlot>[
+          ClassSlot(
+            id: 9,
+            subjectId: 1,
+            weekday: Dates.today().weekday,
+            startMinutes: 9 * 60,
+            endMinutes: 10 * 60,
+            startDate: Dates.today().subtract(const Duration(days: 7)),
+          ),
+        ],
+        schedule: (Ref ref) => _RecordingActions(ActionCore(ref),
+            slots: <ClassSlot>[], extras: extras),
+      ),
+    );
+    await _openSheet(tester);
+
+    await tester.tap(find.text('Physics'));
+    await tester.pumpAndSettle();
+    await _tapButton(tester, 'Add one-off class');
+    final Finder warning = find.textContaining('already has a class at');
+    expect(warning, findsOneWidget);
+
+    await tester.ensureVisible(find.text('9:00 AM'));
+    await tester.pumpAndSettle();
+    await _pickTime(tester, find.text('9:00 AM'), 12, 0);
+    expect(warning, findsNothing);
+
+    // Back onto the clash, then off it by changing the subject instead.
+    await _pickTime(tester, find.text('12:00 PM'), 9, 0);
+    await _tapButton(tester, 'Add one-off class');
+    expect(warning, findsOneWidget);
+    await tester.ensureVisible(find.text('Maths'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Maths'));
+    await tester.pumpAndSettle();
+    expect(warning, findsNothing);
+    expect(extras, isEmpty);
+  });
+
   group('an edit that would strand marks', () {
     final ClassSlot existing = ClassSlot(
       id: 9,

@@ -62,6 +62,13 @@
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
+            <!-- Links reach Dart through app_links and home_widget. Left on,
+                 Flutter also pushes each one as a named route the app doesn't
+                 have, and that failure is reported as a crash. -->
+            <meta-data
+              android:name="flutter_deeplinking_enabled"
+              android:value="false"
+              />
             <!-- Where the Notion callback page sends the browser back to.
                  Any app may claim this scheme, so the redirect is treated as
                  public: it carries a session id that is worthless without the

@@ -110,6 +110,8 @@ class _ExtraClassFormState extends ConsumerState<_ExtraClassForm> {
     );
     if (picked == null || !mounted) return;
     setState(() {
+      // The warning names the old time; left up, it reads as still true.
+      _error = null;
       final int value = Clock.toMinutes(picked.hour, picked.minute);
       if (isStart) {
         final int duration =
@@ -131,7 +133,10 @@ class _ExtraClassFormState extends ConsumerState<_ExtraClassForm> {
       lastDate: DateTime(DateTime.now().year + 3),
     );
     if (picked == null || !mounted) return;
-    setState(() => _date = Dates.dayOf(picked));
+    setState(() {
+      _error = null;
+      _date = Dates.dayOf(picked);
+    });
   }
 
   /// A one-off is a single occurrence, so its date is part of the key too:
@@ -231,6 +236,7 @@ class _ExtraClassFormState extends ConsumerState<_ExtraClassForm> {
         SubjectPicker(
           value: _subjectId,
           onChanged: (int? id) => setState(() {
+            _error = null;
             _subjectId = id;
             if (!_durationTouched) {
               _end = Clock.endFromStart(_start, _defaultDuration);

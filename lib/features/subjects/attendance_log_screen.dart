@@ -432,7 +432,7 @@ extension on _LogTile {
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
     final ActionCore core = ref.read(actionCoreProvider);
     final bool counts = _counts(ref.read(settingsProvider).value);
-    final bool confirmed = await showDialog<bool>(
+    final bool confirmed = await showAppDialog<bool>(
           context: context,
           builder: (BuildContext context) => AlertDialog(
             title: const Text('Remove this mark?'),

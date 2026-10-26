@@ -222,7 +222,8 @@ class NotionSection extends ConsumerWidget {
   }
 
   /// True to skip the app's own rows; null is a cancel.
-  static Future<bool?> _askWhichRows(BuildContext context) => showDialog<bool>(
+  static Future<bool?> _askWhichRows(BuildContext context) =>
+      showAppDialog<bool>(
         context: context,
         builder: (BuildContext context) => AlertDialog(
           backgroundColor: context.palette.surfaceHigh,

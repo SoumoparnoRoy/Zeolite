@@ -83,7 +83,7 @@ class OutOfTermNotice extends ConsumerWidget {
     if (widened == null) return;
     final (DateTime start, DateTime end) = widened;
 
-    final bool? go = await showDialog<bool>(
+    final bool? go = await showAppDialog<bool>(
       context: context,
       builder: (BuildContext context) => AlertDialog(
         title: const Text('Widen the term?'),

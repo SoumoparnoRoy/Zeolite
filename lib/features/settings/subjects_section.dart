@@ -253,7 +253,7 @@ class CategoriesSection extends ConsumerWidget {
         await ref.read(subjectActionsProvider).countSubjectsInCategory(id);
     if (!context.mounted) return;
 
-    final bool? confirmed = await showDialog<bool>(
+    final bool? confirmed = await showAppDialog<bool>(
       context: context,
       builder: (BuildContext context) => AlertDialog(
         backgroundColor: context.palette.surfaceHigh,
@@ -287,7 +287,7 @@ class CategoriesSection extends ConsumerWidget {
 
   /// The one action that restates history, so it asks first.
   Future<void> _applyWeights(BuildContext context, WidgetRef ref) async {
-    final bool? confirmed = await showDialog<bool>(
+    final bool? confirmed = await showAppDialog<bool>(
       context: context,
       builder: (BuildContext context) => AlertDialog(
         backgroundColor: context.palette.surfaceHigh,

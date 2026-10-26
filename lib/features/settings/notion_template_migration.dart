@@ -123,7 +123,7 @@ class NotionTemplateMigration {
   }
 
   Future<bool> _explain(BuildContext context) async {
-    final bool? go = await showDialog<bool>(
+    final bool? go = await showAppDialog<bool>(
       context: context,
       builder: (BuildContext context) => AlertDialog(
         backgroundColor: context.palette.surfaceHigh,
@@ -209,7 +209,7 @@ class NotionTemplateMigration {
     required bool whole,
     required int count,
   }) async {
-    final bool? go = await showDialog<bool>(
+    final bool? go = await showAppDialog<bool>(
       context: context,
       builder: (BuildContext context) => AlertDialog(
         backgroundColor: context.palette.surfaceHigh,
@@ -259,7 +259,7 @@ class NotionTemplateMigration {
     String title, {
     required bool whole,
   }) {
-    return showDialog<_OldDatabase>(
+    return showAppDialog<_OldDatabase>(
       context: context,
       builder: (BuildContext context) => AlertDialog(
         backgroundColor: context.palette.surfaceHigh,

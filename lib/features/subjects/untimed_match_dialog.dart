@@ -7,6 +7,7 @@ import '../../core/words.dart';
 import '../../data/models/attendance_record.dart';
 import '../../domain/untimed_match.dart';
 import '../../state/providers.dart';
+import '../../widgets/common.dart';
 import '../../widgets/undo_snack.dart';
 
 /// After a class is saved, offers to file [subjects]' untimed marks under the
@@ -28,7 +29,7 @@ Future<bool> offerUntimedMatch(
   final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
   final String classes = Words.plural(matches.length, 'class', 'classes');
 
-  final bool? confirmed = await showDialog<bool>(
+  final bool? confirmed = await showAppDialog<bool>(
     context: context,
     builder: (BuildContext context) => AlertDialog(
       backgroundColor: context.palette.surfaceHigh,

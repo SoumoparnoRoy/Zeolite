@@ -650,7 +650,7 @@ class DiscardGuard extends StatelessWidget {
   }
 
   static Future<bool> _confirmDiscard(BuildContext context) async =>
-      await showDialog<bool>(
+      await showAppDialog<bool>(
         context: context,
         builder: (BuildContext context) => AlertDialog(
           title: const Text('Discard this class?'),

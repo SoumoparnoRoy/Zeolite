@@ -255,7 +255,7 @@ class HolidaysSection extends ConsumerWidget {
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
 
     if (!run.isSingleDay) {
-      final bool? confirmed = await showDialog<bool>(
+      final bool? confirmed = await showAppDialog<bool>(
         context: context,
         builder: (BuildContext context) => AlertDialog(
           backgroundColor: context.palette.surfaceHigh,

@@ -13,6 +13,7 @@ import '../../domain/attendance_stats.dart';
 import '../../domain/schedule_engine.dart';
 import '../../services/notification_service.dart';
 import '../../state/providers.dart';
+import '../../widgets/common.dart';
 import '../../widgets/gradient_header.dart';
 import '../../widgets/nav_bar_scroll.dart';
 import '../../widgets/shell_routes.dart';
@@ -316,7 +317,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> with RouteAware {
     // Recorded before awaiting the dialog so a rebuild mid-flight cannot open
     // a second copy of it.
     announced.markAnnounced(pending);
-    unawaited(showDialog<void>(
+    unawaited(showAppDialog<void>(
       context: context,
       builder: (BuildContext context) => _InAppAlertDialog(alerts: pending),
     ));

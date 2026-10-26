@@ -650,7 +650,7 @@ class TagsSection extends ConsumerWidget {
       return;
     }
 
-    final bool? confirmed = await showDialog<bool>(
+    final bool? confirmed = await showAppDialog<bool>(
       context: context,
       builder: (BuildContext context) => AlertDialog(
         title: Text('Delete ${tag.name}?'),

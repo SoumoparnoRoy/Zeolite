@@ -95,7 +95,7 @@ class _SignedInState extends ConsumerState<_SignedIn> {
   bool _deleting = false;
 
   Future<void> _delete() async {
-    final bool confirmed = await showDialog<bool>(
+    final bool confirmed = await showAppDialog<bool>(
           context: context,
           builder: (BuildContext context) => AlertDialog(
             title: const Text('Delete this account?'),
@@ -128,7 +128,7 @@ class _SignedInState extends ConsumerState<_SignedIn> {
     if (AuthService.confirmsWithGoogle(widget.user)) {
       confirmedIdentity = await auth.confirmWithGoogle();
     } else {
-      final String? password = await showDialog<String>(
+      final String? password = await showAppDialog<String>(
         context: context,
         builder: (BuildContext context) =>
             _PasswordCheck(email: widget.user.email),

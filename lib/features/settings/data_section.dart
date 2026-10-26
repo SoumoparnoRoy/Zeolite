@@ -202,7 +202,7 @@ class DataSection extends ConsumerWidget {
     final BackupFile? picked = await backups.pickBackup();
     if (picked == null || !context.mounted) return;
 
-    final bool? confirmed = await showDialog<bool>(
+    final bool? confirmed = await showAppDialog<bool>(
       context: context,
       builder: (BuildContext context) => AlertDialog(
         backgroundColor: context.palette.surfaceHigh,
@@ -246,7 +246,7 @@ class DataSection extends ConsumerWidget {
 
   Future<void> _reset(BuildContext context, WidgetRef ref) async {
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
-    final bool? confirmed = await showDialog<bool>(
+    final bool? confirmed = await showAppDialog<bool>(
       context: context,
       builder: (BuildContext context) => AlertDialog(
         backgroundColor: context.palette.surfaceHigh,

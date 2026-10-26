@@ -45,7 +45,7 @@ Future<bool> _confirmEndWithMarks(
   String from,
   int markCount,
 ) async {
-  final bool? confirmed = await showDialog<bool>(
+  final bool? confirmed = await showAppDialog<bool>(
     context: context,
     builder: (BuildContext context) => AlertDialog(
       title: const Text('Stop repeating and remove its attendance?'),
@@ -76,7 +76,7 @@ Future<bool> _confirmDeleteWithMarks(
   String subjectName,
   int markCount,
 ) async {
-  final bool? confirmed = await showDialog<bool>(
+  final bool? confirmed = await showAppDialog<bool>(
     context: context,
     builder: (BuildContext context) => AlertDialog(
       title: const Text('Delete the class and its attendance?'),

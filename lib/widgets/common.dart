@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -878,7 +880,59 @@ class _SheetTextFormState extends State<SheetTextForm> {
   }
 }
 
-/// Standard bottom-sheet wrapper: drag handle, title, scrollable body.
+/// [showDialog] with the screen covered while the dialog fades out, so the
+/// second tap of a double tap on one of its buttons goes nowhere.
+Future<T?> showAppDialog<T>({
+  required BuildContext context,
+  required WidgetBuilder builder,
+  bool barrierDismissible = true,
+}) async {
+  final OverlayState? overlay =
+      Navigator.of(context, rootNavigator: true).overlay;
+  ModalRoute<Object?>? dialog;
+  final T? result = await showDialog<T>(
+    context: context,
+    barrierDismissible: barrierDismissible,
+    builder: (BuildContext context) {
+      dialog ??= ModalRoute.of(context);
+      return builder(context);
+    },
+  );
+  if (overlay != null && dialog != null) _coverWhileClosing(overlay, dialog!);
+  return result;
+}
+
+/// A closing dialog's or sheet's barrier stops taking taps as soon as it
+/// starts to fade, so the second tap of a double tap on its last button would
+/// land on whatever is underneath: a row, a switch, or a button on the page it
+/// came from. This covers the screen until the route has gone, however it was
+/// closed.
+///
+/// [TransitionRoute.completed] fires when the route is disposed, including
+/// when it is removed before its animation finishes. The timer is a backstop so
+/// the cover can never outlast a route that somehow never completes.
+void _coverWhileClosing(OverlayState overlay, ModalRoute<Object?> route) {
+  if (!overlay.mounted) return;
+  final OverlayEntry cover = OverlayEntry(
+    builder: (BuildContext context) => const ModalBarrier(dismissible: false),
+  );
+  overlay.insert(cover);
+  bool removed = false;
+  late final Timer backstop;
+  void remove() {
+    if (removed) return;
+    removed = true;
+    backstop.cancel();
+    cover.remove();
+    cover.dispose();
+  }
+
+  backstop = Timer(const Duration(seconds: 1), remove);
+  route.completed.whenComplete(remove);
+}
+
+/// Standard bottom-sheet wrapper: drag handle, title, scrollable body. Covered
+/// while it closes, like [showAppDialog].
 ///
 /// [enableDrag] is off for a sheet that asks before discarding: Flutter closes
 /// a dragged sheet with a plain pop, which a `PopScope` inside never sees.
@@ -887,13 +941,17 @@ Future<T?> showAppSheet<T>({
   required String title,
   required Widget child,
   bool enableDrag = true,
-}) {
-  return showModalBottomSheet<T>(
+}) async {
+  final OverlayState? overlay =
+      Navigator.of(context, rootNavigator: true).overlay;
+  ModalRoute<Object?>? sheet;
+  final T? result = await showModalBottomSheet<T>(
     context: context,
     isScrollControlled: true,
     enableDrag: enableDrag,
     backgroundColor: context.palette.canvas,
     builder: (BuildContext context) {
+      sheet ??= ModalRoute.of(context);
       return SafeArea(
         top: false,
         child: Padding(
@@ -928,4 +986,6 @@ Future<T?> showAppSheet<T>({
       );
     },
   );
+  if (overlay != null && sheet != null) _coverWhileClosing(overlay, sheet!);
+  return result;
 }

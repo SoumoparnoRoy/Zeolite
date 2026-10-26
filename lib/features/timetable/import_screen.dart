@@ -131,7 +131,7 @@ class _ImportTimetableScreenState extends ConsumerState<ImportTimetableScreen> {
   /// Per read, never remembered: the policy can only say the image leaves the
   /// device when the student asked it to if it is asked every time.
   Future<bool> _agreesToSend() async {
-    final bool? yes = await showDialog<bool>(
+    final bool? yes = await showAppDialog<bool>(
       context: context,
       builder: (BuildContext context) => AlertDialog(
         title: const Text('Check this sheet with AI?'),

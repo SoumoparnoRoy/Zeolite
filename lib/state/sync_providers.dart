@@ -50,6 +50,35 @@ final syncStatusProvider = NotifierProvider<SyncController, SyncStatus>(
   SyncController.new,
 );
 
+/// True when this device last synced with a different account from the one
+/// signed in now. Nothing syncs until the user says whether the attendance
+/// already here belongs in this account too: on a shared device, the next
+/// person to sign in would otherwise carry the last one's attendance off into
+/// their own backup without anyone being asked.
+final accountChangedProvider = Provider<bool>((ref) {
+  final User? user = ref.watch(signedInUserProvider).value;
+  final String? synced = ref.watch(settingsProvider.select(
+    (AsyncValue<AppSettings> s) => s.value?.syncedAccountId,
+  ));
+  return user != null && synced != null && synced != user.uid;
+});
+
+/// "Keep it on this device only", held for as long as the app runs and for
+/// the account it was said to. Not stored: the question comes back at the
+/// next launch, which costs a tap, and nothing about the data depends on it.
+final keptOnDeviceProvider =
+    NotifierProvider<KeptOnDevice, bool>(KeptOnDevice.new);
+
+class KeptOnDevice extends Notifier<bool> {
+  @override
+  bool build() {
+    ref.watch(signedInUserProvider);
+    return false;
+  }
+
+  void keep() => state = true;
+}
+
 /// The two automatic triggers, alive only while signed in. Rebuilding on the
 /// target means signing out disposes the lifecycle listener and cancels any
 /// pending run, so a debounce armed by the last edit before signing out
@@ -108,7 +137,7 @@ class SyncController extends Notifier<SyncStatus> {
   /// that has already been settled.
   Future<SyncRunResult?> merge(Map<String, SyncSide> decisions) async {
     final SyncCoordinator? coordinator = ref.read(syncCoordinatorProvider);
-    if (coordinator == null) return null;
+    if (coordinator == null || ref.read(accountChangedProvider)) return null;
 
     state = coordinator.status.running();
     if (await _accountGone()) {
@@ -136,6 +165,9 @@ class SyncController extends Notifier<SyncStatus> {
   Future<SyncRunResult?> run({bool force = false}) async {
     final SyncCoordinator? coordinator = ref.read(syncCoordinatorProvider);
     if (coordinator == null) return null;
+    // Asked on the Account screen. Every run waits for the answer, the button
+    // included: it is the answer that sends the rows, not a retry.
+    if (ref.read(accountChangedProvider)) return null;
     if (state.state == SyncState.running) return null;
     // An unanswered merge question is not fixed by asking again, and every
     // automatic retry of it is a fetch of all nine kinds for an outcome that
@@ -186,7 +218,18 @@ class SyncController extends Notifier<SyncStatus> {
     final User? user = ref.read(signedInUserProvider).value;
     if (user == null || !await AuthService.isDeleted(user)) return false;
     await ref.read(authServiceProvider).signOut();
+    ref.read(sessionEndedProvider.notifier).ended();
     return true;
+  }
+
+  /// The answer to [accountChangedProvider] that lets sync go ahead: what is
+  /// on this device goes into the account signed in now, the same way a
+  /// first sync with any account sends it.
+  Future<SyncRunResult?> addDeviceToAccount() async {
+    final SyncCoordinator? coordinator = ref.read(syncCoordinatorProvider);
+    if (coordinator == null) return null;
+    await _forgetLedgerIfAccountChanged(coordinator.target.id);
+    return run(force: true);
   }
 
   /// The ledger keys on the target, and the target's id is the same string for

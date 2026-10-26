@@ -879,14 +879,19 @@ class _SheetTextFormState extends State<SheetTextForm> {
 }
 
 /// Standard bottom-sheet wrapper: drag handle, title, scrollable body.
+///
+/// [enableDrag] is off for a sheet that asks before discarding: Flutter closes
+/// a dragged sheet with a plain pop, which a `PopScope` inside never sees.
 Future<T?> showAppSheet<T>({
   required BuildContext context,
   required String title,
   required Widget child,
+  bool enableDrag = true,
 }) {
   return showModalBottomSheet<T>(
     context: context,
     isScrollControlled: true,
+    enableDrag: enableDrag,
     backgroundColor: context.palette.canvas,
     builder: (BuildContext context) {
       return SafeArea(

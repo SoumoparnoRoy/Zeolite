@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:isolate';
+import 'dart:ui' show IsolateNameServer;
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -62,13 +64,15 @@ final homeWidgetMarkWatcherProvider = Provider<void>((Ref ref) {
   String? seen;
   bool primed = false;
 
-  Future<void> check() async {
+  // [announced] always reloads: on a cold start the write can land between
+  // the launch's read and this first check.
+  Future<void> check({bool announced = false}) async {
     try {
       final String? stamp = await HomeWidget.getWidgetData<String>(
         HomeWidgetService.markEpochKey,
       );
-      if (stamp == null || stamp == seen) return;
-      if (!primed) {
+      if (stamp == null || (!announced && stamp == seen)) return;
+      if (!primed && !announced) {
         primed = true;
         seen = stamp;
         return;
@@ -76,6 +80,7 @@ final homeWidgetMarkWatcherProvider = Provider<void>((Ref ref) {
       await ref.read(actionCoreProvider).reloadAfterWidgetMark();
       // Only once the reload has happened, so a failed one is tried again at
       // the next resume rather than skipped until another mark comes in.
+      primed = true;
       seen = stamp;
     } catch (error, stack) {
       reportError(error, stack, where: 'widget mark reload');
@@ -85,8 +90,28 @@ final homeWidgetMarkWatcherProvider = Provider<void>((Ref ref) {
   final AppLifecycleListener listener =
       AppLifecycleListener(onResume: () => unawaited(check()));
   ref.onDispose(listener.dispose);
+
+  // A resume can land between two quick taps and reload a mark that is about
+  // to change, so the writing isolate also says when it has written.
+  final ReceivePort written = ReceivePort();
+  IsolateNameServer.removePortNameMapping(_markWrittenPort);
+  IsolateNameServer.registerPortWithName(written.sendPort, _markWrittenPort);
+  written.listen((_) => unawaited(check(announced: true)));
+  ref.onDispose(() {
+    IsolateNameServer.removePortNameMapping(_markWrittenPort);
+    written.close();
+  });
+
   unawaited(check());
 });
+
+/// Process-wide, so the widget-tap isolate can reach the app's port.
+const String _markWrittenPort = 'zeolite.widgetMarkWritten';
+
+/// Does nothing with no app running; its launch reads the database fresh.
+@visibleForTesting
+void announceExternalMark() =>
+    IsolateNameServer.lookupPortByName(_markWrittenPort)?.send(null);
 
 /// A request to mark one occurrence from a surface outside the running app.
 @immutable
@@ -223,6 +248,7 @@ Future<void> _handleExternalMark(
       HomeWidgetService.markEpochKey,
       DateTime.now().microsecondsSinceEpoch.toString(),
     );
+    announceExternalMark();
     // Reminders carry the standing, so a mark made here has to reschedule them
     // the same way one made in the app does. After the redraw, because on a
     // cold start this is most of the wait. Best-effort: the service logs and

@@ -81,12 +81,17 @@ void _toCrashlytics(Object error, StackTrace? stack, String where) {
       error.runtimeType.toString(),
       stack,
       reason: where,
-      // Only what nothing caught counts as a crash; a caught failure the app
-      // carried on past stays a non-fatal.
-      fatal: where == _uncaught || where == _framework,
+      fatal: crashIsFatal(where),
     ),
   );
 }
+
+/// Only what nothing caught counts as a crash; a caught failure the app
+/// carried on past stays a non-fatal. That includes a framework error:
+/// Flutter has already caught it, and an overflow or a failed build leaves
+/// the app running.
+@visibleForTesting
+bool crashIsFatal(String where) => where == _uncaught;
 
 const String _uncaught = 'uncaught';
 const String _framework = 'Flutter framework';

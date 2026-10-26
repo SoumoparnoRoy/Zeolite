@@ -24,6 +24,7 @@ Future<void> showExtraClassEditor(
   return showAppSheet<void>(
     context: context,
     title: extra == null ? 'One-off class' : 'Edit one-off class',
+    enableDrag: false,
     child: _ExtraClassForm(initialDate: initialDate, extra: extra),
   );
 }
@@ -90,7 +91,14 @@ class _ExtraClassFormState extends ConsumerState<_ExtraClassForm> {
     } else {
       _weight = _defaultWeight;
     }
+    _opened = _entered;
   }
+
+  /// What the form holds, to tell an untouched sheet from one with something
+  /// in it that Back would throw away.
+  String get _entered => '$_subjectId|$_categoryId|$_date|$_start|$_end|'
+      '$_weight|${_room.text.trim()}';
+  late final String _opened;
 
   @override
   void dispose() {
@@ -230,94 +238,97 @@ class _ExtraClassFormState extends ConsumerState<_ExtraClassForm> {
     final bool use24Hour =
         ref.watch(settingsProvider).value?.use24HourTime ?? false;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        SubjectPicker(
-          value: _subjectId,
-          onChanged: (int? id) => setState(() {
-            _error = null;
-            _subjectId = id;
-            if (!_durationTouched) {
-              _end = Clock.endFromStart(_start, _defaultDuration);
-            }
-            if (!_weightTouched) _weight = _defaultWeight;
-          }),
-        ),
-        const SizedBox(height: AppSpacing.xl),
-        const SectionHeader('When'),
-        FieldButton(
-          label: 'Date',
-          value: '${Dates.weekdayLong(_date)}, ${Dates.formatFull(_date)}',
-          icon: Icons.event_rounded,
-          onTap: _pickDate,
-        ),
-        const SizedBox(height: AppSpacing.md),
-        Row(
-          children: <Widget>[
-            Expanded(
-              child: FieldButton(
-                label: 'Starts',
-                value: Clock.format(_start, use24Hour: use24Hour),
-                icon: Icons.schedule_rounded,
-                onTap: () => _pickTime(isStart: true),
-              ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: FieldButton(
-                label: 'Ends',
-                value: Clock.format(_end, use24Hour: use24Hour),
-                icon: Icons.schedule_rounded,
-                onTap: () => _pickTime(isStart: false),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        const SectionHeader('Room'),
-        RoomField(controller: _room),
-        const SizedBox(height: AppSpacing.xl),
-        MoreOptions(
-          summary: '${classTypeName(ref, _subjectId, _categoryId)} · counts '
-              'as ${classWeightLabel(_weight).toLowerCase()}',
-          initiallyOpen: _categoryId != null || _weight != _defaultWeight,
-          children: <Widget>[
-            TypePicker(
-              subjectId: _subjectId,
-              value: _categoryId,
-              onChanged: (int? id) => setState(() {
-                _categoryId = id;
-                if (!_durationTouched) {
-                  _end = Clock.endFromStart(_start, _defaultDuration);
-                }
-                if (!_weightTouched) _weight = _defaultWeight;
-              }),
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            WeightPicker(
-              value: _weight,
-              onChanged: (int n) => setState(() {
-                _weight = n;
-                _weightTouched = true;
-              }),
-            ),
-          ],
-        ),
-        if (_error != null) ...<Widget>[
+    return DiscardGuard(
+      changed: () => _entered != _opened,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          SubjectPicker(
+            value: _subjectId,
+            onChanged: (int? id) => setState(() {
+              _error = null;
+              _subjectId = id;
+              if (!_durationTouched) {
+                _end = Clock.endFromStart(_start, _defaultDuration);
+              }
+              if (!_weightTouched) _weight = _defaultWeight;
+            }),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          const SectionHeader('When'),
+          FieldButton(
+            label: 'Date',
+            value: '${Dates.weekdayLong(_date)}, ${Dates.formatFull(_date)}',
+            icon: Icons.event_rounded,
+            onTap: _pickDate,
+          ),
           const SizedBox(height: AppSpacing.md),
-          Text(
-            _error!,
-            style: TextStyle(
-                color: context.palette.absent, fontSize: AppType.bodyLarge),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: FieldButton(
+                  label: 'Starts',
+                  value: Clock.format(_start, use24Hour: use24Hour),
+                  icon: Icons.schedule_rounded,
+                  onTap: () => _pickTime(isStart: true),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: FieldButton(
+                  label: 'Ends',
+                  value: Clock.format(_end, use24Hour: use24Hour),
+                  icon: Icons.schedule_rounded,
+                  onTap: () => _pickTime(isStart: false),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          const SectionHeader('Room'),
+          RoomField(controller: _room),
+          const SizedBox(height: AppSpacing.xl),
+          MoreOptions(
+            summary: '${classTypeName(ref, _subjectId, _categoryId)} · counts '
+                'as ${classWeightLabel(_weight).toLowerCase()}',
+            initiallyOpen: _categoryId != null || _weight != _defaultWeight,
+            children: <Widget>[
+              TypePicker(
+                subjectId: _subjectId,
+                value: _categoryId,
+                onChanged: (int? id) => setState(() {
+                  _categoryId = id;
+                  if (!_durationTouched) {
+                    _end = Clock.endFromStart(_start, _defaultDuration);
+                  }
+                  if (!_weightTouched) _weight = _defaultWeight;
+                }),
+              ),
+              const SizedBox(height: AppSpacing.xl),
+              WeightPicker(
+                value: _weight,
+                onChanged: (int n) => setState(() {
+                  _weight = n;
+                  _weightTouched = true;
+                }),
+              ),
+            ],
+          ),
+          if (_error != null) ...<Widget>[
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              _error!,
+              style: TextStyle(
+                  color: context.palette.absent, fontSize: AppType.bodyLarge),
+            ),
+          ],
+          const SizedBox(height: AppSpacing.xl),
+          FilledButton(
+            onPressed: _saving ? null : _save,
+            child: Text(_isEditing ? 'Save changes' : 'Add one-off class'),
           ),
         ],
-        const SizedBox(height: AppSpacing.xl),
-        FilledButton(
-          onPressed: _saving ? null : _save,
-          child: Text(_isEditing ? 'Save changes' : 'Add one-off class'),
-        ),
-      ],
+      ),
     );
   }
 }

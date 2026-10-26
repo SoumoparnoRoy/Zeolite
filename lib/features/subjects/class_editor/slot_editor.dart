@@ -25,6 +25,7 @@ Future<void> showSlotEditor(
   return showAppSheet<void>(
     context: context,
     title: slot == null ? 'Weekly class' : 'Edit weekly class',
+    enableDrag: false,
     child: _SlotForm(slot: slot, initialDate: initialDate),
   );
 }
@@ -180,7 +181,25 @@ class _SlotFormState extends ConsumerState<_SlotForm> {
     // form must not re-weight it from the category.
     _weight = slot?.weight ?? _defaultWeight;
     _weightTouched = slot != null;
+    _opened = _entered;
   }
+
+  /// What the form holds, to tell an untouched sheet from one with something
+  /// in it that Back would throw away.
+  String get _entered => <Object?>[
+        _subjectId,
+        _categoryId,
+        _startDate,
+        _endDate,
+        _weight,
+        for (final _ClassTime time in _times) ...<Object>[
+          time.weekday,
+          time.startMinutes,
+          time.endMinutes,
+          time.roomController.text.trim(),
+        ],
+      ].join('|');
+  late final String _opened;
 
   @override
   void dispose() {
@@ -480,156 +499,159 @@ class _SlotFormState extends ConsumerState<_SlotForm> {
     ));
     final List<int> days = _days;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        SubjectPicker(
-          value: _subjectId,
-          onChanged: (int? id) => setState(() {
-            _subjectId = id;
-            if (!_isEditing && !_startTouched) {
-              _startDate = firstClassFor(
-                ref,
-                id,
-                widget.initialDate ?? Dates.today(),
-              );
-            }
-            // Adopt the new category's length, unless the user set an end
-            // time by hand.
-            if (!_durationTouched) _applyDefaultDurationToAll();
-            if (!_weightTouched) _weight = _defaultWeight;
-          }),
-        ),
-        const SizedBox(height: AppSpacing.xl),
-        SectionHeader(_isEditing ? 'Day' : 'Repeats on'),
-        WeekdaySelector(
-          selected: days.toSet(),
-          onToggle: _toggleWeekday,
-        ),
-        const SizedBox(height: AppSpacing.xl),
-        SectionHeader(
-          _isEditing ? 'Time and room' : 'Class times',
-          // The default length only matters while a start time is being
-          // picked; beside a saved class it reads as a second, wrong length.
-          trailing: _isEditing
-              ? null
-              : Text(
-                  durationLabel,
-                  style: TextStyle(
-                    fontSize: AppType.labelLarge,
-                    fontWeight: FontWeight.w600,
-                    color: context.palette.textTertiary,
-                  ),
-                ),
-        ),
-        for (final int weekday in days)
-          _DayGroup(
-            weekday: weekday,
-            times: _timesOn(weekday),
-            use24Hour: use24Hour,
-            showHeader: !_isEditing,
-            canRemove: _times.length > 1,
-            onAddTime: _isEditing ? null : () => _addTimeOn(weekday),
-            onPickStart: (_ClassTime t) => _pickTime(t, isStart: true),
-            onPickEnd: (_ClassTime t) => _pickTime(t, isStart: false),
-            onRemove: _removeTime,
+    return DiscardGuard(
+      changed: () => _entered != _opened,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          SubjectPicker(
+            value: _subjectId,
+            onChanged: (int? id) => setState(() {
+              _subjectId = id;
+              if (!_isEditing && !_startTouched) {
+                _startDate = firstClassFor(
+                  ref,
+                  id,
+                  widget.initialDate ?? Dates.today(),
+                );
+              }
+              // Adopt the new category's length, unless the user set an end
+              // time by hand.
+              if (!_durationTouched) _applyDefaultDurationToAll();
+              if (!_weightTouched) _weight = _defaultWeight;
+            }),
           ),
-        if (!_isEditing) ...<Widget>[
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            'Each entry keeps its own time and room. Setting a start time '
-            'fills the end in from the subject\'s category, and "Add another '
-            'time" covers a subject that meets twice in one day.',
-            style: TextStyle(
-              fontSize: AppType.bodySmall,
-              height: 1.4,
-              color: context.palette.textTertiary,
-            ),
+          const SizedBox(height: AppSpacing.xl),
+          SectionHeader(_isEditing ? 'Day' : 'Repeats on'),
+          WeekdaySelector(
+            selected: days.toSet(),
+            onToggle: _toggleWeekday,
           ),
-        ],
-        const SizedBox(height: AppSpacing.xl),
-        MoreOptions(
-          summary: <String>[
-            classTypeName(ref, _subjectId, _categoryId),
-            'counts as ${classWeightLabel(_weight).toLowerCase()}',
-            // The first class can move on its own (a subject with untimed
-            // marks starts at the term), so the summary says where it went.
-            'from ${Dates.formatFull(_startDate)}',
-            _endDate == null
-                ? 'to term end'
-                : 'to ${Dates.formatFull(_endDate!)}',
-          ].join(' · '),
-          initiallyOpen: _categoryId != null ||
-              _weight != _defaultWeight ||
-              _endDate != null,
-          children: <Widget>[
-            TypePicker(
-              subjectId: _subjectId,
-              value: _categoryId,
-              onChanged: (int? id) => setState(() {
-                _categoryId = id;
-                if (!_durationTouched) _applyDefaultDurationToAll();
-                if (!_weightTouched) _weight = _defaultWeight;
-              }),
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            WeightPicker(
-              value: _weight,
-              onChanged: (int n) => setState(() {
-                _weight = n;
-                _weightTouched = true;
-              }),
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            const SectionHeader('Runs from'),
-            Row(
-              children: <Widget>[
-                Expanded(
-                  child: FieldButton(
-                    label: 'First class',
-                    value: Dates.formatFull(_startDate),
-                    icon: Icons.play_arrow_rounded,
-                    onTap: () => _pickDate(isStart: true),
+          const SizedBox(height: AppSpacing.xl),
+          SectionHeader(
+            _isEditing ? 'Time and room' : 'Class times',
+            // The default length only matters while a start time is being
+            // picked; beside a saved class it reads as a second, wrong length.
+            trailing: _isEditing
+                ? null
+                : Text(
+                    durationLabel,
+                    style: TextStyle(
+                      fontSize: AppType.labelLarge,
+                      fontWeight: FontWeight.w600,
+                      color: context.palette.textTertiary,
+                    ),
                   ),
-                ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: FieldButton(
-                    label: 'Until',
-                    value: _endDate == null
-                        ? 'Term end'
-                        : Dates.formatFull(_endDate!),
-                    icon: Icons.stop_rounded,
-                    onTap: () => _pickDate(isStart: false),
-                    onClear: _endDate == null
-                        ? null
-                        : () => setState(() => _endDate = null),
-                  ),
-                ),
-              ],
+          ),
+          for (final int weekday in days)
+            _DayGroup(
+              weekday: weekday,
+              times: _timesOn(weekday),
+              use24Hour: use24Hour,
+              showHeader: !_isEditing,
+              canRemove: _times.length > 1,
+              onAddTime: _isEditing ? null : () => _addTimeOn(weekday),
+              onPickStart: (_ClassTime t) => _pickTime(t, isStart: true),
+              onPickEnd: (_ClassTime t) => _pickTime(t, isStart: false),
+              onRemove: _removeTime,
+            ),
+          if (!_isEditing) ...<Widget>[
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Each entry keeps its own time and room. Setting a start time '
+              'fills the end in from the subject\'s category, and "Add another '
+              'time" covers a subject that meets twice in one day.',
+              style: TextStyle(
+                fontSize: AppType.bodySmall,
+                height: 1.4,
+                color: context.palette.textTertiary,
+              ),
             ),
           ],
-        ),
-        if (_error != null) ...<Widget>[
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            _error!,
-            style: TextStyle(
-                color: context.palette.absent, fontSize: AppType.bodyLarge),
+          const SizedBox(height: AppSpacing.xl),
+          MoreOptions(
+            summary: <String>[
+              classTypeName(ref, _subjectId, _categoryId),
+              'counts as ${classWeightLabel(_weight).toLowerCase()}',
+              // The first class can move on its own (a subject with untimed
+              // marks starts at the term), so the summary says where it went.
+              'from ${Dates.formatFull(_startDate)}',
+              _endDate == null
+                  ? 'to term end'
+                  : 'to ${Dates.formatFull(_endDate!)}',
+            ].join(' · '),
+            initiallyOpen: _categoryId != null ||
+                _weight != _defaultWeight ||
+                _endDate != null,
+            children: <Widget>[
+              TypePicker(
+                subjectId: _subjectId,
+                value: _categoryId,
+                onChanged: (int? id) => setState(() {
+                  _categoryId = id;
+                  if (!_durationTouched) _applyDefaultDurationToAll();
+                  if (!_weightTouched) _weight = _defaultWeight;
+                }),
+              ),
+              const SizedBox(height: AppSpacing.xl),
+              WeightPicker(
+                value: _weight,
+                onChanged: (int n) => setState(() {
+                  _weight = n;
+                  _weightTouched = true;
+                }),
+              ),
+              const SizedBox(height: AppSpacing.xl),
+              const SectionHeader('Runs from'),
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: FieldButton(
+                      label: 'First class',
+                      value: Dates.formatFull(_startDate),
+                      icon: Icons.play_arrow_rounded,
+                      onTap: () => _pickDate(isStart: true),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: FieldButton(
+                      label: 'Until',
+                      value: _endDate == null
+                          ? 'Term end'
+                          : Dates.formatFull(_endDate!),
+                      icon: Icons.stop_rounded,
+                      onTap: () => _pickDate(isStart: false),
+                      onClear: _endDate == null
+                          ? null
+                          : () => setState(() => _endDate = null),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          if (_error != null) ...<Widget>[
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              _error!,
+              style: TextStyle(
+                  color: context.palette.absent, fontSize: AppType.bodyLarge),
+            ),
+          ],
+          const SizedBox(height: AppSpacing.xl),
+          FilledButton(
+            onPressed: _saving ? null : _save,
+            child: Text(
+              _isEditing
+                  ? 'Save changes'
+                  : (_times.length > 1
+                      ? 'Add ${_times.length} weekly classes'
+                      : 'Add to timetable'),
+            ),
           ),
         ],
-        const SizedBox(height: AppSpacing.xl),
-        FilledButton(
-          onPressed: _saving ? null : _save,
-          child: Text(
-            _isEditing
-                ? 'Save changes'
-                : (_times.length > 1
-                    ? 'Add ${_times.length} weekly classes'
-                    : 'Add to timetable'),
-          ),
-        ),
-      ],
+      ),
     );
   }
 }

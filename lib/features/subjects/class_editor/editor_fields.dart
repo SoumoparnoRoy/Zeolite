@@ -626,3 +626,49 @@ class FieldButton extends StatelessWidget {
     );
   }
 }
+
+/// Asks before Back or a tap outside throws away what a sheet holds. [changed]
+/// is read at close, since typing in a room field rebuilds nothing.
+class DiscardGuard extends StatelessWidget {
+  const DiscardGuard({super.key, required this.changed, required this.child});
+
+  final bool Function() changed;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (bool didPop, Object? _) async {
+        if (didPop) return;
+        final NavigatorState navigator = Navigator.of(context);
+        if (changed() && !await _confirmDiscard(context)) return;
+        if (navigator.mounted) navigator.pop();
+      },
+      child: child,
+    );
+  }
+
+  static Future<bool> _confirmDiscard(BuildContext context) async =>
+      await showDialog<bool>(
+        context: context,
+        builder: (BuildContext context) => AlertDialog(
+          title: const Text('Discard this class?'),
+          content: const Text("What you've entered here won't be saved."),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Keep editing'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: TextButton.styleFrom(
+                foregroundColor: context.palette.absent,
+              ),
+              child: const Text('Discard'),
+            ),
+          ],
+        ),
+      ) ??
+      false;
+}

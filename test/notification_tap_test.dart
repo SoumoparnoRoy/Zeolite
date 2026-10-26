@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -47,6 +50,53 @@ void main() {
       expect(_screenForLink('zeolite://open?tab=inbox'), isNull);
       expect(_screenForLink('zeolite://notion?session=abc'), isNull);
       expect(_screenForLink('zeolite://mark?subject=1'), isNull);
+    });
+  });
+
+  group('a tap from outside the app', () {
+    final GlobalKey<NavigatorState> navigator = GlobalKey<NavigatorState>();
+
+    Future<void> push(WidgetTester tester, Route<void> route) async {
+      unawaited(navigator.currentState!.push(route));
+      await tester.pumpAndSettle();
+    }
+
+    Route<void> page(String name) => MaterialPageRoute<void>(
+          settings: RouteSettings(name: name),
+          builder: (_) => Text(name),
+        );
+
+    testWidgets('closes plain pages and stops at one holding input',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(navigatorKey: navigator, home: const Text('shell')),
+      );
+      await push(tester, page('account'));
+      await push(tester, page('settings_term'));
+      await push(tester, page('licence'));
+
+      RootShell.closePlainPages(navigator.currentState!);
+      await tester.pumpAndSettle();
+      expect(find.text('account'), findsOneWidget);
+      expect(find.text('settings_term'), findsNothing);
+    });
+
+    testWidgets('leaves a sheet and the page under it alone',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(navigatorKey: navigator, home: const Text('shell')),
+      );
+      await push(tester, page('settings_term'));
+      unawaited(showModalBottomSheet<void>(
+        context: navigator.currentContext!,
+        builder: (_) => const Text('sheet'),
+      ));
+      await tester.pumpAndSettle();
+
+      RootShell.closePlainPages(navigator.currentState!);
+      await tester.pumpAndSettle();
+      expect(find.text('sheet'), findsOneWidget);
+      expect(find.text('settings_term', skipOffstage: false), findsOneWidget);
     });
   });
 

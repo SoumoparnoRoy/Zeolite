@@ -33,3 +33,24 @@ class VerificationPending extends Notifier<bool> {
     return verified;
   }
 }
+
+/// Set when the app signs itself out because the account's session ended
+/// elsewhere, so the Account screen can say why it is back at sign-in. A
+/// sign-out the user chose leaves it alone.
+final sessionEndedProvider =
+    NotifierProvider<SessionEnded, bool>(SessionEnded.new);
+
+class SessionEnded extends Notifier<bool> {
+  @override
+  bool build() {
+    // Signed in again before Account was opened, there is nothing left to say.
+    ref.listen<AsyncValue<User?>>(signedInUserProvider, (_, next) {
+      if (next.value != null) state = false;
+    });
+    return false;
+  }
+
+  void ended() => state = true;
+
+  void told() => state = false;
+}

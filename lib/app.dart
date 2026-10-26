@@ -169,6 +169,34 @@ class RootShell extends ConsumerStatefulWidget {
     return null;
   }
 
+  /// Pushed pages a notification or widget tap may close on its way to a tab:
+  /// ones that only show something or save as they go. A page holding typed
+  /// input or a choice not yet made (the account form, an import, a Notion
+  /// step, a merge) stays open, and so does any sheet or dialog.
+  static const Set<String> plainPages = <String>{
+    'subjects',
+    'settings_categories',
+    'settings_term',
+    'settings_teachingDay',
+    'settings_roomsAndTags',
+    'settings_appearance',
+    'settings_notifications',
+    'settings_notion',
+    'settings_yourData',
+    'settings_licences',
+    'licence',
+    'launcher_icon',
+    'attendance_log',
+  };
+
+  static bool isPlainPage(Route<dynamic> route) =>
+      route is PageRoute && plainPages.contains(route.settings.name);
+
+  /// Closes [plainPages] from the top down, stopping at the first route that
+  /// is not one.
+  static void closePlainPages(NavigatorState navigator) =>
+      navigator.popUntil((Route<dynamic> r) => r.isFirst || !isPlainPage(r));
+
   @override
   ConsumerState<RootShell> createState() => _RootShellState();
 }
@@ -258,6 +286,12 @@ class _RootShellState extends ConsumerState<RootShell> with RouteAware {
   void _openLink(Uri? uri) {
     final int? tab = RootShell.tabForLink(uri);
     if (tab == null || !mounted) return;
+    _openFromOutside(tab);
+  }
+
+  /// A tab switched behind an open page only shows once that page is closed.
+  void _openFromOutside(int tab) {
+    RootShell.closePlainPages(Navigator.of(context));
     _select(tab);
   }
 
@@ -278,7 +312,7 @@ class _RootShellState extends ConsumerState<RootShell> with RouteAware {
     final int? tab = RootShell.tabForPayload(_tapped.value);
     if (_tapped.value != null) _tapped.value = null;
     if (tab == null || !mounted) return;
-    _select(tab);
+    _openFromOutside(tab);
   }
 
   /// A tap on the bar or a notification; a drag moves the pager itself.
@@ -326,79 +360,87 @@ class _RootShellState extends ConsumerState<RootShell> with RouteAware {
   @override
   Widget build(BuildContext context) {
     final int index = ref.watch(selectedTabProvider);
-    return Scaffold(
-      // The day pills, Home's date pager and the settings sliders are deeper
-      // in the tree, so they take a sideways drag before this pager sees it.
-      body: NavBarScroll(
-        report: _onScroll,
-        show: () => _showNav(true),
-        child: PageView(
-          controller: _pages,
-          onPageChanged: _onPageChanged,
-          children: <Widget>[
-            for (final Widget screen in _screens)
-              // Listened per page rather than around the pager, which would
-              // otherwise count as a level and hide every screen's own scroll
-              // from [RootShell.navVisibleFor].
-              KeptAlive(
-                child: NotificationListener<UserScrollNotification>(
-                  onNotification: _onScroll,
-                  child: screen,
+    final int today = shellTabs.indexOf('today');
+    // Back steps out to Today before it leaves the app.
+    return PopScope(
+      canPop: index == today,
+      onPopInvokedWithResult: (bool didPop, Object? _) {
+        if (!didPop) _select(today);
+      },
+      child: Scaffold(
+        // The day pills, Home's date pager and the settings sliders are deeper
+        // in the tree, so they take a sideways drag before this pager sees it.
+        body: NavBarScroll(
+          report: _onScroll,
+          show: () => _showNav(true),
+          child: PageView(
+            controller: _pages,
+            onPageChanged: _onPageChanged,
+            children: <Widget>[
+              for (final Widget screen in _screens)
+                // Listened per page rather than around the pager, which would
+                // otherwise count as a level and hide every screen's own scroll
+                // from [RootShell.navVisibleFor].
+                KeptAlive(
+                  child: NotificationListener<UserScrollNotification>(
+                    onNotification: _onScroll,
+                    child: screen,
+                  ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
-      ),
-      // A shadow rather than a rule: the tab row is the one piece of chrome
-      // that has to stay above the sheet, and a hairline read as one more
-      // divider among the day rules above it.
-      // Collapsed rather than slid away, so the sheet gains the room instead
-      // of scrolling underneath it.
-      bottomNavigationBar: ClipRect(
-        clipper: const _NavBarClip(),
-        child: AnimatedAlign(
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOutCubic,
-          alignment: Alignment.topCenter,
-          heightFactor: _navVisible ? 1 : 0,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: context.palette.navSurface,
-              boxShadow: <BoxShadow>[
-                BoxShadow(
-                  color: context.palette.isDark
-                      ? Colors.black.withValues(alpha: 0.5)
-                      : const Color(0x174C4696),
-                  blurRadius: 16,
-                  offset: const Offset(0, -2),
-                ),
-              ],
-            ),
-            child: NavigationBar(
-              selectedIndex: index,
-              onDestinationSelected: _select,
-              destinations: const <NavigationDestination>[
-                NavigationDestination(
-                  icon: Icon(Icons.today_outlined),
-                  selectedIcon: Icon(Icons.today_rounded),
-                  label: 'Today',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.view_week_outlined),
-                  selectedIcon: Icon(Icons.view_week_rounded),
-                  label: 'Timetable',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.insights_outlined),
-                  selectedIcon: Icon(Icons.insights_rounded),
-                  label: 'Stats',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.settings_outlined),
-                  selectedIcon: Icon(Icons.settings_rounded),
-                  label: 'Settings',
-                ),
-              ],
+        // A shadow rather than a rule: the tab row is the one piece of chrome
+        // that has to stay above the sheet, and a hairline read as one more
+        // divider among the day rules above it.
+        // Collapsed rather than slid away, so the sheet gains the room instead
+        // of scrolling underneath it.
+        bottomNavigationBar: ClipRect(
+          clipper: const _NavBarClip(),
+          child: AnimatedAlign(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.topCenter,
+            heightFactor: _navVisible ? 1 : 0,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: context.palette.navSurface,
+                boxShadow: <BoxShadow>[
+                  BoxShadow(
+                    color: context.palette.isDark
+                        ? Colors.black.withValues(alpha: 0.5)
+                        : const Color(0x174C4696),
+                    blurRadius: 16,
+                    offset: const Offset(0, -2),
+                  ),
+                ],
+              ),
+              child: NavigationBar(
+                selectedIndex: index,
+                onDestinationSelected: _select,
+                destinations: const <NavigationDestination>[
+                  NavigationDestination(
+                    icon: Icon(Icons.today_outlined),
+                    selectedIcon: Icon(Icons.today_rounded),
+                    label: 'Today',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.view_week_outlined),
+                    selectedIcon: Icon(Icons.view_week_rounded),
+                    label: 'Timetable',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.insights_outlined),
+                    selectedIcon: Icon(Icons.insights_rounded),
+                    label: 'Stats',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.settings_outlined),
+                    selectedIcon: Icon(Icons.settings_rounded),
+                    label: 'Settings',
+                  ),
+                ],
+              ),
             ),
           ),
         ),

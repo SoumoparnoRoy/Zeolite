@@ -88,6 +88,8 @@ class _OccurrenceFormState extends ConsumerState<_OccurrenceForm> {
     );
     if (picked == null || !mounted) return;
     setState(() {
+      // The warning names the old time; left up, it reads as still true.
+      _error = null;
       final int value = picked.hour * 60 + picked.minute;
       if (isStart) {
         final int length = _end - _start;
@@ -185,7 +187,10 @@ class _OccurrenceFormState extends ConsumerState<_OccurrenceForm> {
         const SizedBox(height: AppSpacing.xl),
         SubjectPicker(
           value: _subjectId,
-          onChanged: (int? id) => setState(() => _subjectId = id),
+          onChanged: (int? id) => setState(() {
+            _error = null;
+            _subjectId = id;
+          }),
         ),
         const SizedBox(height: AppSpacing.xl),
         const SectionHeader('When'),

@@ -61,6 +61,20 @@ class _RecordingActions extends ScheduleActions {
   Future<void> addExtraClass(ExtraClass extra) async => extras.add(extra);
 }
 
+class _OverrideRecorder extends ScheduleActions {
+  _OverrideRecorder(super.core, this.saved);
+
+  final List<SlotOverride> saved;
+
+  @override
+  Future<void> setSlotOverride(
+    ClassSlot slot,
+    DateTime date,
+    SlotOverride override,
+  ) async =>
+      saved.add(override);
+}
+
 /// Captures a saved subject rather than writing it, so the balance the form
 /// built can be read back.
 /// Tells the two edit paths apart: a plain save and one that carries the
@@ -350,6 +364,131 @@ void main() {
     await tester.pumpAndSettle();
     expect(warning, findsNothing);
     expect(extras, isEmpty);
+  });
+
+  testWidgets('a clash warning on one week goes once the class it names moves',
+      (WidgetTester tester) async {
+    final List<SlotOverride> saved = <SlotOverride>[];
+    final ClassSlot maths = ClassSlot(
+      id: 10,
+      subjectId: 2,
+      weekday: Dates.today().weekday,
+      startMinutes: 11 * 60,
+      endMinutes: 12 * 60,
+      startDate: Dates.today().subtract(const Duration(days: 7)),
+    );
+    await tester.pumpWidget(
+      _host(
+        (c, _) => showOccurrenceEditor(c, slot: maths, date: Dates.today()),
+        slots: <ClassSlot>[
+          ClassSlot(
+            id: 9,
+            subjectId: 1,
+            weekday: Dates.today().weekday,
+            startMinutes: 9 * 60,
+            endMinutes: 10 * 60,
+            startDate: Dates.today().subtract(const Duration(days: 7)),
+          ),
+          maths,
+        ],
+        schedule: (Ref ref) => _OverrideRecorder(ActionCore(ref), saved),
+      ),
+    );
+    await _openSheet(tester);
+
+    await tester.tap(find.text('Physics'));
+    await tester.pumpAndSettle();
+    await _pickTime(tester, find.text('11:00 AM'), 9, 0);
+    await _tapButton(tester, 'Save this week');
+    final Finder warning = find.textContaining('already has a class at');
+    expect(warning, findsOneWidget);
+
+    await tester.ensureVisible(find.text('9:00 AM'));
+    await tester.pumpAndSettle();
+    await _pickTime(tester, find.text('9:00 AM'), 12, 0);
+    expect(warning, findsNothing);
+
+    await _pickTime(tester, find.text('12:00 PM'), 9, 0);
+    await _tapButton(tester, 'Save this week');
+    expect(warning, findsOneWidget);
+    await tester.ensureVisible(find.text('Maths'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Maths'));
+    await tester.pumpAndSettle();
+    expect(warning, findsNothing);
+    expect(saved, isEmpty);
+  });
+
+  group('leaving a class sheet', () {
+    final Finder prompt = find.text('Discard this class?');
+
+    testWidgets('closes on Back when nothing was entered',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(_host((c, _) => showExtraClassEditor(c)));
+      await _openSheet(tester);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(prompt, findsNothing);
+      expect(find.text('One-off class'), findsNothing);
+    });
+
+    testWidgets('asks on Back once a subject is picked, and keeps editing',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(_host((c, _) => showExtraClassEditor(c)));
+      await _openSheet(tester);
+      await tester.tap(find.text('Physics'));
+      await tester.pumpAndSettle();
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(prompt, findsOneWidget);
+      await tester.tap(find.text('Keep editing'));
+      await tester.pumpAndSettle();
+      expect(find.text('One-off class'), findsOneWidget);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Discard'));
+      await tester.pumpAndSettle();
+      expect(find.text('One-off class'), findsNothing);
+    });
+
+    testWidgets('asks on a tap outside once a room is typed',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(_host((c, _) => showSlotEditor(c)));
+      await _openSheet(tester);
+      final Finder room = find.byType(TextField).first;
+      await tester.ensureVisible(room);
+      await tester.enterText(room, 'LT-9');
+      await tester.pumpAndSettle();
+
+      await tester.tapAt(const Offset(8, 8));
+      await tester.pumpAndSettle();
+      expect(prompt, findsOneWidget);
+    });
+
+    for (final (String title, Future<void> Function(BuildContext) open) sheet
+        in <(String, Future<void> Function(BuildContext))>[
+      ('One-off class', showExtraClassEditor),
+      ('Weekly class', showSlotEditor),
+    ]) {
+      testWidgets('a drag down leaves the ${sheet.$1} sheet open',
+          (WidgetTester tester) async {
+        await tester.pumpWidget(_host((c, _) => sheet.$2(c)));
+        await _openSheet(tester);
+        await tester.tap(find.text('Physics'));
+        await tester.pumpAndSettle();
+
+        // From the top edge, where the handle sits when dragging is on; lower
+        // down the sheet's own scroll view takes the drag.
+        final Rect edge = tester.getRect(find.byType(BottomSheet));
+        await tester.flingFrom(
+            edge.topCenter + const Offset(0, 12), const Offset(0, 600), 2000);
+        await tester.pumpAndSettle();
+        expect(find.text(sheet.$1), findsOneWidget);
+      });
+    }
   });
 
   group('an edit that would strand marks', () {

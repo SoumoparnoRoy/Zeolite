@@ -30,6 +30,16 @@ class AccountScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final AsyncValue<User?> user = ref.watch(signedInUserProvider);
 
+    // Said once, whether the session ended with this screen open or while
+    // the user was somewhere else in the app.
+    ref.listen<bool>(sessionEndedProvider, (bool? _, bool ended) {
+      if (ended) _sayEnded(context, ref);
+    });
+    if (ref.read(sessionEndedProvider)) {
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _sayEnded(context, ref));
+    }
+
     return PushScaffold(
       title: 'Account',
       slivers: <Widget>[
@@ -58,6 +68,16 @@ class AccountScreen extends ConsumerWidget {
       ],
     );
   }
+}
+
+void _sayEnded(BuildContext context, WidgetRef ref) {
+  if (!context.mounted || !ref.read(sessionEndedProvider)) return;
+  ref.read(sessionEndedProvider.notifier).told();
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text('Your session ended. Sign in again to keep syncing.'),
+    ),
+  );
 }
 
 class _SignedIn extends ConsumerStatefulWidget {
@@ -166,6 +186,8 @@ class _SignedInState extends ConsumerState<_SignedIn> {
         const SectionHeader('Sync'),
         if (ref.watch(verificationPendingProvider))
           _ConfirmEmail(email: widget.user.email)
+        else if (ref.watch(accountChangedProvider))
+          const _AccountChanged()
         else
           const _SyncSection(),
         const SizedBox(height: AppSpacing.xl),
@@ -247,6 +269,65 @@ class _PasswordCheckState extends State<_PasswordCheck> {
           child: const Text('Delete'),
         ),
       ],
+    );
+  }
+}
+
+/// Shown in place of the sync controls when this device last synced with
+/// another account, until the user says where its attendance belongs.
+class _AccountChanged extends ConsumerStatefulWidget {
+  const _AccountChanged();
+
+  @override
+  ConsumerState<_AccountChanged> createState() => _AccountChangedState();
+}
+
+class _AccountChangedState extends ConsumerState<_AccountChanged> {
+  bool _busy = false;
+
+  Future<void> _add() async {
+    // Two taps in one frame both get here before the row disables, and the
+    // second would forget the ledger under the run the first one started.
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await ref.read(syncStatusProvider.notifier).addDeviceToAccount();
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool kept = ref.watch(keptOnDeviceProvider);
+    return SettingsNoted(
+      note: kept
+          ? 'Sync is off for this account on this device. Nothing here is '
+              'sent to it, and nothing comes down from it.'
+          : 'This device has attendance from another account. Add it to '
+              'this account, or keep it on this device only and leave sync '
+              'off here.',
+      child: GroupedRows(
+        children: <Widget>[
+          SettingsRow(
+            icon: Icons.cloud_upload_outlined,
+            title: 'Add it to this account',
+            value: 'Backs up what is on this device to this account',
+            onTap: _add,
+            enabled: !_busy,
+            semanticsIdentifier: 'account-changed-add',
+          ),
+          if (!kept)
+            SettingsRow(
+              icon: Icons.phone_android_rounded,
+              title: 'Keep it on this device only',
+              value: 'Sync stays off for this account here',
+              onTap: () => ref.read(keptOnDeviceProvider.notifier).keep(),
+              enabled: !_busy,
+              semanticsIdentifier: 'account-changed-keep',
+            ),
+        ],
+      ),
     );
   }
 }

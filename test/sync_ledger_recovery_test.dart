@@ -282,13 +282,67 @@ void main() {
     await second.read(signedInUserProvider.future);
     await second.read(settingsProvider.future);
     final SyncRunResult? result =
-        await second.read(syncStatusProvider.notifier).run(force: true);
+        await second.read(syncStatusProvider.notifier).addDeviceToAccount();
 
     expect(result?.pushed, greaterThan(0));
     expect(
       second.read(settingsProvider).value?.syncedAccountId,
       'uid-second',
     );
+  });
+
+  group('a device last synced with another account', () {
+    Future<ProviderContainer> switchedTo(String uid) async {
+      final ProviderContainer first = signedIn('uid-first');
+      await first.read(signedInUserProvider.future);
+      await first.read(settingsProvider.future);
+      await first.read(syncStatusProvider.notifier).run(force: true);
+      target.calls.clear();
+
+      final ProviderContainer next = signedIn(uid);
+      await next.read(signedInUserProvider.future);
+      await next.read(settingsProvider.future);
+      return next;
+    }
+
+    test('sends nothing until asked, the button included', () async {
+      final ProviderContainer second = await switchedTo('uid-second');
+      expect(second.read(accountChangedProvider), isTrue);
+
+      expect(
+        await second.read(syncStatusProvider.notifier).run(force: true),
+        isNull,
+      );
+      expect(target.calls, isEmpty);
+      expect(
+        second.read(settingsProvider).value?.syncedAccountId,
+        'uid-first',
+        reason: 'the device still belongs to the account it last synced',
+      );
+    });
+
+    test('kept on the device, stays off', () async {
+      final ProviderContainer second = await switchedTo('uid-second');
+      second.read(keptOnDeviceProvider.notifier).keep();
+
+      await second.read(syncStatusProvider.notifier).run();
+      expect(target.calls, isEmpty);
+      expect(second.read(accountChangedProvider), isTrue);
+    });
+
+    test('added to the account, syncs and is not asked again', () async {
+      final ProviderContainer second = await switchedTo('uid-second');
+
+      final SyncRunResult? result =
+          await second.read(syncStatusProvider.notifier).addDeviceToAccount();
+      expect(result?.ok, isTrue);
+      expect(second.read(accountChangedProvider), isFalse);
+    });
+
+    test('the same account again is not asked about', () async {
+      final ProviderContainer again = await switchedTo('uid-first');
+      expect(again.read(accountChangedProvider), isFalse);
+    });
   });
 
   // The second tap used to slip past the running check while the first was
@@ -328,7 +382,7 @@ void main() {
     await after.read(settingsProvider.future);
 
     await expectLater(
-      after.read(syncStatusProvider.notifier).run(force: true),
+      after.read(syncStatusProvider.notifier).addDeviceToAccount(),
       throwsStateError,
     );
     expect(after.read(syncStatusProvider).state, isNot(SyncState.running));

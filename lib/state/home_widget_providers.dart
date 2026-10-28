@@ -199,9 +199,7 @@ class ExternalMarkRequest {
 Future<void> handleWidgetTap(Uri? uri) async {
   final ExternalMarkRequest? request = ExternalMarkRequest.fromWidget(uri);
   if (request == null) return;
-  await oneAtATime(
-    () => _handleExternalMark(request, source: 'Widget', toggles: true),
-  );
+  await _handleExternalMark(request, source: 'Widget', toggles: true);
 }
 
 /// Handles an action without opening the app, including from a killed process.
@@ -210,9 +208,7 @@ Future<void> handleNotificationAction(NotificationResponse response) async {
   final ExternalMarkRequest? request =
       ExternalMarkRequest.fromNotification(response);
   if (request == null) return;
-  await oneAtATime(
-    () => _handleExternalMark(request, source: 'Notification', toggles: false),
-  );
+  await _handleExternalMark(request, source: 'Notification', toggles: false);
 }
 
 /// Taps that land together are handled one after another, each reading the
@@ -229,6 +225,29 @@ Future<T> oneAtATime<T>(Future<T> Function() work) {
 
 Future<void> _lastTap = Future<void>.value();
 
+/// Only the marks wait for one another. Rescheduling the reminders takes
+/// seconds, and a second tap held behind it left the app, which reloads at
+/// every write, on the first tap's status all that time. The reminders keep
+/// their own order, so the last run reads the last mark.
+@visibleForTesting
+Future<void> markThenRemind({
+  required Future<bool> Function() mark,
+  required Future<void> Function() remind,
+}) async {
+  Future<void>? reminders;
+  await oneAtATime(() async {
+    if (!await mark()) return;
+    // Queued inside the mark's turn: from outside it, a later tap could get
+    // its reminders in first.
+    final Future<void> next = _lastReminders.then((_) => remind());
+    _lastReminders = next.then((_) {}, onError: (Object _) {});
+    reminders = next;
+  });
+  await reminders;
+}
+
+Future<void> _lastReminders = Future<void>.value();
+
 Future<void> _handleExternalMark(
   ExternalMarkRequest request, {
   required String source,
@@ -237,26 +256,33 @@ Future<void> _handleExternalMark(
   WidgetsFlutterBinding.ensureInitialized();
   final ProviderContainer container = ProviderContainer();
   try {
-    final bool marked = await applyExternalMark(
-      container,
-      request,
-      toggles: toggles,
-      redraw: () => _pushFromContainer(container, settles: request.drawn),
+    await markThenRemind(
+      mark: () async {
+        final bool marked = await applyExternalMark(
+          container,
+          request,
+          toggles: toggles,
+          redraw: () => _pushFromContainer(container, settles: request.drawn),
+        );
+        if (!marked) return false;
+        await HomeWidget.saveWidgetData<String>(
+          HomeWidgetService.markEpochKey,
+          DateTime.now().microsecondsSinceEpoch.toString(),
+        );
+        announceExternalMark();
+        return true;
+      },
+      // Reminders carry the standing, so a mark made here has to reschedule
+      // them the same way one made in the app does. After the redraw, because
+      // on a cold start this is most of the wait. Best-effort: the service
+      // logs and swallows its own failures.
+      remind: () async {
+        await NotificationService.instance.init(
+          backgroundAction: handleNotificationAction,
+        );
+        await container.read(actionCoreProvider).refreshNotifications();
+      },
     );
-    if (!marked) return;
-    await HomeWidget.saveWidgetData<String>(
-      HomeWidgetService.markEpochKey,
-      DateTime.now().microsecondsSinceEpoch.toString(),
-    );
-    announceExternalMark();
-    // Reminders carry the standing, so a mark made here has to reschedule them
-    // the same way one made in the app does. After the redraw, because on a
-    // cold start this is most of the wait. Best-effort: the service logs and
-    // swallows its own failures.
-    await NotificationService.instance.init(
-      backgroundAction: handleNotificationAction,
-    );
-    await container.read(actionCoreProvider).refreshNotifications();
   } catch (error, stack) {
     reportError(error, stack, where: '$source mark');
   } finally {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -194,5 +195,33 @@ void main() {
       (await repo.getAttendanceAt(subject, day, nine))?.status,
       AttendanceStatus.present,
     );
+  });
+
+  test('a second tap is saved without waiting for the first one\'s reminders',
+      () async {
+    final Completer<void> slowReminders = Completer<void>();
+    final List<String> done = <String>[];
+
+    final Future<void> first = markThenRemind(
+      mark: () async {
+        done.add('mark 1');
+        return true;
+      },
+      remind: () => slowReminders.future,
+    );
+    final Future<void> second = markThenRemind(
+      mark: () async {
+        done.add('mark 2');
+        return true;
+      },
+      remind: () async => done.add('remind 2'),
+    );
+    await pumpEventQueue();
+
+    expect(done, <String>['mark 1', 'mark 2']);
+
+    slowReminders.complete();
+    await Future.wait(<Future<void>>[first, second]);
+    expect(done, <String>['mark 1', 'mark 2', 'remind 2']);
   });
 }

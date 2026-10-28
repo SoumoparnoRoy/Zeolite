@@ -29,6 +29,13 @@ class WidgetMarkReceiver : BroadcastReceiver() {
         // and could name any class on any date. Only a class the widget is
         // showing right now, with a status the app knows, goes on to Dart.
         val tap = runCatching { tapOn(context, uri) }.getOrNull() ?: return
+        // A double tap's second half lands before the first can be seen, above
+        // all from a dead process, and would clear its mark. The window runs from
+        // the tap that went through, so tapping on doesn't keep it open.
+        val key = WidgetData.markKey(tap.subject, tap.date, tap.start)
+        val now = System.currentTimeMillis()
+        if (repeats(WidgetData.raw(context, LAST_TAP), key, tap.status, now)) return
+        WidgetData.write(context, LAST_TAP, "$key|${tap.status}|$now")
         // A head start only: nothing that goes wrong drawing it may stop the
         // tap reaching Dart.
         val drawnAt = runCatching { drawAtOnce(context, tap) }.getOrNull()
@@ -114,6 +121,19 @@ class WidgetMarkReceiver : BroadcastReceiver() {
 
         /** One alarm, moved on by each tap: the last tap's lapse is the one that matters. */
         private const val LAPSE_CODE = 7
+
+        /** Past the 635 ms a dead process took to draw a tap on the tablet, for slower phones. */
+        const val REPEAT_WINDOW_MS = 1500L
+
+        /** The last tap that went through, as `<markKey>|<status>|<millis>`. */
+        private const val LAST_TAP = "lastWidgetTap"
+
+        fun repeats(last: String?, key: String, status: String, now: Long): Boolean {
+            val parts = last?.split('|') ?: return false
+            if (parts.size != 3) return false
+            val at = parts[2].toLongOrNull() ?: return false
+            return parts[0] == key && parts[1] == status && now - at in 0 until REPEAT_WINDOW_MS
+        }
 
         /** The class as the widget drew it, or null when the payload has moved on. */
         fun shownSession(today: JSONObject?, subject: Int, date: Int, start: Int): JSONObject? {

@@ -1,7 +1,7 @@
 name: zeolite
 description: "Zeolite - track your university classes and attendance."
 publish_to: 'none'
-version: 1.0.0+2
+version: 1.0.0+3
 
 # flutter_local_notifications 22.x needs Flutter 3.38.1+ (pub.dev, 11 Aug
 # 2026), but the floor is 3.47.8: older stables still trust the compromised

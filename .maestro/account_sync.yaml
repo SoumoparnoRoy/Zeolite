@@ -53,12 +53,7 @@ env:
     visible: "SIGNED IN AS.*"
     timeout: 15000
 
-- scrollUntilVisible:
-    element: "Sync now\n.*"
-- tapOn: "Sync now\n.*"
-- extendedWaitUntil:
-    visible: ".*Synced .* sent.*"
-    timeout: 60000
+- runFlow: subflows/first_sync.yaml
 - runScript:
     file: scripts/account_rows.js
     env:

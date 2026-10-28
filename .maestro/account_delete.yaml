@@ -11,12 +11,7 @@ env:
 - runFlow: subflows/launch.yaml
 - runFlow: subflows/sign_out_if_needed.yaml
 - runFlow: subflows/sign_in.yaml
-- scrollUntilVisible:
-    element: "Sync now\n.*"
-- tapOn: "Sync now\n.*"
-- extendedWaitUntil:
-    visible: ".*Synced .* sent.*"
-    timeout: 60000
+- runFlow: subflows/first_sync.yaml
 
 # Backing out at either question leaves the account alone.
 - tapOn:

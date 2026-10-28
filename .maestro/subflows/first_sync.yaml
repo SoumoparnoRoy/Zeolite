@@ -1,0 +1,24 @@
+appId: com.soumoparno.zeolite
+---
+# The seed script makes a new account each run, so a device that synced the
+# last one is asked first. Answering it is the first sync.
+- runFlow:
+    when:
+      visible:
+        id: "account-changed-add"
+    commands:
+      - tapOn:
+          id: "account-changed-add"
+      - extendedWaitUntil:
+          visible: ".*Synced .* sent.*"
+          timeout: 60000
+- runFlow:
+    when:
+      notVisible: ".*Synced .* sent.*"
+    commands:
+      - scrollUntilVisible:
+          element: "Sync now\n.*"
+      - tapOn: "Sync now\n.*"
+      - extendedWaitUntil:
+          visible: ".*Synced .* sent.*"
+          timeout: 60000

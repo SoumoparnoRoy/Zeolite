@@ -1,5 +1,5 @@
 appId: com.soumoparno.zeolite
-name: Double tap on Sync now after signing in
+name: Double tap on the first sync after signing in
 env:
   PROJECT: ${MAESTRO_FIREBASE_PROJECT || 'zeolite-app'}
 ---
@@ -11,9 +11,23 @@ env:
 - runFlow: subflows/launch.yaml
 - runFlow: subflows/sign_out_if_needed.yaml
 - runFlow: subflows/sign_in.yaml
-- scrollUntilVisible:
-    element: "Sync now\n.*"
-- doubleTapOn: "Sync now\n.*"
+# The same choice as subflows/first_sync.yaml, double tapped. Sync now goes
+# first so only one of the two can run: the question is gone once answered.
+- runFlow:
+    when:
+      notVisible:
+        id: "account-changed-add"
+    commands:
+      - scrollUntilVisible:
+          element: "Sync now\n.*"
+      - doubleTapOn: "Sync now\n.*"
+- runFlow:
+    when:
+      visible:
+        id: "account-changed-add"
+    commands:
+      - doubleTapOn:
+          id: "account-changed-add"
 - extendedWaitUntil:
     visible: ".*Synced .* sent.*"
     timeout: 60000

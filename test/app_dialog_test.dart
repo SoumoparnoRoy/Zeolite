@@ -122,4 +122,26 @@ void main() {
     await tester.tap(find.text('Count'));
     expect(second, 1);
   });
+
+  // No drag handle, as on the one-off and weekly sheets: the handle's own
+  // height would push the title clear and hide the bug.
+  testWidgets(
+      'a sheet taller than the screen keeps its title below the '
+      'status bar', (WidgetTester tester) async {
+    tester.view.padding = const FakeViewPadding(top: 142);
+    tester.view.viewPadding = const FakeViewPadding(top: 142);
+    addTearDown(tester.view.reset);
+    final BuildContext context = await _page(tester, () {});
+    unawaited(showAppSheet<void>(
+      context: context,
+      title: 'Tall',
+      enableDrag: false,
+      child: const SizedBox(height: 2000),
+    ));
+    await tester.pumpAndSettle();
+
+    final double statusBar = 142 / tester.view.devicePixelRatio;
+    expect(tester.getTopLeft(find.text('Tall')).dy,
+        greaterThanOrEqualTo(statusBar));
+  });
 }

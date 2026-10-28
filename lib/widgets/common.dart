@@ -948,6 +948,9 @@ Future<T?> showAppSheet<T>({
   final T? result = await showModalBottomSheet<T>(
     context: context,
     isScrollControlled: true,
+    // Without the drag handle above it, a sheet tall enough to fill the
+    // screen draws its title under the status bar.
+    useSafeArea: true,
     enableDrag: enableDrag,
     backgroundColor: context.palette.canvas,
     builder: (BuildContext context) {

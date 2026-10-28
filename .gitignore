@@ -60,6 +60,9 @@ ios/Flutter/ephemeral/
 # Firebase CLI deploy cache — regenerated on every `firebase deploy`.
 .firebase/
 
+# Symbol tool the Crashlytics Gradle plugin downloads on a release build.
+.crashlytics/
+
 # OS noise
 .DS_Store
 Thumbs.db

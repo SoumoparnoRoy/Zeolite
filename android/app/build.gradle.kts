@@ -97,4 +97,10 @@ dependencies {
     // Android's org.json is a stub on the JVM; the real one lets the prune be
     // tested against a record the plugin actually wrote.
     testImplementation("org.json:json:20250517")
+
+    constraints {
+        // Firestore's gRPC and Analytics still ask for an older Guava, which
+        // has a deserialization DoS (GHSA-xxph-c9ww-hj94).
+        implementation("com.google.guava:guava:33.7.2-android")
+    }
 }

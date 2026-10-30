@@ -37,6 +37,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final SettingsController controller = ref.read(settingsProvider.notifier);
 
     return GradientScaffold(
+      maxContentWidth: AppScale.listWidth,
       headerGap: 22,
       header: _TargetHeader(
         target: settings.targetPercent,

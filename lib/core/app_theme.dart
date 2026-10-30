@@ -255,14 +255,14 @@ class AppPalette extends ThemeExtension<AppPalette> {
     AccentColour.teal: _AccentSet(
       accent: Color(0xFF5FD8D2),
       soft: Color(0xFF14302F),
-      top: Color(0xFF1B8F8B),
+      top: Color(0xFF198481),
       mid: Color(0xFF12706E),
       bottom: Color(0xFF084543),
     ),
     AccentColour.sky: _AccentSet(
       accent: Color(0xFF80CAEF),
       soft: Color(0xFF1A272E),
-      top: Color(0xFF2191CA),
+      top: Color(0xFF1D7EB0),
       mid: Color(0xFF14709F),
       bottom: Color(0xFF0B4765),
     ),
@@ -302,23 +302,23 @@ class AppPalette extends ThemeExtension<AppPalette> {
     AccentColour.indigo: _AccentSet(
       accent: Color(0xFF2F55E0),
       soft: Color(0xFFE4EBFE),
-      top: Color(0xFF5C86FF),
+      top: Color(0xFF366AFF),
       mid: Color(0xFF3B5BE8),
       bottom: Color(0xFF2F49D6),
       shadow: Color(0x12324C96),
     ),
     AccentColour.teal: _AccentSet(
-      accent: Color(0xFF0E8F8A),
+      accent: Color(0xFF0C7874),
       soft: Color(0xFFDFF4F3),
-      top: Color(0xFF17B2AC),
+      top: Color(0xFF11837E),
       mid: Color(0xFF0E8F8A),
       bottom: Color(0xFF0A736F),
       shadow: Color(0x12147E7A),
     ),
     AccentColour.sky: _AccentSet(
-      accent: Color(0xFF0F76A9),
+      accent: Color(0xFF0E71A2),
       soft: Color(0xFFDEEFF7),
-      top: Color(0xFF1FA0E0),
+      top: Color(0xFF187EB1),
       mid: Color(0xFF117BB0),
       bottom: Color(0xFF0C628D),
       shadow: Color(0x12186891),
@@ -332,9 +332,9 @@ class AppPalette extends ThemeExtension<AppPalette> {
       shadow: Color(0x12791891),
     ),
     AccentColour.magenta: _AccentSet(
-      accent: Color(0xFFC4267F),
+      accent: Color(0xFFC2267E),
       soft: Color(0xFFFDE6F3),
-      top: Color(0xFFE8579F),
+      top: Color(0xFFDE1E7E),
       mid: Color(0xFFC43B85),
       bottom: Color(0xFFA82A72),
       shadow: Color(0x12961B6B),
@@ -591,6 +591,11 @@ class AppScale {
   /// The content column, which grows with the type or the lines get short and
   /// the page starts to look like a phone screenshot in a frame.
   static double contentWidth(Size size) => 560 * of(size);
+
+  /// The column for screens made of label-and-value rows (Stats, Timetable,
+  /// Settings). Flat rather than ramped: at [contentWidth] on a tablet a
+  /// subject's percentage sat about 600dp from its name.
+  static const double listWidth = 560;
 }
 
 /// Multiplies the viewer's own text scaling rather than replacing it, so a

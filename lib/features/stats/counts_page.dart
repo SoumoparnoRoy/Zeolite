@@ -345,7 +345,7 @@ class _StepButton extends StatelessWidget {
           onTap: onTap,
           customBorder: const CircleBorder(),
           child: SizedBox.square(
-            dimension: 44,
+            dimension: kMinInteractiveDimension,
             child: Center(
               child: DecoratedBox(
                 decoration: BoxDecoration(

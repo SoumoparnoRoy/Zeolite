@@ -302,30 +302,28 @@ class _SessionCardState extends State<SessionCard> {
 
   Widget _controls(BuildContext context) {
     final AttendanceStatus? status = widget.session.status;
-    return Padding(
-      padding: const EdgeInsets.only(top: 10),
-      child: Row(
-        children: <Widget>[
-          for (final AttendanceStatus option
-              in AttendanceStatus.values) ...<Widget>[
-            Expanded(
-              child: _StatusButton(
-                status: option,
-                selected: status == option,
-                onTap: () => widget.onMark(option),
-              ),
+    // No top gap of its own: the status buttons' 48dp tap band already puts
+    // their pills about where the gap used to.
+    return Row(
+      children: <Widget>[
+        for (final AttendanceStatus option
+            in AttendanceStatus.values) ...<Widget>[
+          Expanded(
+            child: _StatusButton(
+              status: option,
+              selected: status == option,
+              onTap: () => widget.onMark(option),
             ),
-            if (option != AttendanceStatus.values.last)
-              const SizedBox(width: 6),
-          ],
-          // Only once the class is marked: a tag labels a mark, so offering
-          // one on an unmarked class would have nothing to attach to.
-          if (widget.onTag != null && widget.session.isMarked) ...<Widget>[
-            const SizedBox(width: 6),
-            _TagButton(active: widget.tagName != null, onTap: widget.onTag!),
-          ],
+          ),
+          if (option != AttendanceStatus.values.last) const SizedBox(width: 6),
         ],
-      ),
+        // Only once the class is marked: a tag labels a mark, so offering
+        // one on an unmarked class would have nothing to attach to.
+        if (widget.onTag != null && widget.session.isMarked) ...<Widget>[
+          const SizedBox(width: 6),
+          _TagButton(active: widget.tagName != null, onTap: widget.onTag!),
+        ],
+      ],
     );
   }
 }
@@ -399,7 +397,7 @@ class _StatusButton extends StatelessWidget {
     final Color color = status.colorIn(p);
     // Outlined and in secondary ink: these are the most-tapped controls in
     // the app, and grey-on-grey read as disabled on the light card.
-    return Material(
+    final Widget pill = Material(
       color: selected ? color.withValues(alpha: 0.12) : p.surfaceHigh,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
@@ -429,6 +427,19 @@ class _StatusButton extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+    // The pill keeps its 27dp look; a tap anywhere in the 48dp band around
+    // it counts.
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      excludeFromSemantics: true,
+      onTap: onTap,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: kMinInteractiveDimension),
+        // A Row, not a Center: the pill keeps the full width of its third and
+        // is only centred vertically.
+        child: Row(children: <Widget>[Expanded(child: pill)]),
       ),
     );
   }

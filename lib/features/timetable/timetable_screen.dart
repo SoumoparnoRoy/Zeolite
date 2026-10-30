@@ -40,6 +40,7 @@ class TimetableScreen extends ConsumerWidget {
         .fold<int>(0, (int sum, List<ClassSession> v) => sum + v.length);
 
     return GradientScaffold(
+      maxContentWidth: AppScale.listWidth,
       header: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[

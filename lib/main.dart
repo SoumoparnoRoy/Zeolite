@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
 import 'core/app_theme.dart';
+import 'core/orientation_policy.dart';
 import 'core/report_error.dart';
 import 'services/firebase/firebase_emulator.dart';
 import 'services/notification_service.dart';
@@ -54,10 +55,9 @@ Future<void> main() async {
           : AppPalette.dark,
     ),
   );
-  await SystemChrome.setPreferredOrientations(<DeviceOrientation>[
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
+  final OrientationPolicy orientation = OrientationPolicy();
+  await orientation.apply();
+  WidgetsBinding.instance.addObserver(orientation);
 
   // Notification setup is best-effort — a failure here must never block
   // launch, so the service swallows and logs its own errors.

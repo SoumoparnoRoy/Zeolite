@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/app_theme.dart';
 import '../../widgets/gradient_header.dart';
 import '../../widgets/nav_bar_scroll.dart';
 
@@ -15,7 +16,8 @@ class StatsPageList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final EdgeInsets inset = GradientScaffold.columnInset(context);
+    final EdgeInsets inset =
+        GradientScaffold.columnInset(context, cap: AppScale.listWidth);
     return NotificationListener<UserScrollNotification>(
       onNotification: NavBarScroll.of(context)?.report ?? (_) => false,
       child: CustomScrollView(

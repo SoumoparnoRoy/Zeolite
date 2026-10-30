@@ -336,18 +336,30 @@ class HeaderIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Drawn at 36dp to sit with the headline, but the 48dp square around it
+    // takes the tap as well.
     return Tooltip(
       message: tooltip,
-      child: Material(
-        color: Colors.white.withValues(alpha: active ? 0.3 : 0.16),
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: SizedBox(
-            width: 36,
-            height: 36,
-            child: Icon(icon, size: 19, color: Colors.white),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        excludeFromSemantics: true,
+        onTap: onTap,
+        child: SizedBox.square(
+          dimension: kMinInteractiveDimension,
+          child: Center(
+            child: Material(
+              color: Colors.white.withValues(alpha: active ? 0.3 : 0.16),
+              borderRadius: BorderRadius.circular(12),
+              child: InkWell(
+                onTap: onTap,
+                borderRadius: BorderRadius.circular(12),
+                child: SizedBox(
+                  width: 36,
+                  height: 36,
+                  child: Icon(icon, size: 19, color: Colors.white),
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -390,18 +402,21 @@ class HeaderStepper extends StatelessWidget {
             child: InkWell(
               onTap: onTapLabel,
               borderRadius: BorderRadius.circular(13),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 9),
-                child: Text(
-                  label,
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: AppType.labelLarge,
-                    height: 1,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
+              // As tall as the arrows, so a tap anywhere on the bar lands.
+              child: SizedBox(
+                height: kMinInteractiveDimension,
+                child: Center(
+                  child: Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: AppType.labelLarge,
+                      height: 1,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),
@@ -433,8 +448,8 @@ class _Arrow extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(13),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: SizedBox.square(
+          dimension: kMinInteractiveDimension,
           child: Icon(icon, size: 18, color: Colors.white),
         ),
       ),

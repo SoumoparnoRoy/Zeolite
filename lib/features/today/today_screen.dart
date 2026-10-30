@@ -376,15 +376,13 @@ class _DayHeader extends StatelessWidget {
                   ],
                 ),
               ),
-              if (!isToday) ...<Widget>[
-                const SizedBox(width: 8),
+              // No spacers: the buttons bring their own 6dp margin.
+              if (!isToday)
                 HeaderIconButton(
                   icon: Icons.today_rounded,
                   tooltip: 'Jump to today',
                   onTap: onJumpToToday,
                 ),
-              ],
-              const SizedBox(width: 8),
               HeaderIconButton(
                 icon: Icons.grid_view_rounded,
                 tooltip: 'Show the week grid',

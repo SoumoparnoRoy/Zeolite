@@ -791,40 +791,62 @@ class _ClassTimeCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          Row(
+          // A Wrap rather than a Row with a spacer: at a large font the
+          // duration and the remove button drop to their own line instead of
+          // being pushed off the card.
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: <Widget>[
-              _TimeChip(
-                label: Clock.format(time.startMinutes, use24Hour: use24Hour),
-                onTap: onPickStart,
+              // On a narrow phone at the largest font the two chips alone
+              // are wider than the card; they shrink rather than overflow.
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    _TimeChip(
+                      label:
+                          Clock.format(time.startMinutes, use24Hour: use24Hour),
+                      onTap: onPickStart,
+                    ),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+                      child: Text(
+                        '–',
+                        style: TextStyle(
+                            color: context.palette.textTertiary,
+                            fontSize: AppType.bodyLarge),
+                      ),
+                    ),
+                    _TimeChip(
+                      label:
+                          Clock.format(time.endMinutes, use24Hour: use24Hour),
+                      onTap: onPickEnd,
+                    ),
+                  ],
+                ),
               ),
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-                child: Text(
-                  '–',
-                  style: TextStyle(
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text(
+                    Clock.formatDuration(time.endMinutes - time.startMinutes),
+                    style: TextStyle(
+                      fontSize: AppType.labelLarge,
+                      fontWeight: FontWeight.w600,
                       color: context.palette.textTertiary,
-                      fontSize: AppType.bodyLarge),
-                ),
-              ),
-              _TimeChip(
-                label: Clock.format(time.endMinutes, use24Hour: use24Hour),
-                onTap: onPickEnd,
-              ),
-              const Spacer(),
-              Text(
-                Clock.formatDuration(time.endMinutes - time.startMinutes),
-                style: TextStyle(
-                  fontSize: AppType.labelLarge,
-                  fontWeight: FontWeight.w600,
-                  color: context.palette.textTertiary,
-                ),
-              ),
-              IconButton(
-                onPressed: canRemove ? onRemove : null,
-                icon: const Icon(Icons.close_rounded, size: 17),
-                visualDensity: VisualDensity.compact,
-                color: context.palette.textTertiary,
-                tooltip: 'Remove this class time',
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: canRemove ? onRemove : null,
+                    icon: const Icon(Icons.close_rounded, size: 17),
+                    visualDensity: VisualDensity.compact,
+                    color: context.palette.textTertiary,
+                    tooltip: 'Remove this class time',
+                  ),
+                ],
               ),
             ],
           ),

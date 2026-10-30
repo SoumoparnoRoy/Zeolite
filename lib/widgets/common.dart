@@ -247,7 +247,7 @@ class DayRule extends StatelessWidget {
               ),
               if (onAdd != null)
                 // The glyph stays small so the rule reads as a rule, but the
-                // target underneath it is a full 44px.
+                // target underneath it is Android's full 48dp.
                 Semantics(
                   button: true,
                   label: 'Add a class on this day',
@@ -255,8 +255,8 @@ class DayRule extends StatelessWidget {
                     onTap: onAdd,
                     radius: 24,
                     child: SizedBox(
-                      width: 44,
-                      height: 44,
+                      width: kMinInteractiveDimension,
+                      height: kMinInteractiveDimension,
                       child: Icon(
                         Icons.add_rounded,
                         size: 16,
@@ -492,13 +492,20 @@ class SubjectAvatar extends StatelessWidget {
         color: color.withValues(alpha: p.isDark ? 0.2 : 0.16),
         borderRadius: BorderRadius.circular(size * 0.32),
       ),
-      child: Text(
-        initials,
-        style: TextStyle(
-          color: AppColors.inkOn(color, p),
-          fontSize: size * 0.31,
-          height: 1,
-          fontWeight: FontWeight.w800,
+      // One line, shrunk to fit: at a large system font "DM" wrapped to
+      // "D / M" inside the square.
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          initials,
+          maxLines: 1,
+          softWrap: false,
+          style: TextStyle(
+            color: AppColors.inkOn(color, p),
+            fontSize: size * 0.31,
+            height: 1,
+            fontWeight: FontWeight.w800,
+          ),
         ),
       ),
     );

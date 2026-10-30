@@ -108,6 +108,17 @@ class _WeekStripState extends State<WeekStrip> {
         final double width =
             (usable - _gap * (_visibleDays - 1)) / _visibleDays;
 
+        // The pill is fixed-height chrome, so it has to grow with the system
+        // font rather than clip the date. Capped, because past 1.35 the five
+        // columns matter more than another point of size.
+        final double scale = MediaQuery.textScalerOf(context).scale(10) / 10;
+        final double capped = scale.clamp(1.0, 1.35);
+
+        // An off-screen tab can be laid out at almost no width while the
+        // display rotates, which made every pill negative. Nothing is drawn
+        // or remembered until a real width arrives.
+        if (width <= 0) return SizedBox(height: 50 * capped);
+
         // The first layout has to land on the selected day without an
         // animation, and the offset depends on a width only known here.
         if ((width - _itemWidth).abs() > 0.5 || !_controller.hasClients) {
@@ -116,12 +127,6 @@ class _WeekStripState extends State<WeekStrip> {
             if (mounted) _scrollTo(widget.selected);
           });
         }
-
-        // The pill is fixed-height chrome, so it has to grow with the system
-        // font rather than clip the date. Capped, because past 1.35 the five
-        // columns matter more than another point of size.
-        final double scale = MediaQuery.textScalerOf(context).scale(10) / 10;
-        final double capped = scale.clamp(1.0, 1.35);
 
         return SizedBox(
           height: 50 * capped,

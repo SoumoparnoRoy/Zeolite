@@ -77,17 +77,21 @@ class _SimulateSheetState extends State<SimulateSheet> {
               ),
             ),
             const SizedBox(width: AppSpacing.md),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Text(
-                !now.hasData
-                    ? 'Nothing marked yet'
-                    // Until a class is added the big number already is "now".
-                    : _attended == 0 && _missed == 0
-                        ? 'Where you are now'
-                        : 'Now ${Words.attendance(now.percent)}',
-                style:
-                    monoStyle(color: p.textTertiary, size: AppType.labelSmall),
+            Flexible(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(
+                  !now.hasData
+                      ? 'Nothing marked yet'
+                      // Until a class is added the big number already is "now".
+                      : _attended == 0 && _missed == 0
+                          ? 'Where you are now'
+                          : 'Now ${Words.attendance(now.percent)}',
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: monoStyle(
+                      color: p.textTertiary, size: AppType.labelSmall),
+                ),
               ),
             ),
           ],

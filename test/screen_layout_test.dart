@@ -246,10 +246,10 @@ void main() {
     expect(tester.takeException(), isNull);
 
     // The gradient still bleeds edge to edge; the cards on the sheet do not.
-    // The cap tracks AppScale, so assert against that rather than a constant
-    // that would have to be chased every time the ramp is retuned.
+    // Stats is a list screen, so its cap is the flat list width, not the
+    // ramped content width Today uses.
     final double card = tester.getSize(find.byType(SurfaceCard).first).width;
-    final double cap = AppScale.contentWidth(_tablet);
+    const double cap = AppScale.listWidth;
     expect(card, lessThanOrEqualTo(cap));
     expect(card, greaterThan(cap - 60));
     // Real gutters on both sides, not a full-bleed column.

@@ -56,6 +56,9 @@ final weekWidgetImageProvider = Provider<void>((Ref ref) {
     // because Dart has no way to ask. Drawn at that size the grid fills the
     // widget instead of being centred inside it.
     final Size cell = await service.weekCellSize() ?? _fallbackSize;
+    // A settings change rebuilds this provider while the size is being asked
+    // for, and the old one's ref is gone by the time render reads the grid.
+    if (!ref.mounted) return;
     final DateTime today = Dates.today();
     if (onlyIfStale && drawn == (cell: cell, day: today)) return;
     drawn = (cell: cell, day: today);

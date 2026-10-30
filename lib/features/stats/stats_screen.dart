@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -65,6 +66,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
     return PagerHandoff(
       controller: _views,
       child: GradientScaffold(
+        maxContentWidth: AppScale.listWidth,
         headerGap: 18,
         header: OverallStatsHeader(stats: stats, settings: settings),
         aboveThePages: Padding(
@@ -111,6 +113,11 @@ class OverallStatsHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final String toCome =
         Words.plural(stats.expectedTotal - stats.held, 'class', 'classes');
+    final double legendScale = math.max(
+      1,
+      MediaQuery.textScalerOf(context).scale(AppType.labelSmall) /
+          AppType.labelSmall,
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
@@ -132,7 +139,7 @@ class OverallStatsHeader extends StatelessWidget {
               children: <Widget>[
                 // Shrinks before it clips at a large font; 3:2 keeps the legend.
                 Flexible(
-                  flex: 3,
+                  flex: 30,
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.centerLeft,
@@ -145,11 +152,13 @@ class OverallStatsHeader extends StatelessWidget {
                 const SizedBox(width: 16),
                 // Capped, not just Expanded: on a wide column a label/value
                 // pair stretched to the full width leaves the count stranded
-                // half a screen from the word it belongs to.
+                // half a screen from the word it belongs to. Both the share
+                // and the cap grow with the system font, so at a large one the
+                // figure shrinks before "Cancelled" is cut.
                 Flexible(
-                  flex: 2,
+                  flex: (20 * legendScale).round(),
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 190),
+                    constraints: BoxConstraints(maxWidth: 190 * legendScale),
                     child: Column(
                       children: <Widget>[
                         _LegendLine(label: 'Attended', value: stats.attended),
@@ -186,7 +195,7 @@ class OverallStatsHeader extends StatelessWidget {
                 fontSize: AppType.captionLarge,
                 height: 1.4,
                 fontWeight: FontWeight.w500,
-                color: Colors.white.withValues(alpha: 0.75),
+                color: Colors.white,
               ),
             ),
           ),
@@ -204,7 +213,7 @@ class OverallStatsHeader extends StatelessWidget {
                 fontSize: AppType.captionLarge,
                 height: 1,
                 fontWeight: FontWeight.w500,
-                color: Colors.white.withValues(alpha: 0.75),
+                color: Colors.white,
               ),
             ),
           ),

@@ -208,39 +208,58 @@ class _TodayScreenState extends ConsumerState<TodayScreen> with RouteAware {
               onPressed: () =>
                   showAddClassSheet(context, initialDate: selected),
             ),
-      body: PageView.builder(
-        controller: _pagesFor(view),
-        onPageChanged: (int page) {
-          // A day whose classes fit the screen has nothing to scroll back up,
-          // so arriving on one with the bar already gone would strand it.
-          navBar?.show();
-          ref
-              .read(selectedDateProvider.notifier)
-              .select(TodayScreen.dateForPage(view, _origin, page));
+      // A swipe up a day's list started mid page turn touches the pager too,
+      // which stops the turn; the pager then settles back on the page it was
+      // leaving without reporting a change, under a header already showing
+      // the new day. So a pager that settles off the selected day finishes
+      // the turn. A real swipe has moved the selected day by then, so it
+      // stays put. After the frame, because this arrives mid scroll activity.
+      body: NotificationListener<ScrollEndNotification>(
+        onNotification: (ScrollEndNotification end) {
+          if (end.depth == 0) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+              _followDate(
+                  ref.read(homeViewProvider), ref.read(selectedDateProvider),
+                  animate: true);
+            });
+          }
+          return false;
         },
-        itemBuilder: (BuildContext context, int page) {
-          final DateTime date = TodayScreen.dateForPage(view, _origin, page);
-          // Reported from inside the date pager, which the shell's own listener
-          // sits outside of: from there this list is one viewport too deep for
-          // [RootShell.navVisibleFor] to act on.
-          return NotificationListener<UserScrollNotification>(
-            onNotification: navBar?.report ?? (_) => false,
-            child: RefreshIndicator(
-              color: p.accent,
-              backgroundColor: p.surface,
-              onRefresh: () => ref.refresh(timetableProvider.future),
-              child: CustomScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                slivers: <Widget>[
-                  if (view == HomeView.grid)
-                    _weekPage(Dates.startOfWeek(date))
-                  else
-                    TodayDayPage(date: date, column: column),
-                ],
+        child: PageView.builder(
+          controller: _pagesFor(view),
+          onPageChanged: (int page) {
+            // A day whose classes fit the screen has nothing to scroll back up,
+            // so arriving on one with the bar already gone would strand it.
+            navBar?.show();
+            ref
+                .read(selectedDateProvider.notifier)
+                .select(TodayScreen.dateForPage(view, _origin, page));
+          },
+          itemBuilder: (BuildContext context, int page) {
+            final DateTime date = TodayScreen.dateForPage(view, _origin, page);
+            // Reported from inside the date pager, which the shell's own
+            // listener sits outside of: from there this list is one viewport
+            // too deep for [RootShell.navVisibleFor] to act on.
+            return NotificationListener<UserScrollNotification>(
+              onNotification: navBar?.report ?? (_) => false,
+              child: RefreshIndicator(
+                color: p.accent,
+                backgroundColor: p.surface,
+                onRefresh: () => ref.refresh(timetableProvider.future),
+                child: CustomScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  slivers: <Widget>[
+                    if (view == HomeView.grid)
+                      _weekPage(Dates.startOfWeek(date))
+                    else
+                      TodayDayPage(date: date, column: column),
+                  ],
+                ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }

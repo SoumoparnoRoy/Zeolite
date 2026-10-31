@@ -221,76 +221,101 @@ class _SubjectRowState extends ConsumerState<_SubjectRow> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          Row(
-            children: <Widget>[
-              SubjectAvatar(
-                initials: subject.initials,
-                color: subject.color,
-                size: 36,
-              ),
-              const SizedBox(width: 11),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      subject.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: AppType.bodyMedium,
-                        height: 1.2,
-                        fontWeight: FontWeight.w700,
-                        color: p.textPrimary,
-                      ),
-                    ),
-                    if (detail.isNotEmpty) ...<Widget>[
-                      const SizedBox(height: 4),
-                      Text(
-                        detail,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: monoStyle(
-                            color: p.textTertiary, size: AppType.captionSmall),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                stats != null && stats.hasData
-                    ? Words.attendance(stats.percent)
-                    : '—',
-                style: TextStyle(
-                  fontSize: AppType.titleMedium,
-                  height: 1,
-                  fontWeight: stats?.hasData ?? false
-                      ? FontWeight.w800
-                      : FontWeight.w700,
-                  letterSpacing: -0.3,
-                  color: stats != null && stats.hasData
-                      ? percentColor
-                      : p.textFaint,
-                ),
-              ),
-              // A Builder so the menu opens over the button's own box.
-              Builder(
-                builder: (BuildContext button) => IconButton(
-                  icon: Semantics(
-                    expanded: _menuOpen,
-                    child: Icon(
-                      Icons.more_vert_rounded,
-                      size: 18,
-                      color: p.textFaint,
+          LayoutBuilder(
+            builder: (BuildContext context, BoxConstraints row) {
+              final TextStyle nameStyle = TextStyle(
+                fontSize: AppType.bodyMedium,
+                height: 1.2,
+                fontWeight: FontWeight.w700,
+                color: p.textPrimary,
+              );
+              final bool hasPercent = stats != null && stats.hasData;
+              final String percentText =
+                  hasPercent ? Words.attendance(stats.percent) : '—';
+              final TextStyle percentStyle = TextStyle(
+                fontSize: AppType.titleMedium,
+                height: 1,
+                fontWeight: hasPercent ? FontWeight.w800 : FontWeight.w700,
+                letterSpacing: -0.3,
+                color: hasPercent ? percentColor : p.textFaint,
+              );
+              final Widget percent = Text(percentText, style: percentStyle);
+
+              // At a phone width and a large font, the name's column can end
+              // up narrower than one of its words, or too narrow for the name
+              // in its two lines, and either way it is cut inside a word. The
+              // percentage moves under the name then, so the name gets its
+              // room; wherever the name fits, the row stays as it was.
+              // 36 + 11 + 8 is the avatar and the two gaps, and the menu
+              // button keeps a 48 dp tap target.
+              final double inline = row.maxWidth -
+                  36 -
+                  11 -
+                  8 -
+                  _textWidth(context, percentText, percentStyle) -
+                  kMinInteractiveDimension;
+              final bool stacked = !_fits(context, subject.name, nameStyle,
+                  width: inline, lines: 2);
+
+              return Row(
+                children: <Widget>[
+                  SubjectAvatar(
+                    initials: subject.initials,
+                    color: subject.color,
+                    size: 36,
+                  ),
+                  const SizedBox(width: 11),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          subject.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: nameStyle,
+                        ),
+                        if (detail.isNotEmpty) ...<Widget>[
+                          const SizedBox(height: 4),
+                          Text(
+                            detail,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: monoStyle(
+                                color: p.textTertiary,
+                                size: AppType.captionSmall),
+                          ),
+                        ],
+                        if (stacked) ...<Widget>[
+                          const SizedBox(height: 6),
+                          percent,
+                        ],
+                      ],
                     ),
                   ),
-                  padding: const EdgeInsets.all(8),
-                  tooltip: MaterialLocalizations.of(button).showMenuTooltip,
-                  onPressed: () => _openMenu(button, timetable),
-                ),
-              ),
-            ],
+                  if (!stacked) ...<Widget>[
+                    const SizedBox(width: 8),
+                    percent,
+                  ],
+                  // A Builder so the menu opens over the button's own box.
+                  Builder(
+                    builder: (BuildContext button) => IconButton(
+                      icon: Semantics(
+                        expanded: _menuOpen,
+                        child: Icon(
+                          Icons.more_vert_rounded,
+                          size: 18,
+                          color: p.textFaint,
+                        ),
+                      ),
+                      padding: const EdgeInsets.all(8),
+                      tooltip: MaterialLocalizations.of(button).showMenuTooltip,
+                      onPressed: () => _openMenu(button, timetable),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
           if (countsByHand) ...<Widget>[
             const SizedBox(height: 10),
@@ -379,4 +404,39 @@ class _SubjectRowState extends ConsumerState<_SubjectRow> {
     }
     showUndoSnack(messenger, core, '${subject.name} deleted');
   }
+}
+
+TextPainter _laidOut(BuildContext context, String text, TextStyle style,
+    {double width = double.infinity, int lines = 1}) {
+  return TextPainter(
+    text: TextSpan(
+      text: text,
+      style: DefaultTextStyle.of(context).style.merge(style),
+    ),
+    textDirection: Directionality.of(context),
+    textScaler: MediaQuery.textScalerOf(context),
+    maxLines: lines,
+  )..layout(maxWidth: width);
+}
+
+double _textWidth(BuildContext context, String text, TextStyle style) {
+  final TextPainter painter = _laidOut(context, text, style);
+  final double width = painter.width;
+  painter.dispose();
+  return width;
+}
+
+/// Whether [text] fits [width] in [lines] lines with no word broken.
+bool _fits(BuildContext context, String text, TextStyle style,
+    {required double width, required int lines}) {
+  if (text
+      .split(RegExp(r'\s+'))
+      .any((String word) => _textWidth(context, word, style) > width)) {
+    return false;
+  }
+  final TextPainter painter =
+      _laidOut(context, text, style, width: width, lines: lines);
+  final bool fits = !painter.didExceedMaxLines;
+  painter.dispose();
+  return fits;
 }

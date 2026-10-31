@@ -528,4 +528,65 @@ void main() {
     expect(container.read(statsViewProvider), StatsView.counts);
     expect(container.read(selectedTabProvider), shellTabs.indexOf('stats'));
   });
+
+  // At 360 dp and font 2.0, "Computer" was broken inside the word,
+  // and at 411 dp a longer word, or a name too long for two lines, was cut
+  // short.
+  testWidgets('a name too wide for its column puts the percentage under it',
+      (WidgetTester tester) async {
+    TimetableData named(List<String> names) => TimetableData(
+          categories: const <ClassCategory>[],
+          subjects: <Subject>[
+            for (int i = 0; i < names.length; i++)
+              Subject(
+                id: i + 1,
+                name: names[i],
+                colorValue: AppColors.defaultSubjectColor,
+              ),
+          ],
+          slots: const <ClassSlot>[],
+          extras: const <ExtraClass>[],
+          holidays: const <Holiday>[],
+          records: const <AttendanceRecord>[],
+        );
+
+    bool stacked(String name) {
+      final Finder card = find.ancestor(
+          of: find.text(name), matching: find.byType(SurfaceCard));
+      final Rect percent =
+          tester.getRect(find.descendant(of: card, matching: find.text('—')));
+      return percent.top >= tester.getRect(find.text(name)).bottom;
+    }
+
+    Future<void> show(double width, double font) async {
+      tester.view.physicalSize = Size(width * 3, 800 * 3);
+      tester.view.devicePixelRatio = 3;
+      tester.platformDispatcher.textScaleFactorTestValue = font;
+      await tester.pumpWidget(_app(named(<String>[
+        'Computer Networks',
+        'Thermodynamics',
+        'Art and Design of Big Old Maps',
+        'Art',
+      ])));
+      await tester.pumpAndSettle();
+    }
+
+    addTearDown(tester.view.reset);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+    await show(360, 2);
+    expect(stacked('Computer Networks'), isTrue);
+    expect(stacked('Art'), isFalse);
+
+    await show(411, 2);
+    expect(stacked('Thermodynamics'), isTrue);
+    expect(stacked('Art and Design of Big Old Maps'), isTrue);
+    expect(stacked('Art'), isFalse);
+
+    await show(411, 1);
+    expect(stacked('Computer Networks'), isFalse);
+    expect(stacked('Thermodynamics'), isFalse);
+    expect(stacked('Art and Design of Big Old Maps'), isFalse);
+    expect(stacked('Art'), isFalse);
+  });
 }

@@ -91,4 +91,112 @@ void main() {
       expect(_decide(ScrollDirection.forward, maxExtent: 0), isTrue);
     });
   });
+
+  group('bringing the bar back', () {
+    test('it waits for 8 dp of scrolling back', () {
+      final NavBarReturn back = NavBarReturn()..start();
+      expect(back.scrolled(-5), isFalse);
+      expect(back.scrolled(-2.9), isFalse);
+      expect(back.scrolled(-0.1), isTrue);
+      expect(back.waiting, isFalse);
+    });
+
+    // The end of a fling at a list's end, as measured on the emulator.
+    test('a twitch back that settles on the end again never counts', () {
+      final NavBarReturn back = NavBarReturn()..start();
+      expect(back.scrolled(-2.29), isFalse);
+      expect(back.scrolled(2.29), isFalse);
+      back.stop();
+      expect(back.scrolled(-20), isFalse);
+    });
+
+    test('each gesture starts from nothing', () {
+      final NavBarReturn back = NavBarReturn()..start();
+      expect(back.scrolled(-6), isFalse);
+      back
+        ..stop()
+        ..start();
+      expect(back.scrolled(-6), isFalse);
+    });
+
+    // Stats' header and page each report their part of one drag.
+    test('a drag split between two lists counts once', () {
+      final NavBarReturn back = NavBarReturn()..start();
+      expect(back.scrolled(-3), isFalse);
+      expect(back.scrolled(-5), isTrue);
+    });
+    test('taking it away waits for 8 dp toward the end', () {
+      final NavBarReturn away = NavBarReturn(towardEnd: true)..start();
+      expect(away.scrolled(5), isFalse);
+      expect(away.scrolled(-1), isFalse);
+      expect(away.scrolled(3.9), isFalse);
+      expect(away.scrolled(0.1), isTrue);
+    });
+
+    test('at the end of a list, a push toward the end takes it away at once',
+        () {
+      ScrollMetrics list(double pixels) => FixedScrollMetrics(
+            minScrollExtent: 0,
+            maxScrollExtent: 300,
+            pixels: pixels,
+            viewportDimension: 800,
+            axisDirection: AxisDirection.down,
+            devicePixelRatio: 2.75,
+          );
+      final NavBarReturn away = NavBarReturn(towardEnd: true);
+      expect(away.begin(list(300)), isTrue);
+      expect(away.waiting, isFalse);
+      expect(away.begin(list(200)), isFalse);
+      expect(away.waiting, isTrue);
+    });
+
+    // Stats: the header has scrolled away and sits at its end, while the
+    // list below it, which is the one moving, is not at its end.
+    test('a twitch toward the end with only the header at its end keeps it',
+        () {
+      ScrollMetrics at(double pixels, double max) => FixedScrollMetrics(
+            minScrollExtent: 0,
+            maxScrollExtent: max,
+            pixels: pixels,
+            viewportDimension: 800,
+            axisDirection: AxisDirection.down,
+            devicePixelRatio: 2.625,
+          );
+      final NavBarReturn away = NavBarReturn(towardEnd: true);
+      expect(away.begin(at(298.1, 298.1), hasListInside: true), isFalse);
+      expect(away.begin(at(170, 192.6)), isFalse);
+      expect(away.scrolled(0.06), isFalse);
+    });
+
+    // The finger lifting at the end of the small drag that brought it back.
+    test('a twitch toward the end after the bar came back keeps it', () {
+      final NavBarReturn back = NavBarReturn()..start();
+      final NavBarReturn away = NavBarReturn(towardEnd: true);
+      expect(back.scrolled(-8.5), isTrue);
+      away.start();
+      expect(away.scrolled(0.06), isFalse);
+    });
+  });
+
+  group('the top of a screen', () {
+    ScrollMetrics at(double pixels, double max) => FixedScrollMetrics(
+          minScrollExtent: 0,
+          maxScrollExtent: max,
+          pixels: pixels,
+          viewportDimension: 800,
+          axisDirection: AxisDirection.down,
+          devicePixelRatio: 2.75,
+        );
+
+    test('a list on its own is at the top when it is', () {
+      expect(RootShell.atTop(at(0, 300)), isTrue);
+      expect(RootShell.atTop(at(40, 300)), isFalse);
+    });
+
+    // Stats on a tablet: the page fits, and the header above it has scrolled.
+    test('a list that fits under a scrolled header is not at the top', () {
+      expect(RootShell.atTop(at(0, 0), around: at(292.7, 292.7)), isFalse);
+      expect(RootShell.atTop(at(0, 0), around: at(0, 292.7)), isTrue);
+    });
+  });
 }

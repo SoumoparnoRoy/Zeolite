@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/material.dart';
@@ -146,6 +147,13 @@ class RootShell extends ConsumerStatefulWidget {
       ScrollDirection.idle => atTop ? true : null,
     };
   }
+
+  /// At the top only if the list around it is too. On a tablet, Stats' page
+  /// fits under its header, so it never leaves its top while the header does
+  /// the scrolling, and the bar came back as every fling settled.
+  static bool atTop(ScrollMetrics list, {ScrollMetrics? around}) =>
+      list.pixels <= list.minScrollExtent &&
+      (around == null || around.pixels <= around.minScrollExtent);
 
   /// Where a `zeolite://open?tab=` link lands, so each widget opens the screen
   /// it is a view of. An unknown name returns null and the app opens where it
@@ -330,24 +338,145 @@ class _RootShellState extends ConsumerState<RootShell> with RouteAware {
 
   bool _navVisible = true;
 
+  /// A list near its end when the bar starts coming back. It is moved up as
+  /// the bar takes its room, or its last card would end up under the bar and
+  /// Add class.
+  ScrollPosition? _liftWithBar;
+  double _liftOwed = 0;
+  double? _bodyHeight;
+
   void _showNav(bool visible) {
     if (_navVisible == visible) return;
+    if (!visible) _liftWithBar = null;
     setState(() => _navVisible = visible);
+  }
+
+  /// Only near the end: further up, the list moving under your finger would
+  /// look like a jump, and the bar covering a card there is ordinary reading.
+  ScrollPosition? _nearEnd(UserScrollNotification notification) {
+    final BuildContext? scrollable = notification.context;
+    final double bar = (NavigationBarTheme.of(context).height ?? 80) +
+        MediaQuery.paddingOf(context).bottom;
+    if (scrollable == null || notification.metrics.extentAfter >= bar) {
+      return null;
+    }
+    _liftOwed = 0;
+    return Scrollable.maybeOf(scrollable)?.position;
+  }
+
+  /// Runs during layout, before the list's own, so the list is placed at its
+  /// new offset in the same frame the bar grows. A correction rather than a
+  /// jump, which would cancel the drag that brought the bar back.
+  ///
+  /// It moves no further than the list's end. That end is the last known
+  /// extent plus what the bar took this frame, but only once the list already
+  /// ran past the screen; a list that fitted waits a frame for its real
+  /// extent, then catches up.
+  void _liftAsBarReturns(double height) {
+    final double? before = _bodyHeight;
+    _bodyHeight = height;
+    final ScrollPosition? position = _liftWithBar;
+    if (before == null || position == null || !position.hasPixels) return;
+    if (height >= before) return;
+    final double taken = before - height;
+    _liftOwed += taken;
+    final double end = position.maxScrollExtent > 0
+        ? position.maxScrollExtent + taken
+        : position.minScrollExtent;
+    final double lift = math.min(_liftOwed, end - position.pixels);
+    if (lift <= 0) return;
+    position.correctBy(lift);
+    _liftOwed -= lift;
   }
 
   /// Also reached from [TodayScreen], whose list sits a level deeper.
   bool _onScroll(UserScrollNotification notification) {
+    final ScrollPosition? around = _verticalAround(notification.context);
+    if (around != null && notification.metrics.axis == Axis.vertical) {
+      _hasListInside[around] = true;
+    }
     final bool? visible = RootShell.navVisibleFor(
       notification.direction,
       depth: notification.depth,
       axis: notification.metrics.axis,
       maxExtent: notification.metrics.maxScrollExtent,
-      atTop:
-          notification.metrics.pixels <= notification.metrics.minScrollExtent,
+      atTop: RootShell.atTop(notification.metrics, around: around),
     );
-    if (visible != null) _showNav(visible);
+    if (visible == true &&
+        !_navVisible &&
+        notification.direction == ScrollDirection.forward) {
+      _comingBackFrom = notification;
+      _comingBack.start();
+      _goingAway.stop();
+      return false;
+    }
+    if (visible == false && _navVisible) {
+      _comingBack.stop();
+      final ScrollPosition? reporter = notification.context
+          ?.findAncestorStateOfType<ScrollableState>()
+          ?.position;
+      final bool hasListInside =
+          reporter != null && (_hasListInside[reporter] ?? false);
+      if (!_goingAway.begin(notification.metrics,
+          hasListInside: hasListInside)) {
+        return false;
+      }
+    }
+    if (visible == true && !_navVisible) _liftWithBar = _nearEnd(notification);
+    if (visible != null) {
+      _comingBack.stop();
+      _goingAway.stop();
+      _showNav(visible);
+    }
     return false;
   }
+
+  /// The nearest vertical scroll view around the one that reported, if any:
+  /// the pagers in between scroll sideways. Looked up rather than depended
+  /// on, since this runs from a notification, not a build.
+  ScrollPosition? _verticalAround(BuildContext? reporter) {
+    ScrollableState? outer = reporter
+        ?.findAncestorStateOfType<ScrollableState>()
+        ?.context
+        .findAncestorStateOfType<ScrollableState>();
+    while (outer != null && outer.position.axis != Axis.vertical) {
+      outer = outer.context.findAncestorStateOfType<ScrollableState>();
+    }
+    final ScrollPosition? position = outer?.position;
+    return position != null && position.hasPixels ? position : null;
+  }
+
+  /// Moving the bar either way has to be meant; see [NavBarReturn].
+  final NavBarReturn _comingBack = NavBarReturn();
+  final NavBarReturn _goingAway = NavBarReturn(towardEnd: true);
+  UserScrollNotification? _comingBackFrom;
+
+  /// Scroll views found around a list that reported. An [Expando], so a page
+  /// that goes away takes its entry with it.
+  final Expando<bool> _hasListInside = Expando<bool>();
+
+  /// Any vertical list in the page counts, because the one that turned is
+  /// the one moving.
+  bool _onDrag(ScrollNotification notification) {
+    if (notification.metrics.axis != Axis.vertical) return false;
+    if (notification is ScrollEndNotification) {
+      _comingBack.stop();
+      _goingAway.stop();
+      return false;
+    }
+    if (notification is! ScrollUpdateNotification) return false;
+    final double delta = notification.scrollDelta ?? 0;
+    final UserScrollNotification? from = _comingBackFrom;
+    if (from != null && _comingBack.scrolled(delta)) {
+      if (!_navVisible) _liftWithBar = _nearEnd(from);
+      _showNav(true);
+    } else if (_goingAway.scrolled(delta)) {
+      _showNav(false);
+    }
+    return false;
+  }
+
+  void _bringBarBack() => _showNav(true);
 
   void _report([int? index]) {
     final String tab = shellTabs[index ?? ref.read(selectedTabProvider)];
@@ -370,25 +499,35 @@ class _RootShellState extends ConsumerState<RootShell> with RouteAware {
       child: Scaffold(
         // The day pills, Home's date pager and the settings sliders are deeper
         // in the tree, so they take a sideways drag before this pager sees it.
-        body: NavBarScroll(
-          report: _onScroll,
-          show: () => _showNav(true),
-          child: PageView(
-            controller: _pages,
-            onPageChanged: _onPageChanged,
-            children: <Widget>[
-              for (final Widget screen in _screens)
-                // Listened per page rather than around the pager, which would
-                // otherwise count as a level and hide every screen's own scroll
-                // from [RootShell.navVisibleFor].
-                KeptAlive(
-                  child: NotificationListener<UserScrollNotification>(
-                    onNotification: _onScroll,
-                    child: screen,
-                  ),
-                ),
-            ],
-          ),
+        // Measured here, above the screens, to lift a list as the bar comes
+        // back; see [_liftAsBarReturns].
+        body: LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints constraints) {
+            _liftAsBarReturns(constraints.maxHeight);
+            return NavBarScroll(
+              report: _onScroll,
+              show: _bringBarBack,
+              child: PageView(
+                controller: _pages,
+                onPageChanged: _onPageChanged,
+                children: <Widget>[
+                  for (final Widget screen in _screens)
+                    // Listened per page rather than around the pager, which
+                    // would otherwise count as a level and hide every screen's
+                    // own scroll from [RootShell.navVisibleFor].
+                    KeptAlive(
+                      child: NotificationListener<ScrollNotification>(
+                        onNotification: _onDrag,
+                        child: NotificationListener<UserScrollNotification>(
+                          onNotification: _onScroll,
+                          child: screen,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
         ),
         // A shadow rather than a rule: the tab row is the one piece of chrome
         // that has to stay above the sheet, and a hairline read as one more
@@ -402,6 +541,7 @@ class _RootShellState extends ConsumerState<RootShell> with RouteAware {
             curve: Curves.easeOutCubic,
             alignment: Alignment.topCenter,
             heightFactor: _navVisible ? 1 : 0,
+            onEnd: () => _liftWithBar = null,
             child: DecoratedBox(
               decoration: BoxDecoration(
                 color: context.palette.navSurface,

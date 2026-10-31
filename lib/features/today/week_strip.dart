@@ -128,25 +128,34 @@ class _WeekStripState extends State<WeekStrip> {
           });
         }
 
+        // A fixed extent, gap included, so a day's place is always worked out
+        // from its index. A lazily measured list kept the old pills' offsets
+        // after a width change, and [_offsetFor] then landed weeks away.
         return SizedBox(
           height: 50 * capped,
-          child: ListView.separated(
+          child: ListView.builder(
             controller: _controller,
             scrollDirection: Axis.horizontal,
-            padding: EdgeInsets.symmetric(horizontal: widget.horizontalPadding),
+            padding: EdgeInsets.only(
+              left: widget.horizontalPadding,
+              right: widget.horizontalPadding - _gap,
+            ),
+            itemExtent: width + _gap,
             itemCount: total,
-            separatorBuilder: (_, __) => const SizedBox(width: _gap),
             itemBuilder: (BuildContext context, int index) {
               final DateTime date = Dates.addDays(_first, index);
-              return MediaQuery.withClampedTextScaling(
-                maxScaleFactor: 1.35,
-                child: _DayPill(
-                  date: date,
-                  selected: Dates.isSameDay(date, widget.selected),
-                  isToday: Dates.isSameDay(date, today),
-                  marker: widget.markers[Dates.keyOf(date)],
-                  width: width,
-                  onTap: () => widget.onSelected(date),
+              return Padding(
+                padding: const EdgeInsets.only(right: _gap),
+                child: MediaQuery.withClampedTextScaling(
+                  maxScaleFactor: 1.35,
+                  child: _DayPill(
+                    date: date,
+                    selected: Dates.isSameDay(date, widget.selected),
+                    isToday: Dates.isSameDay(date, today),
+                    marker: widget.markers[Dates.keyOf(date)],
+                    width: width,
+                    onTap: () => widget.onSelected(date),
+                  ),
                 ),
               );
             },

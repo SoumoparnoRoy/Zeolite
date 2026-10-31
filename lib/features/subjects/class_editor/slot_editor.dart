@@ -308,7 +308,7 @@ class _SlotFormState extends ConsumerState<_SlotForm> {
   Future<void> _pickDate({required bool isStart}) async {
     final DateTime initial =
         isStart ? _startDate : (_endDate ?? Dates.addDays(_startDate, 120));
-    final DateTime? picked = await showDatePicker(
+    final DateTime? picked = await showAppDatePicker(
       context: context,
       initialDate: initial,
       firstDate: DateTime(DateTime.now().year - 2),

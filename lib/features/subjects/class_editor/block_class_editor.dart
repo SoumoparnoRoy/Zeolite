@@ -301,7 +301,7 @@ class _BlockClassFormState extends ConsumerState<_BlockClassForm> {
             value: Dates.formatFull(_startDate),
             icon: Icons.play_arrow_rounded,
             onTap: () async {
-              final DateTime? picked = await showDatePicker(
+              final DateTime? picked = await showAppDatePicker(
                 context: context,
                 initialDate: _startDate,
                 firstDate: DateTime(DateTime.now().year - 2),

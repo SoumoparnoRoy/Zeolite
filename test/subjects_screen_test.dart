@@ -286,6 +286,24 @@ void main() {
     expect(find.text('Physics'), findsOneWidget);
   });
 
+  testWidgets('a subject menu button says when its menu is open',
+      (WidgetTester tester) async {
+    final SemanticsHandle semantics = tester.ensureSemantics();
+    await tester.pumpWidget(_app(_fixture()));
+    await tester.pumpAndSettle();
+    final Finder button = find.byTooltip('Show menu').last;
+    expect(tester.getSemantics(button), isSemantics(isExpanded: false));
+
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+    expect(tester.getSemantics(button), isSemantics(isExpanded: true));
+
+    await tester.tapAt(Offset.zero);
+    await tester.pumpAndSettle();
+    expect(tester.getSemantics(button), isSemantics(isExpanded: false));
+    semantics.dispose();
+  });
+
   testWidgets('a carried balance counts among what a delete loses',
       (WidgetTester tester) async {
     final TimetableData data = _fixture();

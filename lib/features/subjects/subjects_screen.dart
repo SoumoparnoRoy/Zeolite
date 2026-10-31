@@ -174,6 +174,7 @@ class _SubjectRowState extends ConsumerState<_SubjectRow> {
   // until the delete lands, so the second tap of a double tap on *Delete*
   // would otherwise open the editor for a subject that is going away.
   bool _deleting = false;
+  bool _menuOpen = false;
 
   Subject get subject => widget.subject;
 
@@ -273,45 +274,21 @@ class _SubjectRowState extends ConsumerState<_SubjectRow> {
                       : p.textFaint,
                 ),
               ),
-              PopupMenuButton<_SubjectAction>(
-                icon: Icon(
-                  Icons.more_vert_rounded,
-                  size: 18,
-                  color: p.textFaint,
+              // A Builder so the menu opens over the button's own box.
+              Builder(
+                builder: (BuildContext button) => IconButton(
+                  icon: Semantics(
+                    expanded: _menuOpen,
+                    child: Icon(
+                      Icons.more_vert_rounded,
+                      size: 18,
+                      color: p.textFaint,
+                    ),
+                  ),
+                  padding: const EdgeInsets.all(8),
+                  tooltip: MaterialLocalizations.of(button).showMenuTooltip,
+                  onPressed: () => _openMenu(button, timetable),
                 ),
-                color: p.surface,
-                onSelected: (_SubjectAction action) async {
-                  switch (action) {
-                    case _SubjectAction.edit:
-                      await showSubjectEditor(context, subject: subject);
-                    case _SubjectAction.colour:
-                      await showSubjectColorPicker(context, ref, subject);
-                    case _SubjectAction.delete:
-                      await _confirmDelete(timetable);
-                  }
-                },
-                itemBuilder: (BuildContext context) =>
-                    <PopupMenuEntry<_SubjectAction>>[
-                  const PopupMenuItem<_SubjectAction>(
-                    value: _SubjectAction.edit,
-                    child: _MenuRow(icon: Icons.edit_outlined, label: 'Edit'),
-                  ),
-                  const PopupMenuItem<_SubjectAction>(
-                    value: _SubjectAction.colour,
-                    child: _MenuRow(
-                      icon: Icons.palette_outlined,
-                      label: 'Change colour',
-                    ),
-                  ),
-                  PopupMenuItem<_SubjectAction>(
-                    value: _SubjectAction.delete,
-                    child: _MenuRow(
-                      icon: Icons.delete_outline_rounded,
-                      label: 'Delete',
-                      color: p.absent,
-                    ),
-                  ),
-                ],
               ),
             ],
           ),
@@ -322,6 +299,47 @@ class _SubjectRowState extends ConsumerState<_SubjectRow> {
         ],
       ),
     );
+  }
+
+  Future<void> _openMenu(BuildContext button, TimetableData? data) async {
+    final AppPalette p = context.palette;
+    setState(() => _menuOpen = true);
+    final _SubjectAction? action = await showAppMenu<_SubjectAction>(
+      context: button,
+      color: p.surface,
+      items: <PopupMenuEntry<_SubjectAction>>[
+        const PopupMenuItem<_SubjectAction>(
+          value: _SubjectAction.edit,
+          child: _MenuRow(icon: Icons.edit_outlined, label: 'Edit'),
+        ),
+        const PopupMenuItem<_SubjectAction>(
+          value: _SubjectAction.colour,
+          child: _MenuRow(
+            icon: Icons.palette_outlined,
+            label: 'Change colour',
+          ),
+        ),
+        PopupMenuItem<_SubjectAction>(
+          value: _SubjectAction.delete,
+          child: _MenuRow(
+            icon: Icons.delete_outline_rounded,
+            label: 'Delete',
+            color: p.absent,
+          ),
+        ),
+      ],
+    );
+    if (!mounted) return;
+    setState(() => _menuOpen = false);
+    if (action == null) return;
+    switch (action) {
+      case _SubjectAction.edit:
+        await showSubjectEditor(context, subject: subject);
+      case _SubjectAction.colour:
+        await showSubjectColorPicker(context, ref, subject);
+      case _SubjectAction.delete:
+        await _confirmDelete(data);
+    }
   }
 
   /// Weekly rules plus one-off classes booked against this subject.

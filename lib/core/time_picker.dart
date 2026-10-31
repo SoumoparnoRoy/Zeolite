@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/common.dart';
 import 'app_theme.dart';
 
 /// [showTimePicker], but honouring the app's own 12/24-hour preference, and
@@ -24,25 +25,31 @@ Future<TimeOfDay?> showAppTimePicker(
   required bool use24Hour,
   String? helpText,
 }) {
-  return showTimePicker(
-    context: context,
-    initialTime: initialTime,
-    helpText: helpText,
-    initialEntryMode: TimePickerEntryMode.input,
-    builder: (BuildContext context, Widget? child) {
-      final MediaQueryData mq = MediaQuery.of(context);
-      final TextScaler scaler = mq.textScaler;
-      return MediaQuery(
-        data: mq.copyWith(
-          alwaysUse24HourFormat: use24Hour,
-          // The dialog sizes its own fields and dial at fixed dimensions, so
-          // the tablet ramp grows text inside geometry that does not move. The
-          // ramp is for our 320dp artboard, which this dialog is not part of —
-          // but the viewer's own scaling still has to apply.
-          textScaler: scaler is ScaledText ? scaler.inner : scaler,
-        ),
-        child: child!,
-      );
-    },
+  return withClosingCover<TimeOfDay>(
+    context,
+    (TransitionBuilder wrap) => showTimePicker(
+      context: context,
+      initialTime: initialTime,
+      helpText: helpText,
+      initialEntryMode: TimePickerEntryMode.input,
+      builder: (BuildContext context, Widget? child) {
+        final MediaQueryData mq = MediaQuery.of(context);
+        final TextScaler scaler = mq.textScaler;
+        return wrap(
+          context,
+          MediaQuery(
+            data: mq.copyWith(
+              alwaysUse24HourFormat: use24Hour,
+              // The dialog sizes its own fields and dial at fixed dimensions,
+              // so the tablet ramp grows text inside geometry that does not
+              // move. The ramp is for our 320dp artboard, which this dialog is
+              // not part of — but the viewer's own scaling still has to apply.
+              textScaler: scaler is ScaledText ? scaler.inner : scaler,
+            ),
+            child: child!,
+          ),
+        );
+      },
+    ),
   );
 }

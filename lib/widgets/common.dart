@@ -938,6 +938,113 @@ void _coverWhileClosing(OverlayState overlay, ModalRoute<Object?> route) {
   route.completed.whenComplete(remove);
 }
 
+/// Covers the screen while the route [open] pushes closes, like
+/// [showAppDialog], for the pickers that take a `builder`. [open] passes
+/// `wrap` on as that builder (or calls it from its own), which is where the
+/// route is found.
+Future<T?> withClosingCover<T>(
+  BuildContext context,
+  Future<T?> Function(TransitionBuilder wrap) open,
+) async {
+  final OverlayState? overlay =
+      Navigator.of(context, rootNavigator: true).overlay;
+  ModalRoute<Object?>? route;
+  final T? result = await open((BuildContext context, Widget? child) {
+    route ??= ModalRoute.of(context);
+    return child!;
+  });
+  if (overlay != null && route != null) _coverWhileClosing(overlay, route!);
+  return result;
+}
+
+/// [showDatePicker] behind the same cover as [showAppDialog].
+Future<DateTime?> showAppDatePicker({
+  required BuildContext context,
+  required DateTime initialDate,
+  required DateTime firstDate,
+  required DateTime lastDate,
+}) {
+  return withClosingCover<DateTime>(
+    context,
+    (TransitionBuilder wrap) => showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: firstDate,
+      lastDate: lastDate,
+      builder: wrap,
+    ),
+  );
+}
+
+/// [showMenu], covered while it closes. Without a [position] it opens over
+/// [context]'s own box, which is where a [PopupMenuButton] puts its menu, and
+/// is measured again on every layout so it follows the box through a rotation.
+Future<T?> showAppMenu<T>({
+  required BuildContext context,
+  required List<PopupMenuEntry<T>> items,
+  RelativeRect? position,
+  Color? color,
+}) async {
+  final OverlayState? overlay =
+      Navigator.of(context, rootNavigator: true).overlay;
+  RelativeRect? last;
+  RelativeRect over(BuildContext _, BoxConstraints constraints) {
+    final RenderObject? anchor =
+        context.mounted ? context.findRenderObject() : null;
+    if (anchor is! RenderBox || !anchor.attached) {
+      return last ?? RelativeRect.fill;
+    }
+    final RenderBox box =
+        Navigator.of(context).overlay!.context.findRenderObject()! as RenderBox;
+    return last = RelativeRect.fromRect(
+      Rect.fromPoints(
+        anchor.localToGlobal(Offset.zero, ancestor: box),
+        anchor.localToGlobal(anchor.size.bottomRight(Offset.zero),
+            ancestor: box),
+      ),
+      Offset.zero & box.size,
+    );
+  }
+
+  ModalRoute<Object?>? menu;
+  final T? result = await showMenu<T>(
+    context: context,
+    position: position,
+    positionBuilder: position == null ? over : null,
+    color: color,
+    // showMenu has no builder, so an empty entry is what finds the route.
+    items: <PopupMenuEntry<T>>[
+      ...items,
+      _RouteProbe<T>((ModalRoute<Object?>? route) => menu ??= route),
+    ],
+  );
+  if (overlay != null && menu != null) _coverWhileClosing(overlay, menu!);
+  return result;
+}
+
+class _RouteProbe<T> extends PopupMenuEntry<T> {
+  const _RouteProbe(this.found);
+
+  final void Function(ModalRoute<Object?>? route) found;
+
+  @override
+  double get height => 0;
+
+  @override
+  bool represents(T? value) => false;
+
+  @override
+  State<_RouteProbe<T>> createState() => _RouteProbeState<T>();
+}
+
+class _RouteProbeState<T> extends State<_RouteProbe<T>> {
+  @override
+  Widget build(BuildContext context) {
+    widget.found(ModalRoute.of(context));
+    return const SizedBox.shrink();
+  }
+}
+
 /// Standard bottom-sheet wrapper: drag handle, title, scrollable body. Covered
 /// while it closes, like [showAppDialog].
 ///

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:zeolite/core/app_theme.dart';
+import 'package:zeolite/core/time_picker.dart';
 import 'package:zeolite/widgets/common.dart';
 
 /// A page that is one big button, so whatever a dialog or sheet button sits
@@ -121,6 +122,101 @@ void main() {
 
     await tester.tap(find.text('Count'));
     expect(second, 1);
+  });
+
+  testWidgets('a double tap on a menu item stops at the menu',
+      (WidgetTester tester) async {
+    int behind = 0;
+    final BuildContext context = await _page(tester, () => behind++);
+    unawaited(showAppMenu<int>(
+      context: context,
+      items: const <PopupMenuEntry<int>>[
+        PopupMenuItem<int>(value: 1, child: Text('Pick')),
+      ],
+    ));
+    await tester.pumpAndSettle();
+
+    await _doubleTap(tester, find.text('Pick'));
+    expect(find.text('Pick'), findsNothing);
+    expect(behind, 0);
+
+    await tester.tap(find.text('behind'));
+    expect(behind, 1);
+  });
+
+  testWidgets('a menu stays over its button when the screen changes size',
+      (WidgetTester tester) async {
+    addTearDown(tester.view.reset);
+    late BuildContext anchor;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Align(
+            alignment: const Alignment(-0.5, 0),
+            child: Builder(
+              builder: (BuildContext context) {
+                anchor = context;
+                return const SizedBox(width: 48, height: 48);
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+    unawaited(showAppMenu<int>(
+      context: anchor,
+      items: const <PopupMenuEntry<int>>[
+        PopupMenuItem<int>(value: 1, child: Text('Pick')),
+      ],
+    ));
+    await tester.pumpAndSettle();
+    double gap() =>
+        tester.getTopLeft(find.text('Pick')).dx -
+        tester.getTopLeft(find.byType(SizedBox).first).dx;
+    final double before = gap();
+
+    tester.view.physicalSize = tester.view.physicalSize * 1.5;
+    await tester.pumpAndSettle();
+    expect(gap(), moreOrLessEquals(before));
+  });
+
+  testWidgets('a double tap on a date picker\'s OK stops at the picker',
+      (WidgetTester tester) async {
+    int behind = 0;
+    final BuildContext context = await _page(tester, () => behind++);
+    unawaited(showAppDatePicker(
+      context: context,
+      initialDate: DateTime(2026, 10, 31),
+      firstDate: DateTime(2026),
+      lastDate: DateTime(2027),
+    ));
+    await tester.pumpAndSettle();
+
+    await _doubleTap(tester, find.text('OK'));
+    expect(find.text('OK'), findsNothing);
+    expect(behind, 0);
+
+    await tester.tap(find.text('behind'));
+    expect(behind, 1);
+  });
+
+  testWidgets('a double tap on a time picker\'s OK stops at the picker',
+      (WidgetTester tester) async {
+    int behind = 0;
+    final BuildContext context = await _page(tester, () => behind++);
+    unawaited(showAppTimePicker(
+      context,
+      initialTime: const TimeOfDay(hour: 9, minute: 0),
+      use24Hour: false,
+    ));
+    await tester.pumpAndSettle();
+
+    await _doubleTap(tester, find.text('OK'));
+    expect(find.text('OK'), findsNothing);
+    expect(behind, 0);
+
+    await tester.tap(find.text('behind'));
+    expect(behind, 1);
   });
 
   // No drag handle, as on the one-off and weekly sheets: the handle's own

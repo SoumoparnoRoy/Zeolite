@@ -78,7 +78,7 @@ class TermSection extends ConsumerWidget {
     final DateTime initial = isStart
         ? (settings.termStart ?? Dates.today())
         : (settings.termEnd ?? Dates.addDays(Dates.today(), 120));
-    final DateTime? picked = await showDatePicker(
+    final DateTime? picked = await showAppDatePicker(
       context: context,
       initialDate: initial,
       firstDate: DateTime(DateTime.now().year - 2),

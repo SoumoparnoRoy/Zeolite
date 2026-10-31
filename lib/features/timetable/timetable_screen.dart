@@ -269,7 +269,7 @@ class _SessionRow extends ConsumerWidget {
         row.localToGlobal(Offset.zero, ancestor: overlay) & row.size;
     final AttendanceStatus? current = session.status;
 
-    final _MarkChoice? choice = await showMenu<_MarkChoice>(
+    final _MarkChoice? choice = await showAppMenu<_MarkChoice>(
       context: context,
       position: RelativeRect.fromRect(
         Rect.fromLTRB(at.right, at.top, at.right, at.bottom),

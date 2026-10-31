@@ -134,7 +134,7 @@ class _ExtraClassFormState extends ConsumerState<_ExtraClassForm> {
   }
 
   Future<void> _pickDate() async {
-    final DateTime? picked = await showDatePicker(
+    final DateTime? picked = await showAppDatePicker(
       context: context,
       initialDate: _date,
       firstDate: DateTime(DateTime.now().year - 2),

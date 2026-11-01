@@ -32,9 +32,9 @@ before you skip a lecture.
 
 Your timetable and attendance live on the device, in SQLite, and everything
 works with no signal. Signing in and connecting Notion are both optional and off
-until you turn them on. Usage is counted on every install (screens visited and
-features used, never anything you entered); [`site/privacy.html`](site/privacy.html)
-is the full text.
+until you turn them on. Usage statistics and crash reports are sent only after
+a yes on first start, and never for anyone under 18;
+[`site/privacy.html`](site/privacy.html) is the full text.
 
 ## Features
 

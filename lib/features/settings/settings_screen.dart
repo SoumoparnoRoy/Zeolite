@@ -69,7 +69,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   'Zeolite · ${ref.watch(appVersionProvider).value ?? ''}\n'
                   'Your timetable and attendance stay on this device unless '
                   'you sign in, connect Notion, or check a sheet with AI. '
-                  'Zeolite counts how the app is used either way.',
+                  'Usage statistics and crash reports are sent only if you '
+                  'said yes to them.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: AppType.bodySmall,
@@ -118,6 +119,7 @@ class _Results extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final List<SettingsTopic> found = searchSettings(query);
+    final bool onDeviceOnly = ref.watch(onDeviceOnlyProvider);
     if (found.isEmpty) {
       return SurfaceCard(
         child: SettingsHint('Nothing in Settings matches "${query.trim()}".'),
@@ -126,21 +128,33 @@ class _Results extends ConsumerWidget {
     return GroupedRows(
       children: <Widget>[
         for (final SettingsTopic topic in found)
-          SettingsRow(
-            icon: topic.item?.icon ?? Icons.percent_rounded,
-            title: topic.title,
-            // Where it lives, so the next visit can go straight there.
-            value: switch (topic.item) {
-              null => 'Top of Settings',
-              final SettingsItem item when item.title == topic.title =>
-                item.group.label,
-              final SettingsItem item => item.title,
-            },
-            onTap: () {
-              dropFocus();
-              topic.item == null ? onTarget() : topic.item!.open(context, ref);
-            },
-          ),
+          if (onDeviceOnly &&
+              (topic.item == SettingsItem.account ||
+                  topic.item == SettingsItem.notion))
+            SettingsRow(
+              icon: topic.item!.icon,
+              title: topic.title,
+              value: availableFrom18,
+              enabled: false,
+            )
+          else
+            SettingsRow(
+              icon: topic.item?.icon ?? Icons.percent_rounded,
+              title: topic.title,
+              // Where it lives, so the next visit can go straight there.
+              value: switch (topic.item) {
+                null => 'Top of Settings',
+                final SettingsItem item when item.title == topic.title =>
+                  item.group.label,
+                final SettingsItem item => item.title,
+              },
+              onTap: () {
+                dropFocus();
+                topic.item == null
+                    ? onTarget()
+                    : topic.item!.open(context, ref);
+              },
+            ),
       ],
     );
   }

@@ -2,15 +2,20 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/auth_service.dart';
+import 'app_providers.dart';
 
 final authServiceProvider = Provider<AuthService>((ref) => AuthService());
 
 /// Loading before it is null, because Firebase restores a session
 /// asynchronously and reading that gap as signed out flashes the wrong screen
 /// on every launch.
-final signedInUserProvider = StreamProvider<User?>(
-  (ref) => ref.watch(authServiceProvider).changes,
-);
+///
+/// Not listened to at all until the age answer is a yes: a live session
+/// refreshes its token with Google for whoever is listening.
+final signedInUserProvider = StreamProvider<User?>((ref) {
+  if (!ref.watch(servicesAllowedProvider)) return Stream<User?>.value(null);
+  return ref.watch(authServiceProvider).changes;
+});
 
 /// True while a password account has not opened its verification link. Sync
 /// stays off until it has: the rules refuse its writes, and a refused write

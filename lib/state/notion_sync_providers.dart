@@ -23,6 +23,7 @@ import 'notion_providers.dart';
 /// Both halves are required: a connection says the app may write, and a
 /// mapping says where. Without either there is nothing to file a mark under.
 final notionSyncTargetProvider = Provider<SyncTarget?>((ref) {
+  if (!ref.watch(servicesAllowedProvider)) return null;
   if (ref.watch(notionConnectionProvider).value == null) return null;
   final NotionMapping? mapping = ref.watch(notionMappingProvider).value;
   if (mapping == null || !mapping.isComplete) return null;

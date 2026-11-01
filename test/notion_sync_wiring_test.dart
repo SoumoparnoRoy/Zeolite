@@ -11,6 +11,7 @@ import 'package:zeolite/services/notion/notion_auth_client.dart';
 import 'package:zeolite/services/notion/notion_connection_store.dart';
 import 'package:zeolite/state/notion_providers.dart';
 import 'package:zeolite/state/notion_sync_providers.dart';
+import 'package:zeolite/state/providers.dart';
 
 NotionProperty _p(String id, String name, String type) =>
     NotionProperty(id: id, name: name, type: type);
@@ -28,8 +29,11 @@ NotionMapping _complete() => NotionMapping(
       },
     );
 
+/// An adult's install: under 18, or before the answer, there is no target at
+/// all, which `privacy_choices_test.dart` covers.
 ProviderContainer _container() => ProviderContainer(
       overrides: [
+        servicesAllowedProvider.overrideWithValue(true),
         notionConnectionStoreProvider.overrideWithValue(
           NotionConnectionStore(storage: const FlutterSecureStorage()),
         ),

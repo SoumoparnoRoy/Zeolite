@@ -10,7 +10,9 @@ import 'package:home_widget/home_widget.dart';
 
 import 'core/app_theme.dart';
 import 'data/settings/app_settings.dart';
+import 'features/launch/first_run_choices_screen.dart';
 import 'features/launch/launch_screen.dart';
+import 'features/launch/update_required_screen.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'features/settings/settings_screen.dart';
 import 'features/stats/stats_screen.dart';
@@ -20,6 +22,7 @@ import 'features/timetable/week_widget_image.dart';
 import 'features/today/today_screen.dart';
 import 'state/home_widget_providers.dart';
 import 'state/notion_sync_providers.dart';
+import 'state/privacy_providers.dart';
 import 'state/providers.dart';
 import 'state/sync_providers.dart';
 import 'widgets/common.dart';
@@ -39,11 +42,14 @@ class ZeoliteApp extends ConsumerWidget {
     final AccentColour accent = settings?.accentColour ?? AccentColour.violet;
 
     // Watched for their lifetime rather than their value; see the providers.
+    // App Check first, so a sync started at launch carries its token.
+    ref.watch(appCheckProvider);
     ref.watch(syncSchedulerProvider);
     ref.watch(notionSchedulerProvider);
     ref.watch(homeWidgetSyncProvider);
     ref.watch(weekWidgetImageProvider);
     ref.watch(homeWidgetMarkWatcherProvider);
+    ref.watch(collectionChoicesProvider);
 
     final FirebaseAnalyticsObserver? observer =
         ref.watch(analyticsObserverProvider);
@@ -79,8 +85,8 @@ class ZeoliteApp extends ConsumerWidget {
   }
 }
 
-/// Plays the launch sequence, then decides between the first-run setup flow
-/// and the main shell.
+/// Asks the first-run questions if they are still open, plays the launch
+/// sequence, then decides between the first-run setup flow and the main shell.
 class _Bootstrap extends ConsumerStatefulWidget {
   const _Bootstrap();
 
@@ -107,11 +113,19 @@ class _BootstrapState extends ConsumerState<_Bootstrap> {
         body: LoadFailed(onRetry: () => ref.invalidate(settingsProvider)),
       ),
       data: (AppSettings value) {
+        if (value.needsPrivacyChoices) {
+          return FirstRunChoicesScreen(settings: value);
+        }
         if (!_launched) {
           return LaunchScreen(
             settings: value,
             onFinished: () => setState(() => _launched = true),
           );
+        }
+        // Checked behind the app rather than before it, so a slow or absent
+        // answer costs nothing; a late one replaces whatever is showing.
+        if (ref.watch(buildTooOldProvider).value == true) {
+          return const UpdateRequiredScreen();
         }
         return value.onboarded ? const RootShell() : const OnboardingScreen();
       },

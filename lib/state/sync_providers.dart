@@ -15,6 +15,7 @@ import 'actions/action_core.dart';
 import 'actions/data_actions.dart';
 import 'app_providers.dart';
 import 'auth_providers.dart';
+import 'privacy_providers.dart';
 
 /// The time now and then once a minute, so a "Synced 3 min ago" line goes on
 /// counting while Settings stays open instead of saying "just now" for good.
@@ -31,6 +32,7 @@ final minuteTickProvider = StreamProvider.autoDispose<DateTime>((ref) async* {
 /// when the user changes, so signing into a second account cannot go on
 /// writing to the first one's collections.
 final syncTargetProvider = Provider<SyncTarget?>((ref) {
+  if (!ref.watch(servicesAllowedProvider)) return null;
   final User? user = ref.watch(signedInUserProvider).value;
   if (user == null || ref.watch(verificationPendingProvider)) return null;
   return FirestoreSyncTarget(uid: user.uid);
@@ -165,6 +167,7 @@ class SyncController extends Notifier<SyncStatus> {
   Future<SyncRunResult?> run({bool force = false}) async {
     final SyncCoordinator? coordinator = ref.read(syncCoordinatorProvider);
     if (coordinator == null) return null;
+    await ref.read(appCheckProvider.future);
     // Asked on the Account screen. Every run waits for the answer, the button
     // included: it is the answer that sends the rows, not a retry.
     if (ref.read(accountChangedProvider)) return null;

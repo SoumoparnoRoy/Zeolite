@@ -11,4 +11,9 @@ abstract final class Endpoints {
 
   static final Uri terms = Uri.parse('https://zeolite-app.web.app/terms');
   static final Uri privacy = Uri.parse('https://zeolite-app.web.app/privacy');
+
+  /// Opened by the update screen. Android hands it to the Play Store app.
+  static final Uri playStore = Uri.parse(
+    'https://play.google.com/store/apps/details?id=com.soumoparno.zeolite',
+  );
 }

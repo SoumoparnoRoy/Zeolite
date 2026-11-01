@@ -23,6 +23,7 @@ class WelcomeCopy extends StatefulWidget {
     required this.colors,
     required this.progress,
     required this.onChoice,
+    this.onDeviceOnly = false,
   });
 
   static const String heading = 'Welcome to Zeolite';
@@ -36,6 +37,8 @@ class WelcomeCopy extends StatefulWidget {
   /// Without this, "Continue without an account" reads as a limited trial
   /// rather than as the whole app.
   static const String caption = 'Everything works offline. Sync is optional.';
+  static const String onDeviceCaption =
+      'Accounts are available from 18. Everything works offline.';
 
   static final Uri termsUrl = Endpoints.terms;
   static final Uri privacyUrl = Endpoints.privacy;
@@ -47,6 +50,10 @@ class WelcomeCopy extends StatefulWidget {
   final double progress;
 
   final ValueChanged<WelcomeChoice> onChoice;
+
+  /// Under 18: the two account buttons stay in place, disabled, so the reason
+  /// under them reads as an answer rather than as a missing feature.
+  final bool onDeviceOnly;
 
   @override
   State<WelcomeCopy> createState() => _WelcomeCopyState();
@@ -114,7 +121,9 @@ class _WelcomeCopyState extends State<WelcomeCopy> {
                       background: colors.accent,
                       foreground: colors.canvas,
                       weight: FontWeight.w700,
-                      onTap: () => widget.onChoice(WelcomeChoice.create),
+                      onTap: widget.onDeviceOnly
+                          ? null
+                          : () => widget.onChoice(WelcomeChoice.create),
                     ),
                     SizedBox(height: WelcomeMetrics.buttonGap * scale),
                     _button(
@@ -122,7 +131,9 @@ class _WelcomeCopyState extends State<WelcomeCopy> {
                       background: colors.surfaceHigh,
                       foreground: colors.text,
                       weight: FontWeight.w600,
-                      onTap: () => widget.onChoice(WelcomeChoice.signIn),
+                      onTap: widget.onDeviceOnly
+                          ? null
+                          : () => widget.onChoice(WelcomeChoice.signIn),
                     ),
                     SizedBox(height: WelcomeMetrics.buttonGap * scale),
                     _button(
@@ -135,7 +146,9 @@ class _WelcomeCopyState extends State<WelcomeCopy> {
                     ),
                     SizedBox(height: WelcomeMetrics.captionGap * scale),
                     Text(
-                      WelcomeCopy.caption,
+                      widget.onDeviceOnly
+                          ? WelcomeCopy.onDeviceCaption
+                          : WelcomeCopy.caption,
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontFamily: AppFonts.sans,
@@ -159,7 +172,7 @@ class _WelcomeCopyState extends State<WelcomeCopy> {
     required Color background,
     required Color foreground,
     required FontWeight weight,
-    required VoidCallback onTap,
+    required VoidCallback? onTap,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(
@@ -168,20 +181,32 @@ class _WelcomeCopyState extends State<WelcomeCopy> {
       child: SizedBox(
         height: metrics.buttonH,
         width: double.infinity,
-        child: Material(
-          color: background,
-          borderRadius: BorderRadius.circular(WelcomeMetrics.buttonRadius),
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(WelcomeMetrics.buttonRadius),
-            child: Center(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontFamily: AppFonts.sans,
-                  fontWeight: weight,
-                  fontSize: AppType.headingSmall * metrics.scale,
-                  color: foreground,
+        // InkWell drops the button role once it has no onTap, and a screen
+        // reader then reads a disabled one as plain text.
+        child: Semantics(
+          button: true,
+          enabled: onTap != null,
+          onTap: onTap,
+          child: Opacity(
+            opacity: onTap == null ? 0.45 : 1,
+            child: Material(
+              color: background,
+              borderRadius: BorderRadius.circular(WelcomeMetrics.buttonRadius),
+              child: InkWell(
+                onTap: onTap,
+                excludeFromSemantics: true,
+                borderRadius:
+                    BorderRadius.circular(WelcomeMetrics.buttonRadius),
+                child: Center(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontFamily: AppFonts.sans,
+                      fontWeight: weight,
+                      fontSize: AppType.headingSmall * metrics.scale,
+                      color: foreground,
+                    ),
+                  ),
                 ),
               ),
             ),

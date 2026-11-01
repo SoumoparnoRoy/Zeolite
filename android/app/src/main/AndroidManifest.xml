@@ -37,6 +37,12 @@
     <uses-permission android:name="android.permission.USE_FINGERPRINT"
         tools:node="remove" />
 
+    <!-- WorkManager declares this for its foreground service, which only runs
+         when a worker calls setForeground. None here does; the widget and
+         background-mark work runs as ordinary jobs. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"
+        tools:node="remove" />
+
     <application
         android:label="Zeolite"
         android:name="${applicationName}"
@@ -47,6 +53,14 @@
         <!-- Removing the permission alone would not stop the SDK asking. -->
         <meta-data
             android:name="google_analytics_adid_collection_enabled"
+            android:value="false" />
+        <!-- Nothing is measured or reported before the person says yes. The
+             app turns each on from its stored answer once it has one. -->
+        <meta-data
+            android:name="firebase_analytics_collection_enabled"
+            android:value="false" />
+        <meta-data
+            android:name="firebase_crashlytics_collection_enabled"
             android:value="false" />
 
         <activity

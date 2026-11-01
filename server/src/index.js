@@ -72,6 +72,9 @@ function readConfig() {
     trustProxy: wholeNumber("TRUST_PROXY", 0),
     vision: readVisionConfig(),
     dailyCalls: wholeNumber("AI_DAILY_CALLS", DAILY_CALLS),
+    // Zero blocks nothing, which is every build until a release breaks the
+    // contract with older ones.
+    minBuild: wholeNumber("MIN_BUILD", 0),
   };
 }
 
@@ -101,11 +104,30 @@ export function createApp({
   app.set("trust proxy", config.trustProxy);
   app.disable("x-powered-by");
 
+  // Every caller is the app, so none of this changes what it sees. It keeps a
+  // browser that lands on a route from sniffing a reply as HTML or framing it.
+  app.use((_request, response, next) => {
+    response.set({
+      "Strict-Transport-Security": "max-age=31536000",
+      "X-Content-Type-Options": "nosniff",
+      "X-Frame-Options": "DENY",
+      "Referrer-Policy": "no-referrer",
+    });
+    next();
+  });
+
   // Called when the connect screen opens, so a host that has spun the service
   // down is awake before anyone taps Connect. Unmetered on purpose: throttling
   // a wake-up call defeats it. It reports nothing worth reconnoitring.
   app.get("/health", (_request, response) => {
     response.status(200).type("text/plain").send("ok");
+  });
+
+  // Read by the app at start, and it lets itself in if this fails. Unmetered
+  // for the same reason as /health, and because a campus behind one address
+  // would otherwise be told to wait for a number that never changes.
+  app.get("/version", (_request, response) => {
+    response.status(200).json({ minBuild: config.minBuild });
   });
 
   // Each route parses its own body, after its rate limit, so a caller already

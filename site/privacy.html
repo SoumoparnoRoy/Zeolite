@@ -10,40 +10,72 @@
 <header>
   <a href="/">Zeolite</a>
   <h1>Privacy Policy</h1>
-  <p class="updated">Last updated 14 October 2026</p>
+  <p class="updated">Last updated 1 November 2026</p>
 </header>
 
 <p class="lead">Zeolite is an attendance tracker for students, published by
-<strong>Zeolite</strong>. This policy describes what the app does with your
-information, who else can see it, how long it is kept and how to have it
-deleted.</p>
+<strong>Soumoparno Roy</strong> ("we", "us"), who decides how the information
+described here is used and is responsible for it. This policy describes what
+the app does with your information, why, who else can see it, where it is
+processed, how long it is kept and how to have it deleted. It applies wherever
+you live, including in the European Union and the United Kingdom.</p>
 
 <p>Zeolite works without an account, and in that state nothing you enter leaves
-your device. Signing in is optional, and it is what changes the answer — so
-this policy is written in two halves, with the measurement that applies to both
-set out between them.</p>
+your device. Everything that can leave it is either a feature you turn on or
+something you agreed to when the app first asked, and each is described
+below.</p>
 
-<h2>If you do not sign in</h2>
+<h2>When the app first opens</h2>
 
-<p>Everything you create — subjects, teachers, rooms, your timetable,
-attendance marks, tags, notes and holidays — is written to a database inside
-the app's own private storage on your device. It is not uploaded, and the
-developer cannot see it.</p>
+<p>Before anything else, Zeolite asks whether you are 18 or older.</p>
 
-<p>Three things still leave the device even without an account, and none of
-them carries anything you entered: the usage measurement and the crash reports
-described below, and the ML Kit diagnostics described further down.</p>
+<ul>
+  <li><strong>If you are 18 or older</strong>, it then asks two separate
+      questions, with neither answer chosen for you: whether to
+      <em>share usage statistics</em>, and whether to <em>send crash
+      reports</em>. Until you answer yes, neither is collected; the app is set
+      up so that nothing is sent before you choose.</li>
+  <li><strong>If you are under 18</strong>, Zeolite stays on your device.
+      See <a href="#children">Children and teenagers</a>.</li>
+</ul>
 
-<p>One further thing can leave the device, and it does carry what you are
-reading: a timetable image you explicitly choose to have checked with AI. It is
-never sent unless you accept that offer for that image, and it is described in
-full under <em>Reading a timetable from an image</em>.</p>
+<p>You can change all three answers later in Settings → Privacy choices.</p>
 
-<p>One more thing can leave, but only if you ask for it. Connecting Notion does
-not require an account either, and once you connect it your attendance is
-written to your own Notion workspace. Nothing is sent there unless you connect
-it, and disconnecting stops it. That is described under
-<a href="#notion">Connecting Notion</a> below.</p>
+<h2>What each feature uses, and why</h2>
+
+<dl>
+  <dt>The app on your device</dt>
+  <dd>Everything you enter, kept on your device only. Nothing leaves it, so
+      there is nothing for us to process.</dd>
+
+  <dt>A Zeolite account and sync</dt>
+  <dd>Your email address, the name on your Google account if you sign in with
+      Google, an account ID, and the records you back up. Used because it is
+      needed to provide the feature you turned on.</dd>
+
+  <dt>Notion sync</dt>
+  <dd>Your attendance, written to your own Notion workspace. Used because it
+      is needed to provide the feature you turned on.</dd>
+
+  <dt>Check with AI</dt>
+  <dd>One timetable image and the text your device read from it, each time you
+      accept. Used because it is needed to provide the feature you asked
+      for.</dd>
+
+  <dt>Usage statistics</dt>
+  <dd>How the app is used, never what you enter. Used only with your consent,
+      and off until you agree.</dd>
+
+  <dt>Crash reports</dt>
+  <dd>The kind of error and where it happened, never what you enter. Used only
+      with your consent, and off until you agree.</dd>
+</dl>
+
+<p>"Needed to provide the feature" means the processing is necessary to do what
+you asked for. Turning the feature off, or deleting your account, stops it.
+Consent can be withdrawn at any time in Settings → Privacy choices, and
+withdrawing it stops collection straight away without affecting what was sent
+before.</p>
 
 <h2>If you sign in</h2>
 
@@ -51,29 +83,34 @@ it, and disconnecting stops it. That is described under
 phone and stays the same on a second device. It is optional, off until you
 choose it, and it never gates recording attendance.</p>
 
-<h3>What is collected</h3>
-
 <dl>
   <dt>Your email address</dt>
   <dd>To identify your account and let you sign back in. Held in Firebase
       Authentication, operated by Google.</dd>
 
+  <dt>Your name, if you sign in with Google</dt>
+  <dd>Google tells Zeolite your email address and basic profile information,
+      including the name on your Google account, so the account can be created.
+      Zeolite never sees your Google password.</dd>
+
   <dt>Your subjects, timetable, attendance marks, categories, rooms, tags,
       holidays, and the app settings that shape your term</dt>
   <dd>To back them up and keep two devices in step. Held in Cloud Firestore,
-      operated by Google, under a record keyed to your account.</dd>
+      operated by Google, under a record keyed to your account's ID.</dd>
 </dl>
 
-<p>If you sign in with Google, Google tells Zeolite your email address and
-basic profile information so the account can be created. Zeolite never sees
-your Google password.</p>
+<p>Your records are stored under your own account and the security rules
+permit only that account to read or write them. Google processes and stores
+the data as the infrastructure provider under its own terms. We can
+technically reach the stored records through the project's administrative
+console, and do so only where necessary to operate or repair the service.</p>
 
-<h3>Usage measurement, whether or not you sign in</h3>
+<h2>Usage statistics, if you agree</h2>
 
-<p>Zeolite uses Firebase Analytics, from Google, to count how the app is used
-so its developer can tell whether it works for people. This is collected on
-every install, account or not, and it is the one thing the app reports without
-being asked.</p>
+<p>If you answer yes to <em>Share usage statistics</em>, Zeolite uses Firebase
+Analytics, from Google, to count how the app is used so we can tell whether it
+works for people. If you answer no, or turn it off later, nothing is
+collected.</p>
 
 <p>What it records is how the app is used, not what you put into it: when the
 app is opened, which of its screens you visit, that a feature was used at
@@ -85,49 +122,41 @@ any image you read.</strong></p>
 
 <p>Firebase Analytics assigns each installation of the app a random identifier,
 so that repeat use from the same install can be counted rather than read as a
-new person each time. It is not your name, your email or your account, it is
-not the advertising identifier described below, and it cannot be used to
-recognise you in any other app. Uninstalling the app or clearing its data
-discards it.</p>
-
-<p>The advertising identifier is switched off. Zeolite sets
+new person each time. It is not your name, your email or your account, and it
+is not an advertising identifier. Zeolite sets
 <code>google_analytics_adid_collection_enabled</code> to false and strips the
-advertising permissions from the app, so this measurement is not tied to an
-advertising ID and cannot be used to target you.</p>
+advertising permissions from the app, so this measurement cannot be used to
+target you. Uninstalling the app or clearing its data discards the
+identifier.</p>
 
-<h3>Crash reports</h3>
+<h2>Crash reports, if you agree</h2>
 
-<p>When something goes wrong in the app, Zeolite sends a crash report through
-Firebase Crashlytics, from Google, so its developer can find and fix the
-fault. A report holds the kind of error, where in the app's code it happened,
-the app version, the device model and Android version, and a random identifier
-for the installation so that one fault on one phone is counted once.</p>
+<p>If you answer yes to <em>Send crash reports</em>, Zeolite sends a report
+through Firebase Crashlytics, from Google, when something goes wrong, so we can
+find and fix the fault. A report holds the kind of error, where in the app's
+code it happened, the app version, the device model and Android version, and a
+random identifier for the installation so that one fault on one phone is
+counted once. If you answer no, reports are not sent, and any the device kept
+from a crash are deleted.</p>
 
 <p><strong>A report never includes your timetable, your attendance, your
 subjects, your notes, or anything else you entered.</strong> For a fault in
 the app's own code, Zeolite leaves the error's message out on purpose, because
 an error's text can quote what it failed on. A crash inside Android itself
 carries Android's description of the fault, which names the app's code, not
-your data. Uninstalling the app or clearing its data discards the
-identifier.</p>
+your data.</p>
 
-<h3>What is not collected</h3>
+<h2>App integrity checks</h2>
 
-<p>There is no advertising, and no tracking of you across
-other apps or websites. Nothing is sold, and nothing is shared with anyone for
-marketing.</p>
-
-<h3>Who can access it</h3>
-
-<p>Your records are stored under your own account and the security rules
-permit only that account to read or write them. Google processes and stores
-the data as the infrastructure provider under its own terms. The developer can
-technically reach the stored records through the project's administrative
-console, and does so only where necessary to operate or repair the service.</p>
+<p>When the app talks to your account or asks for a sheet to be checked with
+AI, it includes a token from Firebase App Check, which uses Google Play
+Integrity to confirm the request comes from a genuine copy of Zeolite. Google
+receives a verdict about the device and the app's installation for that
+purpose only.</p>
 
 <h2>Reading a timetable from an image</h2>
 
-<p>If you use “Read from an image”, the picture is processed
+<p>If you use "Read from an image", the picture is processed
 <strong>on your device</strong> by Google's ML Kit text recognition, using a
 model bundled inside the app. By default the image is not uploaded, not kept
 after the read, and not shared.</p>
@@ -170,17 +199,24 @@ Zeolite account. If you turn it on:</p>
   <li>Your attendance is written to the Notion database you picked, inside your
       own workspace. What happens to it there is governed by Notion's privacy
       policy, not this one.</li>
-  <li>The sign-in exchange passes through a small service the developer runs,
-      which exists only because Notion requires a secret that cannot safely be
-      shipped inside an app. It completes the token exchange, holds the
-      exchange in memory for at most five minutes, and keeps no copy of your
-      attendance.</li>
+  <li>The sign-in exchange passes through Zeolite's small server, which exists
+      only because Notion requires a secret that cannot safely be shipped inside
+      an app. It completes the token exchange, holds the exchange in memory for
+      at most five minutes, and keeps no copy of your attendance.</li>
   <li>The connection is stored encrypted on your device and is never uploaded.
       Signing out of a Zeolite account does not disconnect Notion, because the
       two are unrelated.</li>
   <li>Disconnecting stops any further sync and leaves everything in the app
       intact.</li>
 </ul>
+
+<h2>Checking for updates</h2>
+
+<p>If you are 18 or older, the app asks Zeolite's server at start-up which is
+the oldest version it still supports, so it can tell you when an update is
+needed. The request carries nothing about you. Like any request on the
+internet, it reaches the server from your device's IP address; Zeolite's own
+logs do not record it.</p>
 
 <h2>Backups on your device</h2>
 
@@ -203,28 +239,39 @@ Zeolite account. If you turn it on:</p>
   <tr><td><code>SCHEDULE_EXACT_ALARM</code></td><td>So a reminder arrives at the minute you chose. Optional — decline it and reminders still work, less precisely.</td></tr>
   <tr><td><code>RECEIVE_BOOT_COMPLETED</code></td><td>To restore scheduled reminders after a restart.</td></tr>
   <tr><td><code>VIBRATE</code></td><td>To vibrate for a reminder.</td></tr>
-  <tr><td><code>INTERNET</code></td><td>To sync to your account or to Notion, to check a sheet with AI when you ask for it, and for the usage measurement, the crash reports and the ML Kit side effect described above.</td></tr>
+  <tr><td><code>INTERNET</code></td><td>To sync to your account or to Notion, to check a sheet with AI when you ask for it, to check for updates, for usage statistics and crash reports if you agreed to them, and for the ML Kit side effect described above.</td></tr>
   <tr><td><code>ACCESS_NETWORK_STATE</code></td><td>So syncing can tell it is offline and wait, rather than failing repeatedly.</td></tr>
 </table>
 
-<h2>Who your data reaches</h2>
+<h2>Who your data reaches, and where</h2>
 
 <dl>
   <dt>Google — Firebase Authentication and Cloud Firestore</dt>
-  <dd>Only if you sign in. Stores your email address and the records you chose
-      to back up, as the infrastructure provider.</dd>
+  <dd>Only if you sign in. Stores your email address, your name if you signed
+      in with Google, and the records you chose to back up, as the
+      infrastructure provider.</dd>
 
   <dt>Google — Firebase Analytics</dt>
-  <dd>Always. Receives the usage measurement described above, and nothing you
-      entered.</dd>
+  <dd>Only if you agreed to share usage statistics. Receives the measurement
+      described above, and nothing you entered.</dd>
 
   <dt>Google — Firebase Crashlytics</dt>
-  <dd>When something goes wrong. Receives the crash report described above,
-      and nothing you entered.</dd>
+  <dd>Only if you agreed to send crash reports, and only when something goes
+      wrong. Receives the report described above, and nothing you
+      entered.</dd>
+
+  <dt>Google — Firebase App Check and Play Integrity</dt>
+  <dd>When the app talks to your account or checks a sheet with AI. Receives
+      the integrity check described above.</dd>
 
   <dt>Google — ML Kit</dt>
   <dd>Only if you read from an image. The recognition happens on your device;
       only diagnostics about the API reach Google.</dd>
+
+  <dt>Render</dt>
+  <dd>Hosts Zeolite's small server, which handles the Notion sign-in exchange,
+      passes an image to Cloudflare when you accept an AI check, and answers
+      the update check. It keeps none of it.</dd>
 
   <dt>Cloudflare — Workers AI</dt>
   <dd>Only if you accept the offer to check a sheet with AI. Receives a copy of
@@ -236,21 +283,41 @@ Zeolite account. If you turn it on:</p>
       your own workspace.</dd>
 </dl>
 
-<p>No one else. Your data is not sold, rented, or shared for advertising.</p>
+<p>No one else. Your data is not sold, rented, or shared for advertising, and
+there is no tracking of you across other apps or websites.</p>
+
+<p>Where it is processed: the records in your account are stored in Cloud
+Firestore in Google's Mumbai, India region (<code>asia-south1</code>), and
+Zeolite's server runs on Render in Singapore. Everything else above, including
+your sign-in details in Firebase Authentication, is processed on the providers'
+own servers, which may be in the United States and other countries outside the
+one you live in, where data protection law may differ from yours. Google's processing for Firebase and Google Analytics is covered by
+its data processing terms, which we have accepted.</p>
 
 <h2>How long it is kept</h2>
 
-<p>Data on your device stays until you delete it or uninstall the app. Data in
-your account stays until you delete it. There is no separate archive: deleting
-removes the records rather than hiding them.</p>
+<ul>
+  <li><strong>Usage statistics</strong> are kept for up to two months after you
+      last use the app, then deleted by Google.</li>
+  <li><strong>Crash reports</strong> are kept by Google for 90 days.</li>
+  <li><strong>Data on your device</strong> stays until you delete it or
+      uninstall the app.</li>
+  <li><strong>Data in your account</strong> stays until you delete it or delete
+      the account. There is no separate archive: deleting removes the records
+      rather than hiding them.</li>
+  <li><strong>The Notion sign-in exchange</strong> is held for at most five
+      minutes, and an image sent for an AI check only for as long as the read
+      takes.</li>
+</ul>
 
 <h2>How to delete it</h2>
 
 <ul>
-  <li><strong>On the device</strong> — Settings → Reset everything clears all
-      subjects and history. Uninstalling removes the database with it.</li>
-  <li><strong>Your account</strong> — Settings → Backup and sync → Delete my
-      account removes the account and everything stored under it.</li>
+  <li><strong>On the device</strong> — Settings → Your data → Reset everything
+      clears all subjects and history. Uninstalling removes the database with
+      it.</li>
+  <li><strong>Your account</strong> — Settings → Account → Delete my account
+      removes the account and everything stored under it.</li>
   <li><strong>Without the app installed</strong> — see
       <a href="/delete-account">deleting your account</a>.</li>
   <li><strong>Notion</strong> — disconnecting stops further sync. Records
@@ -259,26 +326,50 @@ removes the records rather than hiding them.</p>
 
 <h2>Your rights</h2>
 
-<p>You may ask for a copy of the personal data held about you, ask for it to be
-corrected, ask for it to be deleted, or withdraw your consent to it being
-stored by deleting your account. Most of this you can do yourself in the app;
-for anything you cannot, write to the address below and it will be actioned.</p>
+<p>You may:</p>
 
-<p>If you are in India and believe your data has been mishandled, you may raise
-a grievance at the address below and, if unsatisfied, complain to the Data
-Protection Board of India.</p>
+<ul>
+  <li><strong>access</strong> the personal data held about you and get a copy
+      of it;</li>
+  <li><strong>export</strong> your records, which you can do yourself with
+      Settings → Your data → Export backup;</li>
+  <li>have it <strong>corrected</strong>, which for your records you can do in
+      the app;</li>
+  <li>have it <strong>deleted</strong>, as described above;</li>
+  <li><strong>withdraw your consent</strong> to usage statistics or crash
+      reports at any time, in Settings → Privacy choices;</li>
+  <li><strong>complain to your local data protection authority</strong> if you
+      believe your data has been mishandled. In India that is the Data
+      Protection Board of India; in the European Union, the supervisory
+      authority where you live; in the United Kingdom, the Information
+      Commissioner's Office.</li>
+</ul>
 
-<h2>Children</h2>
+<p>For anything you cannot do in the app, write to the address below and we
+will reply within 30 days. If you are in India, you may raise a grievance at the
+same address.</p>
 
-<p>Zeolite is a general-purpose study tool. It is not directed at children under
-13 and does not knowingly collect information from them.</p>
+<h2 id="children">Children and teenagers</h2>
+
+<p>Zeolite is not meant for children under 13.</p>
+
+<p>If you are 13 to 17, Zeolite works in on-device mode, and we collect no
+personal data from you. Signing in to an account, connecting Notion and the
+AI check are not available, the app does not check for updates with its
+server, and no usage statistics or crash reports are sent, whatever was chosen
+before. Everything you enter stays on your device. The one thing that still
+leaves it is the ML Kit diagnostic report described above, if you read a
+timetable from an image; it carries nothing you entered.</p>
+
+<p>If you believe a child under 13 is using Zeolite with an account, write to
+the address below and the account will be deleted.</p>
 
 <h2>Security</h2>
 
-<p>Traffic between the app and your account is encrypted in transit. Stored
-records are held in Google's infrastructure and are restricted by rules that
-permit only your own account to read or write them. No system is perfect, and
-this policy does not promise one.</p>
+<p>Traffic between the app and the services above is encrypted in transit.
+Stored records are held in Google's infrastructure and are restricted by rules
+that permit only your own account to read or write them. No system is perfect,
+and this policy does not promise one.</p>
 
 <h2>Changes</h2>
 
@@ -287,7 +378,7 @@ version is published at this address.</p>
 
 <h2>Contact</h2>
 
-<p>Questions, requests and grievances:
+<p>Questions, requests and grievances: Soumoparno Roy,
 <a href="mailto:zeolite.help@gmail.com">zeolite.help@gmail.com</a></p>
 
 <footer>

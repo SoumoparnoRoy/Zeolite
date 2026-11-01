@@ -2,8 +2,28 @@ appId: com.soumoparno.zeolite
 ---
 - launchApp
 - extendedWaitUntil:
-    visible: ".*Tab 1 of 4|Got it"
+    visible: ".*Tab 1 of 4|Got it|Are you 18 or older\\?"
     timeout: 30000
+# Asked once per install. The flows sign in, so the answer is yes, and nothing
+# is measured during a run.
+- runFlow:
+    when:
+      visible: "Are you 18 or older\\?"
+    commands:
+      - tapOn:
+          id: "age_yes"
+      # The two choices' No, top then bottom: the segments carry no id.
+      - tapOn:
+          text: "No"
+          index: 0
+      - tapOn:
+          text: "No"
+          index: 1
+      - tapOn:
+          id: "choices_continue"
+      - extendedWaitUntil:
+          visible: ".*Tab 1 of 4|Got it"
+          timeout: 30000
 - tapOn:
     text: "Got it"
     optional: true

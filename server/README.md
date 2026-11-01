@@ -131,6 +131,7 @@ HTML page.
 | Method | Path | Auth | Limit | Purpose | Status codes |
 | --- | --- | --- | --- | --- | --- |
 | `GET` | `/health` | none | none | Wake-up and health check, returns `ok` | `200` |
+| `GET` | `/version` | none | none | Returns `{minBuild}`, the oldest app build the service still supports | `200` |
 | `GET` | `/notion/start?challenge=` | none | 10/min | Starts a handshake for a 43-character base64url PKCE challenge and redirects to Notion | `302`, `400` bad challenge, `429`, `503` session store full |
 | `GET` | `/notion/callback` | `state` plus the `zeolite_notion` cookie from `/start` | 30/min | Exchanges Notion's code and shows the ready page with the pairing code | `200`, `400` cancelled, expired or another browser, `429`, `502` Notion failed |
 | `POST` | `/notion/claim` | PKCE verifier | 20/min | Body `{session, verifier}` or `{code, verifier}`; returns Notion's token payload once | `200`, `400`, `413`, `429` |
@@ -202,6 +203,7 @@ without the three required ones.
 | `FIREBASE_PROJECT_NUMBER` | for image reading | | The Firebase project App Check tokens are checked against |
 | `CLOUDFLARE_MODEL` | no | `@cf/meta/llama-3.2-11b-vision-instruct` | Workers AI model |
 | `AI_DAILY_CALLS` | no | `180` | Cap on Workers AI calls per UTC day |
+| `MIN_BUILD` | no | `0` | Oldest app build number allowed to run. The app shows an update screen below it. `0` blocks nothing. |
 | `NODE_ENV` | no | | Set `production` where it's deployed. Express reads it; the service's own code doesn't. |
 
 Image reading is on only when all three of `CLOUDFLARE_ACCOUNT_ID`,
@@ -211,7 +213,7 @@ Leave out only some and it's off too, and the start-up log names the missing
 ones. The project number is required alongside the token so that a deployment
 which forgot App Check stays off rather than open to anyone with the URL.
 
-`TRUST_PROXY` and `AI_DAILY_CALLS` must be whole numbers of 0 or more. A typo
+`TRUST_PROXY`, `AI_DAILY_CALLS` and `MIN_BUILD` must be whole numbers of 0 or more. A typo
 stops the service at start-up with the variable's name, and a blank value
 counts as unset.
 
@@ -332,6 +334,10 @@ On a deploy, Render sends `SIGTERM` and waits 30 seconds. The service stops
 taking connections and gives a read already with the model up to 30 s to
 finish. A handshake waiting to be claimed is lost, and the person connects
 again.
+
+To roll back, open the service's Deploys in Render, pick the last good deploy
+and choose *Rollback*. Revert the bad commit on `main` too, or the next commit
+that touches `server/**` deploys it again.
 
 ## Errors and status codes
 

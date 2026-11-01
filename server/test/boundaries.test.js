@@ -136,6 +136,15 @@ test("unknown paths and wrong methods get the same plain 404", async () => {
   }
 });
 
+test("every reply carries the browser hardening headers", async () => {
+  for (const response of [await fetch(`${baseUrl}/health`), await fetch(`${baseUrl}/`)]) {
+    assert.equal(response.headers.get("strict-transport-security"), "max-age=31536000");
+    assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+    assert.equal(response.headers.get("x-frame-options"), "DENY");
+    assert.equal(response.headers.get("referrer-policy"), "no-referrer");
+  }
+});
+
 test("image reading refuses a missing, empty or forged attestation, and spends nothing", async () => {
   const { privateKey } = await generateKeyPair("RS256");
   const forged = await new SignJWT({})
@@ -273,4 +282,23 @@ test("a body that is not an object, or not JSON at all, is refused plainly", asy
     body: "refresh_token=generic",
   });
   await assertPlainRefusal(wrongType, 400);
+});
+
+test("the minimum build is 0 until it is set, and a typo stops start-up", async () => {
+  const unset = await fetch(`${baseUrl}/version`);
+  assert.equal(unset.status, 200);
+  assert.deepEqual(await unset.json(), { minBuild: 0 });
+
+  process.env.MIN_BUILD = "7";
+  try {
+    const setUrl = await listen(createApp({ fetchImpl: fetchStub }));
+    assert.deepEqual(await (await fetch(`${setUrl}/version`)).json(), { minBuild: 7 });
+
+    process.env.MIN_BUILD = "seven";
+    assert.throws(() => createApp(), /MIN_BUILD/);
+    process.env.MIN_BUILD = "-1";
+    assert.throws(() => createApp(), /MIN_BUILD/);
+  } finally {
+    delete process.env.MIN_BUILD;
+  }
 });

@@ -92,6 +92,11 @@ const List<SettingsTopic> settingsTopics = <SettingsTopic>[
   ),
   SettingsTopic('Delete my account', SettingsItem.account, 'remove'),
   SettingsTopic('Notion sync', SettingsItem.notion, 'connect workspace'),
+  SettingsTopic(
+    'Privacy choices',
+    SettingsItem.privacyChoices,
+    'age 18 usage statistics analytics crash reports consent',
+  ),
   SettingsTopic('Import from your table', SettingsItem.notion, 'notion'),
   SettingsTopic('Take the latest template', SettingsItem.notion, 'notion'),
   SettingsTopic('Rewrite every row', SettingsItem.notion, 'notion resync'),

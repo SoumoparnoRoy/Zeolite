@@ -129,30 +129,14 @@ class _ImportTimetableScreenState extends ConsumerState<ImportTimetableScreen> {
   }
 
   /// Per read, never remembered: the policy can only say the image leaves the
-  /// device when the student asked it to if it is asked every time.
+  /// device when the student asked it to if it is asked every time. Under 18
+  /// the offer still shows, with the button off, so a weak read is explained.
   Future<bool> _agreesToSend() async {
+    final bool onDeviceOnly = ref.read(onDeviceOnlyProvider);
     final bool? yes = await showAppDialog<bool>(
       context: context,
-      builder: (BuildContext context) => AlertDialog(
-        title: const Text('Check this sheet with AI?'),
-        content: const Text(
-          'Some of the period times on this sheet could not be read with '
-          'confidence. Zeolite can send a copy of the image to its server, '
-          'which asks an AI to read it and then deletes it.\n\n'
-          'Nothing else about you is sent, and the times stay the ones '
-          'printed on the sheet.',
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('No thanks'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Check with AI'),
-          ),
-        ],
-      ),
+      builder: (BuildContext context) =>
+          AiCheckOffer(onDeviceOnly: onDeviceOnly),
     );
     return yes ?? false;
   }
@@ -473,6 +457,39 @@ class _ImportTimetableScreenState extends ConsumerState<ImportTimetableScreen> {
 /// It names the wait rather than just spinning: a minute of an unexplained
 /// spinner on a screen that was already saying "Reading..." reads as a hang,
 /// and the one thing the student can usefully know is that it is worth waiting.
+/// Pops true only when the student accepts.
+class AiCheckOffer extends StatelessWidget {
+  const AiCheckOffer({super.key, required this.onDeviceOnly});
+
+  final bool onDeviceOnly;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Check this sheet with AI?'),
+      content: Text(
+        'Some of the period times on this sheet could not be read with '
+        'confidence. Zeolite can send a copy of the image to its server, '
+        'which asks an AI to read it and then deletes it.\n\n'
+        'Nothing else about you is sent, and the times stay the ones '
+        'printed on the sheet.'
+        '${onDeviceOnly ? '\n\n$availableFrom18.' : ''}',
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('No thanks'),
+        ),
+        FilledButton(
+          onPressed:
+              onDeviceOnly ? null : () => Navigator.of(context).pop(true),
+          child: const Text('Check with AI'),
+        ),
+      ],
+    );
+  }
+}
+
 class _CheckingDialog extends StatelessWidget {
   const _CheckingDialog();
 

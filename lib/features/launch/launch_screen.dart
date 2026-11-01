@@ -213,6 +213,7 @@ class _LaunchScreenState extends ConsumerState<LaunchScreen>
                         colors: colors,
                         progress: progress,
                         onChoice: _choose,
+                        onDeviceOnly: widget.settings.onDeviceOnly,
                       ),
                     ],
                   ],

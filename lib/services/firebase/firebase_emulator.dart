@@ -8,9 +8,13 @@ import 'package:flutter/foundation.dart';
 const String _emulatorHost =
     String.fromEnvironment('ZEOLITE_FIREBASE_EMULATOR');
 
-/// Before any Auth or Firestore call. Analytics has no emulator, so it stops.
+/// Analytics has no emulator, so a build pointed at one never measures,
+/// whatever the stored choice says.
+const bool firebaseEmulatorInUse = !kReleaseMode && _emulatorHost != '';
+
+/// Before any Auth or Firestore call.
 Future<void> useFirebaseEmulatorIfAsked() async {
-  if (kReleaseMode || _emulatorHost.isEmpty) return;
+  if (!firebaseEmulatorInUse) return;
   await FirebaseAuth.instance.useAuthEmulator(_emulatorHost, 9099);
   FirebaseFirestore.instance.useFirestoreEmulator(_emulatorHost, 8085);
   await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(false);

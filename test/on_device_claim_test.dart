@@ -72,6 +72,21 @@ void main() {
     );
   });
 
+  test('nothing is measured or reported before the person answers', () {
+    final String xml = manifest.readAsStringSync();
+    for (final String flag in <String>[
+      'firebase_analytics_collection_enabled',
+      'firebase_crashlytics_collection_enabled',
+    ]) {
+      expect(
+        RegExp('android:name="$flag"\\s*\\n\\s*android:value="false"')
+            .hasMatch(xml),
+        isTrue,
+        reason: flag,
+      );
+    }
+  });
+
   test('the promise in Settings names both ways data leaves', () {
     final String source = settings.readAsStringSync();
 
@@ -83,7 +98,10 @@ void main() {
     // sync landed, naming only those two was false for everybody once
     // Analytics did — it reports on every install, account or not — and
     // leaving the sheet out was false for anyone who accepts an AI check.
-    expect(source, contains('counts how the app '));
+    // Measurement now waits for a yes, so the line says that instead.
+    expect(
+        source, contains('Usage statistics and crash reports are sent only '));
+    expect(source, isNot(contains('counts how the app ')));
     expect(source,
         isNot(contains('stays on this device unless you connect Notion')));
     expect(source, isNot(contains('Your data stays on this device unless')));
@@ -97,10 +115,12 @@ void main() {
     // Every entry here is a way out of the device that the privacy policy has
     // to describe, so adding one is a decision rather than an oversight to be
     // fixed by widening the list. `timetable/` is the image a student
-    // explicitly sends to be read when the device could not read it.
+    // explicitly sends to be read when the device could not read it, and
+    // `server/` the minimum-build question, which carries nothing at all.
     const List<String> allowed = <String>[
       'lib/services/firebase/',
       'lib/services/notion/',
+      'lib/services/server/',
       'lib/services/sync/',
       'lib/services/timetable/',
     ];

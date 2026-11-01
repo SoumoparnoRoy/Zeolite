@@ -91,6 +91,9 @@ class AppSettings {
     this.launchAnimation = LaunchAnimation.full,
     this.onboarded = false,
     this.welcomeShown = false,
+    this.adult,
+    this.shareUsage,
+    this.sendCrashReports,
   });
 
   final DateTime? termStart;
@@ -237,6 +240,27 @@ class AppSettings {
   /// they had already made.
   final bool welcomeShown;
 
+  /// The answer to "Are you 18 or older?", null until it is given. No keeps
+  /// the app on the device: nothing is measured, synced or sent to the server.
+  /// Device-local and out of the export, like the two choices below: a backup
+  /// restored onto someone else's phone must not answer for them.
+  final bool? adult;
+
+  /// The two collection choices, null until answered so that neither starts
+  /// out decided. Only an adult is asked.
+  final bool? shareUsage;
+  final bool? sendCrashReports;
+
+  bool get onDeviceOnly => adult == false;
+
+  /// Whether the first-run questions still have something to ask.
+  bool get needsPrivacyChoices =>
+      adult == null ||
+      (adult == true && (shareUsage == null || sendCrashReports == null));
+
+  bool get usageAllowed => adult == true && shareUsage == true;
+  bool get crashReportsAllowed => adult == true && sendCrashReports == true;
+
   bool get hasBackupFolder => backupFolderUri != null;
 
   double get targetRatio => targetPercent / 100.0;
@@ -345,6 +369,9 @@ class AppSettings {
     LaunchAnimation? launchAnimation,
     bool? onboarded,
     bool? welcomeShown,
+    bool? adult,
+    bool? shareUsage,
+    bool? sendCrashReports,
   }) {
     return AppSettings(
       termStart: termStart ?? this.termStart,
@@ -397,6 +424,9 @@ class AppSettings {
       launchAnimation: launchAnimation ?? this.launchAnimation,
       onboarded: onboarded ?? this.onboarded,
       welcomeShown: welcomeShown ?? this.welcomeShown,
+      adult: adult ?? this.adult,
+      shareUsage: shareUsage ?? this.shareUsage,
+      sendCrashReports: sendCrashReports ?? this.sendCrashReports,
     );
   }
 
@@ -483,6 +513,9 @@ class AppSettings {
         accountAutoSync: current.accountAutoSync,
         backupFolderUri: current.backupFolderUri,
         backupFolderName: current.backupFolderName,
+        adult: current.adult,
+        shareUsage: current.shareUsage,
+        sendCrashReports: current.sendCrashReports,
       );
 }
 
@@ -526,6 +559,9 @@ class SettingsService {
   static const String _kOnboarded = 'ut.onboarded';
   static const String _kLaunchAnimation = 'ut.launchAnimation';
   static const String _kWelcomeShown = 'ut.welcomeShown';
+  static const String _kAdult = 'ut.adult';
+  static const String _kShareUsage = 'ut.shareUsage';
+  static const String _kSendCrashReports = 'ut.sendCrashReports';
 
   /// The modern, cache-free preferences API. `SharedPreferences.getInstance()`
   /// is a legacy surface that the plugin has flagged for deprecation.
@@ -593,6 +629,10 @@ class SettingsService {
       // first run, so updating into this version must not put the sign-in
       // choice in front of someone who has been using the app for months.
       welcomeShown: await prefs.getBool(_kWelcomeShown) ?? onboarded,
+      // No fallback for an existing install: nobody has answered these yet.
+      adult: await prefs.getBool(_kAdult),
+      shareUsage: await prefs.getBool(_kShareUsage),
+      sendCrashReports: await prefs.getBool(_kSendCrashReports),
     );
   }
 
@@ -699,5 +739,18 @@ class SettingsService {
     await prefs.setString(_kLaunchAnimation, settings.launchAnimation.name);
     await prefs.setBool(_kOnboarded, settings.onboarded);
     await prefs.setBool(_kWelcomeShown, settings.welcomeShown);
+    await _setOrRemove(_kAdult, settings.adult);
+    await _setOrRemove(_kShareUsage, settings.shareUsage);
+    await _setOrRemove(_kSendCrashReports, settings.sendCrashReports);
+  }
+
+  /// Removed rather than stored as false: an unanswered question has to read
+  /// back as unanswered.
+  Future<void> _setOrRemove(String key, bool? value) async {
+    if (value == null) {
+      await _prefs.remove(key);
+    } else {
+      await _prefs.setBool(key, value);
+    }
   }
 }

@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
@@ -12,6 +11,7 @@ import 'app.dart';
 import 'core/app_theme.dart';
 import 'core/orientation_policy.dart';
 import 'core/report_error.dart';
+import 'services/collection_switches.dart';
 import 'services/firebase/firebase_emulator.dart';
 import 'services/notification_service.dart';
 import 'state/home_widget_providers.dart';
@@ -28,18 +28,9 @@ Future<void> main() async {
   // everything except sync works with no Firebase at all.
   try {
     await Firebase.initializeApp();
-    // Play Integrity only vouches for a build Play would recognise, so the
-    // debug and profile builds sideloaded for testing use a registered debug
-    // token instead.
-    await FirebaseAppCheck.instance.activate(
-      providerAndroid: kReleaseMode
-          ? const AndroidPlayIntegrityProvider()
-          : const AndroidDebugProvider(),
-    );
-    // Debug and profile builds keep their failures to the log: a crash on the
-    // development tablet is not a user's.
-    await FirebaseCrashlytics.instance
-        .setCrashlyticsCollectionEnabled(kReleaseMode);
+    // App Check waits for an adult's answer; see appCheckProvider.
+    // Collection itself waits for the person's answer; see
+    // collectionChoicesProvider.
     if (kReleaseMode) errorSink = _toCrashlytics;
     await useFirebaseEmulatorIfAsked();
   } catch (error, stack) {
@@ -76,6 +67,7 @@ Future<void> main() async {
 /// The type and the stack, never the message: an exception's text can quote
 /// what it failed on, and that may be something the user typed.
 void _toCrashlytics(Object error, StackTrace? stack, String where) {
+  if (!FirebaseCollectionSwitches.crashesOn) return;
   unawaited(
     FirebaseCrashlytics.instance.recordError(
       error.runtimeType.toString(),

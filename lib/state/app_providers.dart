@@ -38,6 +38,7 @@ import '../services/backup_service.dart';
 import '../services/class_log_mapping_store.dart';
 import '../services/launcher_icon_service.dart';
 import '../services/notification_service.dart';
+import '../services/server/min_build_check.dart';
 import '../services/timetable/vision_client.dart';
 
 // Singletons
@@ -83,6 +84,32 @@ final classLogMappingStoreProvider =
 final appVersionProvider = FutureProvider<String>(
   (ref) async => (await PackageInfo.fromPlatform()).version,
 );
+
+/// The build number, which is what the server's minimum is compared with.
+final appBuildProvider = FutureProvider<int>(
+  (ref) async => int.parse((await PackageInfo.fromPlatform()).buildNumber),
+);
+
+final minBuildCheckProvider = Provider<MinBuildCheck>((ref) {
+  final MinBuildCheck check = MinBuildCheck();
+  ref.onDispose(check.close);
+  return check;
+});
+
+/// Asked once the first-run answers are in, and never for an under-18, who
+/// sends nothing to the server. False until there is an answer, so the app is
+/// usable while it waits and stays usable if none comes.
+final buildTooOldProvider = FutureProvider<bool>((ref) async {
+  final bool? ask = ref.watch(settingsProvider.select(
+    (AsyncValue<AppSettings> s) => switch (s.value) {
+      final AppSettings v => !v.needsPrivacyChoices && !v.onDeviceOnly,
+      null => null,
+    },
+  ));
+  if (ask != true) return false;
+  final int build = await ref.watch(appBuildProvider.future);
+  return ref.read(minBuildCheckProvider).isTooOld(build);
+});
 
 /// Whether the chosen backup folder can still be written to. Asked when
 /// Settings draws rather than remembered, since the grant can go while the app
@@ -241,6 +268,28 @@ class SettingsController extends AsyncNotifier<AppSettings> {
 final settingsProvider = AsyncNotifierProvider<SettingsController, AppSettings>(
   SettingsController.new,
 );
+
+/// Under 18: nothing leaves the device. The one field, so a settings write
+/// that leaves it alone does not tear down what watches it. Off while settings
+/// load, since the first-run questions stand in front of everything until the
+/// answer is known.
+final onDeviceOnlyProvider = Provider<bool>(
+  (ref) => ref.watch(settingsProvider.select(
+    (AsyncValue<AppSettings> s) => s.value?.onDeviceOnly ?? false,
+  )),
+);
+
+/// Whether anything may reach Firebase or the server at all: only once the
+/// answer is a yes. A missing answer counts as no, since the first-run
+/// questions are showing and the providers behind them are already alive.
+final servicesAllowedProvider = Provider<bool>(
+  (ref) => ref.watch(settingsProvider.select(
+    (AsyncValue<AppSettings> s) => s.value?.adult == true,
+  )),
+);
+
+/// What a feature an under-18 cannot use says in place of its usual line.
+const String availableFrom18 = 'Available from 18';
 
 // Timetable
 

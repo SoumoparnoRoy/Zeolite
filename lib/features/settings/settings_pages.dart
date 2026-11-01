@@ -23,6 +23,7 @@ import 'appearance_section.dart';
 import 'data_section.dart';
 import 'licences_screen.dart';
 import 'notifications_section.dart';
+import 'privacy_section.dart';
 import 'settings_rows.dart';
 import 'subjects_section.dart';
 import 'sync_section.dart';
@@ -70,6 +71,11 @@ enum SettingsItem {
   notifications(
     'Notifications',
     Icons.notifications_outlined,
+    SettingsGroup.app,
+  ),
+  privacyChoices(
+    'Privacy choices',
+    Icons.shield_outlined,
     SettingsGroup.app,
   ),
   account('Account', Icons.cloud_outlined, SettingsGroup.sync),
@@ -149,6 +155,7 @@ enum SettingsItem {
           ]),
         notifications =>
           _SettingsPage(this, const <Widget>[NotificationsSection()]),
+        privacyChoices => _SettingsPage(this, const <Widget>[PrivacySection()]),
         notion => _SettingsPage(this, const <Widget>[NotionSection()]),
         yourData => _SettingsPage(this, const <Widget>[DataSection()]),
         // The fonts' OFL texts are registered in `main.dart`; this is the only
@@ -200,6 +207,8 @@ class SettingsItemRow extends ConsumerWidget {
     final AppSettings settings =
         ref.watch(settingsProvider).value ?? const AppSettings();
     final TimetableData? timetable = ref.watch(timetableProvider).value;
+    final bool unavailable = settings.onDeviceOnly &&
+        (item == SettingsItem.account || item == SettingsItem.notion);
 
     final String value = switch (item) {
       SettingsItem.subjects => _subjectsLine(timetable),
@@ -223,6 +232,8 @@ class SettingsItemRow extends ConsumerWidget {
           settings,
           ref.watch(trayAccessProvider).value ?? TrayAccess.open,
         ),
+      SettingsItem.privacyChoices => _privacyLine(settings),
+      _ when unavailable => availableFrom18,
       SettingsItem.account => ref.watch(signedInUserProvider).value?.email ??
           'Not signed in — nothing is synced',
       SettingsItem.notion =>
@@ -242,7 +253,8 @@ class SettingsItemRow extends ConsumerWidget {
       value: value,
       // The one state on the menu that is stopping something from working.
       danger: item == SettingsItem.notifications && value == _blocked,
-      onTap: () => item.open(context, ref),
+      onTap: unavailable ? null : () => item.open(context, ref),
+      enabled: !unavailable,
       trailing: item.isLink
           ? Icon(
               Icons.open_in_new_rounded,
@@ -254,6 +266,15 @@ class SettingsItemRow extends ConsumerWidget {
   }
 
   static const String _blocked = 'Blocked in Android settings';
+
+  static String _privacyLine(AppSettings settings) => switch (settings) {
+        AppSettings(onDeviceOnly: true) => 'Under 18 · nothing collected',
+        AppSettings(usageAllowed: true, crashReportsAllowed: true) =>
+          'Usage statistics and crash reports on',
+        AppSettings(usageAllowed: true) => 'Usage statistics on',
+        AppSettings(crashReportsAllowed: true) => 'Crash reports on',
+        _ => 'Nothing collected',
+      };
 
   static String _notificationsLine(AppSettings settings, TrayAccess tray) {
     if (!settings.notificationsEnabled) return 'Off';

@@ -24,14 +24,30 @@ List<DeviceOrientation> orientationsFor(double shortestSideDp) =>
 /// tablet's window under 600dp, and locking it back to portrait mid-use would
 /// be worse than the stretched layout. A display's short side does not change
 /// on rotation either, so the answer cannot flip back and forth.
+///
+/// Nothing else in the app may set orientations. A rotation requested while a
+/// route is opening can leave the transition stuck on a phone, so screens,
+/// sheets and dialogs never ask for one (test/orientation_policy_test.dart).
 class OrientationPolicy with WidgetsBindingObserver {
   bool? _wide;
+
+  /// Called once from main, before runApp, so the lock is asked for before
+  /// Flutter draws anything.
+  static Future<OrientationPolicy> start() async {
+    final OrientationPolicy policy = OrientationPolicy();
+    await policy.apply();
+    WidgetsBinding.instance.addObserver(policy);
+    return policy;
+  }
 
   Future<void> apply() async {
     final FlutterView? view =
         WidgetsBinding.instance.platformDispatcher.implicitView;
     if (view == null) return;
     final Display display = view.display;
+    // An empty size would read as a 0dp phone and lock a tablet. Leave
+    // Android's default until the real size arrives with the next metrics.
+    if (display.size.isEmpty) return;
     final double shortest =
         (display.size / display.devicePixelRatio).shortestSide;
     final bool wide = shortest >= AppScale.phoneWidth;

@@ -46,9 +46,7 @@ Future<void> main() async {
           : AppPalette.dark,
     ),
   );
-  final OrientationPolicy orientation = OrientationPolicy();
-  await orientation.apply();
-  WidgetsBinding.instance.addObserver(orientation);
+  await OrientationPolicy.start();
 
   // Notification setup is best-effort — a failure here must never block
   // launch, so the service swallows and logs its own errors.

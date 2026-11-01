@@ -10,7 +10,7 @@
 <header>
   <a href="/">Zeolite</a>
   <h1>Privacy Policy</h1>
-  <p class="updated">Last updated 1 November 2026</p>
+  <p class="updated">Last updated 2 November 2026</p>
 </header>
 
 <p class="lead">Zeolite is an attendance tracker for students, published by
@@ -184,8 +184,10 @@ made it, and the rest of the import works normally.</p>
 <p>One side effect is worth stating plainly. ML Kit ships a component that
 reports usage and performance metrics about the ML Kit APIs to Google, and it
 provides no setting to switch this off. It carries diagnostic information about
-the app and the device — not your timetable, your attendance, or the images you
-read.</p>
+the app and the device, such as the device model, Android version, the app's
+version and how long a read took, and a random identifier for the installation,
+which Google says is not meant to identify you or your device. It never
+includes your timetable, your attendance, or the images you read.</p>
 
 <h2 id="notion">Connecting Notion</h2>
 
@@ -266,7 +268,8 @@ logs do not record it.</p>
 
   <dt>Google — ML Kit</dt>
   <dd>Only if you read from an image. The recognition happens on your device;
-      only diagnostics about the API reach Google.</dd>
+      only diagnostics about the API, with a random installation identifier,
+      reach Google.</dd>
 
   <dt>Render</dt>
   <dd>Hosts Zeolite's small server, which handles the Notion sign-in exchange,
@@ -359,7 +362,8 @@ AI check are not available, the app does not check for updates with its
 server, and no usage statistics or crash reports are sent, whatever was chosen
 before. Everything you enter stays on your device. The one thing that still
 leaves it is the ML Kit diagnostic report described above, if you read a
-timetable from an image; it carries nothing you entered.</p>
+timetable from an image; it carries nothing you entered, and the identifier
+sent with it is not meant to identify you.</p>
 
 <p>If you believe a child under 13 is using Zeolite with an account, write to
 the address below and the account will be deleted.</p>

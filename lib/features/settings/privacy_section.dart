@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/endpoints.dart';
 import '../../data/settings/app_settings.dart';
 import '../../state/auth_providers.dart';
 import '../../state/privacy_providers.dart';
@@ -15,12 +17,20 @@ import 'settings_rows.dart';
 class PrivacySection extends ConsumerWidget {
   const PrivacySection({super.key});
 
+  static const String playUnder18 =
+      "Your Google Play account says you're under 18";
+  static const String playUnverified =
+      'Google Play needs you to confirm your age in the Play Store';
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final AppSettings settings =
         ref.watch(settingsProvider).value ?? const AppSettings();
     final PrivacyChoices choices = ref.read(privacyChoicesProvider);
     final bool adult = settings.adult == true;
+    final bool locked = settings.ageLockedByPlay;
+    final bool unverified =
+        locked && settings.ageFrom == AgeFrom.playUnverified;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -30,14 +40,30 @@ class PrivacySection extends ConsumerWidget {
             SettingsSwitchRow(
               icon: Icons.cake_outlined,
               title: '18 or older',
-              subtitle: adult
-                  ? 'Accounts, Notion and the AI check are available'
-                  : 'Everything stays on this device',
+              subtitle: switch ((adult, locked, unverified)) {
+                (true, _, _) =>
+                  'Accounts, Notion and the AI check are available',
+                (_, _, true) => playUnverified,
+                (_, true, _) => playUnder18,
+                _ => 'Everything stays on this device',
+              },
               value: adult,
-              onChanged: (bool value) => value
-                  ? choices.setAdult(true, fromSettings: true)
-                  : _confirmUnder18(context, ref),
+              onChanged: locked
+                  ? null
+                  : (bool value) => value
+                      ? choices.setAdult(true, fromSettings: true)
+                      : _confirmUnder18(context, ref),
             ),
+            if (unverified)
+              SettingsRow(
+                icon: Icons.shop_outlined,
+                title: 'Open Play Store',
+                value: 'Confirm your age there, then open Zeolite again',
+                onTap: () => launchUrl(
+                  Endpoints.playStore,
+                  mode: LaunchMode.externalApplication,
+                ),
+              ),
             // Hidden rather than shown off: under 18 there is no choice to
             // make, since nothing is collected either way.
             if (adult) ...<Widget>[

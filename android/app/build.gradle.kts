@@ -92,6 +92,9 @@ configurations.matching { it.name.startsWith("_internal-unified-test-platform") 
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    // Play's age range, read through AgeSignalsBridge. No Flutter plugin
+    // exists; the testing fake ships in the same artifact.
+    implementation("com.google.android.play:age-signals:0.0.4")
 
     testImplementation("junit:junit:4.13.2")
     // Android's org.json is a stub on the JVM; the real one lets the prune be

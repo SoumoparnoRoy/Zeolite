@@ -48,6 +48,27 @@ enum LaunchAnimation {
       };
 }
 
+/// Where the age answer came from. Persisted by `name`, as above.
+enum AgeFrom {
+  /// Answered here, on the first-run screen or in Settings.
+  user,
+
+  /// Google Play shared an age range.
+  play,
+
+  /// Google Play needs the age confirmed in the Play Store first. Only in
+  /// regions whose law requires it, so the app cannot treat the person as an
+  /// adult until that is done.
+  playUnverified;
+
+  static AgeFrom? fromName(String? name) {
+    for (final AgeFrom value in AgeFrom.values) {
+      if (value.name == name) return value;
+    }
+    return null;
+  }
+}
+
 /// User preferences: term bounds, attendance target and notification
 /// choices. Small scalar values, so they live in SharedPreferences rather than
 /// the database.
@@ -92,6 +113,7 @@ class AppSettings {
     this.onboarded = false,
     this.welcomeShown = false,
     this.adult,
+    this.ageFrom,
     this.shareUsage,
     this.sendCrashReports,
   });
@@ -246,12 +268,22 @@ class AppSettings {
   /// restored onto someone else's phone must not answer for them.
   final bool? adult;
 
+  /// Where [adult] came from; null on installs that answered before Play was
+  /// asked, which were all answered by the user. Only this is kept of Play's
+  /// reply, never the range itself.
+  final AgeFrom? ageFrom;
+
   /// The two collection choices, null until answered so that neither starts
   /// out decided. Only an adult is asked.
   final bool? shareUsage;
   final bool? sendCrashReports;
 
   bool get onDeviceOnly => adult == false;
+
+  /// Under 18 because Google Play says so; the Settings switch can't undo it.
+  bool get ageLockedByPlay =>
+      adult == false &&
+      (ageFrom == AgeFrom.play || ageFrom == AgeFrom.playUnverified);
 
   /// Whether the first-run questions still have something to ask.
   bool get needsPrivacyChoices =>
@@ -370,6 +402,8 @@ class AppSettings {
     bool? onboarded,
     bool? welcomeShown,
     bool? adult,
+    AgeFrom? ageFrom,
+    bool clearAnswers = false,
     bool? shareUsage,
     bool? sendCrashReports,
   }) {
@@ -424,9 +458,13 @@ class AppSettings {
       launchAnimation: launchAnimation ?? this.launchAnimation,
       onboarded: onboarded ?? this.onboarded,
       welcomeShown: welcomeShown ?? this.welcomeShown,
-      adult: adult ?? this.adult,
-      shareUsage: shareUsage ?? this.shareUsage,
-      sendCrashReports: sendCrashReports ?? this.sendCrashReports,
+      // All three unanswered again, so both first-run screens ask once more
+      // rather than a consent given before a Play lock carrying over.
+      adult: clearAnswers ? null : adult ?? this.adult,
+      ageFrom: clearAnswers ? null : ageFrom ?? this.ageFrom,
+      shareUsage: clearAnswers ? null : shareUsage ?? this.shareUsage,
+      sendCrashReports:
+          clearAnswers ? null : sendCrashReports ?? this.sendCrashReports,
     );
   }
 
@@ -514,6 +552,7 @@ class AppSettings {
         backupFolderUri: current.backupFolderUri,
         backupFolderName: current.backupFolderName,
         adult: current.adult,
+        ageFrom: current.ageFrom,
         shareUsage: current.shareUsage,
         sendCrashReports: current.sendCrashReports,
       );
@@ -560,6 +599,7 @@ class SettingsService {
   static const String _kLaunchAnimation = 'ut.launchAnimation';
   static const String _kWelcomeShown = 'ut.welcomeShown';
   static const String _kAdult = 'ut.adult';
+  static const String _kAgeFrom = 'ut.ageFrom';
   static const String _kShareUsage = 'ut.shareUsage';
   static const String _kSendCrashReports = 'ut.sendCrashReports';
 
@@ -631,6 +671,7 @@ class SettingsService {
       welcomeShown: await prefs.getBool(_kWelcomeShown) ?? onboarded,
       // No fallback for an existing install: nobody has answered these yet.
       adult: await prefs.getBool(_kAdult),
+      ageFrom: AgeFrom.fromName(await prefs.getString(_kAgeFrom)),
       shareUsage: await prefs.getBool(_kShareUsage),
       sendCrashReports: await prefs.getBool(_kSendCrashReports),
     );
@@ -740,6 +781,11 @@ class SettingsService {
     await prefs.setBool(_kOnboarded, settings.onboarded);
     await prefs.setBool(_kWelcomeShown, settings.welcomeShown);
     await _setOrRemove(_kAdult, settings.adult);
+    if (settings.ageFrom == null) {
+      await prefs.remove(_kAgeFrom);
+    } else {
+      await prefs.setString(_kAgeFrom, settings.ageFrom!.name);
+    }
     await _setOrRemove(_kShareUsage, settings.shareUsage);
     await _setOrRemove(_kSendCrashReports, settings.sendCrashReports);
   }

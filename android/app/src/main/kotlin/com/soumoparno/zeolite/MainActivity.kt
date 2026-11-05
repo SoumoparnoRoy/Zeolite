@@ -10,6 +10,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import com.google.android.play.agesignals.AgeSignalsManagerFactory
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -17,6 +18,12 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
 
     private var clock: MethodChannel? = null
+
+    // Made on the first call, after the first frame, so Play's client never
+    // adds to launch.
+    private val ageSignals by lazy {
+        AgeSignalsBridge(AgeSignalsManagerFactory.create(applicationContext))
+    }
 
     // The app's clock waits on a timer for the next class or midnight; a time
     // or zone set while the app is open would otherwise leave it waiting for
@@ -56,6 +63,13 @@ class MainActivity : FlutterActivity() {
                             result.error("no_settings", "No settings screen to open", null)
                         }
                     }
+                    else -> result.notImplemented()
+                }
+            }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, AGE_SIGNALS_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "check" -> ageSignals.check(this) { result.success(it) }
                     else -> result.notImplemented()
                 }
             }
@@ -145,6 +159,7 @@ class MainActivity : FlutterActivity() {
         const val CHANNEL = "zeolite/launcher_icon"
         const val SETTINGS_CHANNEL = "zeolite/notification_settings"
         const val CLOCK_CHANNEL = "zeolite/clock"
+        const val AGE_SIGNALS_CHANNEL = "zeolite/age_signals"
         const val DEFAULT = "default"
 
         val ICONS = listOf(

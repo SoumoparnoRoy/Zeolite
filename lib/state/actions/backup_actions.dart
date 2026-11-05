@@ -56,8 +56,11 @@ class BackupActions {
                 folderUri: settings.backupFolderUri,
               );
       if (written == null) return;
+      // Over the settings as they are now: the write takes long enough at
+      // launch for Play's age answer to land in the meantime.
+      final AppSettings latest = _ref.read(settingsProvider).value ?? settings;
       await _ref.read(settingsProvider.notifier).save(
-            settings.copyWith(
+            latest.copyWith(
               lastAutoBackupAt: DateTime.now(),
               lastAutoBackupFellBack: settings.hasBackupFolder &&
                   written == BackupDestination.appFolder,

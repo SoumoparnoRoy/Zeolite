@@ -50,6 +50,7 @@ class ZeoliteApp extends ConsumerWidget {
     ref.watch(weekWidgetImageProvider);
     ref.watch(homeWidgetMarkWatcherProvider);
     ref.watch(collectionChoicesProvider);
+    ref.watch(playAgeProvider);
 
     final FirebaseAnalyticsObserver? observer =
         ref.watch(analyticsObserverProvider);

@@ -60,7 +60,9 @@ class SettingsSwitchRow extends StatelessWidget {
   final String title;
   final String subtitle;
   final bool value;
-  final ValueChanged<bool> onChanged;
+
+  /// Null draws the switch disabled; the subtitle then says why.
+  final ValueChanged<bool>? onChanged;
   final VoidCallback? onTapSubtitle;
 
   /// Something outside the app is stopping this row; the tap goes there.
@@ -107,7 +109,11 @@ class SettingsSwitchRow extends StatelessWidget {
             child: InkWell(
               // The subtitle's own action wins where there is one: the
               // reminder rows open their time from it.
-              onTap: onTapSubtitle ?? () => onChanged(!value),
+              onTap: onTapSubtitle ??
+                  switch (onChanged) {
+                    final ValueChanged<bool> change => () => change(!value),
+                    null => null,
+                  },
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                 child: Column(

@@ -10,7 +10,7 @@
 <header>
   <a href="/">Zeolite</a>
   <h1>Privacy Policy</h1>
-  <p class="updated">Last updated 2 November 2026</p>
+  <p class="updated">Last updated 5 November 2026</p>
 </header>
 
 <p class="lead">Zeolite is an attendance tracker for students, published by
@@ -39,7 +39,27 @@ below.</p>
       See <a href="#children">Children and teenagers</a>.</li>
 </ul>
 
-<p>You can change all three answers later in Settings → Privacy choices.</p>
+<p>In some regions, if you installed Zeolite from Google Play, the app also
+asks Google Play for the age range on your Google Play account each time it
+opens. It uses the answer only to set under-18 mode:</p>
+
+<ul>
+  <li><strong>If Google Play says you are under 18</strong>, or that your age
+      has to be confirmed in the Play Store first, Zeolite stays on your device
+      without asking, and the age setting stays locked until Google Play says
+      otherwise.</li>
+  <li><strong>If Google Play says you are 18 or older</strong>, Zeolite skips
+      the age question and still asks the two questions above.</li>
+</ul>
+
+<p>Zeolite keeps only that result (under 18 or not, and that it came from
+Google Play), never the age range itself, and never shares it: it is not sent
+to us, to our server or to Firebase, and it is not part of usage statistics or
+crash reports. Without an answer from Google Play, the app asks you as
+above.</p>
+
+<p>You can change all three answers later in Settings → Privacy choices,
+except under-18 mode set by Google Play.</p>
 
 <h2>What each feature uses, and why</h2>
 
@@ -266,6 +286,11 @@ logs do not record it.</p>
   <dd>When the app talks to your account or checks a sheet with AI. Receives
       the integrity check described above.</dd>
 
+  <dt>Google — Google Play</dt>
+  <dd>In some regions, Zeolite asks the Play Store app on your device for an
+      age range, as described in <em>When the app first opens</em>. Zeolite
+      sends nothing about you with the request.</dd>
+
   <dt>Google — ML Kit</dt>
   <dd>Only if you read from an image. The recognition happens on your device;
       only diagnostics about the API, with a random installation identifier,
@@ -364,6 +389,9 @@ before. Everything you enter stays on your device. The one thing that still
 leaves it is the ML Kit diagnostic report described above, if you read a
 timetable from an image; it carries nothing you entered, and the identifier
 sent with it is not meant to identify you.</p>
+
+<p>Where Google Play tells the app that you are under 18, Zeolite uses
+on-device mode whatever the answer to the age question.</p>
 
 <p>If you believe a child under 13 is using Zeolite with an account, write to
 the address below and the account will be deleted.</p>

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/report_error.dart';
 import '../data/settings/app_settings.dart';
+import '../services/age_signals.dart';
 import '../services/auth_service.dart';
 import '../services/collection_switches.dart';
 import '../services/firebase/app_check_starter.dart';
@@ -59,6 +60,26 @@ final appCheckProvider = FutureProvider<void>((ref) async {
   }
 });
 
+final ageSignalsProvider = Provider<AgeSignals>((ref) => const AgeSignals());
+
+/// Asks Google Play for the age range once per start, once settings have
+/// loaded, and applies the answer. Nothing waits on it: the first-run
+/// questions and the app draw as usual, and a reply moves them on. Watched for
+/// its lifetime by the app root.
+final playAgeProvider = FutureProvider<void>((ref) async {
+  if (!ref.watch(
+      settingsProvider.select((AsyncValue<AppSettings> s) => s.hasValue))) {
+    return;
+  }
+  final PlayAge age = await ref.read(ageSignalsProvider).check();
+  try {
+    await ref.read(privacyChoicesProvider).applyPlayAge(age);
+  } catch (error, stack) {
+    // A failed settings write; the age itself is not in the error.
+    reportError(error, stack, where: 'applying the Play age');
+  }
+});
+
 final privacyChoicesProvider = Provider<PrivacyChoices>(PrivacyChoices.new);
 
 /// Every write of the age answer and the two collection choices.
@@ -79,20 +100,55 @@ class PrivacyChoices {
   /// since the switches the answer reveals already say so.
   Future<void> setAdult(bool adult, {bool fromSettings = false}) async {
     await _save((AppSettings s) {
-      final AppSettings answered = s.copyWith(adult: adult);
+      final AppSettings answered =
+          s.copyWith(adult: adult, ageFrom: AgeFrom.user);
       if (!adult || !fromSettings) return answered;
       return answered.copyWith(
         shareUsage: s.shareUsage ?? false,
         sendCrashReports: s.sendCrashReports ?? false,
       );
     });
-    // Read from Firebase itself rather than the provider, which stops
-    // listening before the answer is in: a session restored on an install
-    // updating into this version is still there underneath.
-    if (!adult && Firebase.apps.isNotEmpty) {
-      final AuthService auth = _ref.read(authServiceProvider);
-      if (auth.user != null) await auth.signOut();
+    if (!adult) await _signOut();
+  }
+
+  /// Play's answer wins over the user's in one direction only: under 18 (or
+  /// unconfirmed where the law asks for confirmation) locks the app on the
+  /// device, and only Play saying 18 or over lifts that lock, after which the
+  /// age question and both collection choices are asked again. Play saying 18
+  /// or over otherwise only answers a question nobody has answered yet, so
+  /// someone who chose on-device mode keeps it. No answer from Play changes
+  /// nothing.
+  Future<void> applyPlayAge(PlayAge age) async {
+    final AppSettings? current = _ref.read(settingsProvider).value;
+    if (current == null) return;
+    switch (age) {
+      case PlayAge.under18 || PlayAge.unverified:
+        final AgeFrom from =
+            age == PlayAge.under18 ? AgeFrom.play : AgeFrom.playUnverified;
+        if (current.adult == false && current.ageFrom == from) return;
+        await _save((AppSettings s) => s.copyWith(adult: false, ageFrom: from));
+        await _signOut();
+      case PlayAge.adult:
+        if (current.ageLockedByPlay) {
+          await _save((AppSettings s) => s.copyWith(clearAnswers: true));
+        } else if (current.adult == null) {
+          // The two collection choices stay unanswered, so the consent screen
+          // still asks them with nothing chosen.
+          await _save((AppSettings s) =>
+              s.copyWith(adult: true, ageFrom: AgeFrom.play));
+        }
+      case PlayAge.none:
+        return;
     }
+  }
+
+  /// Read from Firebase itself rather than the provider, which stops
+  /// listening before the answer is in: a session restored on an install
+  /// updating into this version is still there underneath.
+  Future<void> _signOut() async {
+    if (Firebase.apps.isEmpty) return;
+    final AuthService auth = _ref.read(authServiceProvider);
+    if (auth.user != null) await auth.signOut();
   }
 
   Future<void> setCollection({required bool usage, required bool crashes}) =>

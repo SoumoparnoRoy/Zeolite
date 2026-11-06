@@ -834,6 +834,11 @@ class TimetableOcr {
   /// A room: `B101`, `B101A`, `250`, `LT201`, `L101`.
   static final RegExp _room = RegExp(r'^[A-Z]{0,3}-?\d{2,4}[A-Z]?$');
 
+  /// A room with one digit, `LT-1`. Only after a hyphen, since `B1` is a batch,
+  /// and only for a cell naming no other room: a course's own `AB-1` is printed
+  /// the same way, above the room it would otherwise replace.
+  static final RegExp _shortRoom = RegExp(r'^[A-Z]{1,3}-\d[A-Z]?$');
+
   /// A room that names its block before its number, which is how every sheet
   /// so far prints one. A bare `8204` is the `B204` whose letter was lost.
   static final RegExp _blockThenNumber = RegExp(r'^[A-Z]');
@@ -1382,7 +1387,7 @@ class TimetableOcr {
           weekday: weekday,
           from: span.$1,
           to: span.$2,
-          room: c.room,
+          room: c.room ?? c.shortRoom,
           teacher: c.teacher,
           group: c.group,
         ));
@@ -1645,6 +1650,8 @@ class TimetableOcr {
         final String? named = _roomFrom(part);
         if (named != null) {
           c.room ??= named;
+        } else if (_shortRoom.hasMatch(part)) {
+          c.shortRoom ??= part;
         } else if (_initials.hasMatch(part)) {
           c.teacher ??= part;
         }
@@ -1910,6 +1917,7 @@ class _Candidate {
   final String subject;
   final OcrBox box;
   String? room;
+  String? shortRoom;
   String? teacher;
   final String? group;
 }

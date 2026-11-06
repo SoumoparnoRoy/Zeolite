@@ -715,6 +715,51 @@ void main() {
       expect(TimetableOcr.groupsIn(entries), isEmpty);
     });
 
+    test('a one-digit room counts after a hyphen, and a batch marker does not',
+        () {
+      final List<OcrLine> lines = (Sheet()
+            ..build()
+            ..put(0, 0, 'AAA1001', room: 'LT-1', teacher: 'AB')
+            ..put(0, 1, 'BBB2002', room: 'B1', teacher: 'CD'))
+          .lines;
+
+      final List<OcrEntry> found =
+          TimetableOcr.read(lines, TimetableGridReader.read(lines)!);
+
+      expect(found[0].room, 'LT-1');
+      expect(found[1].room, isNull);
+    });
+
+    test('a one-digit form printed above a real room does not replace it', () {
+      final Sheet sheet = Sheet();
+      final List<OcrLine> lines = <OcrLine>[
+        ..._weekOfClasses(),
+        _at('AA-9', sheet.colX(0), sheet.rowY(1) + 12, h: 10),
+      ];
+
+      final List<OcrEntry> found =
+          TimetableOcr.read(lines, TimetableGridReader.read(lines)!);
+
+      final OcrEntry tuesday = found.firstWhere(
+        (OcrEntry e) => e.weekday == 2 && e.subject == 'CCC3003',
+      );
+      expect(tuesday.room, 'R103');
+    });
+
+    test('a class named only in the one-digit form is still a class', () {
+      final List<OcrLine> lines = (Sheet()
+            ..build()
+            ..put(0, 0, 'CS-1', room: 'R101', teacher: 'AB')
+            ..put(1, 0, 'AAA1001', room: 'R102', teacher: 'CD'))
+          .lines;
+
+      final OcrEntry monday =
+          TimetableOcr.read(lines, TimetableGridReader.read(lines)!).first;
+
+      expect(monday.subject, 'CS-1');
+      expect(monday.room, 'R101');
+    });
+
     test('a line drops the trailing separators it has nothing for', () {
       const OcrEntry bare = OcrEntry(
         subject: 'ABC1234',

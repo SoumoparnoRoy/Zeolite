@@ -18,16 +18,20 @@ before you skip a lecture.
 </div>
 
 <p align="center">
-  <img src="docs/screenshots/today.png" alt="Today: the day's classes with their marks" width="24%">
-  <img src="docs/screenshots/stats.png" alt="Stats: each subject against its target" width="24%">
-  <img src="docs/screenshots/timetable.png" alt="Timetable: the week's classes by day" width="24%">
-  <img src="docs/screenshots/week.png" alt="Week grid: the timetable laid out in blocks" width="24%">
+  <img src="docs/screenshots/today.png" alt="Today in teal: the day's classes, three marked and one still showing its buttons" width="24%">
+  <img src="docs/screenshots/stats.png" alt="Stats in teal: each subject against its target" width="24%">
+  <img src="docs/screenshots/timetable.png" alt="Timetable in teal: the week's classes by day with their marks" width="24%">
+  <img src="docs/screenshots/week.png" alt="Week grid in teal: the timetable laid out in blocks with marks" width="24%">
 </p>
 
 <p align="center">
   <img src="docs/screenshots/marking.gif" alt="Marking today's three classes, one tap each" width="24%">
-  <img src="docs/screenshots/import.png" alt="Timetable import: the on-device read of a sheet flagged as doubtful, shown as classes before anything is saved" width="24%">
+  <img src="docs/screenshots/import.png" alt="Timetable import: a made-up printed sheet beside the 15 classes the app read from it, shown before anything is saved" width="48%">
   <img src="docs/screenshots/tablet.png" alt="Stats on a tablet" width="34%">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/themes.png" alt="Themes: the same Today screen in teal light, teal dark, magenta light and sky dark, each above its matching launcher icon" width="60%">
 </p>
 
 Your timetable and attendance live on the device, in SQLite, and everything
@@ -76,7 +80,7 @@ a yes on first start, and never for anyone under 18;
   week's grid, and see where every subject stands. They move to the new day at
   midnight with the app closed.
 
-  <img src="docs/screenshots/widgets.png" alt="The three home-screen widgets: Attendance, Today and This week" width="80%">
+  <img src="docs/screenshots/widgets.png" alt="The three home-screen widgets: Today with its mark buttons, Attendance with each subject's percentage, and This week's grid" width="80%">
 - Notifications before class, at the end of class with mark buttons, in the
   evening when something is unmarked, and when a subject nears its limit.
 - Optional account (email and password, or Google) that syncs the term to

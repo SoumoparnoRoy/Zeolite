@@ -7,6 +7,7 @@ import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../core/report_error.dart';
 import '../domain/timetable_ocr.dart';
 
 /// Reads text out of a timetable image, on the device.
@@ -208,14 +209,26 @@ class TextRecognition {
     }
   }
 
+  static Future<File> _inputFile() async =>
+      File(p.join((await getTemporaryDirectory()).path, 'ocr_input'));
+
+  /// A read the process died during leaves the student's photo behind.
+  static Future<void> deleteLeftoverInput() async {
+    try {
+      final File file = await _inputFile();
+      if (file.existsSync()) await file.delete();
+    } catch (error, stack) {
+      reportError(error, stack, where: 'clearing the OCR input');
+    }
+  }
+
   /// ML Kit will only read a real file, and a file from Android's document
   /// picker is a `content://` URI with no filesystem path.
   static Future<List<OcrLine>> _read(
     TextRecognizer recognizer,
     Uint8List bytes,
   ) async {
-    final Directory dir = await getTemporaryDirectory();
-    final File file = File(p.join(dir.path, 'ocr_input'));
+    final File file = await _inputFile();
     await file.writeAsBytes(bytes, flush: true);
     try {
       final RecognizedText result =
@@ -235,8 +248,8 @@ class TextRecognition {
             ),
       ];
     } finally {
-      // Best effort: a leftover temp file is harmless and the next read
-      // overwrites it anyway, so a failure here must not lose the result.
+      // Best effort: start-up clears a leftover, so a failure here must not
+      // lose the result.
       try {
         await file.delete();
       } catch (_) {}

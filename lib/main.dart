@@ -14,6 +14,7 @@ import 'core/report_error.dart';
 import 'services/collection_switches.dart';
 import 'services/firebase/firebase_emulator.dart';
 import 'services/notification_service.dart';
+import 'services/picked_file.dart';
 import 'state/home_widget_providers.dart';
 
 Future<void> main() async {
@@ -58,6 +59,7 @@ Future<void> main() async {
   // Cheap, and it has to happen before the first tap rather than before the
   // first frame.
   unawaited(registerHomeWidgetCallbacks());
+  unawaited(PickedFile.clearAtStart());
 
   runApp(const ProviderScope(child: ZeoliteApp()));
 }

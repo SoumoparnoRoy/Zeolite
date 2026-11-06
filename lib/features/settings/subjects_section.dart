@@ -1,6 +1,6 @@
 import 'dart:async';
+import 'dart:typed_data';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -14,6 +14,7 @@ import '../../domain/class_log.dart';
 import '../../domain/class_weight.dart';
 import '../../domain/notion_export.dart';
 import '../../services/class_log_mapping_store.dart';
+import '../../services/picked_file.dart';
 import '../../state/providers.dart';
 import '../../widgets/common.dart';
 import '../../widgets/undo_snack.dart';
@@ -32,13 +33,12 @@ Future<void> importClassLogFile(
   BuildContext context,
   WidgetRef ref,
 ) async {
-  final PlatformFile? picked = await FilePicker.pickFile(
+  final Uint8List? bytes = await PickedFile.read(
     dialogTitle: 'Choose a class log (CSV or Notion export)',
   );
-  if (picked == null || !context.mounted) return;
+  if (bytes == null || !context.mounted) return;
 
-  final ClassLogTable? table = ClassLogTable.of(await picked.readAsBytes());
-  if (!context.mounted) return;
+  final ClassLogTable? table = ClassLogTable.of(bytes);
   if (table == null) {
     _say(
         context,

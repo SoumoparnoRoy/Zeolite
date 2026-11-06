@@ -1,6 +1,5 @@
 import 'dart:typed_data';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/attendance_totals_ocr.dart';
@@ -10,6 +9,7 @@ import '../domain/timetable_ocr.dart';
 import '../domain/vision_merge.dart';
 import '../domain/vision_read.dart';
 import '../services/image_edges.dart';
+import '../services/picked_file.dart';
 import '../services/text_recognition.dart';
 import '../services/timetable/vision_client.dart';
 import 'app_providers.dart';
@@ -96,10 +96,7 @@ class TimetableImageReader {
   static const int _sentWidth = 1600;
 
   /// Null when the student backed out of the picker.
-  Future<Uint8List?> pickImage() async {
-    final PlatformFile? picked = await FilePicker.pickFile();
-    return picked?.readAsBytes();
-  }
+  Future<Uint8List?> pickImage() => PickedFile.read();
 
   Future<SheetRead> read(Uint8List bytes) async {
     final ImageReads reads = await TextRecognition.readImage(bytes);

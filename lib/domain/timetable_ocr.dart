@@ -24,7 +24,19 @@ class OcrBox {
 /// Lines rather than blocks: a block can swallow a whole column of a timetable,
 /// and elements split a room code into digits. A line is a cell's worth.
 class OcrLine {
-  const OcrLine(this.text, this.box);
+  const OcrLine(this.text, this.box, {this.words = const <OcrWord>[]});
+
+  final String text;
+  final OcrBox box;
+
+  /// Where each word of [text] sits. Only ever read to cut a line that ran
+  /// across a table rule, since a cell's worth of text is still read whole.
+  final List<OcrWord> words;
+}
+
+/// One word of an [OcrLine], at the box the recogniser gave it.
+class OcrWord {
+  const OcrWord(this.text, this.box);
 
   final String text;
   final OcrBox box;
@@ -1149,9 +1161,17 @@ class TimetableOcr {
     TimetableGrid? grid;
     List<OcrEntry> entries = const <OcrEntry>[];
     List<OcrLine> won = const <OcrLine>[];
-    for (final List<OcrLine> lines in reads) {
-      final TimetableGrid? candidate =
+    for (final List<OcrLine> uncut in reads) {
+      List<OcrLine> lines =
+          lattice == null ? uncut : cutAtRules(uncut, lattice);
+      TimetableGrid? candidate =
           TimetableGridReader.read(lines, lattice: lattice);
+      // No spans means the grid came from the labels because the lattice held
+      // no week, so its rules are not the table's and have no say in the text.
+      if (lattice != null && candidate?.spans == null) {
+        lines = uncut;
+        candidate = TimetableGridReader.read(lines, lattice: lattice);
+      }
       if (candidate == null) continue;
       final List<OcrEntry> found = read(lines, candidate);
       if (grid == null || found.length > entries.length) {
@@ -1162,6 +1182,90 @@ class TimetableOcr {
     }
     return (grid: grid, entries: entries, lines: won);
   }
+
+  /// Lines the recogniser ran across a drawn rule, cut back into their cells.
+  ///
+  /// Text level across a divider can come back as one line, and a line files
+  /// under the cell its centre lands in, so one class loses its room and
+  /// teacher and the next is handed them. It has to happen here rather than in
+  /// [_attach], because by then two cells' words are already mixed.
+  ///
+  /// Only where a rule is drawn: a lab across two periods leaves its divider
+  /// out, and its text is meant to run across. A single word stays whole
+  /// wherever it sits, because nothing says where to break it.
+  static List<OcrLine> cutAtRules(List<OcrLine> lines, TableLattice lattice) =>
+      <OcrLine>[
+        for (final OcrLine line in lines) ..._piecesOf(line, lattice),
+      ];
+
+  static List<OcrLine> _piecesOf(OcrLine line, TableLattice lattice) {
+    final double y = line.box.centreY;
+    final int row = <int>[
+          for (int r = 0; r < lattice.rows; r++)
+            if (y >= lattice.ys[r] && y < lattice.ys[r + 1]) r,
+        ].firstOrNull ??
+        -1;
+    if (row < 0 || line.words.isEmpty) return <OcrLine>[line];
+
+    final List<double> rules = <double>[
+      for (int c = 0; c + 1 < lattice.columns; c++)
+        if (lattice.dividedRight[row][c]) lattice.xs[c + 1].toDouble(),
+    ];
+    final Map<int, List<OcrWord>> cells = <int, List<OcrWord>>{};
+    for (final OcrWord word in line.words) {
+      for (final OcrWord part in _splitAtBar(word, rules)) {
+        final int cell =
+            rules.where((double x) => x <= part.box.centreX).length;
+        cells.putIfAbsent(cell, () => <OcrWord>[]).add(part);
+      }
+    }
+    if (cells.length < 2) return <OcrLine>[line];
+
+    return <OcrLine>[
+      for (final List<OcrWord> cell in cells.values)
+        if (_withoutBars(cell) case final List<OcrWord> kept
+            when kept.isNotEmpty)
+          OcrLine(
+            kept.map((OcrWord w) => w.text).join(' '),
+            _hullOf(
+                <OcrLine>[for (final OcrWord w in kept) OcrLine('', w.box)]),
+          ),
+    ];
+  }
+
+  /// A word holding the rule it was read across: `MV|LAB-12` is two cells'
+  /// words with the divider read as a bar. Split only when the bars and the
+  /// rules inside its box agree, which is also what says where each half ends.
+  static List<OcrWord> _splitAtBar(OcrWord word, List<double> rules) {
+    final List<String> parts = word.text.split('|');
+    final List<double> inside = <double>[
+      for (final double x in rules)
+        if (x > word.box.left && x < word.box.right) x,
+    ];
+    if (parts.length < 2 || parts.length - 1 != inside.length) {
+      return <OcrWord>[word];
+    }
+    final OcrBox b = word.box;
+    return <OcrWord>[
+      for (int i = 0; i < parts.length; i++)
+        OcrWord(
+          parts[i],
+          OcrBox(
+            i == 0 ? b.left : inside[i - 1],
+            b.top,
+            i == inside.length ? b.right : inside[i],
+            b.bottom,
+          ),
+        ),
+    ];
+  }
+
+  static List<OcrWord> _withoutBars(List<OcrWord> words) => <OcrWord>[
+        for (final OcrWord w in words)
+          if (w.text.replaceAll('|', ' ').trim() case final String text
+              when text.isNotEmpty)
+            OcrWord(text, w.box),
+      ];
 
   /// What each period column runs from and to, in reading order, with a null
   /// where a header could not be read and could not be rebuilt.

@@ -145,16 +145,21 @@ class TextRecognition {
       if (drawn == null) return null;
 
       final List<OcrLine> lines = await _read(recognizer, drawn);
+      OcrBox unscaled(OcrBox box) => OcrBox(
+            src.left + box.left / scale,
+            src.top + box.top / scale,
+            src.left + box.right / scale,
+            src.top + box.bottom / scale,
+          );
       return <OcrLine>[
         for (final OcrLine line in lines)
           OcrLine(
             line.text,
-            OcrBox(
-              src.left + line.box.left / scale,
-              src.top + line.box.top / scale,
-              src.left + line.box.right / scale,
-              src.top + line.box.bottom / scale,
-            ),
+            unscaled(line.box),
+            words: <OcrWord>[
+              for (final OcrWord word in line.words)
+                OcrWord(word.text, unscaled(word.box)),
+            ],
           ),
       ];
     } finally {
@@ -215,17 +220,18 @@ class TextRecognition {
     try {
       final RecognizedText result =
           await recognizer.processImage(InputImage.fromFilePath(file.path));
+      OcrBox boxOf(ui.Rect rect) =>
+          OcrBox(rect.left, rect.top, rect.right, rect.bottom);
       return <OcrLine>[
         for (final TextBlock block in result.blocks)
           for (final TextLine line in block.lines)
             OcrLine(
               line.text,
-              OcrBox(
-                line.boundingBox.left,
-                line.boundingBox.top,
-                line.boundingBox.right,
-                line.boundingBox.bottom,
-              ),
+              boxOf(line.boundingBox),
+              words: <OcrWord>[
+                for (final TextElement element in line.elements)
+                  OcrWord(element.text, boxOf(element.boundingBox)),
+              ],
             ),
       ];
     } finally {

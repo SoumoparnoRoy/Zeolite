@@ -163,6 +163,9 @@ class _ImportTimetableScreenState extends ConsumerState<ImportTimetableScreen> {
     Map<String, int> into, {
     required bool weighByBlocks,
   }) async {
+    // The button scales out over a few frames and takes taps until it's gone.
+    // A second run would write everything again and pop past this route.
+    if (_saving) return;
     setState(() => _saving = true);
     // The screen pops on success, so the offer is raised on the messenger
     // rather than through this route's context.

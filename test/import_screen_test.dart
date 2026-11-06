@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -10,6 +12,7 @@ import 'package:zeolite/data/models/extra_class.dart';
 import 'package:zeolite/data/models/holiday.dart';
 import 'package:zeolite/data/models/subject.dart';
 import 'package:zeolite/data/settings/app_settings.dart';
+import 'package:zeolite/domain/timetable_import.dart';
 import 'package:zeolite/features/timetable/import_screen.dart';
 import 'package:zeolite/state/providers.dart';
 
@@ -67,7 +70,72 @@ Future<void> _paste(WidgetTester tester, String text) async {
   await tester.pumpAndSettle();
 }
 
+/// Holds the write open, the way a slow write does on a device.
+class _HeldImport extends ImportActions {
+  _HeldImport(super.core, this.gate);
+
+  final Completer<void> gate;
+  int calls = 0;
+
+  @override
+  Future<void> importTimetable(
+    TimetableImportResult result, {
+    bool weighByBlocks = false,
+    Map<String, int>? into,
+  }) {
+    calls++;
+    return gate.future;
+  }
+}
+
 void main() {
+  testWidgets('a double tap on Add imports once and closes one screen',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1200, 2600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final Completer<void> gate = Completer<void>();
+    late _HeldImport held;
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        timetableProvider.overrideWith((Ref ref) async => _empty),
+        settingsProvider.overrideWith(() => _StaticSettings(_settings)),
+        importActionsProvider.overrideWith(
+          (Ref ref) => held = _HeldImport(ref.read(actionCoreProvider), gate),
+        ),
+      ],
+      child: MaterialApp(
+        theme: AppTheme.dark(),
+        home: Builder(
+          builder: (BuildContext context) => TextButton(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const ImportTimetableScreen(),
+              ),
+            ),
+            child: const Text('Below'),
+          ),
+        ),
+      ),
+    ));
+    await tester.tap(find.text('Below'));
+    await tester.pumpAndSettle();
+    await _paste(tester, 'GEN201, Mo, 5');
+
+    // The button leaves on a scale-out, and it can still be tapped until that
+    // ends. A second write doubled the import and the second pop left no route.
+    final Offset add = tester.getCenter(find.text('Add 1 to my timetable'));
+    await tester.tapAt(add);
+    await tester.pump(const Duration(milliseconds: 40));
+    await tester.tapAt(add);
+    await tester.pump();
+    gate.complete();
+    await tester.pumpAndSettle();
+
+    expect(held.calls, 1);
+    expect(find.text('Below'), findsOneWidget);
+  });
+
   testWidgets('a paste is shown back as the classes it would create',
       (WidgetTester tester) async {
     await _open(tester);

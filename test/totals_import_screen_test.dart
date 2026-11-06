@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -12,6 +14,7 @@ import 'package:zeolite/data/models/extra_class.dart';
 import 'package:zeolite/data/models/holiday.dart';
 import 'package:zeolite/data/models/subject.dart';
 import 'package:zeolite/data/settings/app_settings.dart';
+import 'package:zeolite/domain/attendance_totals_import.dart';
 import 'package:zeolite/domain/attendance_totals_ocr.dart';
 import 'package:zeolite/features/subjects/totals_import_screen.dart';
 import 'package:zeolite/state/providers.dart';
@@ -97,7 +100,63 @@ Widget _app(AttendanceTotals totals) {
   );
 }
 
+class _HeldImport extends ImportActions {
+  _HeldImport(super.core, this.gate);
+
+  final Completer<int> gate;
+  int calls = 0;
+
+  @override
+  Future<int> importAttendanceTotals(List<TotalsDecision> decisions) {
+    calls++;
+    return gate.future;
+  }
+}
+
 void main() {
+  testWidgets('a double tap on Bring in writes once and closes one screen',
+      (WidgetTester tester) async {
+    final Completer<int> gate = Completer<int>();
+    late _HeldImport held;
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        timetableProvider.overrideWith((Ref ref) async => _fixture()),
+        settingsProvider.overrideWith(_StaticSettings.new),
+        importActionsProvider.overrideWith(
+          (Ref ref) => held = _HeldImport(ref.read(actionCoreProvider), gate),
+        ),
+      ],
+      child: MaterialApp(
+        theme: AppTheme.light(),
+        home: Builder(
+          builder: (BuildContext context) => TextButton(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const TotalsImportScreen(
+                  totals: AttendanceTotals(rows: _rows),
+                ),
+              ),
+            ),
+            child: const Text('Below'),
+          ),
+        ),
+      ),
+    ));
+    await tester.tap(find.text('Below'));
+    await tester.pumpAndSettle();
+
+    final Offset bringIn = tester.getCenter(find.text('Bring in 2'));
+    await tester.tapAt(bringIn);
+    await tester.pump(const Duration(milliseconds: 40));
+    await tester.tapAt(bringIn);
+    await tester.pump();
+    gate.complete(2);
+    await tester.pumpAndSettle();
+
+    expect(held.calls, 1);
+    expect(find.text('Below'), findsOneWidget);
+  });
+
   testWidgets('a subject being marked here is flagged, not applied',
       (WidgetTester tester) async {
     await tester.pumpWidget(_app(const AttendanceTotals(rows: _rows)));

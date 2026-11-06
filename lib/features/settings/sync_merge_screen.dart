@@ -57,7 +57,7 @@ class _SyncMergeScreenState extends ConsumerState<SyncMergeScreen> {
       });
 
   Future<void> _merge() async {
-    if (ref.read(syncCoordinatorProvider) == null) return;
+    if (_merging || ref.read(syncCoordinatorProvider) == null) return;
 
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
     final NavigatorState navigator = Navigator.of(context);

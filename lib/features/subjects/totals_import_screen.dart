@@ -69,6 +69,7 @@ class _TotalsImportScreenState extends ConsumerState<TotalsImportScreen> {
   }
 
   Future<void> _apply(TotalsPlan plan) async {
+    if (_saving) return;
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
     final NavigatorState navigator = Navigator.of(context);
     setState(() => _saving = true);

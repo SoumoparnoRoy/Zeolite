@@ -95,6 +95,7 @@ class _NotionImportScreenState extends ConsumerState<NotionImportScreen> {
   }
 
   Future<void> _apply(NotionPlan plan) async {
+    if (_saving) return;
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
     final NavigatorState navigator = Navigator.of(context);
     setState(() => _saving = true);

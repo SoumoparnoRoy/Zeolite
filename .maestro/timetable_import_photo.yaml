@@ -1,0 +1,71 @@
+appId: com.soumoparno.zeolite
+name: Import a timetable from a photo
+---
+- addMedia:
+    - assets/regression_sheet.png
+- runFlow: subflows/launch.yaml
+
+# A stopped run leaves these subjects behind. The line break matches rows only:
+# the snackbar after each delete names the subject too.
+- tapOn: "Settings\nTab 4 of 4"
+- tapOn: "Subjects\n.*"
+- scrollUntilVisible:
+    element: ".*RG30\\d\n.*"
+    timeout: 5000
+    optional: true
+- repeat:
+    while:
+      visible: ".*RG30\\d\n.*"
+    commands:
+      - tapOn:
+          text: "Show menu"
+          childOf: ".*RG30\\d\n.*"
+      - tapOn: "Delete"
+      - tapOn:
+          text: "Delete"
+          below: "Delete RG30\\d\\?"
+      - waitForAnimationToEnd
+      - scrollUntilVisible:
+          element: ".*RG30\\d\n.*"
+          timeout: 3000
+          optional: true
+- back
+
+- scrollUntilVisible:
+    element: "Import timetable\n.*"
+- tapOn: "Import timetable\n.*"
+- tapOn: "Read from an image"
+# addMedia files it under Pictures, and the picker reopens on the last folder.
+- runFlow:
+    when:
+      notVisible: "regression_sheet.*"
+    commands:
+      - tapOn: "Show roots"
+      - tapOn: "Images"
+      - tapOn: "Pictures"
+- tapOn: "regression_sheet.*"
+- extendedWaitUntil:
+    visible: "Read 15 lines.*"
+    timeout: 30000
+
+- scrollUntilVisible:
+    element: "WHAT WILL BE ADDED"
+- assertVisible: ".*RG301.*LT-1.*"
+
+# Twice wrote everything twice and popped past the last route.
+- doubleTapOn: "Add 15 to my timetable"
+- extendedWaitUntil:
+    visible: "Added 15 classes to your timetable"
+    timeout: 5000
+- assertVisible: "Import timetable\n.*"
+
+- tapOn: "Timetable\nTab 2 of 4"
+- assertVisible: ".*RG301.*9:00 AM.*LT-1.*"
+- assertNotVisible:
+    text: ".*RG301.*9:00 AM.*LT-1.*"
+    index: 1
+
+- tapOn: "Undo"
+- extendedWaitUntil:
+    notVisible: ".*RG301.*"
+    timeout: 5000

@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:zeolite/core/app_theme.dart';
 import 'package:zeolite/core/date_utils.dart';
+import 'package:zeolite/core/words.dart';
 import 'package:zeolite/data/models/attendance_record.dart';
 import 'package:zeolite/data/models/attendance_status.dart';
 import 'package:zeolite/data/models/class_category.dart';
@@ -17,6 +18,8 @@ import 'package:zeolite/data/models/subject.dart';
 import 'package:zeolite/data/settings/app_settings.dart';
 import 'package:zeolite/features/subjects/class_editor_sheets.dart';
 import 'package:zeolite/state/providers.dart';
+
+import 'slider_drag.dart';
 
 /// A global default of one hour and a Lab category of two, so the two rules
 /// produce visibly different answers and a test cannot pass by accident.
@@ -1117,5 +1120,92 @@ void main() {
       saved.firstWhere((Subject s) => s.name == 'Physics').categoryId,
       isNull,
     );
+  });
+
+  testWidgets(
+      'a subject target slider follows the drag and saves what it shows',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final List<Subject> saved = <Subject>[];
+    await tester.pumpWidget(
+      _host(
+        (c, _) => showSubjectEditor(c, subject: _fixture().subjects[1]),
+        subjects: (Ref ref) => _SubjectRecorder(ActionCore(ref), saved: saved),
+      ),
+    );
+    await _openSheet(tester);
+    final Finder toggle = find.text('Custom attendance target');
+    await tester.ensureVisible(toggle);
+    await tester.pumpAndSettle();
+    await tester.tap(toggle);
+    await tester.pumpAndSettle();
+
+    final Finder slider = find.byType(Slider);
+    final (TestGesture drag, double finger) =
+        await dragSlider(tester, slider, 120);
+    expectThumbUnderFinger(tester, slider, finger, steps: 100);
+    await drag.up();
+    await tester.pumpAndSettle();
+
+    final String shown = tester
+        .widgetList<Text>(find.byType(Text))
+        .map((Text t) => t.data ?? '')
+        .firstWhere((String s) => s.startsWith('This subject needs'));
+    await _tapButton(tester, 'Save');
+    expect(
+      shown,
+      'This subject needs ${Words.percent(saved.single.targetPercent!)}',
+    );
+    expect(saved.single.targetPercent, saved.single.targetPercent!.round());
+  });
+
+  testWidgets('a subject target runs from 0, and the lowest pick is 1',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final List<Subject> saved = <Subject>[];
+    await tester.pumpWidget(
+      _host(
+        (c, _) => showSubjectEditor(c, subject: _fixture().subjects[1]),
+        subjects: (Ref ref) => _SubjectRecorder(ActionCore(ref), saved: saved),
+      ),
+    );
+    await _openSheet(tester);
+    final Finder toggle = find.text('Custom attendance target');
+    await tester.ensureVisible(toggle);
+    await tester.pumpAndSettle();
+    await tester.tap(toggle);
+    await tester.pumpAndSettle();
+    final Finder slider = find.byType(Slider);
+
+    final double at75 = thumbX(tester, slider);
+    final double at100 = await dragAndRelease(tester, slider, 4000);
+    final double at1 = await dragAndRelease(tester, slider, -4000);
+
+    expectThreeQuarters(at1, at75, at100);
+    expect(find.text('This subject needs 1%'), findsOneWidget);
+    await _tapButton(tester, 'Save');
+    expect(saved.single.targetPercent, 1);
+  });
+
+  testWidgets('a category length slider follows the drag',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(_host(
+      (BuildContext c, WidgetRef _) => showCategoryEditor(c),
+    ));
+    await _openSheet(tester);
+
+    final Finder slider = find.byType(Slider);
+    final (TestGesture drag, double finger) =
+        await dragSlider(tester, slider, 120);
+    expectThumbUnderFinger(tester, slider, finger, steps: 57);
+    await drag.up();
+    await tester.pumpAndSettle();
   });
 }

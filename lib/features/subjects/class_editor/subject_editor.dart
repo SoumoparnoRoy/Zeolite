@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/app_theme.dart';
 import '../../../core/date_utils.dart';
+import '../../../core/target_range.dart';
 import '../../../core/words.dart';
 import '../../../data/models/class_category.dart';
 import '../../../data/models/subject.dart';
@@ -220,12 +221,13 @@ class _SubjectFormState extends ConsumerState<_SubjectForm> {
           ),
         ),
         if (_overrideTarget)
-          Slider(
+          SteppedSlider(
             value: _target,
-            min: 40,
-            max: 100,
-            divisions: 60,
-            label: Words.percent(_target),
+            min: 0,
+            lowest: lowestTarget,
+            max: highestTarget,
+            step: 1,
+            describe: Words.percent,
             onChanged: (double v) => setState(() => _target = v),
           ),
         const SizedBox(height: AppSpacing.xl),

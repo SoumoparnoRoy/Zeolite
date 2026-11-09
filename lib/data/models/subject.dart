@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
+import '../../core/target_range.dart';
 
 /// A course you are enrolled in. Classes hang off a subject, and attendance is
 /// aggregated per subject.
@@ -149,7 +150,10 @@ class Subject {
       code: map['code'] as String?,
       teacher: map['teacher'] as String?,
       colorValue: (map['color'] as int?) ?? AppColors.defaultSubjectColor,
-      targetPercent: (map['target_percent'] as num?)?.toDouble(),
+      targetPercent: switch (map['target_percent']) {
+        final num target => targetInRange(target.toDouble()),
+        _ => null,
+      },
       categoryId: map['category_id'] as int?,
       createdAt: map['created_at'] == null
           ? null

@@ -8,6 +8,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import '../core/date_utils.dart';
 import '../core/report_error.dart';
+import '../core/target_range.dart';
 import '../core/words.dart';
 import '../data/db/zeolite_repository.dart';
 import '../data/models/attendance_record.dart';
@@ -261,7 +262,7 @@ class SettingsController extends AsyncNotifier<AppSettings> {
   Future<void> setTarget(double percent) async {
     final AppSettings? current = state.value;
     if (current == null) return;
-    await save(current.copyWith(targetPercent: percent.clamp(0, 100)));
+    await save(current.copyWith(targetPercent: targetInRange(percent)));
   }
 }
 

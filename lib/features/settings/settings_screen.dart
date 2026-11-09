@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
+import '../../core/target_range.dart';
 import '../../core/words.dart';
 import '../../data/settings/app_settings.dart';
 import '../../state/providers.dart';
@@ -231,12 +232,13 @@ class _TargetHeader extends StatelessWidget {
               thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
               overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
             ),
-            child: Slider(
-              value: target.clamp(40, 100),
-              min: 40,
-              max: 100,
-              divisions: 60,
-              label: Words.percent(target),
+            child: SteppedSlider(
+              value: target,
+              min: 0,
+              lowest: lowestTarget,
+              max: highestTarget,
+              step: 1,
+              describe: Words.percent,
               onChanged: onChanged,
               onChangeEnd: onChangeEnd,
             ),

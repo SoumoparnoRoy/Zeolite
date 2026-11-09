@@ -234,12 +234,12 @@ class CategoriesSection extends ConsumerWidget {
                         ),
                       ],
                     ),
-                    Slider(
+                    SteppedSlider(
                       value: shown,
                       min: 15,
                       max: 300,
-                      divisions: 57,
-                      label: Clock.formatDuration(minutes),
+                      step: 5,
+                      describe: (double v) => Clock.formatDuration(v.round()),
                       onChanged: onChanged,
                       onChangeEnd: onChangeEnd,
                     ),

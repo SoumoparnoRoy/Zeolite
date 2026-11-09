@@ -122,7 +122,10 @@ class SubjectStats {
   int get canSkip {
     if (target <= 0) return 999;
     if (attended == 0) return 0;
-    final int maxTotal = (attended / target).floor();
+    // Most targets have no exact binary form, so 7 / 0.07 comes out as
+    // 99.999…; the nudge stops a whole answer losing a class. Real fractions
+    // here are at least 1/100 from a whole number.
+    final int maxTotal = (attended / target + 1e-9).floor();
     return math.max(0, maxTotal - held);
   }
 
@@ -135,7 +138,9 @@ class SubjectStats {
     if (target >= 1) return remainingPlanned;
     final double numerator = target * held - attended;
     if (numerator <= 0) return 0;
-    return math.max(0, (numerator / (1 - target)).ceil());
+    // The same nudge the other way: at 80%, 0 of 1 needs 4, and 3.2 / 0.2
+    // comes out as 4.000…1.
+    return math.max(0, (numerator / (1 - target) - 1e-9).ceil());
   }
 
   /// The best percentage still achievable if you attend everything left.

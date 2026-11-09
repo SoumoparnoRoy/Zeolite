@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
+import '../../core/target_range.dart';
 import '../../domain/day_grid.dart';
 import '../models/attendance_status.dart';
 
@@ -502,7 +503,8 @@ class AppSettings {
       termStart: start == null ? null : Dates.fromKey(start),
       termEnd: end == null ? null : Dates.fromKey(end),
       countOutsideTerm: json['countOutsideTerm'] as bool? ?? false,
-      targetPercent: (json['targetPercent'] as num?)?.toDouble() ?? 75,
+      targetPercent:
+          targetInRange((json['targetPercent'] as num?)?.toDouble() ?? 75),
       defaultClassDurationMinutes:
           (json['defaultClassDurationMinutes'] as num?)?.toInt() ?? 60,
       // A backup taken before the day grid existed restores as "not divided
@@ -615,7 +617,7 @@ class SettingsService {
     return AppSettings(
       termStart: start == null ? null : Dates.fromKey(start),
       termEnd: end == null ? null : Dates.fromKey(end),
-      targetPercent: await prefs.getDouble(_kTarget) ?? 75,
+      targetPercent: targetInRange(await prefs.getDouble(_kTarget) ?? 75),
       defaultClassDurationMinutes: await prefs.getInt(_kDefaultDuration) ?? 60,
       dayStartMinutes: await prefs.getInt(_kDayStart) ?? 9 * 60,
       dayEndMinutes: await prefs.getInt(_kDayEnd) ?? 17 * 60,

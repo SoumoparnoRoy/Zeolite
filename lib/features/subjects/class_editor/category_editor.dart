@@ -193,14 +193,13 @@ class _CategoryFormState extends ConsumerState<_CategoryForm> {
         Row(
           children: <Widget>[
             Expanded(
-              child: Slider(
-                value: _minutes.toDouble().clamp(15, 300),
+              child: SteppedSlider(
+                value: _minutes.toDouble(),
                 min: 15,
                 max: 300,
-                divisions: 57,
-                label: Clock.formatDuration(_minutes),
-                onChanged: (double v) =>
-                    setState(() => _minutes = (v / 5).round() * 5),
+                step: 5,
+                describe: (double v) => Clock.formatDuration(v.round()),
+                onChanged: (double v) => setState(() => _minutes = v.round()),
               ),
             ),
             SizedBox(

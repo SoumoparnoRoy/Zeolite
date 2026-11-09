@@ -292,4 +292,55 @@ void main() {
       expect(overall.verdict, 'Nothing marked yet');
     });
   });
+
+  group('low targets', () {
+    test('at 1% the skip count is exact and nothing divides by zero', () {
+      // 94 / 0.01 = 9400 classes in all, 123 of them held.
+      final SubjectStats stats = statsOf(present: 94, absent: 29, target: 0.01);
+      expect(stats.canSkip, 9400 - 123);
+      expect(stats.needToAttend, 0);
+      expect(stats.headline, 'You can skip 9277 more classes');
+      expect(statsOf(absent: 5, target: 0.01).canSkip, 0);
+    });
+
+    test('at 1% one attended class after 297 misses is enough', () {
+      // (0 + y) / (297 + y) >= 0.01 first holds at y = 3.
+      final SubjectStats stats =
+          statsOf(absent: 297, target: 0.01, remaining: 10);
+      expect(stats.needToAttend, 3);
+      expect(stats.headline, 'Attending the next 3 brings you back to target');
+    });
+
+    test('at 5% the counts are exact', () {
+      expect(statsOf(absent: 19, target: 0.05).needToAttend, 1);
+      expect(statsOf(absent: 38, target: 0.05).needToAttend, 2);
+      expect(statsOf(present: 1, absent: 0, target: 0.05).canSkip, 19);
+    });
+
+    test('a target that is not a binary fraction is not one class out', () {
+      // 0.8 and 0.07 are stored slightly off, which used to push a whole
+      // answer over the line: 5 instead of 4, and 99 instead of 100.
+      expect(statsOf(absent: 1, target: 0.8).needToAttend, 4);
+      expect(statsOf(present: 7, target: 0.07).canSkip, 100 - 7);
+    });
+
+    test('every whole target from 1 to 99 gives the exact answer', () {
+      for (int p = 1; p <= 99; p++) {
+        for (int held = 1; held <= 60; held++) {
+          for (int a = 0; a <= held; a++) {
+            final SubjectStats stats =
+                statsOf(present: a, absent: held - a, target: p / 100);
+            final int skip =
+                a == 0 ? 0 : (a * 100 ~/ p - held).clamp(0, 1 << 30);
+            expect(stats.canSkip, skip, reason: '$a of $held at $p%');
+            if (a * 100 < p * held) {
+              final int d = 100 - p;
+              expect(stats.needToAttend, (p * held - 100 * a + d - 1) ~/ d,
+                  reason: '$a of $held at $p%');
+            }
+          }
+        }
+      }
+    });
+  });
 }

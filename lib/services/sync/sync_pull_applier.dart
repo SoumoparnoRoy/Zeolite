@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../core/date_utils.dart';
+import '../../core/target_range.dart';
 import '../../data/db/zeolite_repository.dart';
 import '../../data/models/attendance_record.dart';
 import '../../data/models/attendance_status.dart';
@@ -91,7 +92,7 @@ class SyncPullApplier {
     final AppSettings merged = current.copyWith(
       termStart: readDay(f['semesterStart']),
       termEnd: readDay(f['semesterEnd']),
-      targetPercent: readDouble(f['targetPercent']),
+      targetPercent: _targetPercent(f['targetPercent']),
       defaultClassDurationMinutes: readInt(f['defaultClassMinutes']),
       dayStartMinutes: readInt(f['dayStartMinutes']),
       dayEndMinutes: readInt(f['dayEndMinutes']),
@@ -207,7 +208,7 @@ class SyncPullApplier {
       code: readString(f['code']),
       teacher: readString(f['teacher']),
       colorValue: readInt(f['color']) ?? existing?.colorValue ?? 0xff607d8b,
-      targetPercent: readDouble(f['targetPercent']),
+      targetPercent: _targetPercent(f['targetPercent']),
       // Categories sync first, so a named one is already here unless the far
       // side never had it.
       categoryId:
@@ -535,3 +536,9 @@ class _MarkKey {
     return _MarkKey(parts[0], date, start!);
   }
 }
+
+/// A target from another device, held to the range this one accepts.
+double? _targetPercent(Object? value) => switch (readDouble(value)) {
+      final double percent => targetInRange(percent),
+      null => null,
+    };

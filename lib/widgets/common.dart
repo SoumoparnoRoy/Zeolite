@@ -403,6 +403,81 @@ class _SettledSliderState extends State<SettledSlider> {
   }
 }
 
+/// A slider that moves in whole steps with its thumb kept under the finger.
+///
+/// Given `divisions`, Material's slider eases the thumb towards each new value
+/// over 75 ms and restarts that on every touch event, so during a drag the
+/// thumb trails the value by up to a quarter of the track. This one leaves
+/// `divisions` off, so the thumb is placed directly, and rounds to [step]
+/// itself. It shows no value bubble: every caller already prints the value
+/// beside the slider, and the bubble covered it.
+///
+/// Without divisions a screen reader would move it by a twentieth of the range,
+/// so its own semantics move one step, and they finish the change the way a
+/// released drag does.
+class SteppedSlider extends StatelessWidget {
+  const SteppedSlider({
+    super.key,
+    required this.value,
+    required this.min,
+    required this.max,
+    required this.step,
+    required this.describe,
+    required this.onChanged,
+    this.onChangeEnd,
+    this.lowest,
+  });
+
+  final double value;
+  final double min;
+  final double max;
+  final double step;
+
+  /// The smallest value that can be picked, when that is above [min]. The
+  /// track still starts at [min], so the thumb's position matches the number.
+  final double? lowest;
+
+  /// What a screen reader says for a value.
+  final String Function(double value) describe;
+  final ValueChanged<double> onChanged;
+  final ValueChanged<double>? onChangeEnd;
+
+  double _snap(double raw) =>
+      (min + ((raw - min) / step).round() * step).clamp(lowest ?? min, max);
+
+  void _settle(double next) {
+    onChanged(next);
+    onChangeEnd?.call(next);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final double current = _snap(value);
+    final double up = _snap(current + step);
+    final double down = _snap(current - step);
+    return Semantics(
+      container: true,
+      slider: true,
+      value: describe(current),
+      increasedValue: describe(up),
+      decreasedValue: describe(down),
+      onIncrease: up > current ? () => _settle(up) : null,
+      onDecrease: down < current ? () => _settle(down) : null,
+      child: ExcludeSemantics(
+        child: Slider(
+          value: value.clamp(min, max),
+          min: min,
+          max: max,
+          onChanged: (double raw) => onChanged(_snap(raw)),
+          onChangeEnd: onChangeEnd == null
+              ? null
+              : (double raw) => onChangeEnd!(_snap(raw)),
+        ),
+      ),
+    );
+  }
+}
+
 /// Thin horizontal meter with an optional target marker.
 class TargetBar extends StatelessWidget {
   const TargetBar({

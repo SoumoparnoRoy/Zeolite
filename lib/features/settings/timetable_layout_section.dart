@@ -110,17 +110,18 @@ class DayGridSection extends ConsumerWidget {
                           ),
                         ],
                       ),
-                      Slider(
+                      SteppedSlider(
                         // Zero is a real state — "the day is not divided up" —
                         // so the track starts one step below the shortest
                         // usable block and that step clears the grid rather
                         // than setting a 5-minute one.
                         value: shown,
+                        min: 0,
                         max: 180,
-                        divisions: 36,
-                        label: draft.blockMinutes <= 0
+                        step: 5,
+                        describe: (double v) => _blockOf(v) <= 0
                             ? 'Not divided'
-                            : Clock.formatDuration(draft.blockMinutes),
+                            : Clock.formatDuration(_blockOf(v)),
                         onChanged: onChanged,
                         onChangeEnd: onChangeEnd,
                       ),
@@ -178,11 +179,16 @@ class _BreakField extends ConsumerWidget {
               double shown,
               ValueChanged<double> onChanged,
               ValueChanged<double> onChangeEnd) {
-            final int minutes = (shown / 5).round() * 5;
             // At rest the grid decides, as before: a length with no block to
-            // follow is no break.
-            final bool hasBreak =
-                minutes == settings.breakMinutes ? grid.hasBreak : minutes > 0;
+            // follow is no break. The screen reader is told the same.
+            String describe(double value) {
+              final int minutes = (value / 5).round() * 5;
+              final bool hasBreak = minutes == settings.breakMinutes
+                  ? grid.hasBreak
+                  : minutes > 0;
+              return hasBreak ? Clock.formatDuration(minutes) : 'None';
+            }
+
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
@@ -197,7 +203,7 @@ class _BreakField extends ConsumerWidget {
                       ),
                     ),
                     Text(
-                      hasBreak ? Clock.formatDuration(minutes) : 'None',
+                      describe(shown),
                       style: TextStyle(
                         fontSize: AppType.headlineMedium,
                         fontWeight: FontWeight.w800,
@@ -207,11 +213,12 @@ class _BreakField extends ConsumerWidget {
                     ),
                   ],
                 ),
-                Slider(
+                SteppedSlider(
                   value: shown,
+                  min: 0,
                   max: 90,
-                  divisions: 18,
-                  label: minutes <= 0 ? 'None' : Clock.formatDuration(minutes),
+                  step: 5,
+                  describe: describe,
                   onChanged: onChanged,
                   onChangeEnd: onChangeEnd,
                 ),

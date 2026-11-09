@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:zeolite/core/app_theme.dart';
+import 'package:zeolite/core/report_error.dart';
 import 'package:zeolite/features/settings/subjects_section.dart';
 import 'package:zeolite/services/picked_file.dart';
 import 'package:zeolite/state/timetable_image_reader.dart';
@@ -147,6 +148,19 @@ void main() {
       await pick(tester);
 
       expect(platform.cleared, 1);
+    });
+
+    testWidgets('a failed read says so instead of crashing',
+        (WidgetTester tester) async {
+      final List<String> reported = <String>[];
+      errorSink = (_, __, String where) => reported.add(where);
+      addTearDown(() => errorSink = null);
+      using(_Platform(picked: _Picked(null)));
+
+      await pick(tester);
+
+      expect(reported, <String>['class log read']);
+      expect(find.text('Could not read that file'), findsOneWidget);
     });
   });
 

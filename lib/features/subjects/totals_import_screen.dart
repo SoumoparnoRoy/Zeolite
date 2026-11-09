@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
+import '../../core/report_error.dart';
 import '../../core/words.dart';
 import '../../data/models/attendance_record.dart';
 import '../../data/models/subject.dart';
@@ -86,7 +87,17 @@ class _TotalsImportScreenState extends ConsumerState<TotalsImportScreen> {
 
     final ActionCore core = ref.read(actionCoreProvider);
     final ImportActions imports = ref.read(importActionsProvider);
-    final int count = await imports.importAttendanceTotals(decisions);
+    final int count;
+    try {
+      count = await imports.importAttendanceTotals(decisions);
+    } catch (error, stack) {
+      reportError(error, stack, where: 'totals import');
+      if (mounted) setState(() => _saving = false);
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Could not bring those in. Try again.')),
+      );
+      return;
+    }
     if (!mounted) return;
     navigator.pop();
     showUndoSnack(

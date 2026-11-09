@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
+import '../../core/report_error.dart';
 import '../../core/words.dart';
 import '../../data/models/attendance_record.dart';
 import '../../data/models/class_category.dart';
@@ -59,14 +60,26 @@ class _NotionImportScreenState extends ConsumerState<NotionImportScreen> {
   late NotionExport _export = widget.export;
 
   Future<void> _remap() async {
-    final NotionExport? read = await widget.remap!();
-    if (read != null && mounted) {
-      setState(() {
-        _export = read;
-        // What was chosen belonged to the rows as they were read before.
-        _excluded.clear();
-        _seeded.clear();
-      });
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    try {
+      final NotionExport? read = await widget.remap!();
+      if (read != null && mounted) {
+        setState(() {
+          _export = read;
+          // What was chosen belonged to the rows as they were read before.
+          _excluded.clear();
+          _seeded.clear();
+        });
+      }
+    } catch (error, stack) {
+      reportError(error, stack, where: 'class log remap');
+      if (mounted) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Could not change how the file is read'),
+          ),
+        );
+      }
     }
   }
 
@@ -102,14 +115,24 @@ class _NotionImportScreenState extends ConsumerState<NotionImportScreen> {
 
     final ActionCore core = ref.read(actionCoreProvider);
     final ImportActions imports = ref.read(importActionsProvider);
-    final int count = await imports.importNotionLog(
-      <NotionPlanSubject>[
-        for (final NotionPlanSubject s in plan.subjects)
-          if (!_excluded.contains(s.name)) s,
-      ],
-      cancelledCounts: plan.countsCancelled,
-      typeWeights: plan.typeWeights,
-    );
+    final int count;
+    try {
+      count = await imports.importNotionLog(
+        <NotionPlanSubject>[
+          for (final NotionPlanSubject s in plan.subjects)
+            if (!_excluded.contains(s.name)) s,
+        ],
+        cancelledCounts: plan.countsCancelled,
+        typeWeights: plan.typeWeights,
+      );
+    } catch (error, stack) {
+      reportError(error, stack, where: 'notion log import');
+      if (mounted) setState(() => _saving = false);
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Could not bring those in. Try again.')),
+      );
+      return;
+    }
     if (!mounted) return;
     navigator.pop();
     showUndoSnack(

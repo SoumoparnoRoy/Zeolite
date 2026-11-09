@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:zeolite/core/app_theme.dart';
 import 'package:zeolite/core/date_utils.dart';
+import 'package:zeolite/core/report_error.dart';
 import 'package:zeolite/data/models/attendance_record.dart';
 import 'package:zeolite/data/models/attendance_status.dart';
 import 'package:zeolite/data/models/class_category.dart';
@@ -159,6 +160,65 @@ void main() {
 
     expect(held.calls, 1);
     expect(find.text('Below'), findsOneWidget);
+  });
+
+  testWidgets('a failed write says so and gives the button back',
+      (WidgetTester tester) async {
+    final List<String> reported = <String>[];
+    errorSink = (_, __, String where) => reported.add(where);
+    addTearDown(() => errorSink = null);
+    final Completer<int> gate = Completer<int>();
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        timetableProvider.overrideWith((Ref ref) async => _fixture()),
+        settingsProvider.overrideWith(_StaticSettings.new),
+        importActionsProvider.overrideWith(
+          (Ref ref) => _HeldImport(ref.read(actionCoreProvider), gate),
+        ),
+      ],
+      child: MaterialApp(
+        theme: AppTheme.light(),
+        home: NotionImportScreen(export: _export()),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Bring in 2'));
+    await tester.pump();
+    gate.completeError(StateError('disk full'));
+    await tester.pumpAndSettle();
+
+    expect(reported, <String>['notion log import']);
+    expect(find.text('Could not bring those in. Try again.'), findsOneWidget);
+    expect(find.text('Bring in 2'), findsOneWidget);
+  });
+
+  testWidgets('a failed remap says so and keeps the rows as they were',
+      (WidgetTester tester) async {
+    final List<String> reported = <String>[];
+    errorSink = (_, __, String where) => reported.add(where);
+    addTearDown(() => errorSink = null);
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        timetableProvider.overrideWith((Ref ref) async => _fixture()),
+        settingsProvider.overrideWith(_StaticSettings.new),
+      ],
+      child: MaterialApp(
+        theme: AppTheme.light(),
+        home: NotionImportScreen(
+          export: _export(),
+          remap: () async => throw StateError('store gone'),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Change how the file is read'));
+    await tester.pumpAndSettle();
+
+    expect(reported, <String>['class log remap']);
+    expect(find.text('Could not change how the file is read'), findsOneWidget);
+    expect(find.text('Bring in 2'), findsOneWidget);
   });
 
   testWidgets('grouped, the course is one new subject',

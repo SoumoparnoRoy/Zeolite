@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
+import '../../core/report_error.dart';
 import '../../core/words.dart';
 import '../../data/models/class_category.dart';
 import '../../data/models/subject.dart';
@@ -33,6 +34,17 @@ Future<void> importClassLogFile(
   BuildContext context,
   WidgetRef ref,
 ) async {
+  try {
+    await _readClassLogFile(context, ref);
+  } catch (error, stack) {
+    // A file the picker lost, or a layout store that won't read: say so
+    // rather than leave the row looking dead.
+    reportError(error, stack, where: 'class log read');
+    if (context.mounted) _say(context, 'Could not read that file');
+  }
+}
+
+Future<void> _readClassLogFile(BuildContext context, WidgetRef ref) async {
   final Uint8List? bytes = await PickedFile.read(
     dialogTitle: 'Choose a class log (CSV or Notion export)',
   );

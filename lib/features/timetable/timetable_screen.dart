@@ -310,6 +310,7 @@ class _SessionRow extends ConsumerWidget {
     } else if (status != current) {
       // Not for the current status: mark() reads that tap as clearing it.
       await attendance.mark(session, status);
+      await attendance.offerReview(session.date);
     }
   }
 

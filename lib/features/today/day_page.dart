@@ -280,9 +280,13 @@ class TodayDayPage extends ConsumerWidget {
   ) async {
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
     final ActionCore core = ref.read(actionCoreProvider);
-    final bool cleared =
-        await ref.read(attendanceActionsProvider).mark(session, status);
-    if (cleared) showMarkCleared(messenger, core);
+    final AttendanceActions attendance = ref.read(attendanceActionsProvider);
+    final bool cleared = await attendance.mark(session, status);
+    if (cleared) {
+      showMarkCleared(messenger, core);
+    } else {
+      await attendance.offerReview(session.date);
+    }
   }
 
   static Future<void> _markAllPresent(
@@ -292,15 +296,21 @@ class TodayDayPage extends ConsumerWidget {
   ) async {
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
     final ActionCore core = ref.read(actionCoreProvider);
-    final int count = await ref
-        .read(attendanceActionsProvider)
-        .markAll(sessions, AttendanceStatus.present);
+    final AttendanceActions attendance = ref.read(attendanceActionsProvider);
+    final int count =
+        await attendance.markAll(sessions, AttendanceStatus.present);
     if (count == 0) return;
     showUndoSnack(
       messenger,
       core,
       'Marked ${Words.plural(count, 'class', 'classes')} present',
     );
+    // The banner's list reaches back two weeks, so this can finish either.
+    for (final DateTime monday in <DateTime>{
+      for (final ClassSession s in sessions) Dates.startOfWeek(s.date),
+    }) {
+      await attendance.offerReview(monday);
+    }
   }
 }
 

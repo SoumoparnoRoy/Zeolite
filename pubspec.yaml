@@ -78,6 +78,11 @@ dependencies:
   # and stack, never their message, so nothing typed into the app can ride
   # along. BSD-3-Clause.
   firebase_crashlytics: ^5.4.0
+  # Settings > Share Zeolite: Android's share sheet. Adds a private file
+  # provider and receiver, no permissions. BSD-3-Clause.
+  share_plus: ^13.3.1
+  # Play's review card, asked for once (ReviewPrompt). MIT.
+  in_app_review: ^2.0.12
 
 dev_dependencies:
   flutter_test:

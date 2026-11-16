@@ -416,16 +416,21 @@ extension on _LogTile {
   ) async {
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
     final ActionCore core = ref.read(actionCoreProvider);
-    final bool cleared = await ref.read(attendanceActionsProvider).setStatusAt(
-          subjectId: subjectId,
-          date: entry.date,
-          startMinutes: entry.startMinutes,
-          current: entry.status,
-          status: status,
-          weight: entry.weight,
-          tagId: entry.tagId,
-        );
-    if (cleared) showMarkCleared(messenger, core);
+    final AttendanceActions attendance = ref.read(attendanceActionsProvider);
+    final bool cleared = await attendance.setStatusAt(
+      subjectId: subjectId,
+      date: entry.date,
+      startMinutes: entry.startMinutes,
+      current: entry.status,
+      status: status,
+      weight: entry.weight,
+      tagId: entry.tagId,
+    );
+    if (cleared) {
+      showMarkCleared(messenger, core);
+    } else {
+      await attendance.offerReview(entry.date);
+    }
   }
 
   Future<void> _confirmRemove(BuildContext context, WidgetRef ref) async {

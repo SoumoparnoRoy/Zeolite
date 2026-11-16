@@ -2,11 +2,15 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/date_utils.dart';
 import '../../data/db/zeolite_repository.dart';
 import '../../data/models/attendance_record.dart';
 import '../../data/models/attendance_status.dart';
 import '../../data/models/class_session.dart';
+import '../../domain/schedule_engine.dart';
 import '../../domain/untimed_match.dart';
+import '../../services/review_prompt.dart';
+import '../app_providers.dart';
 
 import 'action_core.dart';
 
@@ -192,8 +196,21 @@ class AttendanceActions {
     _core.arm(before);
     return records.length;
   }
+
+  /// Called by the screens after a mark, never from inside [mark]: a widget
+  /// or notification mark runs with no screen to put Play's card over.
+  Future<void> offerReview(DateTime date) async {
+    final ScheduleEngine? engine = _core.ref.read(scheduleEngineProvider);
+    if (engine == null) return;
+    final DateTime monday = Dates.startOfWeek(date);
+    await _core.ref
+        .read(reviewPromptProvider)
+        .afterMark(engine.sessionsBetween(monday, Dates.addDays(monday, 6)));
+  }
 }
 
 final attendanceActionsProvider = Provider<AttendanceActions>(
   (ref) => AttendanceActions(ref.read(actionCoreProvider)),
 );
+
+final reviewPromptProvider = Provider<ReviewPrompt>((ref) => ReviewPrompt());

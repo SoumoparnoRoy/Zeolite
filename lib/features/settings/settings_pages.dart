@@ -2,10 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/date_utils.dart';
+import '../../core/endpoints.dart';
 import '../../core/words.dart';
 import '../../data/settings/app_settings.dart';
 import '../../domain/holiday_runs.dart';
@@ -81,6 +83,8 @@ enum SettingsItem {
   account('Account', Icons.cloud_outlined, SettingsGroup.sync),
   notion('Notion', Icons.sync_alt_rounded, SettingsGroup.sync),
   yourData('Your data', Icons.storage_rounded, SettingsGroup.sync),
+  share('Share Zeolite', Icons.share_outlined, SettingsGroup.about),
+  rate('Rate Zeolite', Icons.star_outline_rounded, SettingsGroup.about),
   privacy('Privacy Policy', Icons.privacy_tip_outlined, SettingsGroup.about),
   terms('Terms of Use', Icons.gavel_rounded, SettingsGroup.about),
   licences(
@@ -96,12 +100,25 @@ enum SettingsItem {
   final SettingsGroup group;
 
   /// Opens outside the app rather than as a page.
-  bool get isLink => this == privacy || this == terms;
+  bool get isLink => this == privacy || this == terms || this == rate;
+
+  static final String shareMessage =
+      'I track my class attendance with Zeolite. It shows how many classes '
+      'I can still miss: ${Endpoints.playStore}';
 
   Future<void> open(BuildContext context, WidgetRef ref) async {
     switch (this) {
       case importClassLog:
         return importClassLogFile(context, ref);
+      case share:
+        unawaited(SharePlus.instance
+            .share(ShareParams(text: shareMessage, subject: 'Zeolite')));
+        return;
+      case rate:
+        // Not Play's in-app card: it's rationed, so a tap could show nothing.
+        unawaited(launchUrl(Endpoints.playStore,
+            mode: LaunchMode.externalApplication));
+        return;
       case privacy:
         unawaited(launchUrl(WelcomeCopy.privacyUrl,
             mode: LaunchMode.inAppBrowserView));
@@ -162,6 +179,8 @@ enum SettingsItem {
         // place a user can read them.
         licences => const LicencesScreen(),
         importClassLog ||
+        share ||
+        rate ||
         privacy ||
         terms =>
           throw StateError('$name does not open a page'),
@@ -242,6 +261,8 @@ class SettingsItemRow extends ConsumerWidget {
       SettingsItem.yourData => settings.autoBackupEnabled
           ? 'Backed up automatically once a day'
           : 'Automatic backup is off',
+      SettingsItem.share => 'Send a friend the link',
+      SettingsItem.rate => 'Leave a rating on Google Play',
       SettingsItem.privacy => 'What leaves your device, and when',
       SettingsItem.terms => 'The rules for using Zeolite',
       SettingsItem.licences => 'The packages and fonts Zeolite is built on',

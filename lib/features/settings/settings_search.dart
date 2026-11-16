@@ -116,6 +116,11 @@ const List<SettingsTopic> settingsTopics = <SettingsTopic>[
   ),
   SettingsTopic('Share Zeolite', SettingsItem.share, 'invite friend send link'),
   SettingsTopic('Rate Zeolite', SettingsItem.rate, 'review stars play store'),
+  SettingsTopic(
+    'Send feedback',
+    SettingsItem.feedback,
+    'email contact support bug report',
+  ),
   SettingsTopic('Privacy Policy', SettingsItem.privacy, 'data legal'),
   SettingsTopic('Terms of Use', SettingsItem.terms, 'legal conditions'),
   SettingsTopic(

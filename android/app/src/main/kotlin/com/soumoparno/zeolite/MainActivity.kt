@@ -66,6 +66,14 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, DEVICE_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "androidVersion" -> result.success(
+                        "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
+                    else -> result.notImplemented()
+                }
+            }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, AGE_SIGNALS_CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -160,6 +168,7 @@ class MainActivity : FlutterActivity() {
         const val SETTINGS_CHANNEL = "zeolite/notification_settings"
         const val CLOCK_CHANNEL = "zeolite/clock"
         const val AGE_SIGNALS_CHANNEL = "zeolite/age_signals"
+        const val DEVICE_CHANNEL = "zeolite/device"
         const val DEFAULT = "default"
 
         val ICONS = listOf(

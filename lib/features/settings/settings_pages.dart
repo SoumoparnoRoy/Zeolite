@@ -26,6 +26,7 @@ import 'data_section.dart';
 import 'licences_screen.dart';
 import 'notifications_section.dart';
 import 'privacy_section.dart';
+import 'send_feedback.dart';
 import 'settings_rows.dart';
 import 'subjects_section.dart';
 import 'sync_section.dart';
@@ -85,6 +86,7 @@ enum SettingsItem {
   yourData('Your data', Icons.storage_rounded, SettingsGroup.sync),
   share('Share Zeolite', Icons.share_outlined, SettingsGroup.about),
   rate('Rate Zeolite', Icons.star_outline_rounded, SettingsGroup.about),
+  feedback('Send feedback', Icons.mail_outline_rounded, SettingsGroup.about),
   privacy('Privacy Policy', Icons.privacy_tip_outlined, SettingsGroup.about),
   terms('Terms of Use', Icons.gavel_rounded, SettingsGroup.about),
   licences(
@@ -100,7 +102,8 @@ enum SettingsItem {
   final SettingsGroup group;
 
   /// Opens outside the app rather than as a page.
-  bool get isLink => this == privacy || this == terms || this == rate;
+  bool get isLink =>
+      this == privacy || this == terms || this == rate || this == feedback;
 
   static final String shareMessage =
       'I track my class attendance with Zeolite. It shows how many classes '
@@ -119,6 +122,8 @@ enum SettingsItem {
         unawaited(launchUrl(Endpoints.playStore,
             mode: LaunchMode.externalApplication));
         return;
+      case feedback:
+        return sendFeedback(context, ref);
       case privacy:
         unawaited(launchUrl(WelcomeCopy.privacyUrl,
             mode: LaunchMode.inAppBrowserView));
@@ -181,6 +186,7 @@ enum SettingsItem {
         importClassLog ||
         share ||
         rate ||
+        feedback ||
         privacy ||
         terms =>
           throw StateError('$name does not open a page'),
@@ -263,6 +269,7 @@ class SettingsItemRow extends ConsumerWidget {
           : 'Automatic backup is off',
       SettingsItem.share => 'Send a friend the link',
       SettingsItem.rate => 'Leave a rating on Google Play',
+      SettingsItem.feedback => 'Email the developer',
       SettingsItem.privacy => 'What leaves your device, and when',
       SettingsItem.terms => 'The rules for using Zeolite',
       SettingsItem.licences => 'The packages and fonts Zeolite is built on',

@@ -223,7 +223,7 @@ stops at its ceiling rather than billing.
 
 ## Running locally
 
-Needs Node 24 (`engines` in `package.json`).
+Needs Node 24.22.3 or a later 24 (`engines` in `package.json`).
 
 ```bash
 cd server
@@ -318,7 +318,7 @@ It runs as a Render web service, deployed from this repo:
 | Start command | `npm start` |
 | Health check path | `/health` |
 | Auto-deploy | On commits to `main` that touch `server/**` |
-| Node version | From `engines` (`24.x`) |
+| Node version | From `engines` (`>=24.22.3 <25`) |
 
 Set the variables in Render's dashboard: the three required ones,
 `TRUST_PROXY=1` (Render puts one load balancer in front), `NODE_ENV=production`,

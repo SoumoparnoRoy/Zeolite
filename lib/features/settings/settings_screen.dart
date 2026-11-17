@@ -153,7 +153,11 @@ class _Results extends ConsumerWidget {
                 dropFocus();
                 topic.item == null
                     ? onTarget()
-                    : topic.item!.open(context, ref);
+                    : topic.item!.open(
+                        context,
+                        ref,
+                        helpQuestion: topic.helpQuestion,
+                      );
               },
             ),
       ],

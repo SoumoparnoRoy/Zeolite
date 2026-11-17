@@ -1,18 +1,27 @@
+import 'help_topics.dart';
 import 'settings_pages.dart';
 
 /// Something a user might look for in Settings, and the menu row it lives
 /// behind. [item] is null for the target, which is on the menu page itself.
 class SettingsTopic {
-  const SettingsTopic(this.title, this.item, [this.words = '']);
+  const SettingsTopic(
+    this.title,
+    this.item, [
+    this.words = '',
+    this.helpQuestion,
+  ]);
 
   final String title;
   final SettingsItem? item;
 
   /// Other words people use for it, so "semester" finds the term dates.
   final String words;
+
+  /// The [HelpQuestion.id] a Help and FAQ topic opens at.
+  final String? helpQuestion;
 }
 
-const List<SettingsTopic> settingsTopics = <SettingsTopic>[
+final List<SettingsTopic> settingsTopics = <SettingsTopic>[
   SettingsTopic('Minimum required', null, 'target percentage attendance goal'),
   SettingsTopic('Subjects', SettingsItem.subjects, 'courses colour target'),
   SettingsTopic(
@@ -117,6 +126,11 @@ const List<SettingsTopic> settingsTopics = <SettingsTopic>[
   SettingsTopic('Share Zeolite', SettingsItem.share, 'invite friend send link'),
   SettingsTopic('Rate Zeolite', SettingsItem.rate, 'review stars play store'),
   SettingsTopic(
+    'Help and FAQ',
+    SettingsItem.help,
+    'faq questions answers how support',
+  ),
+  SettingsTopic(
     'Send feedback',
     SettingsItem.feedback,
     'email contact support bug report',
@@ -128,6 +142,8 @@ const List<SettingsTopic> settingsTopics = <SettingsTopic>[
     SettingsItem.licences,
     'licenses acknowledgements credits attribution fonts',
   ),
+  for (final HelpQuestion q in helpQuestions)
+    SettingsTopic(q.question, SettingsItem.help, q.words, q.id),
 ];
 
 /// Every word typed has to start a word somewhere in the topic, so "back"

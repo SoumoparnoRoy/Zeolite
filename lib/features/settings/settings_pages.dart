@@ -23,6 +23,7 @@ import '../timetable/import_screen.dart';
 import 'account_screen.dart';
 import 'appearance_section.dart';
 import 'data_section.dart';
+import 'help_screen.dart';
 import 'licences_screen.dart';
 import 'notifications_section.dart';
 import 'privacy_section.dart';
@@ -86,6 +87,7 @@ enum SettingsItem {
   yourData('Your data', Icons.storage_rounded, SettingsGroup.sync),
   share('Share Zeolite', Icons.share_outlined, SettingsGroup.about),
   rate('Rate Zeolite', Icons.star_outline_rounded, SettingsGroup.about),
+  help('Help and FAQ', Icons.help_outline_rounded, SettingsGroup.about),
   feedback('Send feedback', Icons.mail_outline_rounded, SettingsGroup.about),
   privacy('Privacy Policy', Icons.privacy_tip_outlined, SettingsGroup.about),
   terms('Terms of Use', Icons.gavel_rounded, SettingsGroup.about),
@@ -109,7 +111,12 @@ enum SettingsItem {
       'I track my class attendance with Zeolite. It shows how many classes '
       'I can still miss: ${Endpoints.playStore}';
 
-  Future<void> open(BuildContext context, WidgetRef ref) async {
+  /// [helpQuestion] opens Help and FAQ at that question; other rows ignore it.
+  Future<void> open(
+    BuildContext context,
+    WidgetRef ref, {
+    String? helpQuestion,
+  }) async {
     switch (this) {
       case importClassLog:
         return importClassLogFile(context, ref);
@@ -143,7 +150,8 @@ enum SettingsItem {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         settings: RouteSettings(name: _routeName),
-        builder: (BuildContext context) => _page,
+        builder: (BuildContext context) =>
+            this == help ? HelpScreen(openQuestion: helpQuestion) : _page,
       ),
     );
   }
@@ -180,6 +188,7 @@ enum SettingsItem {
         privacyChoices => _SettingsPage(this, const <Widget>[PrivacySection()]),
         notion => _SettingsPage(this, const <Widget>[NotionSection()]),
         yourData => _SettingsPage(this, const <Widget>[DataSection()]),
+        help => const HelpScreen(),
         // The fonts' OFL texts are registered in `main.dart`; this is the only
         // place a user can read them.
         licences => const LicencesScreen(),
@@ -269,6 +278,7 @@ class SettingsItemRow extends ConsumerWidget {
           : 'Automatic backup is off',
       SettingsItem.share => 'Send a friend the link',
       SettingsItem.rate => 'Leave a rating on Google Play',
+      SettingsItem.help => 'Answers to common questions',
       SettingsItem.feedback => 'Email the developer',
       SettingsItem.privacy => 'What leaves your device, and when',
       SettingsItem.terms => 'The rules for using Zeolite',

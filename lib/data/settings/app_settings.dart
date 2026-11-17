@@ -113,6 +113,7 @@ class AppSettings {
     this.launchAnimation = LaunchAnimation.full,
     this.onboarded = false,
     this.welcomeShown = false,
+    this.tourSeen = true,
     this.adult,
     this.ageFrom,
     this.shareUsage,
@@ -263,6 +264,13 @@ class AppSettings {
   /// they had already made.
   final bool welcomeShown;
 
+  /// Whether the walkthrough on Today has been finished or skipped. True by
+  /// default so only a stored false starts it: [SettingsService.load] gives a
+  /// fresh install false, and an install that finished setup before the tour
+  /// existed true, since it is past the point the tour explains.
+  /// Device-local: a backup restored here must not replay or cancel it.
+  final bool tourSeen;
+
   /// The answer to "Are you 18 or older?", null until it is given. No keeps
   /// the app on the device: nothing is measured, synced or sent to the server.
   /// Device-local and out of the export, like the two choices below: a backup
@@ -402,6 +410,7 @@ class AppSettings {
     LaunchAnimation? launchAnimation,
     bool? onboarded,
     bool? welcomeShown,
+    bool? tourSeen,
     bool? adult,
     AgeFrom? ageFrom,
     bool clearAnswers = false,
@@ -459,6 +468,7 @@ class AppSettings {
       launchAnimation: launchAnimation ?? this.launchAnimation,
       onboarded: onboarded ?? this.onboarded,
       welcomeShown: welcomeShown ?? this.welcomeShown,
+      tourSeen: tourSeen ?? this.tourSeen,
       // All three unanswered again, so both first-run screens ask once more
       // rather than a consent given before a Play lock carrying over.
       adult: clearAnswers ? null : adult ?? this.adult,
@@ -545,6 +555,7 @@ class AppSettings {
   /// sync run at an account this device never agreed with.
   AppSettings onDeviceOf(AppSettings current) => copyWith(
         welcomeShown: current.welcomeShown,
+        tourSeen: current.tourSeen,
         syncedAccountId: current.syncedAccountId,
         syncedNotionDatabaseId: current.syncedNotionDatabaseId,
         lastSyncAt: current.lastSyncAt,
@@ -600,6 +611,7 @@ class SettingsService {
   static const String _kOnboarded = 'ut.onboarded';
   static const String _kLaunchAnimation = 'ut.launchAnimation';
   static const String _kWelcomeShown = 'ut.welcomeShown';
+  static const String _kTourSeen = 'ut.tourSeen';
   static const String _kAdult = 'ut.adult';
   static const String _kAgeFrom = 'ut.ageFrom';
   static const String _kShareUsage = 'ut.shareUsage';
@@ -671,6 +683,9 @@ class SettingsService {
       // first run, so updating into this version must not put the sign-in
       // choice in front of someone who has been using the app for months.
       welcomeShown: await prefs.getBool(_kWelcomeShown) ?? onboarded,
+      // The same reasoning: someone updating after finishing setup already
+      // knows their way round, so only a new install is shown the tour.
+      tourSeen: await prefs.getBool(_kTourSeen) ?? onboarded,
       // No fallback for an existing install: nobody has answered these yet.
       adult: await prefs.getBool(_kAdult),
       ageFrom: AgeFrom.fromName(await prefs.getString(_kAgeFrom)),
@@ -782,6 +797,7 @@ class SettingsService {
     await prefs.setString(_kLaunchAnimation, settings.launchAnimation.name);
     await prefs.setBool(_kOnboarded, settings.onboarded);
     await prefs.setBool(_kWelcomeShown, settings.welcomeShown);
+    await prefs.setBool(_kTourSeen, settings.tourSeen);
     await _setOrRemove(_kAdult, settings.adult);
     if (settings.ageFrom == null) {
       await prefs.remove(_kAgeFrom);

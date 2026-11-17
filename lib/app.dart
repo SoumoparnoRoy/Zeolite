@@ -20,6 +20,8 @@ import 'features/stats/stats_view.dart';
 import 'features/timetable/timetable_screen.dart';
 import 'features/timetable/week_widget_image.dart';
 import 'features/today/today_screen.dart';
+import 'features/tour/tour_launcher.dart';
+import 'features/tour/tour_stops.dart';
 import 'state/home_widget_providers.dart';
 import 'state/notion_sync_providers.dart';
 import 'state/privacy_providers.dart';
@@ -278,6 +280,20 @@ class _RootShellState extends ConsumerState<RootShell> with RouteAware {
     });
   }
 
+  /// Puts the tour's stops on screen: Today, in its day view, with the bar
+  /// showing. A cut rather than a slide, so the tour measures where they end
+  /// up rather than where they were mid-slide.
+  void _prepareForTour() {
+    _showNav(true);
+    if (ref.read(homeViewProvider) == HomeView.grid) {
+      ref.read(homeViewProvider.notifier).toggle();
+    }
+    final int today = shellTabs.indexOf('today');
+    if (_pages.hasClients && _pages.page?.round() != today) {
+      _pages.jumpToPage(today);
+    }
+  }
+
   /// Due at most once a day and a date comparison the rest of the time, so a
   /// launch and every return to the app can both ask.
   void _maybeBackUp() =>
@@ -505,96 +521,103 @@ class _RootShellState extends ConsumerState<RootShell> with RouteAware {
   Widget build(BuildContext context) {
     final int index = ref.watch(selectedTabProvider);
     final int today = shellTabs.indexOf('today');
+    final TourTargets targets = ref.watch(tourTargetsProvider);
     // Back steps out to Today before it leaves the app.
-    return PopScope(
-      canPop: index == today,
-      onPopInvokedWithResult: (bool didPop, Object? _) {
-        if (!didPop) _select(today);
-      },
-      child: Scaffold(
-        // The day pills, Home's date pager and the settings sliders are deeper
-        // in the tree, so they take a sideways drag before this pager sees it.
-        // Measured here, above the screens, to lift a list as the bar comes
-        // back; see [_liftAsBarReturns].
-        body: LayoutBuilder(
-          builder: (BuildContext context, BoxConstraints constraints) {
-            _liftAsBarReturns(constraints.maxHeight);
-            return NavBarScroll(
-              report: _onScroll,
-              show: _bringBarBack,
-              child: PageView(
-                controller: _pages,
-                onPageChanged: _onPageChanged,
-                children: <Widget>[
-                  for (final Widget screen in _screens)
-                    // Listened per page rather than around the pager, which
-                    // would otherwise count as a level and hide every screen's
-                    // own scroll from [RootShell.navVisibleFor].
-                    KeptAlive(
-                      child: NotificationListener<ScrollNotification>(
-                        onNotification: _onDrag,
-                        child: NotificationListener<UserScrollNotification>(
-                          onNotification: _onScroll,
-                          child: screen,
+    return TourLauncher(
+      onPrepare: _prepareForTour,
+      child: PopScope(
+        canPop: index == today,
+        onPopInvokedWithResult: (bool didPop, Object? _) {
+          if (!didPop) _select(today);
+        },
+        child: Scaffold(
+          // The day pills, Home's date pager and the settings sliders are deeper
+          // in the tree, so they take a sideways drag before this pager sees it.
+          // Measured here, above the screens, to lift a list as the bar comes
+          // back; see [_liftAsBarReturns].
+          body: LayoutBuilder(
+            builder: (BuildContext context, BoxConstraints constraints) {
+              _liftAsBarReturns(constraints.maxHeight);
+              return NavBarScroll(
+                report: _onScroll,
+                show: _bringBarBack,
+                child: PageView(
+                  controller: _pages,
+                  onPageChanged: _onPageChanged,
+                  children: <Widget>[
+                    for (final Widget screen in _screens)
+                      // Listened per page rather than around the pager, which
+                      // would otherwise count as a level and hide every screen's
+                      // own scroll from [RootShell.navVisibleFor].
+                      KeptAlive(
+                        child: NotificationListener<ScrollNotification>(
+                          onNotification: _onDrag,
+                          child: NotificationListener<UserScrollNotification>(
+                            onNotification: _onScroll,
+                            child: screen,
+                          ),
                         ),
                       ),
+                  ],
+                ),
+              );
+            },
+          ),
+          // A shadow rather than a rule: the tab row is the one piece of chrome
+          // that has to stay above the sheet, and a hairline read as one more
+          // divider among the day rules above it.
+          // Collapsed rather than slid away, so the sheet gains the room instead
+          // of scrolling underneath it.
+          bottomNavigationBar: ClipRect(
+            clipper: const _NavBarClip(),
+            child: AnimatedAlign(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              alignment: Alignment.topCenter,
+              heightFactor: _navVisible ? 1 : 0,
+              onEnd: () => _liftWithBar = null,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: context.palette.navSurface,
+                  boxShadow: <BoxShadow>[
+                    BoxShadow(
+                      color: context.palette.isDark
+                          ? Colors.black.withValues(alpha: 0.5)
+                          : const Color(0x174C4696),
+                      blurRadius: 16,
+                      offset: const Offset(0, -2),
                     ),
-                ],
-              ),
-            );
-          },
-        ),
-        // A shadow rather than a rule: the tab row is the one piece of chrome
-        // that has to stay above the sheet, and a hairline read as one more
-        // divider among the day rules above it.
-        // Collapsed rather than slid away, so the sheet gains the room instead
-        // of scrolling underneath it.
-        bottomNavigationBar: ClipRect(
-          clipper: const _NavBarClip(),
-          child: AnimatedAlign(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOutCubic,
-            alignment: Alignment.topCenter,
-            heightFactor: _navVisible ? 1 : 0,
-            onEnd: () => _liftWithBar = null,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: context.palette.navSurface,
-                boxShadow: <BoxShadow>[
-                  BoxShadow(
-                    color: context.palette.isDark
-                        ? Colors.black.withValues(alpha: 0.5)
-                        : const Color(0x174C4696),
-                    blurRadius: 16,
-                    offset: const Offset(0, -2),
-                  ),
-                ],
-              ),
-              child: NavigationBar(
-                selectedIndex: index,
-                onDestinationSelected: _select,
-                destinations: const <NavigationDestination>[
-                  NavigationDestination(
-                    icon: Icon(Icons.today_outlined),
-                    selectedIcon: Icon(Icons.today_rounded),
-                    label: 'Today',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.view_week_outlined),
-                    selectedIcon: Icon(Icons.view_week_rounded),
-                    label: 'Timetable',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.insights_outlined),
-                    selectedIcon: Icon(Icons.insights_rounded),
-                    label: 'Stats',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.settings_outlined),
-                    selectedIcon: Icon(Icons.settings_rounded),
-                    label: 'Settings',
-                  ),
-                ],
+                  ],
+                ),
+                child: NavigationBar(
+                  selectedIndex: index,
+                  onDestinationSelected: _select,
+                  destinations: <NavigationDestination>[
+                    const NavigationDestination(
+                      icon: Icon(Icons.today_outlined),
+                      selectedIcon: Icon(Icons.today_rounded),
+                      label: 'Today',
+                    ),
+                    NavigationDestination(
+                      key: targets.keyFor(TourTarget.timetableTab),
+                      icon: const Icon(Icons.view_week_outlined),
+                      selectedIcon: const Icon(Icons.view_week_rounded),
+                      label: 'Timetable',
+                    ),
+                    NavigationDestination(
+                      key: targets.keyFor(TourTarget.statsTab),
+                      icon: const Icon(Icons.insights_outlined),
+                      selectedIcon: const Icon(Icons.insights_rounded),
+                      label: 'Stats',
+                    ),
+                    NavigationDestination(
+                      key: targets.keyFor(TourTarget.settingsTab),
+                      icon: const Icon(Icons.settings_outlined),
+                      selectedIcon: const Icon(Icons.settings_rounded),
+                      label: 'Settings',
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

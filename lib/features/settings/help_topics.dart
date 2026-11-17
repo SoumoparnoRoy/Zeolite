@@ -23,6 +23,15 @@ class HelpSection {
 // Every answer here was checked against the code it describes. When that code
 // changes, so does the answer: the store listing words it the same way.
 const List<HelpSection> helpSections = <HelpSection>[
+  HelpSection('Getting started', <HelpQuestion>[
+    HelpQuestion(
+      'tour',
+      'Can I see the tour again?',
+      'Yes. In Settings, tap Show tour again under About. It goes through the '
+          'same stops and changes nothing in the app.',
+      'walkthrough guide intro tips replay',
+    ),
+  ]),
   HelpSection('Skipping classes', <HelpQuestion>[
     HelpQuestion(
       'skip-now',

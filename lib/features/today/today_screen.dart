@@ -19,6 +19,7 @@ import '../../widgets/nav_bar_scroll.dart';
 import '../../widgets/shell_routes.dart';
 import '../subjects/class_editor_sheets.dart';
 import '../timetable/week_grid_view.dart';
+import '../tour/tour_stops.dart';
 import 'day_page.dart';
 import 'week_strip.dart';
 
@@ -204,6 +205,9 @@ class _TodayScreenState extends ConsumerState<TodayScreen> with RouteAware {
               (timetable?.extras.isEmpty ?? true)
           ? null
           : GradientFab(
+              // The tour's first stop once classes exist, on a replay.
+              key:
+                  ref.watch(tourTargetsProvider).keyFor(TourTarget.addClassFab),
               label: 'Add class',
               onPressed: () =>
                   showAddClassSheet(context, initialDate: selected),
@@ -253,7 +257,11 @@ class _TodayScreenState extends ConsumerState<TodayScreen> with RouteAware {
                     if (view == HomeView.grid)
                       _weekPage(Dates.startOfWeek(date))
                     else
-                      TodayDayPage(date: date, column: column),
+                      TodayDayPage(
+                        date: date,
+                        column: column,
+                        selected: Dates.isSameDay(date, selected),
+                      ),
                   ],
                 ),
               ),
@@ -283,6 +291,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> with RouteAware {
   }
 
   Widget _dayHeader(DateTime selected) => _DayHeader(
+        stripKey: ref.watch(tourTargetsProvider).keyFor(TourTarget.weekStrip),
         selected: selected,
         isToday: Dates.isSameDay(selected, Dates.today()),
         stats: ref.watch(statsProvider),
@@ -347,6 +356,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> with RouteAware {
 /// move around in, and the number the verdict came from.
 class _DayHeader extends StatelessWidget {
   const _DayHeader({
+    required this.stripKey,
     required this.selected,
     required this.isToday,
     required this.stats,
@@ -357,6 +367,8 @@ class _DayHeader extends StatelessWidget {
     required this.onToggleView,
   });
 
+  /// Where the tour finds the week strip.
+  final GlobalKey stripKey;
   final DateTime selected;
   final bool isToday;
   final OverallStats stats;
@@ -412,6 +424,7 @@ class _DayHeader extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         WeekStrip(
+          key: stripKey,
           selected: selected,
           markers: markers,
           onSelected: onSelectDay,

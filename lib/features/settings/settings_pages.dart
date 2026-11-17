@@ -19,6 +19,7 @@ import '../../widgets/gradient_header.dart';
 import '../launch/welcome_screen.dart';
 import '../subjects/subjects_screen.dart';
 import '../timetable/import_screen.dart';
+import '../tour/tour_stops.dart';
 
 import 'account_screen.dart';
 import 'appearance_section.dart';
@@ -88,6 +89,7 @@ enum SettingsItem {
   share('Share Zeolite', Icons.share_outlined, SettingsGroup.about),
   rate('Rate Zeolite', Icons.star_outline_rounded, SettingsGroup.about),
   help('Help and FAQ', Icons.help_outline_rounded, SettingsGroup.about),
+  tour('Show tour again', Icons.tour_outlined, SettingsGroup.about),
   feedback('Send feedback', Icons.mail_outline_rounded, SettingsGroup.about),
   privacy('Privacy Policy', Icons.privacy_tip_outlined, SettingsGroup.about),
   terms('Terms of Use', Icons.gavel_rounded, SettingsGroup.about),
@@ -131,6 +133,10 @@ enum SettingsItem {
         return;
       case feedback:
         return sendFeedback(context, ref);
+      case tour:
+        // The shell runs it: the stops are on Today, which it brings forward.
+        ref.read(tourReplayProvider.notifier).request();
+        return;
       case privacy:
         unawaited(launchUrl(WelcomeCopy.privacyUrl,
             mode: LaunchMode.inAppBrowserView));
@@ -193,6 +199,7 @@ enum SettingsItem {
         // place a user can read them.
         licences => const LicencesScreen(),
         importClassLog ||
+        tour ||
         share ||
         rate ||
         feedback ||
@@ -279,6 +286,7 @@ class SettingsItemRow extends ConsumerWidget {
       SettingsItem.share => 'Send a friend the link',
       SettingsItem.rate => 'Leave a rating on Google Play',
       SettingsItem.help => 'Answers to common questions',
+      SettingsItem.tour => 'A quick look at the main screens',
       SettingsItem.feedback => 'Email the developer',
       SettingsItem.privacy => 'What leaves your device, and when',
       SettingsItem.terms => 'The rules for using Zeolite',

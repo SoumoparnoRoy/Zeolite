@@ -16,6 +16,7 @@ import '../../widgets/common.dart';
 import '../../widgets/tag_picker.dart';
 import '../../widgets/undo_snack.dart';
 import '../subjects/class_editor_sheets.dart';
+import '../tour/tour_stops.dart';
 import 'session_card.dart';
 
 /// One day on Today: its notices, then a card per class to mark.
@@ -23,9 +24,18 @@ import 'session_card.dart';
 /// A group of slivers rather than a box, so it sits in the page's scroll view
 /// exactly where the slivers it replaced did.
 class TodayDayPage extends ConsumerWidget {
-  const TodayDayPage({super.key, required this.date, required this.column});
+  const TodayDayPage({
+    super.key,
+    required this.date,
+    required this.column,
+    this.selected = false,
+  });
 
   final DateTime date;
+
+  /// Only the day on show carries the tour's key: the pager can build its
+  /// neighbours too, and a key can be in one place at a time.
+  final bool selected;
 
   /// The centred column every screen keeps to. Applied to each sliver rather
   /// than to the pager, so a swipe anywhere still turns the day.
@@ -181,6 +191,9 @@ class TodayDayPage extends ConsumerWidget {
               message: 'Add your first class and Zeolite starts tracking '
                   'attendance for it.',
               action: FilledButton.icon(
+                key: selected
+                    ? ref.watch(tourTargetsProvider).keyFor(TourTarget.addClass)
+                    : null,
                 onPressed: () => showAddClassSheet(context, initialDate: date),
                 icon: const Icon(Icons.add_rounded),
                 label: const Text('Add your first class'),

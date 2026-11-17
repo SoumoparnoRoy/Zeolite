@@ -41,6 +41,16 @@ void main() {
     }
   });
 
+  test('the tour can be found, by name or by another word for it', () {
+    expect(searchSettings('tour').first.item, SettingsItem.tour);
+    expect(searchSettings('walkthrough').first.item, SettingsItem.tour);
+    // Its Help answer follows the row.
+    expect(
+      searchSettings('tour').map((SettingsTopic t) => t.helpQuestion),
+      contains('tour'),
+    );
+  });
+
   test('words match from their start only, and blank finds nothing', () {
     expect(titles('ckup'), isEmpty);
     expect(titles('   '), isEmpty);

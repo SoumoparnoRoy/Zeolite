@@ -131,6 +131,11 @@ final List<SettingsTopic> settingsTopics = <SettingsTopic>[
     'faq questions answers how support',
   ),
   SettingsTopic(
+    'Show tour again',
+    SettingsItem.tour,
+    'walkthrough guide intro introduction tips replay',
+  ),
+  SettingsTopic(
     'Send feedback',
     SettingsItem.feedback,
     'email contact support bug report',

@@ -15,6 +15,10 @@ before you skip a lecture.
 [![Node](https://img.shields.io/badge/Server-Node%2024-5FA04E?logo=nodedotjs&logoColor=white)](server/README.md)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
+**Status:** in closed testing on Google Play, version 1.1.0. To join as a
+tester, email [zeolite.help@gmail.com](mailto:zeolite.help@gmail.com) and I'll
+add you to the tester list.
+
 </div>
 
 <p align="center">
@@ -45,9 +49,8 @@ a yes on first start, and never for anyone under 18;
 **Marking and numbers**
 - One tap for Present, Absent or Cancelled. Tapping the status a class already
   has clears it. Tags such as "Proxy" or "Online" record how a class went.
-- Not just a percentage: how many classes you can still skip, how many you need
-  to attend in a row to recover, and whether the target is still reachable this
-  term.
+- How many classes you can still skip, how many you need to attend in a row to
+  recover, and whether the target is still reachable this term.
 - A target for the whole term (75% by default) and an override per subject.
 - Stats in three views: Overview, Counts (for subjects with no timetable, or a
   balance carried over from before the app) and Plan (the term's skip budget per
@@ -72,7 +75,7 @@ a yes on first start, and never for anyone under 18;
   would create before anything is written.
 - When the photo read looks doubtful, the app can offer to check it with AI.
   It asks every time and never remembers a yes.
-- Read your totals off a photo of the college portal's attendance page, or
+- Read your totals off a photo of the university portal's attendance page, or
   import a CSV class log or an existing Notion table.
 
 **Outside the app**
@@ -91,6 +94,10 @@ a yes on first start, and never for anyone under 18;
   you pick once.
 - Light, dark or system theme, seven accent colours and a launcher icon to
   match each.
+- A short tour on first launch points at where to start, and can be skipped or
+  shown again from Settings. Help and FAQ answers common questions and shows up
+  in Settings search. Send feedback opens a draft in your email app with the
+  app and Android versions filled in; nothing is sent from the app itself.
 
 ## Tech stack
 
@@ -104,7 +111,7 @@ a yes on first start, and never for anyone under 18;
 | home_widget plus Kotlin | Home-screen widgets | Android can't render Flutter into a widget. Dart builds the payload; Kotlin only draws it. |
 | flutter_local_notifications | Reminders and class-end actions | Exact local scheduling with no server. |
 | Firebase Auth and Cloud Firestore | Optional account and sync | Security rules give per-user access without a backend of my own for data. |
-| Firebase App Check, Crashlytics, Analytics | Server request checks, crash reports, usage counts | Crash reports send the error type and stack, never the message, so nothing typed in rides along. |
+| Firebase App Check, Crashlytics, Analytics | Request checks for the server and Firestore, crash reports, usage counts | Crash reports send the error type and stack, never the message, so nothing typed in rides along. |
 | Node 24 and Express 5 ([`server/`](server/README.md)) | Notion OAuth exchange and the AI timetable check | Holds the two secrets the APK can't carry. Small enough to read in one sitting. |
 | Cloudflare Workers AI | The model behind the AI check | A vision model on a free tier, called only from the server. |
 | Render | Hosts the server | Free tier, deploys from this repo. |
@@ -162,7 +169,7 @@ Backend details, endpoints and environment variables are in
 ## How I built it
 
 I wanted somewhere to update my own attendance every day and check it against
-my college portal, which can take a while to catch up. I wasn't keeping any
+my university portal, which can take a while to catch up. I wasn't keeping any
 record of my own before this.
 
 - **August 2026.** The first commit was *Attend It!*: a simple app for marking
@@ -176,14 +183,23 @@ record of my own before this.
   could ship. Home-screen widgets, the AI check for doubtful sheets, and
   claiming rows in a Notion table someone already keeps by hand. Four friends
   suggested features and lent me their timetables, which turned a parser for
-  one college's sheets into one that reads other layouts. Mid-month I split the
-  large classes (the class editor, settings, sync and actions) into smaller
-  pieces.
+  one university's sheets into one that reads other layouts. Mid-month I split
+  the large classes (the class editor, settings, sync and actions) into
+  smaller pieces.
 - **October 2026.** Review passes over the app, the server and security, then a
   dependency and secrets audit, and fixes for what they found. Crashlytics, a
   term skip budget, a Maestro regression suite against the Firebase emulators,
   and a device pass on a tablet and a phone, which found the widget bugs
   below.
+- **November 2026.** The app went into closed testing on Google Play on
+  6 November. Once Play-installed copies were passing App Check, I turned on
+  enforcement for Firestore, so it refuses requests App Check can't vouch
+  for. The photo reader learnt to cut merged lines at the table's drawn rules
+  and to read one-digit rooms like LT-1. The import screens stopped a double
+  tap from saving twice, delete their cached copies of picked files, and report
+  a class log that fails to read or write. Version 1.1.0 (build 7) added a help
+  screen, a first-launch tour and a feedback row, and has been the live release
+  since 18 November.
 
 ## Challenges
 
@@ -227,7 +243,7 @@ record of my own before this.
 <summary><b>Reading a timetable off a photo</b></summary>
 
 - **Problem:** timetables come as grids with merged cells, rooms written under
-  the class, break columns and sheets turned on their side, and each college
+  the class, break columns and sheets turned on their side, and each university
   lays them out differently.
 - **Cause:** text recognition gives words and boxes, not a table. Reading the
   table from text positions alone put rooms in the period below and dropped
@@ -273,13 +289,13 @@ record of my own before this.
 
 ## Testing and quality
 
-Numbers from runs on 27 October 2026:
+Numbers from runs on 18 November 2026:
 
 | Check | Result |
 |---|---|
-| `flutter test` | 1186 tests, all passing |
+| `flutter test` | 1359 tests, all passing |
 | `flutter analyze` (`flutter_lints`, extra rules, strict casts and inference) | No issues |
-| Server `npm test` | 57 tests, all passing |
+| Server `npm test` | 59 tests, all passing |
 | Server `npm run lint` and `npm run format:check` | Clean |
 | Firestore rules tests (`firestore-test/`, on the emulator) | 14 tests, all passing |
 
@@ -288,13 +304,15 @@ Numbers from runs on 27 October 2026:
   mapping round trip and row claiming, the OCR parsers, the notification rules,
   the widget payload, and widget tests for things like a double tap through a
   closing dialog.
-- **Regression flows:** seven Maestro flows in `.maestro/` (marking, creating
-  and deleting a subject, account sync and deletion, and the double-tap cases)
+- **Regression flows:** eight Maestro flows in `.maestro/` (marking, creating
+  and deleting a subject, account sync and deletion, a timetable photo import,
+  and the double-tap cases)
   run against the Firebase emulators on a device. They weren't part of the runs
   above.
 - **Security:** Firestore rules require a verified email to create or change
-  data, and cap field sizes. The server accepts each App Check token once and rate-limits per
-  route. The Notion callback is bound to the browser that started it. Android
+  data, and cap field sizes, and App Check is enforced on Firestore. The
+  server accepts each App Check token once and rate-limits per route. The
+  Notion callback is bound to the browser that started it. Android
   dependencies are locked in `android/app/gradle.lockfile`.
 - **No CI yet:** the checks above are run by hand before each commit.
 
@@ -369,14 +387,23 @@ To run the server locally, see [`server/README.md`](server/README.md).
 
 ## What I learnt
 
-I learnt a lot between the first commit and now, and I wouldn't do it
-differently. That path is what got me here, and nobody starts out knowing
-everything. You keep moving forward and learn as you go.
+The hard parts were where the pieces met. A mark made on a home-screen widget
+is drawn by Kotlin and saved by a background isolate, so the running app had to
+be told about it. With no server of my own in front of Firestore, the security
+rules had to do the checking, and they needed their own tests on the emulator.
+The server only exists for the two secrets an APK can't hold, and once strangers
+could install the app, App Check had to guard both the AI route and Firestore.
+Then the Play release brought its own work: signing, obfuscation, age and
+consent, and a privacy policy that matches what the code actually sends.
+
+I learnt to plan for each of those from the start, and to check a change on a
+real device as well as in tests. The device pass found bugs a green test run
+didn't.
 
 ## Credits
 
 Built by me. Four friends suggested features and lent their timetables for
-testing, which is what made the timetable reader work beyond my own college.
+testing, which is what made the timetable reader work beyond my own university.
 
 ## License
 

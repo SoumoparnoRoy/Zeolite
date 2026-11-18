@@ -36,6 +36,12 @@ own read.
 *Notion sync* is tapped, and when the connect screen opens, so a free instance
 that has spun down is awake before anyone taps Connect.
 
+**Minimum build.** The app reads `/version` when it starts, once the first-run
+questions are answered. An under-18 install never calls it, since it sends
+nothing to the server. If the app's build number is below `minBuild`, it shows
+an update screen instead of running. If the call fails or times out, the app
+opens as usual and checks again on the next launch.
+
 ## Architecture
 
 ```mermaid
@@ -61,7 +67,7 @@ flowchart LR
     Tab -->|GET /notion/start, /callback| Limit
     App -->|POST /notion/claim, /refresh| Limit
     App -->|POST /timetable/read| Limit
-    App -->|GET /health, no limit| Health[Health route]
+    App -->|GET /health, /version, no limit| Health[Health and version routes]
     Limit -->|GET| Notion
     Limit -->|POST| Parse --> Notion
     Limit --> Check --> Parse --> Read
@@ -252,7 +258,7 @@ To point a debug build of the app at a local server, build it with
 ### Tests and lint
 
 ```bash
-npm test              # node --test, 57 tests
+npm test              # node --test, 59 tests
 npm run lint          # ESLint
 npm run format:check  # Prettier; npm run format fixes it
 ```
@@ -287,22 +293,25 @@ What the code does today:
     requests to Google.
   - Each token is accepted once. The app asks for a limited-use token per
     read.
-  - The Notion routes don't check App Check yet. They will once the app is on
-    Google Play and App Check enforcement is turned on.
-- **Limits.** Per-IP rate limits on every route except `/health`, the daily
-  Workers AI cap, and body limits: Express's default 100 KB on the Notion
-  routes, 6 MB on `/timetable/read`, and 3 MB for the decoded image. The
-  recognised text is cut to 20,000 characters.
+  - The Notion routes don't check App Check.
+- **Limits.** Per-IP rate limits on every route except `/health` and
+  `/version`, the daily Workers AI cap, and body limits: Express's default
+  100 KB on the Notion routes, 6 MB on `/timetable/read`, and 3 MB for the
+  decoded image. The recognised text is cut to 20,000 characters.
 - **Input checks.** The challenge must match its format, and the image type is
   read from its bytes rather than taken from the caller.
-- **Headers.** `X-Powered-By` is off, and the callback pages send
+- **Headers.** `X-Powered-By` is off. Every reply sends
+  `Strict-Transport-Security: max-age=31536000`, `X-Content-Type-Options: nosniff`,
+  `X-Frame-Options: DENY` and `Referrer-Policy: no-referrer`, and the callback
+  pages also send
   `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'`.
   No CORS headers are set, so a script on another site can't read a response.
 - **Errors and logs.**
   - Callers get a fixed message, never a stack trace or an upstream body.
-  - Logs carry status codes, error names and network causes only. No token,
-    request body or model reply is logged, because a parse error would quote
-    the body, which on `/notion/refresh` is a refresh token.
+  - Logs carry status codes, error names, the service's own error messages,
+    network causes and why an image was refused. No token, request body or
+    model reply is logged, because a parse error would quote the body, which
+    on `/notion/refresh` is a refresh token.
 - **Nothing kept.** No token is held after a claim, and no image or text after
   the reply.
 
@@ -359,7 +368,7 @@ that touches `server/**` deploys it again.
 | --- | --- |
 | `Missing required environment variables: …` at start | One of the three Notion variables isn't set. `npm start` doesn't read `.env`; `npm run dev` does. |
 | `Cannot listen on port 8080: EADDRINUSE` | Something else has the port. Set `PORT`. |
-| `TRUST_PROXY must be a whole number, got "…"` | A typo in `TRUST_PROXY` or `AI_DAILY_CALLS` |
+| `TRUST_PROXY must be a whole number, got "…"` | A typo in `TRUST_PROXY`, `AI_DAILY_CALLS` or `MIN_BUILD`; the message names the variable |
 | `Image reading is off, missing: …` | Only some of the three image-reading variables are set |
 | Everyone gets `429` at once behind a proxy | `TRUST_PROXY` is `0`, so every caller shares the proxy's address |
 | `/timetable/read` always `401` | No token, a token for another project (logged as `App Check not verified` with a claim error, which means a wrong `FIREBASE_PROJECT_NUMBER`), or a token used twice (logged as `App Check token used twice`) |

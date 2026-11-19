@@ -11,7 +11,7 @@ weekly schedule once, mark each class with one tap, and get a straight answer
 before you skip a lecture.
 
 [![Platform](https://img.shields.io/badge/Platform-Android-3DDC84?logo=android&logoColor=white)](#getting-started)
-[![Flutter](https://img.shields.io/badge/Flutter-3.47.8+-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
+[![Flutter](https://img.shields.io/badge/Flutter-3.47.9+-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![Node](https://img.shields.io/badge/Server-Node%2024-5FA04E?logo=nodedotjs&logoColor=white)](server/README.md)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
@@ -318,7 +318,7 @@ Numbers from runs on 18 November 2026:
 
 ## Getting started
 
-**Prerequisites:** Flutter 3.47.8 or newer, an Android device or emulator, and
+**Prerequisites:** Flutter 3.47.9 or newer, an Android device or emulator, and
 your own Firebase project.
 
 1. Clone and fetch packages:

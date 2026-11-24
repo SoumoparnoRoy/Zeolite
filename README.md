@@ -15,9 +15,8 @@ before you skip a lecture.
 [![Node](https://img.shields.io/badge/Server-Node%2024-5FA04E?logo=nodedotjs&logoColor=white)](server/README.md)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
-**Status:** in closed testing on Google Play, version 1.1.0. To join as a
-tester, email [zeolite.help@gmail.com](mailto:zeolite.help@gmail.com) and I'll
-add you to the tester list.
+**Status:** on Google Play, version 1.1.1.
+[Get it on Google Play](https://play.google.com/store/apps/details?id=com.soumoparno.zeolite)
 
 </div>
 
@@ -198,8 +197,9 @@ record of my own before this.
   and to read one-digit rooms like LT-1. The import screens stopped a double
   tap from saving twice, delete their cached copies of picked files, and report
   a class log that fails to read or write. Version 1.1.0 (build 7) added a help
-  screen, a first-launch tour and a feedback row, and has been the live release
-  since 18 November.
+  screen, a first-launch tour and a feedback row, and went live on 18 November.
+  Version 1.1.1 (build 8) moved to Flutter 3.47.9 and went public on Google
+  Play on 24 November.
 
 ## Challenges
 

@@ -302,3 +302,35 @@ test("the minimum build is 0 until it is set, and a typo stops start-up", async 
     delete process.env.MIN_BUILD;
   }
 });
+
+test("a refresh is logged, never refused, when its App Check token is missing or fails", async () => {
+  let stderr = "";
+  const originalWrite = process.stderr.write;
+  process.stderr.write = (chunk) => {
+    stderr += String(chunk);
+    return true;
+  };
+  const statuses = [];
+  const logged = [];
+  try {
+    for (const headers of [{}, { "X-Firebase-AppCheck": "forged" }, null]) {
+      nextWindow();
+      stderr = "";
+      const token = headers ?? { "X-Firebase-AppCheck": await attestation() };
+      const response = await post(
+        `${baseUrl}/notion/refresh`,
+        { refresh_token: "generic-refresh-token" },
+        token,
+      );
+      statuses.push(response.status);
+      logged.push(stderr);
+    }
+  } finally {
+    process.stderr.write = originalWrite;
+  }
+  assert.deepEqual(statuses, [200, 200, 200]);
+  assert.match(logged[0], /Notion refresh without App Check/);
+  assert.match(logged[1], /Notion refresh with a failed App Check token/);
+  assert.doesNotMatch(logged[2], /App Check/);
+  assert.doesNotMatch(logged.join(), /generic-refresh-token/);
+});

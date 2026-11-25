@@ -5,8 +5,8 @@ const SWEEP_INTERVAL_MS = 60 * 1000;
 const PAIRING_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
 
 // Anyone can start a session, so many addresses would grow this without end;
-// one app never has thousands of people connecting in the same five minutes.
-const MOST_SESSIONS = 5000;
+// a session is a few hundred bytes, so even full this is tens of megabytes.
+const MOST_SESSIONS = 50_000;
 
 function randomPairingCode() {
   let code = "";
@@ -16,7 +16,7 @@ function randomPairingCode() {
   return code;
 }
 
-export function createSessionStore({ now = Date.now } = {}) {
+export function createSessionStore({ now = Date.now, capacity = MOST_SESSIONS } = {}) {
   const byId = new Map();
   const byState = new Map();
   const byPairingCode = new Map();
@@ -49,12 +49,21 @@ export function createSessionStore({ now = Date.now } = {}) {
   const sweepTimer = setInterval(removeExpired, SWEEP_INTERVAL_MS);
   sweepTimer.unref();
 
-  function create(challenge) {
-    if (byId.size >= MOST_SESSIONS) {
-      removeExpired();
-      if (byId.size >= MOST_SESSIONS) {
-        return undefined;
+  // Refusing when full let a few hundred addresses lock everyone out. A session
+  // approved in Notion is kept; Map order is age order, so this stops early.
+  function makeRoom() {
+    for (const session of byId.values()) {
+      if (isExpired(session) || session.status === "pending") {
+        remove(session);
+        return true;
       }
+    }
+    return false;
+  }
+
+  function create(challenge) {
+    if (byId.size >= capacity && !makeRoom()) {
+      return undefined;
     }
     // A shared code would leave one of the two sessions unreachable by code.
     let pairingCode;

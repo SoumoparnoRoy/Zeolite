@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -12,8 +14,15 @@ const String _tokenPayload = '{"access_token":"secret-token",'
     '"refresh_token":"secret-refresh","bot_id":"bot-1",'
     '"workspace_id":"ws-1","workspace_name":"Study"}';
 
-NotionAuthClient _client(MockClient mock) =>
-    NotionAuthClient(httpClient: mock, baseUri: _base);
+NotionAuthClient _client(
+  MockClient mock, {
+  Future<String?> Function()? appCheckToken,
+}) =>
+    NotionAuthClient(
+      httpClient: mock,
+      baseUri: _base,
+      appCheckToken: appCheckToken ?? () async => 'app-check-token',
+    );
 
 void main() {
   test('the browser is sent the challenge and nothing else', () {
@@ -84,6 +93,45 @@ void main() {
     expect(result.ok, isTrue);
     expect(result.tokens!.accessToken, 'fresh');
     expect(result.tokens!.refreshToken, isNull);
+  });
+
+  test('a refresh carries App Check, and still goes out when there is none',
+      () async {
+    final List<http.Request> sent = <http.Request>[];
+    MockClient recording() => MockClient((http.Request r) async {
+          sent.add(r);
+          return http.Response(_tokenPayload, 200);
+        });
+
+    await _client(recording()).refresh('secret-refresh');
+    await _client(
+      recording(),
+      appCheckToken: () async => throw Exception('no attestation'),
+    ).refresh('secret-refresh');
+    await _client(recording()).claim(session: 's', verifier: 'v');
+
+    expect(sent[0].headers['X-Firebase-AppCheck'], 'app-check-token');
+    expect(sent[1].url.path, '/notion/refresh');
+    expect(sent[1].headers.containsKey('X-Firebase-AppCheck'), isFalse);
+    expect(sent[2].headers.containsKey('X-Firebase-AppCheck'), isFalse);
+  });
+
+  test('a stalled App Check token does not hold the refresh back', () {
+    fakeAsync((FakeAsync async) {
+      final List<http.Request> sent = <http.Request>[];
+      _client(
+        MockClient((http.Request r) async {
+          sent.add(r);
+          return http.Response(_tokenPayload, 200);
+        }),
+        appCheckToken: () => Completer<String?>().future,
+      ).refresh('secret-refresh');
+
+      async.elapse(const Duration(seconds: 11));
+
+      expect(sent, hasLength(1));
+      expect(sent.single.headers.containsKey('X-Firebase-AppCheck'), isFalse);
+    });
   });
 
   test('an unreachable service is offline, not a rejection', () async {

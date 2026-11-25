@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { after, before, test } from "node:test";
 import { createApp } from "../src/index.js";
+import { createRateLimiter } from "../src/limit.js";
 import { createSessionStore } from "../src/sessions.js";
 
 process.env.NOTION_CLIENT_ID = "test-client";
@@ -239,17 +240,29 @@ test("a session that runs out during the exchange is not shown as ready", async 
   currentTime += 61_000;
 });
 
-test("the session store refuses new sessions once full, until some expire", () => {
+test("a full session store drops the oldest unfinished session, never an approved one", () => {
   let time = 0;
-  const store = createSessionStore({ now: () => time });
-  for (let index = 0; index < 5000; index += 1) {
-    assert.ok(store.create(challenge));
-  }
-  assert.equal(store.create(challenge), undefined);
-  time += 5 * 60 * 1000;
+  const store = createSessionStore({ now: () => time, capacity: 3 });
+  const approved = store.create(challenge);
+  approved.status = "ready";
+  const oldest = store.create(challenge);
+  const newer = store.create(challenge);
+
   const fresh = store.create(challenge);
   assert.equal(store.getByState(fresh.state), fresh);
   assert.equal(store.getByPairingCode(fresh.pairingCode.toLowerCase()), fresh);
+  assert.equal(store.getById(approved.id), approved);
+  assert.equal(store.getById(newer.id), newer);
+  assert.equal(store.getById(oldest.id), undefined);
+  assert.equal(store.getByState(oldest.state), undefined);
+  assert.equal(store.getByPairingCode(oldest.pairingCode), undefined);
+
+  // Refused only when every session is approved and still waiting to be claimed.
+  newer.status = "ready";
+  fresh.status = "ready";
+  assert.equal(store.create(challenge), undefined);
+  time += 5 * 60 * 1000;
+  assert.ok(store.create(challenge));
 });
 
 test("claim rejects the wrong verifier", async () => {
@@ -416,4 +429,24 @@ test("health stays answerable when a route's rate limit is spent", async () => {
   }
   const response = await fetch(`${baseUrl}/health`);
   assert.equal(response.status, 200);
+});
+
+test("the rate limit counts an IPv6 /64 as one caller and IPv4 per address", () => {
+  const enforce = createRateLimiter({ now: () => 0 })("/test", 1);
+  const allowed = (ip) => {
+    let passed = false;
+    const response = { status: () => ({ json: () => {} }) };
+    enforce({ ip }, response, () => {
+      passed = true;
+    });
+    return passed;
+  };
+
+  assert.ok(allowed("2001:db8:1:2::1"));
+  assert.ok(!allowed("2001:DB8:1:2:ffff::9"));
+  assert.ok(allowed("2001:db8:1:3::1"));
+  assert.ok(allowed("192.0.2.1"));
+  assert.ok(allowed("192.0.2.2"));
+  assert.ok(allowed("::ffff:192.0.2.3"));
+  assert.ok(allowed("::ffff:192.0.2.4"));
 });

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
@@ -77,9 +78,14 @@ class NotionAuthResult {
 /// Attendance never comes through here — once connected the app calls Notion
 /// directly, so this is reached twice in a user's life.
 class NotionAuthClient {
-  NotionAuthClient({http.Client? httpClient, Uri? baseUri})
-      : _http = httpClient ?? http.Client(),
-        _base = baseUri ?? Uri.parse(defaultBaseUrl);
+  NotionAuthClient({
+    http.Client? httpClient,
+    Uri? baseUri,
+    Future<String?> Function()? appCheckToken,
+  })  : _http = httpClient ?? http.Client(),
+        _base = baseUri ?? Uri.parse(defaultBaseUrl),
+        _appCheckToken = appCheckToken ??
+            (() => FirebaseAppCheck.instance.getLimitedUseToken());
 
   static const String defaultBaseUrl = Endpoints.server;
 
@@ -93,8 +99,11 @@ class NotionAuthClient {
   /// has just served `/start` and `/callback` and is certainly awake.
   static const Duration _callTimeout = Duration(seconds: 30);
 
+  static const Duration _tokenTimeout = Duration(seconds: 10);
+
   final http.Client _http;
   final Uri _base;
+  final Future<String?> Function() _appCheckToken;
 
   /// Called when the connect screen opens, so the host is awake before anyone
   /// taps Connect. Advisory: false means the wake-up did not land in time, not
@@ -151,22 +160,40 @@ class NotionAuthClient {
   }
 
   /// Reactive only — call this when Notion answers 401, never on a timer.
-  Future<NotionAuthResult> refresh(String refreshToken) => _post(
+  Future<NotionAuthResult> refresh(String refreshToken) async => _post(
         '/notion/refresh',
         <String, String>{'refresh_token': refreshToken},
         _wakeTimeout,
+        appCheck: await _appCheckOrNull(),
       );
+
+  /// The service only logs a refresh without a token for now, so a device that
+  /// cannot get one still refreshes rather than losing its connection over it.
+  /// The token comes through Play Integrity, which can stall, and the refresh
+  /// timeout only covers the request itself.
+  Future<String?> _appCheckOrNull() async {
+    try {
+      final String? token = await _appCheckToken().timeout(_tokenTimeout);
+      return token == null || token.isEmpty ? null : token;
+    } catch (_) {
+      return null;
+    }
+  }
 
   Future<NotionAuthResult> _post(
     String path,
     Map<String, String> body,
-    Duration timeout,
-  ) async {
+    Duration timeout, {
+    String? appCheck,
+  }) async {
     try {
       final http.Response response = await _http
           .post(
             _base.resolve(path),
-            headers: <String, String>{'Content-Type': 'application/json'},
+            headers: <String, String>{
+              'Content-Type': 'application/json',
+              if (appCheck != null) 'X-Firebase-AppCheck': appCheck,
+            },
             body: jsonEncode(body),
           )
           .timeout(timeout);

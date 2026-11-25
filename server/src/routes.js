@@ -51,9 +51,24 @@ function callbackSuccess(session, appScheme) {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="0;url=${deepLink}"><title>Return to Zeolite</title><style>body{font-family:system-ui,sans-serif;margin:0;min-height:100vh;display:grid;place-items:center;background:#f7f7f5;color:#202020}main{text-align:center;padding:2rem}.code{font-size:clamp(2rem,10vw,4rem);font-weight:700;letter-spacing:.18em;margin:1rem 0}</style></head><body><main><h1>Connection ready</h1><div class="code">${session.pairingCode}</div><p>Type this code into Zeolite if the app did not open.</p><a href="${deepLink}">Open Zeolite</a></main></body></html>`;
 }
 
-export function createNotionRouter({ config, sessions, limit, fetchImpl }) {
+export function createNotionRouter({ config, sessions, limit, verifyAppCheck, fetchImpl }) {
   const router = Router();
   const parseBody = express.json();
+
+  // Logged, not refused, until MIN_BUILD is past the builds before 9: they send
+  // no token, and refusing them would quietly stop their sync.
+  async function attestationLogged(request, _response, next) {
+    if (verifyAppCheck) {
+      const token = request.get("X-Firebase-AppCheck");
+      if (!token) {
+        process.stderr.write("Notion refresh without App Check\n");
+      } else if (!(await verifyAppCheck(token))) {
+        process.stderr.write("Notion refresh with a failed App Check token\n");
+      }
+    }
+    next();
+  }
+
   // A browser drops a Secure cookie set over plain http, which a local server is.
   const secureCookie = new URL(config.redirectUri).protocol === "https:";
 
@@ -175,7 +190,9 @@ export function createNotionRouter({ config, sessions, limit, fetchImpl }) {
     response.status(200).json(tokenPayload);
   });
 
-  router.post("/refresh", limit("/notion/refresh", 10), parseBody, async (request, response) => {
+  const refreshAdmitted = [limit("/notion/refresh", 10), attestationLogged, parseBody];
+
+  router.post("/refresh", refreshAdmitted, async (request, response) => {
     const value = request.body?.refresh_token;
     if (typeof value !== "string" || value.trim().length === 0) {
       response.status(400).json({ error: "Invalid request." });

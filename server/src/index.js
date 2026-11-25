@@ -93,12 +93,10 @@ export function createApp({
   const sessions = createSessionStore({ now });
   const limit = createRateLimiter({ now });
   const budget = createDailyBudget({ maximum: config.dailyCalls, now });
-  const verifyAppCheck = config.vision
-    ? createAppCheckVerifier({
-        projectNumber: config.vision.projectNumber,
-        keys: appCheckKeys,
-        now,
-      })
+  // The Notion refresh checks App Check even where image reading is off.
+  const projectNumber = process.env.FIREBASE_PROJECT_NUMBER;
+  const verifyAppCheck = projectNumber
+    ? createAppCheckVerifier({ projectNumber, keys: appCheckKeys, now })
     : null;
 
   app.set("trust proxy", config.trustProxy);
@@ -132,7 +130,7 @@ export function createApp({
 
   // Each route parses its own body, after its rate limit, so a caller already
   // refused costs nothing to turn away.
-  app.use("/notion", createNotionRouter({ config, sessions, limit, fetchImpl }));
+  app.use("/notion", createNotionRouter({ config, sessions, limit, verifyAppCheck, fetchImpl }));
   app.use(
     "/timetable",
     createTimetableRouter({ config, limit, budget, verifyAppCheck, fetchImpl }),

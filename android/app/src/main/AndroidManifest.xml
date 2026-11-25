@@ -245,6 +245,17 @@
                 android:resource="@xml/widget_stats_info" />
         </receiver>
 
+        <!-- Moves the widgets to the right day when the clock or zone is set by
+             hand with the app closed. Only the system sends these. -->
+        <receiver
+            android:name=".widget.ClockChangeReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+        </receiver>
+
         <!-- Where a Today widget status button lands: draws the tap at once, then
              passes it on to the receiver below. -->
         <receiver

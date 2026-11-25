@@ -28,7 +28,13 @@ class WidgetMarkReceiver : BroadcastReceiver() {
         // The list's template is mutable, so the widget host fills this URI in
         // and could name any class on any date. Only a class the widget is
         // showing right now, with a status the app knows, goes on to Dart.
-        val tap = runCatching { tapOn(context, uri) }.getOrNull() ?: return
+        val tap = runCatching { tapOn(context, uri) }.getOrNull()
+        if (tap == null) {
+            // Most often a widget left on another day; redrawing moves it to
+            // today, so the next tap lands on a class it can mark.
+            runCatching { redrawToday(context) }
+            return
+        }
         // A double tap's second half lands before the first can be seen, above
         // all from a dead process, and would clear its mark. The window runs from
         // the tap that went through, so tapping on doesn't keep it open.
@@ -84,12 +90,18 @@ class WidgetMarkReceiver : BroadcastReceiver() {
         // the status a class already has clears it.
         val at = WidgetData.putPendingMark(context, key, if (shown == tap.status) "" else tap.status)
 
-        val manager = AppWidgetManager.getInstance(context)
-        val ids = manager.getAppWidgetIds(ComponentName(context, TodayWidgetProvider::class.java))
-        if (ids.isEmpty()) return at
-        TodayWidgetProvider().onUpdate(context, manager, ids)
+        val ids = redrawToday(context) ?: return at
         redrawWhenLapsed(context, ids, at)
         return at
+    }
+
+    /** The Today widgets' ids, or null when none is placed. */
+    private fun redrawToday(context: Context): IntArray? {
+        val manager = AppWidgetManager.getInstance(context)
+        val ids = manager.getAppWidgetIds(ComponentName(context, TodayWidgetProvider::class.java))
+        if (ids.isEmpty()) return null
+        TodayWidgetProvider().onUpdate(context, manager, ids)
+        return ids
     }
 
     /**
@@ -135,8 +147,21 @@ class WidgetMarkReceiver : BroadcastReceiver() {
             return parts[0] == key && parts[1] == status && now - at in 0 until REPEAT_WINDOW_MS
         }
 
-        /** The class as the widget drew it, or null when the payload has moved on. */
-        fun shownSession(today: JSONObject?, subject: Int, date: Int, start: Int): JSONObject? {
+        /**
+         * The class as the widget draws it [on] that day, or null when the
+         * payload has moved on. The payload holds a week, but the widget only
+         * ever shows the device's today: a button still showing another day,
+         * because the clock moved and nothing has redrawn it yet, is refused
+         * rather than marking that day's class.
+         */
+        fun shownSession(
+            today: JSONObject?,
+            subject: Int,
+            date: Int,
+            start: Int,
+            on: Int = WidgetData.todayKey(),
+        ): JSONObject? {
+            if (date != on) return null
             val days = today?.optJSONArray("days") ?: return null
             for (index in 0 until days.length()) {
                 val day = days.optJSONObject(index) ?: continue

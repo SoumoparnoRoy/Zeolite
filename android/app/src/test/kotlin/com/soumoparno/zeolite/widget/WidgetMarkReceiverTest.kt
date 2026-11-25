@@ -26,17 +26,35 @@ class WidgetMarkReceiverTest {
 
     @Test
     fun `a class the widget is showing is found`() {
-        assertEquals("present", shownSession(today, 7, 20261019, 600)?.optString("status"))
-        assertNotNull(shownSession(today, 4, 20261019, 540))
+        assertEquals("present", shownSession(today, 7, 20261019, 600, on = 20261019)?.optString("status"))
+        assertNotNull(shownSession(today, 4, 20261019, 540, on = 20261019))
     }
 
     // The widget host fills in the URI, so it can name anything.
     @Test
     fun `a class or day the widget is not showing is refused`() {
-        assertNull(shownSession(today, 4, 20261018, 540))
-        assertNull(shownSession(today, 4, 20261019, 600))
-        assertNull(shownSession(today, 99, 20261019, 540))
-        assertNull(shownSession(null, 4, 20261019, 540))
+        assertNull(shownSession(today, 4, 20261018, 540, on = 20261019))
+        assertNull(shownSession(today, 4, 20261019, 600, on = 20261019))
+        assertNull(shownSession(today, 99, 20261019, 540, on = 20261019))
+        assertNull(shownSession(null, 4, 20261019, 540, on = 20261019))
+    }
+
+    // Seen on the tablet: after the date was set back by hand, the widget kept
+    // showing Friday on a Wednesday, and its buttons would have marked Friday's
+    // classes.
+    @Test
+    fun `a class from another day of the pushed week is refused`() {
+        val now = WidgetData.todayKey()
+        val week = JSONObject(
+            """
+            {"days": [
+              {"date": $now, "classes": [{"subjectId": 4, "startMinutes": 540}]},
+              {"date": ${now + 1}, "classes": [{"subjectId": 7, "startMinutes": 600}]}
+            ]}
+            """,
+        )
+        assertNotNull(shownSession(week, 4, now, 540, on = now))
+        assertNull(shownSession(week, 7, now + 1, 600, on = now))
     }
 
     @Test

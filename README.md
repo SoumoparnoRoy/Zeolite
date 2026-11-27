@@ -15,7 +15,7 @@ before you skip a lecture.
 [![Node](https://img.shields.io/badge/Server-Node%2024-5FA04E?logo=nodedotjs&logoColor=white)](server/README.md)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
-**Status:** on Google Play, version 1.1.1.
+**Status:** on Google Play, version 1.1.2.
 [Get it on Google Play](https://play.google.com/store/apps/details?id=com.soumoparno.zeolite)
 
 </div>
@@ -199,7 +199,11 @@ record of my own before this.
   a class log that fails to read or write. Version 1.1.0 (build 7) added a help
   screen, a first-launch tour and a feedback row, and went live on 18 November.
   Version 1.1.1 (build 8) moved to Flutter 3.47.9 and went public on Google
-  Play on 24 November.
+  Play on 24 November. Version 1.1.2 (build 9) made the Today and Stats widgets
+  refresh after a manual date or time-zone change and a widget tap mark only
+  today's classes. The server began dropping the oldest unfinished Notion
+  sign-in when full, instead of turning new ones away, and logging App Check on
+  Notion token refresh.
 
 ## Challenges
 

@@ -103,7 +103,7 @@ class AppSettings {
     this.lastNotionSyncAt,
     this.syncedAccountId,
     this.syncedNotionDatabaseId,
-    this.accentColour = AccentColour.violet,
+    this.accentColour = AccentColour.teal,
     this.cancelledCountsAsAttended = false,
     this.notionAutoSync = false,
     this.accountAutoSync = false,
@@ -252,8 +252,8 @@ class AppSettings {
   /// Stored so the Settings row draws without a platform call per build.
   final String? backupFolderName;
 
-  /// Device preference, like [accentColour] — it describes this install, not
-  /// the account, so it stays out of [toJson].
+  /// Device preference, like [accentColour]: it describes this install, not
+  /// the account. Both still go into [toJson], so a backup brings them back.
   final LaunchAnimation launchAnimation;
 
   final bool onboarded;
@@ -604,6 +604,7 @@ class SettingsService {
   static const String _kSyncedAccount = 'ut.syncedAccount';
   static const String _kSyncedNotionDatabase = 'ut.syncedNotionDatabase';
   static const String _kAccentColour = 'ut.accentColour';
+  static const String _kAccentMovedToTeal = 'ut.accentMovedToTeal';
   static const String _kNotionAutoSync = 'ut.notionAutoSync';
   static const String _kAccountAutoSync = 'ut.accountAutoSync';
   static const String _kBackupFolderUri = 'ut.backupFolderUri';
@@ -666,8 +667,7 @@ class SettingsService {
       },
       syncedAccountId: await prefs.getString(_kSyncedAccount),
       syncedNotionDatabaseId: await prefs.getString(_kSyncedNotionDatabase),
-      accentColour:
-          AccentColour.fromName(await prefs.getString(_kAccentColour)),
+      accentColour: await _loadAccent(prefs),
       notionAutoSync: await prefs.getBool(_kNotionAutoSync) ?? false,
       accountAutoSync: await prefs.getBool(_kAccountAutoSync) ?? false,
       scheduleChangedAt: switch (await prefs.getInt(_kScheduleChangedAt)) {
@@ -692,6 +692,22 @@ class SettingsService {
       shareUsage: await prefs.getBool(_kShareUsage),
       sendCrashReports: await prefs.getBool(_kSendCrashReports),
     );
+  }
+
+  /// Teal replaced violet as the default in build 10, and every earlier save
+  /// wrote the accent, so a stored violet almost always means it was never
+  /// changed. It moves once; violet picked after the record is written stays.
+  /// The accent is written first, so dying in between only repeats the move.
+  Future<AccentColour> _loadAccent(SharedPreferencesAsync prefs) async {
+    String? stored = await prefs.getString(_kAccentColour);
+    if (await prefs.getBool(_kAccentMovedToTeal) != true) {
+      if (stored == AccentColour.violet.name) {
+        stored = AccentColour.teal.name;
+        await prefs.setString(_kAccentColour, stored);
+      }
+      await prefs.setBool(_kAccentMovedToTeal, true);
+    }
+    return AccentColour.fromName(stored);
   }
 
   Future<void> save(AppSettings settings) async {

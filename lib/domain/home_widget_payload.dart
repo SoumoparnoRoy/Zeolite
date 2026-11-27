@@ -213,9 +213,10 @@ class HomeWidgetPayload {
   /// the app's own theme choice — a user who runs the app dark on a light
   /// system would otherwise get a white widget beside a dark app.
   static Map<String, Object?> theme(AppSettings settings) {
-    final AppPalette p = widgetBrightness(settings) == Brightness.light
-        ? AppPalette.light
-        : AppPalette.dark;
+    final AppPalette p = (widgetBrightness(settings) == Brightness.light
+            ? AppPalette.light
+            : AppPalette.dark)
+        .withAccent(settings.accentColour);
     return <String, Object?>{
       'canvas': p.canvas.toARGB32(),
       'surface': p.surface.toARGB32(),

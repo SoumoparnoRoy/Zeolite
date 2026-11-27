@@ -122,7 +122,7 @@ class WidgetTheme(private val json: JSONObject?) {
     val surface get() = color("surface", 0xFF16161F)
     val surfaceHigh get() = color("surfaceHigh", 0xFF1E1E28)
     val outline get() = color("outline", 0xFF2C2C39)
-    val accent get() = color("accent", 0xFFA28FFF)
+    val accent get() = color("accent", 0xFF5FD8D2)
     val textPrimary get() = color("textPrimary", 0xFFF2F2F7)
     val textSecondary get() = color("textSecondary", 0xFFA3A3B2)
     val textTertiary get() = color("textTertiary", 0xFF7E7E92)

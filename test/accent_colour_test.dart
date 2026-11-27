@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 import 'package:zeolite/core/app_theme.dart';
 import 'package:zeolite/data/settings/app_settings.dart';
+import 'package:zeolite/domain/home_widget_payload.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -84,7 +86,66 @@ void main() {
   });
 
   test('an accent written by a newer build reads back as the default', () {
-    expect(AccentColour.fromName('chartreuse'), AccentColour.violet);
-    expect(AccentColour.fromName(null), AccentColour.violet);
+    expect(AccentColour.fromName('chartreuse'), AccentColour.teal);
+    expect(AccentColour.fromName(null), AccentColour.teal);
+  });
+
+  group('teal as the default', () {
+    late SharedPreferencesAsync prefs;
+
+    setUp(() {
+      SharedPreferencesAsyncPlatform.instance =
+          InMemorySharedPreferencesAsync.empty();
+      prefs = SharedPreferencesAsync();
+    });
+
+    test('a fresh install starts in teal', () async {
+      expect((await SettingsService().load()).accentColour, AccentColour.teal);
+    });
+
+    test('violet stored by an older build moves to teal', () async {
+      await prefs.setString('ut.accentColour', 'violet');
+      expect((await SettingsService().load()).accentColour, AccentColour.teal);
+    });
+
+    test('violet picked after the move stays violet across restarts', () async {
+      await prefs.setString('ut.accentColour', 'violet');
+      final SettingsService first = SettingsService();
+      await first.save(
+        (await first.load()).copyWith(accentColour: AccentColour.violet),
+      );
+
+      final SettingsService restarted = SettingsService();
+      expect((await restarted.load()).accentColour, AccentColour.violet);
+      expect((await restarted.load()).accentColour, AccentColour.violet);
+    });
+
+    test('any other stored accent is left alone', () async {
+      await prefs.setString('ut.accentColour', 'plum');
+      expect((await SettingsService().load()).accentColour, AccentColour.plum);
+    });
+
+    test('an unknown stored accent falls back to teal', () async {
+      await prefs.setString('ut.accentColour', 'chartreuse');
+      expect((await SettingsService().load()).accentColour, AccentColour.teal);
+    });
+  });
+
+  test('the home-screen widgets get the chosen accent', () {
+    const AppSettings settings = AppSettings(
+      themeMode: AppThemeMode.dark,
+      accentColour: AccentColour.plum,
+    );
+    expect(
+      HomeWidgetPayload.theme(settings)['accent'],
+      AppPalette.dark.withAccent(AccentColour.plum).accent.toARGB32(),
+    );
+  });
+
+  test("light theme's Undo uses the chosen accent's light shade", () {
+    expect(
+      AppTheme.light(AccentColour.teal).snackBarTheme.actionTextColor,
+      AppPalette.dark.withAccent(AccentColour.teal).accent,
+    );
   });
 }

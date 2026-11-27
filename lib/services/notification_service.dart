@@ -119,8 +119,10 @@ class NotificationService {
   /// Fixed when the reminder is scheduled, and the tray follows the *system*
   /// theme, so neither palette can be picked with confidence — the midpoint
   /// of the two reads on a white tray and on a dark one.
-  static final Color _trayAccent =
-      AppPalette.light.lerp(AppPalette.dark, 0.5).accent;
+  static Color _trayAccent(AccentColour accent) => AppPalette.light
+      .withAccent(accent)
+      .lerp(AppPalette.dark.withAccent(accent), 0.5)
+      .accent;
 
   // The three channel ids keep their pre-Zeolite names for the same reason the
   // database file does — an id is how Android finds an existing channel, and a
@@ -642,7 +644,7 @@ class NotificationService {
           priority: Priority.high,
           category: AndroidNotificationCategory.reminder,
           groupKey: _classGroupKey,
-          color: _trayAccent,
+          color: _trayAccent(settings.accentColour),
           // In the header rather than the title: it dates the notification
           // rather than describing the class.
           subText: 'Just ended',

@@ -12,7 +12,8 @@
     <!-- What a widget draws before its first update, and what the launcher's
          widget picker renders as a preview: the runtime colours come from the
          app's own palette and are pushed in onUpdate, which never runs for a
-         preview. These are AppPalette.light, with values-night carrying dark.
+         preview. These are AppPalette.light with the default (teal) accent,
+         and values-night carries dark.
          A preview cannot read the app's theme setting, so it follows the
          system's — right whenever the two agree, which is the usual case. -->
     <color name="widget_canvas">#F3F4FB</color>
@@ -20,7 +21,7 @@
     <color name="widget_text_primary">#14141B</color>
     <color name="widget_text_secondary">#5A5A6E</color>
     <color name="widget_text_tertiary">#8B8B9E</color>
-    <color name="widget_accent">#6C4CF0</color>
+    <color name="widget_accent">#0C7874</color>
     <color name="widget_present">#12A05F</color>
     <color name="widget_absent">#C0504E</color>
     <color name="widget_cancelled">#8F7210</color>

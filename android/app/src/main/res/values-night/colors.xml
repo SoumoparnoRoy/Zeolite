@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- AppPalette.dark. See values/colors.xml for why a preview follows the
+<!-- AppPalette.dark with the default (teal) accent. See values/colors.xml for why a preview follows the
      system's theme rather than the app's. -->
 <resources>
     <color name="widget_canvas">#0B0B11</color>
@@ -7,7 +7,7 @@
     <color name="widget_text_primary">#F2F2F7</color>
     <color name="widget_text_secondary">#A3A3B2</color>
     <color name="widget_text_tertiary">#7E7E92</color>
-    <color name="widget_accent">#A28FFF</color>
+    <color name="widget_accent">#5FD8D2</color>
     <color name="widget_present">#3DD68C</color>
     <color name="widget_absent">#E87C7C</color>
     <color name="widget_cancelled">#E3C34A</color>

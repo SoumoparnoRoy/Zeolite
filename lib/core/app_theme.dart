@@ -26,7 +26,7 @@ enum AccentColour {
     for (final AccentColour accent in AccentColour.values) {
       if (accent.name == value) return accent;
     }
-    return AccentColour.violet;
+    return AccentColour.teal;
   }
 }
 
@@ -114,7 +114,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
   final Color accentSoft;
   final Color cyan;
 
-  /// The violet block that bleeds from the top of every screen. Three stops
+  /// The accent block that bleeds from the top of every screen. Three stops
   /// rather than two: the tall Today header needs the extra depth at the
   /// bottom, and the shorter headers simply stop before reaching it.
   final Color gradientTop;
@@ -149,7 +149,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
         stops: const <double>[0, 0.62, 1],
       );
 
-  /// The same violet as a compact fill for buttons and the FAB, where the
+  /// The same gradient as a compact fill for buttons and the FAB, where the
   /// three-stop version has no room to develop.
   LinearGradient get accentGradient => LinearGradient(
         begin: Alignment.topLeft,
@@ -233,9 +233,8 @@ class AppPalette extends ThemeExtension<AppPalette> {
     warning: Color(0xFFB57516),
   );
 
-  /// Violet repeats what [dark] and [light] already hold, so the default
-  /// tint is the one the app shipped with and nothing moves for anybody who
-  /// never opens the picker.
+  /// Violet repeats what [dark] and [light] already hold: the base palettes
+  /// are the tint the app first shipped with, before teal became the default.
   static const Map<AccentColour, _AccentSet> _darkAccents =
       <AccentColour, _AccentSet>{
     AccentColour.violet: _AccentSet(
@@ -739,14 +738,14 @@ class AppTheme {
   }
 
   static ThemeData dark([AccentColour accent = AccentColour.violet]) =>
-      _build(AppPalette.dark.withAccent(accent));
+      _build(AppPalette.dark.withAccent(accent), accent);
 
   static ThemeData light([AccentColour accent = AccentColour.violet]) =>
-      _build(AppPalette.light.withAccent(accent));
+      _build(AppPalette.light.withAccent(accent), accent);
 
   /// One builder for both themes. Everything below reads from [p], so a colour
   /// can never be right in one theme and hard-coded wrong in the other.
-  static ThemeData _build(AppPalette p) {
+  static ThemeData _build(AppPalette p, AccentColour accent) {
     final bool isDark = p.isDark;
 
     final ColorScheme scheme = ColorScheme(
@@ -954,16 +953,17 @@ class AppTheme {
           fontFamily: AppFonts.sans,
           color: isDark ? p.textPrimary : Colors.white,
         ),
-        // The chip is dark in both themes, so Undo takes the light violet even
-        // in light — the light palette's accent is far too dark against it.
-        actionTextColor: isDark ? p.accent : const Color(0xFFA28FFF),
+        // The chip is dark in both themes, so Undo takes the accent's dark-theme
+        // shade even in light; the light shade is far too dark against it.
+        actionTextColor:
+            isDark ? p.accent : AppPalette.dark.withAccent(accent).accent,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
         ),
       ),
       // A range's in-between band defaults to secondaryContainer, so the two
-      // ends come out violet and everything between them mint.
+      // ends come out in the accent and everything between them mint.
       datePickerTheme: DatePickerThemeData(
         backgroundColor: p.surface,
         rangeSelectionBackgroundColor: p.accentSoft,
@@ -971,8 +971,8 @@ class AppTheme {
       // The picker opens on its keyboard, so the hour and minute are fields
       // and have to look like fields: on a white dialog the Material default
       // fill is a shade the eye cannot find, which leaves two bare numbers and
-      // their labels floating. The day period is the app's violet rather than
-      // the scheme's tertiary, which lands on teal here.
+      // their labels floating. The day period is the app's accent rather than
+      // the scheme's tertiary, which isn't set here and so ignores the accent.
       timePickerTheme: TimePickerThemeData(
         backgroundColor: p.surface,
         hourMinuteColor: WidgetStateColor.resolveWith(

@@ -41,7 +41,7 @@ class ZeoliteApp extends ConsumerWidget {
     // app follows the system, which is also what a fresh install settles on.
     final AppSettings? settings = ref.watch(settingsProvider).value;
     final AppThemeMode mode = settings?.themeMode ?? AppThemeMode.system;
-    final AccentColour accent = settings?.accentColour ?? AccentColour.violet;
+    final AccentColour accent = settings?.accentColour ?? AccentColour.teal;
 
     // Watched for their lifetime rather than their value; see the providers.
     // App Check first, so a sync started at launch carries its token.
@@ -108,7 +108,7 @@ class _BootstrapState extends ConsumerState<_Bootstrap> {
 
     return settings.when(
       // The sequence draws in the chosen accent, so it waits for the stored
-      // choice rather than starting violet and changing colour part way.
+      // choice rather than starting teal and changing colour part way.
       loading: () => ColoredBox(color: context.palette.canvas),
       // Reported where the load fails, in SettingsController, not from here:
       // build runs again on every frame the error stays up.
